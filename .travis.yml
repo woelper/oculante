@@ -5,15 +5,14 @@ cache: cargo
 script:
   - cargo build --release
   - ls $TRAVIS_BUILD_DIR/target/release/
-  #- cp $TRAVIS_BUILD_DIR/target/release/oc* .
+  - git config --local user.name "Johann Woelper"
+  - git config --local user.email "woelper@gmail.com"
+  - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
 os:
   - linux
   - osx
   - windows
 before_deploy:
-  - git config --local user.name "Johann Woelper"
-  - git config --local user.email "woelper@gmail.com"
-  - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
   - cd $TRAVIS_BUILD_DIR
 deploy:
   provider: releases
