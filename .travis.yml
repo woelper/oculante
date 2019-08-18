@@ -1,13 +1,19 @@
 language: rust
 rust:
-  - nightly-2019-06-24
+- nightly-2019-06-24
 cache: cargo
 script:
-  - cargo build --release
-  - ls $TRAVIS_BUILD_DIR/target/release/
+- cargo build --release
+- ls $TRAVIS_BUILD_DIR/target/release/
 before_deploy:
-  # Set up git user name and tag this commit
-  - git config --local user.name "Johann Woelper"
-  - git config --local user.email "woelper@gmail.com"
-  #- export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')}
-  - git tag $TRAVIS_OS_NAME$(date +'%Y%m%d%H%M%S')
+- git config --local user.name "Johann Woelper"
+- git config --local user.email "woelper@gmail.com"
+- git tag $TRAVIS_OS_NAME$(date +'%Y%m%d%H%M%S')
+deploy:
+  provider: releases
+  on:
+    repo: woelper/oculante
+  skip_cleanup: true
+  file: $TRAVIS_BUILD_DIR/target/release/oculante
+  key:
+    secure: NTxkFPR4gWYJn1ZKeB+hpemF59+v/PVhdEogN+P8UulOeMbhKmxnsffIgSmIY3km+2QA8/NeWyxgn2dW1u8ZkIXpMf84RhJis0zxeKTI2nRQSXvtt2h6RmewHyZJa2MEbCt2VBhcK16AtIl1AcbHCQZ2pzsxK4zT5X7YEG2Logp6n4AGIhMXN3Hqk2z9UAZ+V9yOnH+I73zBQt2FUtMFT0alLoleAF1UrT8cuD3cnH8Wn39aEzmKlCtfJXfJOpWPa8FRyojvHcF1gKn1KnGGOADkblvLOyfqBpviDkDkE5wK/yHg+Q9VIQLv4Ls1ulSSWCtczOX4GPtWVlIVXJJQF4qDtNCeeh2v0rO72/WvwBh0yTsRdUu1G0qVC9I1YdUAcyD5ydNGzxc4RxxjP+dNxCdyjhQU+tvkQpJM2+N2iocOrn4/D5bKg2mZMYQLIVHJky8aqUmvxiZ8Mwxxmb0nuhOxFnJPiluTVP79D94tDK+TmqgM9nU+io9jHdGZN+H26IwOPaKGzUAJbU2OU+3GXoIF3DKu5PI5V0Fz6AjXSsVjcjP8hoISM7LUtFGg5gtdQo4pZXT/MkeeaUREB/g2kMjSrfx29vTFE7L7z5Rdek1hZJplApdpPHStMTy2NUi+50unXMi1zwGgf/q2iRoAYQsUQEoqrgsP0e41j1HYycs=
