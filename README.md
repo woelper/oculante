@@ -23,3 +23,5 @@ Platform support:
 
 Planned:
 - Display unpremultiplied images correctly
+
+[![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
