@@ -1,0 +1,10 @@
+[package]
+name = "oculante"
+version = "0.1.1"
+authors = ["Johann Woelper <woelper@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+piston_window = "*"
+clap = "*"
+#image = "*"
