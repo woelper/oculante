@@ -11,15 +11,3 @@ before_deploy:
   - git config --local user.email "woelper@gmail.com"
   #- export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')}
   - git tag $TRAVIS_OS_NAME$(date +'%Y%m%d%H%M%S')
-
-
-  deploy:
-  provider: releases
-  overwrite: true
-  api_key:
-    secure: sHVmtftpuFuak5+COdiNOZIFo/DIP8lhgEJR9NBK4Na9L+0GZDBm/TcgPRBKD6nbUUS+6MGUT/Y7mOUJpxK8EI+KAWii6E4OXqlKxQcXn7r378TE4im48YAeRf8vT91vZWVKyZqAGHk/HWNVqA03OlWcr3jQ1CuHYVc8gxnV/uu5kn+Iy3Jgfl2gkoOSYub8I4+V1EmZAbbmFL1F+uTPnJsczq+Ufufl/MDiccGvwoOij20quajusYg3CrxSL0sf+bcXkeKgwE/QDhXYafIVRmu6eh3PA9PWgMnqAY5rwFHPpIl3C7TtXqQz5oiof9kAGbCNZl9yZS/bWTaNLQ/Vfxy2cMYT58BVvKpr/eVXatcOLwv0CM/P7ONQ47NZolIJf8cDHEYy3Plp0YGgBLO8HiO8usNlt1q4Y/BwCEMyaZUJ2Y6ainMXM+tyl+IlfMX/Tydk5lDuEiD+zhWiCAGYopomPfU/DtNHvQkL/daTnCn4GsSwR3dXSM8ollxxrTCmp3AbvA/mcu6DkLhGjU8P1oy+8bNxNfpwuHApWUvRoQyRT3I25IqrnmT4vHmnJYWiRLeKlZu3TbuEoYuyF21HHcZuvYNcgs8cvQSaNKE8H2TA6bTQl0T6ffKSXjXk3p2uCEAEkqmMgn9htvlYIAuFP1Xkx6nEP5qjwR5wpgmKTfA=
-  skip_cleanup: true
-  file: $TRAVIS_BUILD_DIR/target/release/oculante
-  on:
-    repo: woelper/oculante
-    #tags: true
