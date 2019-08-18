@@ -4,7 +4,7 @@
 // use crate::img::GenericImageView;
 // extern crate piston_window;
 use clap;
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 use piston_window::*;
 // use opengl_graphics::{ GlGraphics, OpenGL };
 // use graphics::{ Context, Graphics };
