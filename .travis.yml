@@ -1,29 +1,28 @@
 language: rust
 rust:
-- nightly-2019-06-24
+  - nightly-2019-06-24
 cache: cargo
 script:
-- cargo build --release
-- ls $TRAVIS_BUILD_DIR/target/release/
-#- cp $TRAVIS_BUILD_DIR/target/release/oc* .
+  - cargo build --release
+  - ls $TRAVIS_BUILD_DIR/target/release/
+  #- cp $TRAVIS_BUILD_DIR/target/release/oc* .
 os:
   - linux
   - osx
   - windows
 before_deploy:
-- git config --local user.name "Johann Woelper"
-- git config --local user.email "woelper@gmail.com"
-- git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
-- cd $TRAVIS_BUILD_DIR
+  - git config --local user.name "Johann Woelper"
+  - git config --local user.email "woelper@gmail.com"
+  - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
+  - cd $TRAVIS_BUILD_DIR
 deploy:
   provider: releases
   skip_cleanup: true
   file_glob: true
-  api_key:
-    secure: T4bKfoDJhSysxOjlr7JGQqYz89OKRD59xdfKqr7FCYWVLySOpeSTO2FRbvCmRW/U589VhKqxT+mkMOI0Sr33N0JBq3CNxY5QXzsh/G5+AqfPBG+smSE9xQI2OweX68J/ykag8AxuVc4skR318okIvE0t9OaFMidYkU8gs8XkU97yc3cOoIeuDeDMQrIIhNkuA2yZLik1znCFJHktn28TKjH7VjdWB0Qhs0v0/2JsSYkqLIjgeiOqCnPjOIlTPNS+GIsVnfk4ItVjPK/f8VU7IVRZ8evmUk7+It+DkJKJIpp6LwQ7U8Ltfr/ReMpRihl5zKrexUzqjesqFw7efh8JuN9VmwRH3p05onzljpN1IcQCRRGLHQ63rRKeWt9A7sHLO7G4V1dWMCK0U3TlM9RfZe0zP70sBTSj3I0QNSBrEoRIqUi7oYmeH0bWysPmDxSkB53jXfP+raTjjpnowgfmD0pVIT53SB76IQVL305VO1HKmxSRC4ztNNBYLY3blQtls5CZamJyNJ58YpkhJBMryMnve5FX2etyrvUMSN3fuw7/hPqof4VDj6zD0Ilc1U2l+E5l8SgCJTNzvx2ExHbeEop8sx0OB/+fi7RsVAeLlqWmZwzT1bp5OXDRkezFGaObsetGcApMZr80xA5fyKXnngCDhyQDAzNmfIhy8B45X3A=
   file:
-    # - rust.png
     - target/release/oculante
     - target/release/oculante.exe
-  on:
-    repo: woelper/oculante
+  api_key:
+    secure: T4bKfoDJhSysxOjlr7JGQqYz89OKRD59xdfKqr7FCYWVLySOpeSTO2FRbvCmRW/U589VhKqxT+mkMOI0Sr33N0JBq3CNxY5QXzsh/G5+AqfPBG+smSE9xQI2OweX68J/ykag8AxuVc4skR318okIvE0t9OaFMidYkU8gs8XkU97yc3cOoIeuDeDMQrIIhNkuA2yZLik1znCFJHktn28TKjH7VjdWB0Qhs0v0/2JsSYkqLIjgeiOqCnPjOIlTPNS+GIsVnfk4ItVjPK/f8VU7IVRZ8evmUk7+It+DkJKJIpp6LwQ7U8Ltfr/ReMpRihl5zKrexUzqjesqFw7efh8JuN9VmwRH3p05onzljpN1IcQCRRGLHQ63rRKeWt9A7sHLO7G4V1dWMCK0U3TlM9RfZe0zP70sBTSj3I0QNSBrEoRIqUi7oYmeH0bWysPmDxSkB53jXfP+raTjjpnowgfmD0pVIT53SB76IQVL305VO1HKmxSRC4ztNNBYLY3blQtls5CZamJyNJ58YpkhJBMryMnve5FX2etyrvUMSN3fuw7/hPqof4VDj6zD0Ilc1U2l+E5l8SgCJTNzvx2ExHbeEop8sx0OB/+fi7RsVAeLlqWmZwzT1bp5OXDRkezFGaObsetGcApMZr80xA5fyKXnngCDhyQDAzNmfIhy8B45X3A=
+  # on:
+  #   repo: woelper/oculante
