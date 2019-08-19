@@ -19,7 +19,7 @@ deploy:
   provider: releases
   skip_cleanup: true
   file_glob: true
-  draft: true
+  # draft: true
   overwrite: true
   name: $TRAVIS_OS_NAME
   file:
