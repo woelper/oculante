@@ -7,7 +7,8 @@ script:
   - ls $TRAVIS_BUILD_DIR/target/release/
   - git config --local user.name "Johann Woelper"
   - git config --local user.email "woelper@gmail.com"
-  - export TRAVIS_TAG="latest"
+  # - export TRAVIS_TAG="latest"
+  - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
   # - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
 os:
   - linux
@@ -15,6 +16,7 @@ os:
   - windows
 before_deploy:
   - cd $TRAVIS_BUILD_DIR
+  - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
 deploy:
   provider: releases
   skip_cleanup: true
