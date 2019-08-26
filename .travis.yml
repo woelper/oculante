@@ -16,6 +16,7 @@ os:
   - windows
 before_deploy:
   - cd $TRAVIS_BUILD_DIR
+  #- mv target/release/oculante target/release/oculante.$TRAVIS_OS_NAME
   - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
 deploy:
   provider: releases

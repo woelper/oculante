@@ -45,6 +45,7 @@ fn main() {
             
             window.set_lazy(true);
             let mut offset = (100.0,0.0);
+            let mut cursor = (100.0,0.0);
             let mut scale = 1.0;
             let mut drag = false;
             //let mut events = Events::new(EventSettings::new().lazy(true));
@@ -64,12 +65,27 @@ fn main() {
                     if key == Key::R {reset = true;}
                     println!("Pressed keyboard key '{:?}'", key);
                 };
+                if let Some(Button::Keyboard(key)) = e.press_args() {
+                    if key == Key::NumPadPlus {
+                        scale += 0.1;
+
+                        }
+                };
 
                 e.mouse_scroll(|d| {
                     if d[1] > 0.0 {
-                        scale += 0.2;
+                        scale += 0.1;
+
+                        // offset.0 += cursor.0;
+                        // offset.1 += cursor.1;
+                        let mut delta = (0.0,0.0);
+                        delta.0 = offset.0 - cursor.0;// * (1.0 / scale);
+                        println!("offset {:?} / cursor {:?} / delta {:?}", offset.0, cursor.0, delta.0);
+                        // offset.0 -= delta.0 * (1.0/scale);
+                        offset.0 = offset.0 - offset.0* (1.0 / scale);
+                        // offset.1 = cursor.1 - 100.0*scale;
                     } else {
-                        scale -= 0.2;
+                        scale -= 0.1;
                         if scale < 0.1 {scale = 0.1;}
                     }
                 });
@@ -79,6 +95,13 @@ fn main() {
                         offset.1 += d[1];
                     }
                 });
+
+                e.mouse_cursor(|d| {
+                    cursor.0 = d[0];
+                    cursor.1 = d[1];
+                });
+
+
                 // e.resize(|args| {
                 //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
                 // });
@@ -90,8 +113,7 @@ fn main() {
                         scale = 1.0;
                         reset = false;
                     }
-                    let transform = c.transform.trans(offset.0, offset.1).scale(scale, scale);
-
+                    let transform = c.transform.trans(offset.0, offset.1).zoom(scale);
                     image(&texture, transform, gfx);
                 
 
