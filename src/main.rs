@@ -1,13 +1,13 @@
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
-// extern crate image as img;
-// use crate::img::GenericImageView;
-// extern crate piston_window;
+
 use clap;
 use clap::{App, Arg};
 use piston_window::*;
-// use opengl_graphics::{ GlGraphics, OpenGL };
-// use graphics::{ Context, Graphics };
+use nalgebra::Vector2;
+
+
+
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
@@ -44,70 +44,59 @@ fn main() {
         Ok(texture) => {
             
             window.set_lazy(true);
-            let mut offset = (100.0,0.0);
-            let mut cursor = (0.0,0.0);
+            let mut offset =  Vector2::new(0.0, 0.0);
+            let mut cursor = Vector2::new(0.0, 0.0);
             let mut scale = 1.0;
             let mut drag = false;
-            let scale_increment = 0.1;
-            //let mut events = Events::new(EventSettings::new().lazy(true));
+            let scale_increment = 0.2;
             let mut reset = false;
             let dimensions = texture.get_size();
 
             let mut glyphs = Glyphs::from_bytes(font, window.create_texture_context(), TextureSettings::new()).unwrap();
 
-
+            fn scale_pt(origin: Vector2<f64>, pt: Vector2<f64>, scale: f64, scale_inc: f64) -> Vector2<f64> {
+                ((pt-origin)*scale_inc)/scale
+            }
   
+
+
             while let Some(e) = window.next() {
                 
-                if let Some(Button::Mouse(_)) = e.press_args() {drag = true;}
+                if let Some(Button::Mouse(_)) = e.press_args() {
+                    drag = true;
+                    // println!("Cursor {:?} OFFSET {:?}", cursor, scale_pt(offset, cursor, scale, scale_increment));
+                }
                 if let Some(Button::Mouse(_)) = e.release_args() {drag = false;}
 
                 if let Some(Button::Keyboard(key)) = e.press_args() {
                     if key == Key::R {reset = true;}
-                    println!("Pressed keyboard key '{:?}'", key);
                 };
-                if let Some(Button::Keyboard(key)) = e.press_args() {
-                    if key == Key::NumPadPlus {
-                        scale += scale_increment;
-                        let in_image = (cursor.0 - offset.0, cursor.1 - offset.1);
-                        let comp = (in_image.0*(scale+scale_increment) - in_image.0*scale, in_image.1*(scale+scale_increment) - in_image.1*scale);
-                        println!("in img{:?} comp{:?}", in_image, comp);
-                        // offset.0 -= comp.0/2.0;
-                        // offset.1 -= comp.1/2.0;
-                        offset.0 = offset.0 - offset.0*scale_increment/2.0;
-                        // offset.1 -= comp.1/2.0;
-
-
-                        }
-                };
+                // if let Some(Button::Keyboard(key)) = e.press_args() {
+                //     if key == Key::P {
+                //         offset -= scale_pt(offset, cursor, scale, scale_increment);
+                //         scale += scale_increment;
+                //         }
+                // };
 
                 e.mouse_scroll(|d| {
                     if d[1] > 0.0 {
+                        offset -= scale_pt(offset, cursor, scale, scale_increment);
                         scale += scale_increment;
-
-                        // offset.0 += cursor.0;
-                        // offset.1 += cursor.1;
-                        let mut delta = (0.0,0.0);
-                        delta.0 = offset.0 - cursor.0;// * (1.0 / scale);
-                        println!("offset {:?} / cursor {:?} / delta {:?}", offset.0, cursor.0, delta.0);
-                        // offset.0 -= delta.0 * (1.0/scale);
-                        offset.0 = offset.0 - offset.0* (1.0 / scale);
-                        // offset.1 = cursor.1 - 100.0*scale;
                     } else {
-                        scale -= scale_increment;
-                        if scale < scale_increment {scale = scale_increment;}
+                        if scale > scale_increment {
+                            offset += scale_pt(offset, cursor, scale, scale_increment);
+                            scale -= scale_increment;
+                        }
                     }
                 });
                 e.mouse_relative(|d| {
                     if drag {
-                        offset.0 += d[0];
-                        offset.1 += d[1];
+                        offset += Vector2::new(d[0], d[1]);
                     }
                 });
 
                 e.mouse_cursor(|d| {
-                    cursor.0 = d[0];
-                    cursor.1 = d[1];
+                    cursor = Vector2::new(d[0], d[1]);
                 });
 
 
@@ -118,23 +107,23 @@ fn main() {
                 window.draw_2d(&e, |c, gfx, device| {
                     clear([0.2; 4], gfx);
                     if reset {
-                        offset = (0.0,0.0);
+                        offset = Vector2::new(0.0, 0.0);
                         scale = 1.0;
                         reset = false;
                     }
-                    let transform = c.transform.trans(offset.0, offset.1).zoom(scale);
+                    let transform = c.transform.trans(offset.x as f64, offset.y as f64).zoom(scale);
                     image(&texture, transform, gfx);
                 
 
-                    text::Text::new_color([0.8, 0.8, 0.8, 0.7], 16).draw(
+                    text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16).draw(
                         &format!("{} {}X{}", img_path, dimensions.0, dimensions.1),
                         &mut glyphs,
                         &c.draw_state,
                         c.transform.trans(10.0, 20.0), gfx
                     ).unwrap();
 
-                    text::Text::new_color([0.8, 0.8, 0.8, 0.7], 16).draw(
-                        &format!("x offset {} scale {}", offset.0, scale),
+                    text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16).draw(
+                        &format!("Scale {}", (scale * 10.0).round()/10.0),
                         &mut glyphs,
                         &c.draw_state,
                         c.transform.trans(10.0, 50.0), gfx
