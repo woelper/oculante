@@ -45,9 +45,10 @@ fn main() {
             
             window.set_lazy(true);
             let mut offset = (100.0,0.0);
-            let mut cursor = (100.0,0.0);
+            let mut cursor = (0.0,0.0);
             let mut scale = 1.0;
             let mut drag = false;
+            let scale_increment = 0.1;
             //let mut events = Events::new(EventSettings::new().lazy(true));
             let mut reset = false;
             let dimensions = texture.get_size();
@@ -67,14 +68,22 @@ fn main() {
                 };
                 if let Some(Button::Keyboard(key)) = e.press_args() {
                     if key == Key::NumPadPlus {
-                        scale += 0.1;
+                        scale += scale_increment;
+                        let in_image = (cursor.0 - offset.0, cursor.1 - offset.1);
+                        let comp = (in_image.0*(scale+scale_increment) - in_image.0*scale, in_image.1*(scale+scale_increment) - in_image.1*scale);
+                        println!("in img{:?} comp{:?}", in_image, comp);
+                        // offset.0 -= comp.0/2.0;
+                        // offset.1 -= comp.1/2.0;
+                        offset.0 = offset.0 - offset.0*scale_increment/2.0;
+                        // offset.1 -= comp.1/2.0;
+
 
                         }
                 };
 
                 e.mouse_scroll(|d| {
                     if d[1] > 0.0 {
-                        scale += 0.1;
+                        scale += scale_increment;
 
                         // offset.0 += cursor.0;
                         // offset.1 += cursor.1;
@@ -85,8 +94,8 @@ fn main() {
                         offset.0 = offset.0 - offset.0* (1.0 / scale);
                         // offset.1 = cursor.1 - 100.0*scale;
                     } else {
-                        scale -= 0.1;
-                        if scale < 0.1 {scale = 0.1;}
+                        scale -= scale_increment;
+                        if scale < scale_increment {scale = scale_increment;}
                     }
                 });
                 e.mouse_relative(|d| {
@@ -123,6 +132,14 @@ fn main() {
                         &c.draw_state,
                         c.transform.trans(10.0, 20.0), gfx
                     ).unwrap();
+
+                    text::Text::new_color([0.8, 0.8, 0.8, 0.7], 16).draw(
+                        &format!("x offset {} scale {}", offset.0, scale),
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform.trans(10.0, 50.0), gfx
+                    ).unwrap();
+
                     glyphs.factory.encoder.flush(device);
 
                 });
