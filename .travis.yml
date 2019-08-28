@@ -8,7 +8,7 @@ script:
   - git config --local user.name "Johann Woelper"
   - git config --local user.email "woelper@gmail.com"
   # - export TRAVIS_TAG="latest"
-  # - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
+  - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
   # - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
 os:
   - linux
