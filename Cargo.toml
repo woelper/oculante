@@ -7,5 +7,6 @@ edition = "2018"
 [dependencies]
 piston_window = "*"
 clap = "*"
-#image = "*"
+image = "*"
 nalgebra = "*"
+
