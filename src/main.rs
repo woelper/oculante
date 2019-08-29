@@ -1,8 +1,10 @@
 //#![windows_subsystem = "windows"]
 
+mod utils;
 use clap;
 use clap::{App, Arg};
-use nalgebra::{Vector2, clamp};
+use nalgebra::Vector2;
+
 use piston_window::*;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -10,12 +12,10 @@ use std::thread;
 extern crate image;
 use crate::image::GenericImageView;
 use crate::image::Pixel;
-
-//https://docs.piston.rs/piston_window/image/trait.GenericImageView.html#tymethod.get_pixel
+use utils::{scale_pt, pos_from_coord};
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
-    let font_bold = include_bytes!("FiraSans-Bold.ttf");
     let matches = App::new("Oculante")
         .arg(
             Arg::with_name("INPUT")
@@ -64,22 +64,7 @@ fn main() {
     )
     .unwrap();
 
-    fn scale_pt(
-        origin: Vector2<f64>,
-        pt: Vector2<f64>,
-        scale: f64,
-        scale_inc: f64,
-    ) -> Vector2<f64> {
-        ((pt - origin) * scale_inc) / scale
-    }
-
-    fn pos_from_coord(origin: Vector2<f64>, pt: Vector2<f64>, bounds: Vector2<f64>, scale: f64) -> Vector2<f64> {
-        let mut size = (pt - origin) / scale;
-        size.x = clamp(size.x, 0.0, bounds.x-1.0);
-        size.y = clamp(size.y, 0.0, bounds.y-1.0);
-        size
-
-    }
+ 
 
     let i = img_path.clone();
 
@@ -150,8 +135,6 @@ fn main() {
                 &tx_settings,
             );
             current_image = img;
-
-            window.next();
         }
 
         window.draw_2d(&e, |c, gfx, device| {
@@ -172,19 +155,26 @@ fn main() {
             }
 
 
+            let info = format!("{} {}X{} R{} G{} B{} A{} @{}X", img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0);
 
-            text::Text::new_color([0.0, 0.0, 0.0, 2.0], 18)
-                .draw(
-                    &format!("{} {}X{}", img_path, dimensions.0, dimensions.1),
-                    &mut glyphs,
-                    &c.draw_state,
-                    c.transform.trans(13.0, 23.0),
-                    gfx,
-                )
-                .unwrap();
+            // Draw text three times to simulate outline
+
+            for i in vec![(-2,-2), (-2,-0), (0,-2), (2,2), (2,0)] {
+
+                text::Text::new_color([0.0, 0.0, 0.0, 1.0], 18)
+                    .draw(
+                        &info,
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform.trans(10.0 + i.0 as f64, 20.0 + i.1 as f64),
+                        gfx,
+                    )
+                    .unwrap();
+
+            }
             text::Text::new_color([1.0, 1.0, 1.0, 0.7], 18)
                 .draw(
-                    &format!("{} {}X{} R{} G{} B{} A{} @{}X", img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0),
+                    &info,
                     &mut glyphs,
                     &c.draw_state,
                     c.transform.trans(10.0, 20.0),
@@ -192,19 +182,7 @@ fn main() {
                 )
                 .unwrap();
 
-
-
             glyphs.factory.encoder.flush(device);
-
-            // text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16)
-            //     .draw(
-            //         &format!("R{} G{} B{} A{} @{}X", current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0),
-            //         &mut glyphs,
-            //         &c.draw_state,
-            //         c.transform.trans(10.0, 50.0),
-            //         gfx,
-            //     )
-            //     .unwrap();
 
         });
     }

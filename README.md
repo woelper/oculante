@@ -21,6 +21,10 @@ Platform support:
 - Mac
 - Windows
 
+Threaded image loading
+
+
+
 Planned:
 - Display unpremultiplied images correctly
 
