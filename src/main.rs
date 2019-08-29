@@ -15,6 +15,7 @@ use crate::image::Pixel;
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
+    let font_bold = include_bytes!("FiraSans-Bold.ttf");
     let matches = App::new("Oculante")
         .arg(
             Arg::with_name("INPUT")
@@ -170,9 +171,20 @@ fn main() {
                 dimensions = tex.get_size();
             }
 
-            text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16)
+
+
+            text::Text::new_color([0.0, 0.0, 0.0, 2.0], 18)
                 .draw(
                     &format!("{} {}X{}", img_path, dimensions.0, dimensions.1),
+                    &mut glyphs,
+                    &c.draw_state,
+                    c.transform.trans(13.0, 23.0),
+                    gfx,
+                )
+                .unwrap();
+            text::Text::new_color([1.0, 1.0, 1.0, 0.7], 18)
+                .draw(
+                    &format!("{} {}X{} R{} G{} B{} A{} @{}X", img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0),
                     &mut glyphs,
                     &c.draw_state,
                     c.transform.trans(10.0, 20.0),
@@ -180,17 +192,20 @@ fn main() {
                 )
                 .unwrap();
 
-            text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16)
-                .draw(
-                    &format!("R{} G{} B{} A{} @{}X", current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0),
-                    &mut glyphs,
-                    &c.draw_state,
-                    c.transform.trans(10.0, 50.0),
-                    gfx,
-                )
-                .unwrap();
+
 
             glyphs.factory.encoder.flush(device);
+
+            // text::Text::new_color([0.8, 0.5, 0.8, 0.7], 16)
+            //     .draw(
+            //         &format!("R{} G{} B{} A{} @{}X", current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0),
+            //         &mut glyphs,
+            //         &c.draw_state,
+            //         c.transform.trans(10.0, 50.0),
+            //         gfx,
+            //     )
+            //     .unwrap();
+
         });
     }
 }
