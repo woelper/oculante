@@ -9,4 +9,5 @@ piston_window = "*"
 clap = "*"
 image = "*"
 nalgebra = "*"
-
+dds-rs = "0.7.0"
+rgb = "*"

@@ -6,7 +6,7 @@ I started this as a toy project to make a simple image viewer. Here are the feat
 Image format support:
 - bmp	
 - dxt	
-- gif	
+- gif (No animation support)	
 - hdr	
 - ico	
 - jpeg	
@@ -15,17 +15,20 @@ Image format support:
 - tga	
 - tiff	
 - webp	
+- DDS (DXT1-5, via dds-rs)
 
 Platform support:
 - Linux
 - Mac
 - Windows
 
-Threaded image loading
-
-
+Misc
+- Threaded image loading
 
 Planned:
-- Display unpremultiplied images correctly
-
+- Custom display for images with unassociated channels
+- Image rotation (and read EXIF for that)
+- Investigate PVR / ETC support
+- SVG support
+- Brighness/gamma adjust for HDR
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)

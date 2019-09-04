@@ -10,9 +10,15 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 extern crate image;
-use crate::image::GenericImageView;
+
 use crate::image::Pixel;
 use utils::{scale_pt, pos_from_coord};
+use std::io::BufReader;
+use std::fs::File;
+use std::path::{PathBuf};
+use dds::DDS;
+use rgb::*;
+
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
@@ -36,8 +42,8 @@ fn main() {
         .unwrap();
 
     let (texture_sender, texture_receiver): (
-        Sender<image::DynamicImage>,
-        Receiver<image::DynamicImage>,
+        Sender<image::RgbaImage>,
+        Receiver<image::RgbaImage>,
     ) = mpsc::channel();
 
     let mut tx_settings = TextureSettings::new();
@@ -52,7 +58,7 @@ fn main() {
     let scale_increment = 0.2;
     let mut reset = false;
     let mut dimensions = (0, 0);
-    let mut current_image = image::DynamicImage::new_rgba8(1, 1);
+    let mut current_image = image::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
     let mut current_color = (0, 0, 0, 0);
 
     let mut texture = Texture::empty(&mut window.create_texture_context());
@@ -66,12 +72,40 @@ fn main() {
 
  
 
-    let i = img_path.clone();
 
-    thread::spawn(move || match image::open(i) {
-        Ok(img) => texture_sender.send(img).unwrap(),
-        Err(e) => println!("ERR {:?}", e),
-    });
+    let sender = texture_sender.clone();
+    let img_location = PathBuf::from(&img_path);
+
+    thread::spawn(move || 
+    {
+
+        match img_location.extension().unwrap_or_default().to_str() {
+            Some("dds") => {
+                let file = File::open(img_location).unwrap();
+                let mut reader = BufReader::new(file);
+
+                let dds = DDS::decode(&mut reader).unwrap();
+                if let Some(main_layer) = dds.layers.get(0) {
+                    let buf = main_layer.as_bytes();
+                    let buffer: image::RgbaImage = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
+                    let _ = texture_sender.send(buffer.clone());
+    }
+            },
+            _ => {
+                match image::open(img_location) {
+                    Ok(img) => {
+                        sender.send(img.to_rgba()).unwrap();
+                        },
+                    Err(e) => println!("ERR {:?}", e),
+                    }
+            }
+        }
+
+    }
+    );
+
+
+ 
 
     while let Some(e) = window.next() {
         if let Some(Button::Mouse(_)) = e.press_args() {
@@ -131,7 +165,7 @@ fn main() {
 
             texture = Texture::from_image(
                 &mut window.create_texture_context(),
-                &img.to_rgba(),
+                &img,
                 &tx_settings,
             );
             current_image = img;
@@ -155,7 +189,7 @@ fn main() {
             }
 
 
-            let info = format!("{} {}X{} R{} G{} B{} A{} @{}X", img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0);
+            let info = format!("{} {}X{} R{} G{} B{} A{} @{}X", &img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0);
 
             // Draw text three times to simulate outline
 
