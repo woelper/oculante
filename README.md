@@ -22,8 +22,9 @@ Platform support:
 - Mac
 - Windows
 
-Misc
+Misc features
 - Threaded image loading
+- Color picker (LMB)
 
 Planned:
 - Custom display for images with unassociated channels
@@ -31,4 +32,5 @@ Planned:
 - Investigate PVR / ETC support
 - SVG support
 - Brighness/gamma adjust for HDR
+- Read next image(s) in dir and advance to them
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
