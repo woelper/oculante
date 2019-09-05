@@ -18,7 +18,8 @@ use std::fs::File;
 use std::path::{PathBuf};
 use dds::DDS;
 use rgb::*;
-
+use psd::{ColorMode, Psd, PsdChannelCompression};
+use std::io::Read;
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
@@ -89,7 +90,18 @@ fn main() {
                     let buf = main_layer.as_bytes();
                     let buffer: image::RgbaImage = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
                     let _ = texture_sender.send(buffer.clone());
-    }
+                }
+            },
+            Some("psd") => {
+                let mut file = File::open(img_location).unwrap();
+                let mut contents = vec![];
+                if let Ok(f) = file.read_to_end(&mut contents){
+                    let psd = Psd::from_bytes(&contents).unwrap();
+                    let buffer: Option<image::RgbaImage> = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba());
+                    if let Some(b) = buffer {
+                        let _ = texture_sender.send(b.clone());
+                    }
+                }
             },
             _ => {
                 match image::open(img_location) {
