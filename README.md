@@ -25,6 +25,7 @@ Platform support:
 
 Misc
 - Async image loading
+- Color picker / basic image info
 
 Planned:
 - Custom display for images with unassociated channels
