@@ -18,7 +18,9 @@ use std::fs::File;
 use std::path::{PathBuf};
 use dds::DDS;
 use rgb::*;
-
+use psd::Psd;
+use std::io::Read;
+//use rs_exr;
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
@@ -70,7 +72,6 @@ fn main() {
     )
     .unwrap();
 
- 
 
 
     let sender = texture_sender.clone();
@@ -83,13 +84,37 @@ fn main() {
             Some("dds") => {
                 let file = File::open(img_location).unwrap();
                 let mut reader = BufReader::new(file);
-
                 let dds = DDS::decode(&mut reader).unwrap();
                 if let Some(main_layer) = dds.layers.get(0) {
                     let buf = main_layer.as_bytes();
                     let buffer: image::RgbaImage = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
                     let _ = texture_sender.send(buffer.clone());
-    }
+                }
+            },
+            Some("exr") => {
+                let mut file = File::open(img_location).unwrap();
+                let mut reader = BufReader::new(file);
+      
+                // if let Ok(image) = rs_exr::image::immediate::read_raw_parts(&mut file) {
+                // }
+
+                      
+                // if let Ok(image) = rs_exr::image::immediate::read_seekable_buffered(&mut reader) {
+                //     //let _ = texture_sender.send(image.parts[0];
+                //     let a = image
+                // }
+
+            },
+            Some("psd") => {
+                let mut file = File::open(img_location).unwrap();
+                let mut contents = vec![];
+                if let Ok(_) = file.read_to_end(&mut contents){
+                    let psd = Psd::from_bytes(&contents).unwrap();
+                    let buffer: Option<image::RgbaImage> = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba());
+                    if let Some(b) = buffer {
+                        let _ = texture_sender.send(b.clone());
+                    }
+                }
             },
             _ => {
                 match image::open(img_location) {
