@@ -130,20 +130,31 @@ fn main() {
     );
 
 
- 
 
     while let Some(e) = window.next() {
+
+        if let Ok(img) = texture_receiver.try_recv() {
+            println!("received image data from loader");
+
+            texture = Texture::from_image(
+                &mut window.create_texture_context(),
+                &img,
+                &tx_settings,
+            );
+            current_image = img;
+            let window_size = Vector2::new(window.size().width, window.size().height);
+            let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
+            offset += window_size/2.0 - img_size/2.0;
+        }
+
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
             let pos = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
             // dbg!(pos);
-
-            current_color = current_image.get_pixel(pos.x as u32, pos.y as u32).channels4();
-
-
-            
+            current_color = current_image.get_pixel(pos.x as u32, pos.y as u32).channels4();            
             // println!("Cursor {:?} OFFSET {:?}", cursor, scale_pt(offset, cursor, scale, scale_increment));
         }
+
         if let Some(Button::Mouse(_)) = e.release_args() {
             drag = false;
         }
@@ -153,12 +164,6 @@ fn main() {
                 reset = true;
             }
         };
-        // if let Some(Button::Keyboard(key)) = e.press_args() {
-        //     if key == Key::P {
-        //         offset -= scale_pt(offset, cursor, scale, scale_increment);
-        //         scale += scale_increment;
-        //         }
-        // };
 
         e.mouse_scroll(|d| {
             if d[1] > 0.0 {
@@ -185,16 +190,7 @@ fn main() {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
 
-        if let Ok(img) = texture_receiver.try_recv() {
-            println!("received image data from loader");
 
-            texture = Texture::from_image(
-                &mut window.create_texture_context(),
-                &img,
-                &tx_settings,
-            );
-            current_image = img;
-        }
 
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
