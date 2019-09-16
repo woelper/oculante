@@ -62,16 +62,13 @@ fn main() {
     let mut dimensions = (0, 0);
     let mut current_image = image::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
     let mut current_color = (0, 0, 0, 0);
-
     let mut texture = Texture::empty(&mut window.create_texture_context());
-
     let mut glyphs = Glyphs::from_bytes(
         font,
         window.create_texture_context(),
         TextureSettings::new(),
     )
     .unwrap();
-
 
 
     let sender = texture_sender.clone();
@@ -92,12 +89,12 @@ fn main() {
                 }
             },
             Some("exr") => {
-                let mut file = File::open(img_location).unwrap();
-                let mut reader = BufReader::new(file);
+                // TODO: Add EXR support
+                // let mut file = File::open(img_location).unwrap();
+                // let mut reader = BufReader::new(file);
       
                 // if let Ok(image) = rs_exr::image::immediate::read_raw_parts(&mut file) {
                 // }
-
                       
                 // if let Ok(image) = rs_exr::image::immediate::read_seekable_buffered(&mut reader) {
                 //     //let _ = texture_sender.send(image.parts[0];
@@ -122,10 +119,9 @@ fn main() {
                         sender.send(img.to_rgba()).unwrap();
                         },
                     Err(e) => println!("ERR {:?}", e),
-                    }
+                }
             }
         }
-
     }
     );
 
@@ -145,6 +141,8 @@ fn main() {
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
             offset += window_size/2.0 - img_size/2.0;
+            window.set_lazy(true);
+
         }
 
         if let Some(Button::Mouse(_)) = e.press_args() {
@@ -189,8 +187,6 @@ fn main() {
         // e.resize(|args| {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
-
-
 
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
