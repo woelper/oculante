@@ -183,6 +183,11 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "concat-string"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "core-foundation"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -328,6 +333,16 @@ dependencies = [
  "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "synstructure 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "find-winsdk"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winreg 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -797,6 +812,7 @@ dependencies = [
  "psd 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "rs-exr 0.1.0 (git+https://github.com/johannesvollmer/rs-exr.git)",
+ "windres 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1515,6 +1531,15 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "windres"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "concat-string 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "find-winsdk 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "winit"
 version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1535,6 +1560,15 @@ dependencies = [
  "wayland-client 0.21.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "x11-dl 2.18.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "winreg"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1582,6 +1616,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum cocoa 0.18.4 (registry+https://github.com/rust-lang/crates.io-index)" = "cf79daa4e11e5def06e55306aa3601b87de6b5149671529318da048f67cdd77b"
 "checksum color_quant 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
+"checksum concat-string 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7439becb5fafc780b6f4de382b1a7a3e70234afe783854a4702ee8adbb838609"
 "checksum core-foundation 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "25b9e03f145fd4f2bf705e07b900cd41fc636598fe5dc452fd0db1441c3f496d"
 "checksum core-foundation-sys 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e7ca8a5221364ef15ce201e8ed2f609fc312682a8f4e0e3d4aa5879764e0fa3b"
 "checksum core-graphics 0.17.3 (registry+https://github.com/rust-lang/crates.io-index)" = "56790968ab1c8a1202a102e6de05fc6e1ec87da99e4e93e9a7d13efbfc1e95a9"
@@ -1599,6 +1634,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
+"checksum find-winsdk 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a8cbf17b871570c1f8612b763bac3e86290602bcf5dc3c5ce657e0e1e9071d9e"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
 "checksum foreign-types-shared 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
@@ -1738,7 +1774,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum winapi-i686-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 "checksum winapi-util 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7168bab6e1daee33b4557efd0e95d5ca70a03706d39fa5f3fe7a236f584b03c9"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+"checksum windres 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dd6e13ff705d7fab032bdf857354035c56c8c889e364029e4300779eb6e1d729"
 "checksum winit 0.19.3 (registry+https://github.com/rust-lang/crates.io-index)" = "7d0da905e61ae52d55c5ca6f8bea1e09daf5e325b6c77b0947c65a5179b49f5f"
+"checksum winreg 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a27a759395c1195c4cc5cda607ef6f8f6498f64e78f7900f5de0a127a424704a"
 "checksum x11-dl 2.18.4 (registry+https://github.com/rust-lang/crates.io-index)" = "be65e1342a3baae65439cd03306778831a3d133b0d20243a7fb83fd5cf403c58"
 "checksum xdg 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d089681aa106a86fade1b0128fb5daf07d5867a509ab036d99988dec80429a57"
 "checksum xml-rs 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "541b12c998c5b56aa2b4e6f18f03664eef9a4fd0a246a55594efae6cc2d964b5"
