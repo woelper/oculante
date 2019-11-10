@@ -206,7 +206,22 @@ fn main() {
             }
 
 
-            let info = format!("{} {}X{} R{} G{} B{} A{} @{}X", &img_path, dimensions.0, dimensions.1, current_color.0, current_color.1, current_color.2, current_color.3, (scale * 10.0).round() / 10.0);
+            
+
+            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} @{}X", &img_path,
+                dimensions.0,
+                dimensions.1,
+                current_color.0,
+                current_color.1,
+                current_color.2,
+                current_color.3,
+                current_color.0 as f32 / 255.0,
+                current_color.1 as f32 / 255.0,
+                current_color.2 as f32 / 255.0,
+                current_color.3 as f32 / 255.0,
+                
+                
+                (scale * 10.0).round() / 10.0);
 
             // Draw text three times to simulate outline
 
