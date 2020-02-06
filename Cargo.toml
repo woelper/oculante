@@ -12,7 +12,7 @@ nalgebra = "*"
 dds-rs = "0.7.0"
 rgb = "*"
 psd = "0.1.4"
-rs-exr = {git = "https://github.com/johannesvollmer/rs-exr.git"}
+exr = {git = "https://github.com/johannesvollmer/exrs.git"}
 
 
 [target.'cfg(windows)'.build-dependencies]

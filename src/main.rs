@@ -20,7 +20,7 @@ use dds::DDS;
 use rgb::*;
 use psd::Psd;
 use std::io::Read;
-//use rs_exr;
+//use exr;
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
