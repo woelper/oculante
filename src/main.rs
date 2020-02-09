@@ -11,16 +11,181 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 extern crate image;
 
-use crate::image::Pixel;
-use utils::{scale_pt, pos_from_coord};
+use crate::image::{Pixel};
 use std::io::BufReader;
 use std::fs::File;
 use std::path::{PathBuf};
+use std::cmp::Ordering;
 use dds::DDS;
 use rgb::*;
 use psd::Psd;
 use std::io::Read;
-//use exr;
+use exr::prelude::*;
+use exr;
+use exr::image::full::*;
+use exr::math::Vec2;
+use utils::{scale_pt, pos_from_coord};
+
+
+fn is_ext_compatible(fname: &PathBuf) -> bool {
+    match fname.extension().unwrap_or_default().to_str().unwrap_or_default() {
+        "png" => true,
+        "exr" => true,
+        "jpg" => true,
+        "jpeg" => true,
+        "psd" => true,
+        "dds" => true,
+        "gif" => true,
+        "hdr" => true,
+        "bmp" => true,
+        "ico" => true,
+        "tga" => true,
+        "tiff" => true,
+        "tif" => true,
+        "webp" => true,
+        "pnm" => true,
+        _ => false
+    }
+}
+
+
+fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
+    if let Some(parent) = file.parent() {
+        let mut files = std::fs::read_dir(parent)
+        .unwrap()
+        .map(|x| x.unwrap().path().to_path_buf())
+        .filter(|x| is_ext_compatible(x))
+        .collect::<Vec<PathBuf>>()
+        ;
+        files.sort();
+        for (i, f) in files.iter().enumerate() {
+            if f == file {
+                if let Some(next) = files.get( (i as i8 + inc) as usize) {
+                    return next.clone();
+
+                }
+            }
+        }
+    }
+    file.clone()
+
+}
+
+
+fn open_image(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
+    
+    let img_location = img_location.clone();
+    thread::spawn(move || 
+        {
+    
+            match img_location.extension().unwrap_or_default().to_str() {
+                Some("dds") => {
+                    let file = File::open(img_location).unwrap();
+                    let mut reader = BufReader::new(file);
+                    let dds = DDS::decode(&mut reader).unwrap();
+                    if let Some(main_layer) = dds.layers.get(0) {
+                        let buf = main_layer.as_bytes();
+                        let buffer: image::RgbaImage = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
+                        let _ = texture_sender.send(buffer.clone());
+                    }
+                },
+                Some("exr") => {
+                    let img = FullImage::read_from_file(img_location, ReadOptions::default()).unwrap();
+                    // println!("file meta data: {:#?}", img); // does not print actual pixel values
+                    // TODO: Add EXR support
+                
+    
+                    fn save_f32_image_as_png(data: &[f32], size: Vec2<usize>, name: String) {
+                        let mut png_buffer = image::GrayImage::new(size.0 as u32, size.1 as u32);
+                        let mut sorted = Vec::from(data);
+                        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
+                
+                        // sixth percentile normalization
+                        let max = sorted[7 * sorted.len() / 8];
+                        let min = sorted[1 * sorted.len() / 8];
+                
+                        let tone = |v: f32| (v - 0.5).tanh() * 0.5 + 0.5;
+                        let max_toned = tone(*sorted.last().unwrap());
+                        let min_toned = tone(*sorted.first().unwrap());
+                
+                        for (x, y, pixel) in png_buffer.enumerate_pixels_mut() {
+                            let v = data[(y * size.0 as u32 + x) as usize];
+                            let v = (v - min) / (max - min);
+                            let v = tone(v);
+                
+                            let v = (v - min_toned) / (max_toned - min_toned);
+                            *pixel = image::Luma([(v.max(0.0).min(1.0) * 255.0) as u8]);
+                        }
+                
+                        println!("Saving to {}", name);
+                        png_buffer.save(&name).unwrap();
+                    }
+    
+    
+    
+                    for (part_index, part) in img.parts.iter().enumerate() {
+    
+                        for channel in &part.channels {
+                            match &channel.content {
+                                ChannelData::F16(levels) => {
+                                    let levels = levels.as_flat_samples().unwrap();
+                                    for sample_block in levels.as_slice() {
+                                        let data : Vec<f32> = sample_block.samples.iter().map(|f16| f16.to_f32()).collect();
+    
+                                        dbg!(&channel.name);
+                                        save_f32_image_as_png(&data, sample_block.resolution, format!(
+                                            "{}_f16_{}x{}.png",
+                                            channel.name,
+                                            sample_block.resolution.0,
+                                            sample_block.resolution.1,
+                                        ))
+                                    }
+                                },
+                                ChannelData::F32(levels) => {
+                                    let levels = levels.as_flat_samples().unwrap();
+                                    for sample_block in levels.as_slice() {
+                                        dbg!(&channel.name);
+    
+                                        save_f32_image_as_png(&sample_block.samples, sample_block.resolution, format!(
+                                            "{}_f16_{}x{}.png",
+                                            channel.name,
+                                            sample_block.resolution.0,
+                                            sample_block.resolution.1,
+                                        ))
+                                    }
+                                },
+                                _ => panic!()
+                            }
+                        }
+                    }
+    
+    
+                },
+                Some("psd") => {
+                    let mut file = File::open(img_location).unwrap();
+                    let mut contents = vec![];
+                    if let Ok(_) = file.read_to_end(&mut contents){
+                        let psd = Psd::from_bytes(&contents).unwrap();
+                        let buffer: Option<image::RgbaImage> = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba());
+                        if let Some(b) = buffer {
+                            let _ = texture_sender.send(b.clone());
+                        }
+                    }
+                },
+                _ => {
+                    match image::open(img_location) {
+                        Ok(img) => {
+                            texture_sender.send(img.to_rgba()).unwrap();
+                            },
+                        Err(e) => println!("ERR {:?}", e),
+                    }
+                }
+            }
+        }
+        );
+}
+
+
 
 fn main() {
     let font = include_bytes!("FiraSans-Regular.ttf");
@@ -71,59 +236,11 @@ fn main() {
     .unwrap();
 
 
-    let sender = texture_sender.clone();
-    let img_location = PathBuf::from(&img_path);
+    let mut img_location = PathBuf::from(&img_path);
 
-    thread::spawn(move || 
-    {
-
-        match img_location.extension().unwrap_or_default().to_str() {
-            Some("dds") => {
-                let file = File::open(img_location).unwrap();
-                let mut reader = BufReader::new(file);
-                let dds = DDS::decode(&mut reader).unwrap();
-                if let Some(main_layer) = dds.layers.get(0) {
-                    let buf = main_layer.as_bytes();
-                    let buffer: image::RgbaImage = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
-                    let _ = texture_sender.send(buffer.clone());
-                }
-            },
-            Some("exr") => {
-                // TODO: Add EXR support
-                // let mut file = File::open(img_location).unwrap();
-                // let mut reader = BufReader::new(file);
-      
-                // if let Ok(image) = rs_exr::image::immediate::read_raw_parts(&mut file) {
-                // }
-                      
-                // if let Ok(image) = rs_exr::image::immediate::read_seekable_buffered(&mut reader) {
-                //     //let _ = texture_sender.send(image.parts[0];
-                //     let a = image
-                // }
-
-            },
-            Some("psd") => {
-                let mut file = File::open(img_location).unwrap();
-                let mut contents = vec![];
-                if let Ok(_) = file.read_to_end(&mut contents){
-                    let psd = Psd::from_bytes(&contents).unwrap();
-                    let buffer: Option<image::RgbaImage> = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba());
-                    if let Some(b) = buffer {
-                        let _ = texture_sender.send(b.clone());
-                    }
-                }
-            },
-            _ => {
-                match image::open(img_location) {
-                    Ok(img) => {
-                        sender.send(img.to_rgba()).unwrap();
-                        },
-                    Err(e) => println!("ERR {:?}", e),
-                }
-            }
-        }
-    }
-    );
+    open_image(&img_location, texture_sender.clone());
+    
+    
 
 
 
@@ -161,6 +278,29 @@ fn main() {
             if key == Key::R {
                 reset = true;
             }
+            if key == Key::Q {
+                std::process::exit(0);
+            }
+            if key == Key::Right {
+                img_location = img_shift(&img_location, 1);
+                window.set_lazy(false);
+                reset = true;
+
+                open_image(&img_location, texture_sender.clone());
+                // TODO: next img
+
+
+            }
+            if key == Key::Left {
+                img_location = img_shift(&img_location, -1);
+                window.set_lazy(false);
+                reset = true;
+
+                open_image(&img_location, texture_sender.clone());
+                // TODO: next img
+
+            }
+
         };
 
         e.mouse_scroll(|d| {
@@ -174,6 +314,7 @@ fn main() {
                 }
             }
         });
+
         e.mouse_relative(|d| {
             if drag {
                 offset += Vector2::new(d[0], d[1]);
@@ -208,7 +349,7 @@ fn main() {
 
             
 
-            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} @{}X", &img_path,
+            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} @{}X", &img_location.to_string_lossy(),
                 dimensions.0,
                 dimensions.1,
                 current_color.0,
