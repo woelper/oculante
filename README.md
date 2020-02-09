@@ -1,5 +1,7 @@
 # oculante
 A no-nonsense image viewer
+
+
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
 
 I started this as a toy project to make a simple image viewer. Here are the features:
@@ -33,4 +35,5 @@ Planned:
 - Investigate PVR / ETC support
 - SVG support
 - Brighness/gamma adjust for HDR
-- Read next image(s) in dir and advance to them
+- EXR support
+- ~~Read next image(s) in dir and advance to them~~

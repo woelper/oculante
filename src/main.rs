@@ -10,8 +10,10 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 extern crate image;
-
 use crate::image::{Pixel};
+
+// use image;
+
 use std::io::BufReader;
 use std::fs::File;
 use std::path::{PathBuf};
@@ -118,7 +120,7 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) 
                         }
                 
                         println!("Saving to {}", name);
-                        png_buffer.save(&name).unwrap();
+                        // png_buffer.save(&name).unwrap();
                     }
     
     
@@ -201,10 +203,13 @@ fn main() {
     let img_path = matches.value_of("INPUT").unwrap().to_string();
 
     let opengl = OpenGL::V3_2;
+
+
     let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
         .graphics_api(opengl)
         // .samples(4)
+        // .fullscreen(true)
         .build()
         .unwrap();
 
@@ -239,15 +244,15 @@ fn main() {
     let mut img_location = PathBuf::from(&img_path);
 
     open_image(&img_location, texture_sender.clone());
-    
-    
 
 
 
     while let Some(e) = window.next() {
 
+        // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
-            println!("received image data from loader");
+            // println!("received image data from loader");
+            window.set_lazy(false);
 
             texture = Texture::from_image(
                 &mut window.create_texture_context(),
@@ -257,7 +262,7 @@ fn main() {
             current_image = img;
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
-            offset += window_size/2.0 - img_size/2.0;
+            offset = window_size/2.0 - img_size/2.0;
             window.set_lazy(true);
 
         }
@@ -278,27 +283,28 @@ fn main() {
             if key == Key::R {
                 reset = true;
             }
+
             if key == Key::Q {
                 std::process::exit(0);
             }
+
+            if key == Key::F {
+                // window.window.;
+                // std::process::exit(0);
+            }
+
             if key == Key::Right {
                 img_location = img_shift(&img_location, 1);
                 window.set_lazy(false);
                 reset = true;
-
                 open_image(&img_location, texture_sender.clone());
-                // TODO: next img
-
-
             }
+
             if key == Key::Left {
                 img_location = img_shift(&img_location, -1);
                 window.set_lazy(false);
                 reset = true;
-
                 open_image(&img_location, texture_sender.clone());
-                // TODO: next img
-
             }
 
         };
@@ -329,18 +335,33 @@ fn main() {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
 
+        let size = window.size();
+
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
+
             if reset {
+                let window_size = Vector2::new(size.width, size.height);
+                let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
                 offset = Vector2::new(0.0, 0.0);
+                offset += window_size/2.0 - img_size/2.0;
+
                 scale = 1.0;
                 reset = false;
             }
-            let transform = c
-                .transform
-                .trans(offset.x as f64, offset.y as f64)
-                .zoom(scale);
 
+            
+
+            let transform = c.
+            transform
+            .trans(offset.x as f64, offset.y as f64)
+            .zoom(scale);
+
+           
+
+
+
+                
             if let Ok(tex) = &texture {
                 image(tex, transform, gfx);
                 dimensions = tex.get_size();
