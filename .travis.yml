@@ -1,6 +1,7 @@
 language: rust
 rust:
-  - nightly-2019-06-24
+  # - nightly-2019-06-24
+  - nightly
 #cache: cargo
 script:
   - cargo build --release
