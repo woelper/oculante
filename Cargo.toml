@@ -1,19 +1,20 @@
 [package]
 name = "oculante"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 piston_window = "*"
 clap = "*"
-image = "*"
+image = "0.23.0"
 nalgebra = "*"
 dds-rs = "*"
 rgb = "*"
 psd = "*"
 exr = {git = "https://github.com/johannesvollmer/exrs.git"}
-
+# resvg = "*"
+nsvg = "0.5.1"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"
