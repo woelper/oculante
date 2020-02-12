@@ -1,5 +1,5 @@
 # oculante
-A no-nonsense image viewer
+A no-nonsense hardware-accelerated image viewer
 
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
