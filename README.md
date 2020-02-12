@@ -19,6 +19,7 @@ Image format support:
 - webp	
 - DDS (DXT1-5, via _dds-rs_)
 - psd (via _psd_)
+- svg (via _nsvg_)
 
 Platform support:
 - Linux
@@ -33,7 +34,7 @@ Planned:
 - Custom display for images with unassociated channels
 - Image rotation (and read EXIF for that)
 - Investigate PVR / ETC support
-- SVG support
+- ~~SVG support~~
 - Brighness/gamma adjust for HDR
 - EXR support
 - ~~Read next image(s) in dir and advance to them~~
