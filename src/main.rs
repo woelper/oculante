@@ -2,8 +2,8 @@
 
 
 use ::image as image_crate;
-use image_crate::{Pixel};
-
+use image_crate::{Pixel, ImageDecoder};
+use std::time::{Duration, Instant};
 mod utils;
 use clap;
 use clap::{App, Arg};
@@ -218,8 +218,10 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                     }
                 },
                 _ => {
+                    // println!("opening...");
                     match image_crate::open(img_location) {
                         Ok(img) => {
+                            // println!("open. sending");
                             texture_sender.send(img.to_rgba()).unwrap();
                             },
                         Err(e) => println!("ERR {:?}", e),
@@ -232,8 +234,33 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
 
 
 
+fn draw_status (img: Vec<u8>, texture_sender: Sender<image_crate::RgbaImage>) {
+
+    // match image_crate::png::PngReader::read_to_end(img)
+    // let b =
+    // let mut reader = BufReader::new(img);
+    
+    let png = image_crate::png::PngDecoder::new(&*img).unwrap();
+    let mut b = vec![0; png.total_bytes() as usize];
+    png.read_image(&mut b);
+
+    let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(256, 256, b).unwrap();
+    // dbg!(&buffer);
+    let _ = texture_sender.send(buffer.clone());
+    // if let Some(buffer) = png {
+    //     let _ = texture_sender.send(b.clone());
+    // }
+}
+
+
 fn main() {
-    let font = include_bytes!("FiraSans-Regular.ttf");
+    
+    // let font = include_bytes!("FiraSans-Regular.ttf");
+    let font = include_bytes!("IBMPlexSans-Regular.ttf");
+    let loading_img = include_bytes!("loading.png");
+
+    let mut now = Instant::now();
+
     let matches = App::new("Oculante")
         .arg(
             Arg::with_name("INPUT")
@@ -265,7 +292,6 @@ fn main() {
     tx_settings.set_mag(Filter::Nearest);
     // tx_settings.set_min(Filter::Nearest);
 
-    // window.set_lazy(true);
     let mut offset = Vector2::new(0.0, 0.0);
     let mut cursor = Vector2::new(0.0, 0.0);
     let mut scale = 1.0;
@@ -286,22 +312,24 @@ fn main() {
 
     let mut img_location = PathBuf::from(&img_path);
 
+    draw_status(loading_img.to_vec(), texture_sender.clone());
+
+
     open_image(&img_location, texture_sender.clone());
 
-
-
+    window.set_max_fps(30);
     while let Some(e) = window.next() {
+
+        // dbg!(now.elapsed().as_secs());
+        // if now.elapsed().as_secs() > 5 && now.elapsed().as_secs() < 7 {
+        //     println!("old!");
+        //     window.set_lazy(true);
+        // }
 
         // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
             // println!("received image data from loader");
-            window.set_lazy(false);
-
-            // let dimensions = img.dimensions();
-            // This is just to convert between different crate versions of "image". TODO: remove if crates catch up
-            // let raw = img.into_raw();
-            // let buffer: piston::image::RgbaImage = image_crate::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
-
+            // window.set_lazy(false);
             
             texture = Texture::from_image(
                 &mut window.create_texture_context(),
@@ -312,14 +340,13 @@ fn main() {
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
             offset = window_size/2.0 - img_size/2.0;
-            window.set_lazy(true);
+            now = Instant::now();
 
-        }
+        } 
 
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
             let pos = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
-            // dbg!(pos);
             current_color = current_image.get_pixel(pos.x as u32, pos.y as u32).channels4();            
             // println!("Cursor {:?} OFFSET {:?}", cursor, scale_pt(offset, cursor, scale, scale_increment));
         }
@@ -338,21 +365,22 @@ fn main() {
             }
 
             if key == Key::F {
+                //TODO: Fullscreen
                 // window.window.;
                 // std::process::exit(0);
             }
 
             if key == Key::Right {
                 img_location = img_shift(&img_location, 1);
-                window.set_lazy(false);
                 reset = true;
+                draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone());
             }
 
             if key == Key::Left {
                 img_location = img_shift(&img_location, -1);
-                window.set_lazy(false);
                 reset = true;
+                draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone());
             }
 
@@ -394,21 +422,14 @@ fn main() {
                 let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
                 offset = Vector2::new(0.0, 0.0);
                 offset += window_size/2.0 - img_size/2.0;
-
                 scale = 1.0;
                 reset = false;
             }
 
-            
-
             let transform = c.
-            transform
-            .trans(offset.x as f64, offset.y as f64)
-            .zoom(scale);
-
-           
-
-
+                transform
+                .trans(offset.x as f64, offset.y as f64)
+                .zoom(scale);
 
                 
             if let Ok(tex) = &texture {
@@ -416,8 +437,6 @@ fn main() {
                 dimensions = tex.get_size();
             }
 
-
-            
 
             let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} @{}X", &img_location.to_string_lossy(),
                 dimensions.0,
@@ -430,8 +449,6 @@ fn main() {
                 current_color.1 as f32 / 255.0,
                 current_color.2 as f32 / 255.0,
                 current_color.3 as f32 / 255.0,
-                
-                
                 (scale * 10.0).round() / 10.0);
 
             // Draw text three times to simulate outline
@@ -462,6 +479,10 @@ fn main() {
             glyphs.factory.encoder.flush(device);
 
         });
+
+        // dbg!(&dirty);
+
+
     }
 }
 
