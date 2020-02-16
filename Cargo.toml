@@ -13,8 +13,9 @@ dds-rs = "*"
 rgb = "*"
 psd = "*"
 exr = {git = "https://github.com/johannesvollmer/exrs.git"}
-# resvg = "*"
+gif-dispose = "*"
 nsvg = "0.5.1"
+gif = "*"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"

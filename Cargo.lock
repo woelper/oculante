@@ -450,6 +450,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gif-dispose"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "gif 0.10.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "imgref 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rgb 0.8.16 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "gl"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -606,6 +616,11 @@ dependencies = [
  "scoped_threadpool 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiff 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "imgref"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "inflate"
@@ -884,6 +899,8 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dds-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "exr 0.1.0 (git+https://github.com/johannesvollmer/exrs.git)",
+ "gif 0.10.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gif-dispose 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nalgebra 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nsvg 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1686,6 +1703,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum gfx_device_gl 0.16.2 (registry+https://github.com/rust-lang/crates.io-index)" = "109c385fa380c18888633aa27d1e16cbae518469702a2f69dcb5f52d5378bebc"
 "checksum gfx_gl 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f2d38164670920cfb7491bc0cf6f49f0554bd1c44cdbedc6c78d2bf91691ff5e"
 "checksum gif 0.10.3 (registry+https://github.com/rust-lang/crates.io-index)" = "471d90201b3b223f3451cd4ad53e34295f16a1df17b1edf3736d47761c3981af"
+"checksum gif-dispose 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4f7dfe369a0cea0946f8db885225a6f503102f98061ef5452e0f77071bd6bfd4"
 "checksum gl 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d7d8c8e25e8ed44d4813809205090162723a866fb4be3a9d8bb983c9a0bf98f1"
 "checksum gl_generator 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a0ffaf173cf76c73a73e080366bf556b4776ece104b06961766ff11449f38604"
 "checksum gl_generator 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ca98bbde17256e02d17336a6bdb5a50f7d0ccacee502e191d3e3d0ec2f96f84a"
@@ -1701,6 +1719,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum hermit-abi 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "eff2656d88f158ce120947499e971d743c05dbcbed62e5bd2f38f1698bbc3772"
 "checksum image 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ebdff791af04e30089bde8ad2a632b86af433b40c04db8d70ad4b21487db7a6a"
 "checksum image 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ef4e336ec01a678e7ab692914c641181528e8656451e6252f8f9e33728882eaf"
+"checksum imgref 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a45f5dd9db42f924c8e75d53777c4ea87a024b162ddb4af5dbe7c1add901a212"
 "checksum inflate 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "1cdb29978cc5797bd8dcc8e5bf7de604891df2a8dc576973d71a281e916db2ff"
 "checksum interpolation 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d3b7357d2bbc5ee92f8e899ab645233e43d21407573cceb37fed8bc3dede2c02"
 "checksum jpeg-decoder 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0256f0aec7352539102a9efbcb75543227b7ab1117e0f95450023af730128451"

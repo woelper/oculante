@@ -8,6 +8,9 @@ mod utils;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
+use gif::*;
+use gif_dispose;
+
 
 use piston_window::*;
 use std::sync::mpsc;
@@ -217,6 +220,29 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                         }
                     }
                 },
+                Some("gif") => {
+                    
+                    let file = File::open(&img_location).unwrap();
+                    let mut decoder = gif::Decoder::new(file);
+                    decoder.set(gif::ColorOutput::Indexed);
+                    let mut reader = decoder.read_info().unwrap();
+                    
+                    
+                    let mut screen = gif_dispose::Screen::new_reader(&reader);
+                    let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
+                    
+                        
+                    println!("GIF:");
+                    while let Some(frame) = reader.read_next_frame().unwrap() {
+                        screen.blit_frame(&frame).unwrap();
+                        let buffer: Option<image_crate::RgbaImage> = image_crate::ImageBuffer::from_raw(dim.0, dim.1, screen.pixels.buf().as_bytes().to_vec());
+                        texture_sender.send(buffer.unwrap()).unwrap();
+                        std::thread::sleep_ms(150);
+
+                    }
+                    
+
+                }
                 _ => {
                     // println!("opening...");
                     match image_crate::open(img_location) {
