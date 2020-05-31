@@ -241,6 +241,7 @@ fn main() {
 
     let mut offset = Vector2::new(0.0, 0.0);
     let mut cursor = Vector2::new(0.0, 0.0);
+    let mut cursor_in_image = Vector2::new(0.0, 0.0);
     let mut scale = 1.0;
     let mut drag = false;
     let scale_increment = 0.2;
@@ -293,8 +294,8 @@ fn main() {
 
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
-            let pos = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
-            current_color = current_image.get_pixel(pos.x as u32, pos.y as u32).channels4();            
+            cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
+            current_color = current_image.get_pixel(cursor_in_image.x as u32, cursor_in_image.y as u32).channels4();            
             // println!("Cursor {:?} OFFSET {:?}", cursor, scale_pt(offset, cursor, scale, scale_increment));
         }
 
@@ -353,6 +354,7 @@ fn main() {
 
         e.mouse_cursor(|d| {
             cursor = Vector2::new(d[0], d[1]);
+            cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
         });
 
         // e.resize(|args| {
@@ -385,7 +387,8 @@ fn main() {
             }
 
 
-            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} @{}X", &img_location.to_string_lossy(),
+            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} {:.2}x{:.2} @{}X",
+                &img_location.to_string_lossy(),
                 dimensions.0,
                 dimensions.1,
                 current_color.0,
@@ -396,7 +399,10 @@ fn main() {
                 current_color.1 as f32 / 255.0,
                 current_color.2 as f32 / 255.0,
                 current_color.3 as f32 / 255.0,
-                (scale * 10.0).round() / 10.0);
+                cursor_in_image[0].round() as i32,
+                cursor_in_image[1].round() as i32,
+                (scale * 10.0).round() / 10.0
+            );
 
             // Draw text three times to simulate outline
 
@@ -422,6 +428,8 @@ fn main() {
                     gfx,
                 )
                 .unwrap();
+
+
 
             glyphs.factory.encoder.flush(device);
 
