@@ -11,6 +11,8 @@ use nalgebra::Vector2;
 use gif::*;
 use gif_dispose;
 
+extern crate exr;
+use exr::prelude::*;
 
 use piston_window::*;
 use std::sync::mpsc;
@@ -104,8 +106,6 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                 Some("svg") => {
 
 
-                    // let path = Path::new("examples/example.svg");
-
                     // Load and parse the svg
                     let svg = nsvg::parse_file(&img_location, nsvg::Units::Pixel, 96.0).unwrap();
                   
@@ -119,93 +119,15 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
 
                     let _ = texture_sender.send(buffer);
 
-                    // let file = File::open(img_location).unwrap();
-                    // let mut reader = BufReader::new(file);
-
-                    // let backend: Box<dyn Render> = Box::new(resvg::backend_qt::Backend);
-
-                    // "cairo" => Box::new(resvg::backend_cairo::Backend),
-                    // "qt" => Box::new(resvg::backend_qt::Backend),
-                    // "skia" => Box::new(resvg::backend_skia::Backend),
-                    // "raqote" => Box::new(resvg::backend_raqote::Backend),
-
-                    // let opts = usvg::Options::default();
-                    // let tree = usvg::Tree::from_file(&img_location, &opts).map_err(|e| e.to_string());
-
-                    // backend.render_node_to_image(&tree, &opts);
+ 
 
                 },
                 Some("exr") => {
 
+                    // let mut image = rgba::Image::read_from_file(&img_location, read_options::high()).unwrap();
+                    // let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(image.resolution.0 as u32, image.resolution.1 as u32, image).unwrap();
 
-                    // let img = FullImage::read_from_file(img_location, ReadOptions::default()).unwrap();
-                    // // println!("file meta data: {:#?}", img); // does not print actual pixel values
-                    // // TODO: Add EXR support
-                
-    
-                    // fn save_f32_image_as_png(data: &[f32], size: Vec2<usize>, name: String) {
-                    //     let mut png_buffer = image::GrayImage::new(size.0 as u32, size.1 as u32);
-                    //     let mut sorted = Vec::from(data);
-                    //     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
-                
-                    //     // sixth percentile normalization
-                    //     let max = sorted[7 * sorted.len() / 8];
-                    //     let min = sorted[1 * sorted.len() / 8];
-                
-                    //     let tone = |v: f32| (v - 0.5).tanh() * 0.5 + 0.5;
-                    //     let max_toned = tone(*sorted.last().unwrap());
-                    //     let min_toned = tone(*sorted.first().unwrap());
-                
-                    //     for (x, y, pixel) in png_buffer.enumerate_pixels_mut() {
-                    //         let v = data[(y * size.0 as u32 + x) as usize];
-                    //         let v = (v - min) / (max - min);
-                    //         let v = tone(v);
-                
-                    //         let v = (v - min_toned) / (max_toned - min_toned);
-                    //         *pixel = image::Luma([(v.max(0.0).min(1.0) * 255.0) as u8]);
-                    //     }
-                
-                    //     println!("Saving to {}", name);
-                    //     // png_buffer.save(&name).unwrap();
-                    // }
-    
-    
-    
-                    // for (part_index, part) in img.parts.iter().enumerate() {
-    
-                    //     for channel in &part.channels {
-                    //         match &channel.content {
-                    //             ChannelData::F16(levels) => {
-                    //                 let levels = levels.as_flat_samples().unwrap();
-                    //                 for sample_block in levels.as_slice() {
-                    //                     let data : Vec<f32> = sample_block.samples.iter().map(|f16| f16.to_f32()).collect();
-    
-                    //                     dbg!(&channel.name);
-                    //                     save_f32_image_as_png(&data, sample_block.resolution, format!(
-                    //                         "{}_f16_{}x{}.png",
-                    //                         channel.name,
-                    //                         sample_block.resolution.0,
-                    //                         sample_block.resolution.1,
-                    //                     ))
-                    //                 }
-                    //             },
-                    //             ChannelData::F32(levels) => {
-                    //                 let levels = levels.as_flat_samples().unwrap();
-                    //                 for sample_block in levels.as_slice() {
-                    //                     dbg!(&channel.name);
-    
-                    //                     save_f32_image_as_png(&sample_block.samples, sample_block.resolution, format!(
-                    //                         "{}_f16_{}x{}.png",
-                    //                         channel.name,
-                    //                         sample_block.resolution.0,
-                    //                         sample_block.resolution.1,
-                    //                     ))
-                    //                 }
-                    //             },
-                    //             _ => panic!()
-                    //         }
-                    //     }
-                    // }
+                    // println!("loaded image {:#?}", image);
     
     
                 },
@@ -281,7 +203,6 @@ fn draw_status (img: Vec<u8>, texture_sender: Sender<image_crate::RgbaImage>) {
 
 fn main() {
     
-    // let font = include_bytes!("FiraSans-Regular.ttf");
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
     let loading_img = include_bytes!("loading.png");
 
