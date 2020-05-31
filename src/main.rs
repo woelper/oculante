@@ -8,35 +8,35 @@ mod utils;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-use gif::*;
 use gif_dispose;
+use gif::{SetParameter, ColorOutput};
 
 extern crate exr;
-use exr::prelude::*;
-use exr::prelude::simple_image::*;
 use exr::prelude::rgba_image as rgb_exr;
 
 use piston_window::*;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-// use resvg::prelude::*;
 use nsvg;
 
 use std::io::BufReader;
 use std::fs::File;
 use std::path::{PathBuf};
-// use std::cmp::Ordering;
 use dds::DDS;
 use rgb::*;
 use psd::Psd;
 use std::io::Read;
-// use exr::prelude::*;
-// use exr;
-// use exr::image::full::*;
-// use exr::math::Vec2;
 use utils::{scale_pt, pos_from_coord};
 
+
+/// compress any possible f32 into the range of [0,1].
+/// and then convert it to an unsigned byte.
+fn tone_map(linear: f32) -> u8 {
+    // TODO does the `image` crate expect gamma corrected data?
+    let clamped = (linear - 0.5).tanh() * 0.5 + 0.5;
+    (clamped * 255.0) as u8
+}
 
 fn is_ext_compatible(fname: &PathBuf) -> bool {
     match fname
@@ -107,7 +107,6 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                 },
                 Some("svg") => {
 
-
                     // Load and parse the svg
                     let svg = nsvg::parse_file(&img_location, nsvg::Units::Pixel, 96.0).unwrap();
                   
@@ -118,10 +117,7 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                     // This is just to convert between different crate versions of "image". TODO: remove if crates catch up
                     let raw = image.into_raw();
                     let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
-
                     let _ = texture_sender.send(buffer);
-
- 
 
                 },
                 Some("exr") => {
@@ -155,19 +151,7 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                         },
                     ).unwrap();
 
-
-                    /// compress any possible f32 into the range of [0,1].
-                    /// and then convert it to an unsigned byte.
-                    fn tone_map(linear: f32) -> u8 {
-                        // TODO does the `image` crate expect gamma corrected data?
-                        let clamped = (linear - 0.5).tanh() * 0.5 + 0.5;
-                        (clamped * 255.0) as u8
-                    };
-
-
                     let _ = texture_sender.send(png_buffer);
-    
-    
                 },
                 Some("psd") => {
                     let mut file = File::open(img_location).unwrap();
@@ -182,22 +166,28 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                 },
                 Some("gif") => {
                     
-                    let file = File::open(&img_location).unwrap();
-                    let mut decoder = gif::Decoder::new(file);
-                    decoder.set(gif::ColorOutput::Indexed);
-                    let mut reader = decoder.read_info().unwrap();
                     
-                    
-                    let mut screen = gif_dispose::Screen::new_reader(&reader);
-                    let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
-                    
-                        
                     println!("GIF:");
-                    while let Some(frame) = reader.read_next_frame().unwrap() {
-                        screen.blit_frame(&frame).unwrap();
-                        let buffer: Option<image_crate::RgbaImage> = image_crate::ImageBuffer::from_raw(dim.0, dim.1, screen.pixels.buf().as_bytes().to_vec());
-                        texture_sender.send(buffer.unwrap()).unwrap();
-                        std::thread::sleep_ms(150);
+                    // let file = File::open(&img_location).unwrap();
+
+                    // let mut r = BufReader::new(file);
+                    loop {
+                        // of course this is shit. Don't reload the image all the time.
+                        let file = File::open(&img_location).unwrap();
+                        let mut decoder = gif::Decoder::new(file);
+                        // let mut decoder = gif::Decoder::new(r.by_ref());
+                        decoder.set(ColorOutput::Indexed);
+                        let mut reader = decoder.read_info().unwrap();
+                        let mut screen = gif_dispose::Screen::new_reader(&reader);
+                        let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
+          
+
+                        while let Some(frame) = reader.read_next_frame().unwrap() {
+                            screen.blit_frame(&frame).unwrap();
+                            let buffer: Option<image_crate::RgbaImage> = image_crate::ImageBuffer::from_raw(dim.0, dim.1, screen.pixels.buf().as_bytes().to_vec());
+                            texture_sender.send(buffer.unwrap()).unwrap();
+                            std::thread::sleep(Duration::from_millis(30));
+                        }
 
                     }
                     
@@ -326,7 +316,7 @@ fn main() {
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
             offset = window_size/2.0 - img_size/2.0;
-            now = Instant::now();
+            // now = Instant::now();
 
         } 
 
@@ -443,6 +433,36 @@ fn main() {
             );
 
             // Draw text three times to simulate outline
+
+            // fn draw_txt(pos: (f64, f64), size: u32, text: &String, cache: GlyphCache<TextureContext<Factory, Resources, CommandBuffer>, Texture<Resources>>) {
+
+            //     text::Text::new_color([1.0, 1.0, 1.0, 0.7], 18)
+            //     .draw(
+            //         &text,
+            //         &mut glyphs,
+            //         &c.draw_state,
+            //         c.transform.trans(10.0, 20.0),
+            //         gfx,
+            //     )
+            //     .unwrap();
+
+            // }
+
+
+
+            // fn render_text(x: f64, y: f64,
+            //     text: &str, size: u32,
+            //     c: Context, g: &mut G2d, 
+            //     g: &mut glyph_cache::rusttype::GlyphCache<GfxFactory, G2dTexture>) {
+            // text::Text::new(size).draw(
+            //     text,
+            //     g,
+            //     &c.draw_state,
+            //     c.transform.trans(x, y),
+            //     g
+            // ).unwrap();
+            // } 
+
 
             for i in vec![(-2,-2), (-2,-0), (0,-2), (2,2), (2,0)] {
 
