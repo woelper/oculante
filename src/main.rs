@@ -158,19 +158,13 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                     let mut contents = vec![];
                     if let Ok(_) = file.read_to_end(&mut contents){
                         let psd = Psd::from_bytes(&contents).unwrap();
-                        let buffer: Option<image_crate::RgbaImage> = image_crate::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba());
-                        if let Some(b) = buffer {
-                            let _ = texture_sender.send(b.clone());
+                        if let Some(buffer) = image_crate::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba()) {
+                            let _ = texture_sender.send(buffer.clone());
                         }
                     }
                 },
                 Some("gif") => {
-                    
-                    
-                    println!("GIF:");
-                    // let file = File::open(&img_location).unwrap();
 
-                    // let mut r = BufReader::new(file);
                     loop {
                         // of course this is shit. Don't reload the image all the time.
                         let file = File::open(&img_location).unwrap();
@@ -188,47 +182,32 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                             texture_sender.send(buffer.unwrap()).unwrap();
                             std::thread::sleep(Duration::from_millis(30));
                         }
-
                     }
-                    
-
                 }
                 _ => {
-                    // println!("opening...");
                     match image_crate::open(img_location) {
                         Ok(img) => {
-                            // println!("open. sending");
                             texture_sender.send(img.to_rgba()).unwrap();
-                            
                         },
                         Err(e) => println!("ERR {:?}", e),
                     }
                 }
             }
-            
             state_sender.send(String::new()).unwrap();
         }
         );
 }
 
 
-
+/// This is not really a status, it just displays a "loading" image.
 fn draw_status (img: Vec<u8>, texture_sender: Sender<image_crate::RgbaImage>) {
-
-    // match image_crate::png::PngReader::read_to_end(img)
-    // let b =
-    // let mut reader = BufReader::new(img);
     
     let png = image_crate::png::PngDecoder::new(&*img).unwrap();
     let mut b = vec![0; png.total_bytes() as usize];
     let _ = png.read_image(&mut b);
 
     let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(256, 256, b).unwrap();
-    // dbg!(&buffer);
     let _ = texture_sender.send(buffer.clone());
-    // if let Some(buffer) = png {
-    //     let _ = texture_sender.send(b.clone());
-    // }
 }
 
 
@@ -236,7 +215,6 @@ fn main() {
     
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
     let loading_img = include_bytes!("loading.png");
-
 
     let matches = App::new("Oculante")
         .arg(
@@ -255,7 +233,6 @@ fn main() {
     let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
         .graphics_api(opengl)
-        // .samples(4)
         // .fullscreen(true)
         .build()
         .unwrap();
@@ -318,13 +295,10 @@ fn main() {
         }
 
 
-
-
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
             cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
             current_color = current_image.get_pixel(cursor_in_image.x as u32, cursor_in_image.y as u32).channels4();            
-            // println!("Cursor {:?} OFFSET {:?}", cursor, scale_pt(offset, cursor, scale, scale_increment));
         }
 
         if let Some(Button::Mouse(_)) = e.release_args() {
@@ -344,8 +318,6 @@ fn main() {
                 //TODO: Fullscreen
                 // window.window.;
                 // std::process::exit(0);
-                dbg!("LAZU");
-
             }
 
             if key == Key::Right {
@@ -354,7 +326,6 @@ fn main() {
                 reset = true;
                 draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
-                
             }
 
             if key == Key::Left {
@@ -364,7 +335,6 @@ fn main() {
                 draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
             }
-
         };
 
         e.mouse_scroll(|d| {
@@ -388,8 +358,6 @@ fn main() {
         e.mouse_cursor(|d| {
             cursor = Vector2::new(d[0], d[1]);
             cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
-            // window.set_lazy(true);
-            
         });
 
         // e.resize(|args| {
@@ -456,7 +424,6 @@ fn main() {
             // }
 
 
-
             // fn render_text(x: f64, y: f64,
             //     text: &str, size: u32,
             //     c: Context, g: &mut G2d, 
@@ -494,16 +461,14 @@ fn main() {
                 )
                 .unwrap();
 
-
-
             glyphs.factory.encoder.flush(device);
             
         });
+
         if let Ok(_) = state_receiver.try_recv() {
             window.set_lazy(true);
             
         }
-        // dbg!(&dirty);
 
 
     }
