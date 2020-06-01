@@ -89,7 +89,7 @@ fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
 }
 
 
-fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaImage>) {
+fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaImage>, state_sender: Sender<String>) {
     let img_location = img_location.clone();
     thread::spawn(move || 
         {
@@ -199,11 +199,14 @@ fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaIm
                         Ok(img) => {
                             // println!("open. sending");
                             texture_sender.send(img.to_rgba()).unwrap();
-                            },
+                            
+                        },
                         Err(e) => println!("ERR {:?}", e),
                     }
                 }
             }
+            
+            state_sender.send(String::new()).unwrap();
         }
         );
 }
@@ -263,6 +266,12 @@ fn main() {
         Receiver<image_crate::RgbaImage>,
     ) = mpsc::channel();
 
+    let (state_sender, state_receiver): (
+        Sender<String>,
+        Receiver<String>,
+    ) = mpsc::channel();
+
+
     let mut tx_settings = TextureSettings::new();
     tx_settings.set_mag(Filter::Nearest);
     // tx_settings.set_min(Filter::Nearest);
@@ -285,27 +294,16 @@ fn main() {
     )
     .unwrap();
 
-
     let mut img_location = PathBuf::from(&img_path);
-
     draw_status(loading_img.to_vec(), texture_sender.clone());
+    open_image(&img_location, texture_sender.clone(), state_sender.clone());
+    window.set_max_fps(45);
 
 
-    open_image(&img_location, texture_sender.clone());
-
-    window.set_max_fps(30);
     while let Some(e) = window.next() {
-
-        // dbg!(now.elapsed().as_secs());
-        // if now.elapsed().as_secs() > 5 && now.elapsed().as_secs() < 7 {
-        //     println!("old!");
-        //     window.set_lazy(true);
-        // }
 
         // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
-            // println!("received image data from loader");
-            // window.set_lazy(false);
             
             texture = Texture::from_image(
                 &mut window.create_texture_context(),
@@ -318,7 +316,10 @@ fn main() {
             offset = window_size/2.0 - img_size/2.0;
             // now = Instant::now();
 
-        } 
+        }
+
+
+
 
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
@@ -344,20 +345,25 @@ fn main() {
                 //TODO: Fullscreen
                 // window.window.;
                 // std::process::exit(0);
+                dbg!("LAZU");
+
             }
 
             if key == Key::Right {
+                window.set_lazy(false);
                 img_location = img_shift(&img_location, 1);
                 reset = true;
                 draw_status(loading_img.to_vec(), texture_sender.clone());
-                open_image(&img_location, texture_sender.clone());
+                open_image(&img_location, texture_sender.clone(), state_sender.clone());
+                
             }
 
             if key == Key::Left {
+                window.set_lazy(false);
                 img_location = img_shift(&img_location, -1);
                 reset = true;
                 draw_status(loading_img.to_vec(), texture_sender.clone());
-                open_image(&img_location, texture_sender.clone());
+                open_image(&img_location, texture_sender.clone(), state_sender.clone());
             }
 
         };
@@ -383,6 +389,8 @@ fn main() {
         e.mouse_cursor(|d| {
             cursor = Vector2::new(d[0], d[1]);
             cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
+            // window.set_lazy(true);
+            
         });
 
         // e.resize(|args| {
@@ -490,9 +498,12 @@ fn main() {
 
 
             glyphs.factory.encoder.flush(device);
-
+            
         });
-
+        if let Ok(state) = state_receiver.try_recv() {
+            window.set_lazy(true);
+            
+        }
         // dbg!(&dirty);
 
 
