@@ -20,6 +20,7 @@ Image format support:
 - DDS (DXT1-5, via _dds-rs_)
 - psd (via _psd_)
 - svg (via _nsvg_)
+- exr (via _exr-rs_)
 
 Platform support:
 - Linux
@@ -36,5 +37,5 @@ Planned:
 - Investigate PVR / ETC support
 - ~~SVG support~~
 - Brighness/gamma adjust for HDR
-- EXR support
+- ~~EXR support~~
 - ~~Read next image(s) in dir and advance to them~~

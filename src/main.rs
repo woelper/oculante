@@ -3,7 +3,7 @@
 
 use ::image as image_crate;
 use image_crate::{Pixel, ImageDecoder};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 mod utils;
 use clap;
 use clap::{App, Arg};
@@ -221,7 +221,7 @@ fn draw_status (img: Vec<u8>, texture_sender: Sender<image_crate::RgbaImage>) {
     
     let png = image_crate::png::PngDecoder::new(&*img).unwrap();
     let mut b = vec![0; png.total_bytes() as usize];
-    png.read_image(&mut b);
+    let _ = png.read_image(&mut b);
 
     let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(256, 256, b).unwrap();
     // dbg!(&buffer);
@@ -237,7 +237,6 @@ fn main() {
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
     let loading_img = include_bytes!("loading.png");
 
-    let mut now = Instant::now();
 
     let matches = App::new("Oculante")
         .arg(
@@ -500,7 +499,7 @@ fn main() {
             glyphs.factory.encoder.flush(device);
             
         });
-        if let Ok(state) = state_receiver.try_recv() {
+        if let Ok(_) = state_receiver.try_recv() {
             window.set_lazy(true);
             
         }
