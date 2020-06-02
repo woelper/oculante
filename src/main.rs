@@ -1,42 +1,22 @@
 #![windows_subsystem = "windows"]
 
 
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
+
+use std::path::{PathBuf};
 use ::image as image_crate;
 use image_crate::{Pixel, ImageDecoder};
-use std::time::Duration;
+
+use piston_window::*;
 mod utils;
+use utils::{scale_pt, pos_from_coord, open_image};
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-use gif_dispose;
-use gif::{SetParameter, ColorOutput};
-
-extern crate exr;
-use exr::prelude::rgba_image as rgb_exr;
-
-use piston_window::*;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use nsvg;
-
-use std::io::BufReader;
-use std::fs::File;
-use std::path::{PathBuf};
-use dds::DDS;
-use rgb::*;
-use psd::Psd;
-use std::io::Read;
-use utils::{scale_pt, pos_from_coord};
 
 
-/// compress any possible f32 into the range of [0,1].
-/// and then convert it to an unsigned byte.
-fn tone_map(linear: f32) -> u8 {
-    // TODO does the `image` crate expect gamma corrected data?
-    let clamped = (linear - 0.5).tanh() * 0.5 + 0.5;
-    (clamped * 255.0) as u8
-}
+
 
 fn is_ext_compatible(fname: &PathBuf) -> bool {
     match fname
@@ -89,114 +69,7 @@ fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
 }
 
 
-fn open_image(img_location: &PathBuf, texture_sender: Sender<image_crate::RgbaImage>, state_sender: Sender<String>) {
-    let img_location = img_location.clone();
-    thread::spawn(move || 
-        {
-    
-            match img_location.extension().unwrap_or_default().to_str() {
-                Some("dds") => {
-                    let file = File::open(img_location).unwrap();
-                    let mut reader = BufReader::new(file);
-                    let dds = DDS::decode(&mut reader).unwrap();
-                    if let Some(main_layer) = dds.layers.get(0) {
-                        let buf = main_layer.as_bytes();
-                        let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
-                        let _ = texture_sender.send(buffer.clone());
-                    }
-                },
-                Some("svg") => {
 
-                    // Load and parse the svg
-                    let svg = nsvg::parse_file(&img_location, nsvg::Units::Pixel, 96.0).unwrap();
-                  
-                    // Create a scaled raster
-                    let scale = 3.0;
-                    let image = svg.rasterize(scale).unwrap();
-                    let dimensions = image.dimensions();
-                    // This is just to convert between different crate versions of "image". TODO: remove if crates catch up
-                    let raw = image.into_raw();
-                    let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
-                    let _ = texture_sender.send(buffer);
-
-                },
-                Some("exr") => {
-
-
-                    // read the image from a file and keep only the png buffer
-                    let (_info, png_buffer) = rgb_exr::ImageInfo::read_pixels_from_file(
-                        &img_location,
-                        rgb_exr::read_options::high(),
-
-                        // how to create an empty png buffer from exr image meta data (used for loading the exr image)
-                        |info: &rgb_exr::ImageInfo| -> image_crate::RgbaImage {
-                            image_crate::ImageBuffer::new(
-                                info.resolution.width() as u32,
-                                info.resolution.height() as u32
-                            )
-                        },
-
-                        // set each pixel in the png buffer from the exr file
-                        |png_pixels: &mut image_crate::RgbaImage, position: rgb_exr::Vec2<usize>, pixel: rgb_exr::Pixel| {
-                            png_pixels.put_pixel(
-                                position.x() as u32, position.y() as u32,
-
-                                image_crate::Rgba([
-                                    tone_map(pixel.red.to_f32()),
-                                    tone_map(pixel.green.to_f32()),
-                                    tone_map(pixel.blue.to_f32()),
-                                    (pixel.alpha_or_default().to_f32() * 255.0) as u8,
-                                ])
-                            );
-                        },
-                    ).unwrap();
-
-                    let _ = texture_sender.send(png_buffer);
-                },
-                Some("psd") => {
-                    let mut file = File::open(img_location).unwrap();
-                    let mut contents = vec![];
-                    if let Ok(_) = file.read_to_end(&mut contents){
-                        let psd = Psd::from_bytes(&contents).unwrap();
-                        if let Some(buffer) = image_crate::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba()) {
-                            let _ = texture_sender.send(buffer.clone());
-                        }
-                    }
-                },
-                Some("gif") => {
-
-                    loop {
-                        // of course this is shit. Don't reload the image all the time.
-                        let file = File::open(&img_location).unwrap();
-                        let mut decoder = gif::Decoder::new(file);
-                        // let mut decoder = gif::Decoder::new(r.by_ref());
-                        decoder.set(ColorOutput::Indexed);
-                        let mut reader = decoder.read_info().unwrap();
-                        let mut screen = gif_dispose::Screen::new_reader(&reader);
-                        let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
-          
-
-                        while let Some(frame) = reader.read_next_frame().unwrap() {
-                            screen.blit_frame(&frame).unwrap();
-                            let buffer: Option<image_crate::RgbaImage> = image_crate::ImageBuffer::from_raw(dim.0, dim.1, screen.pixels.buf().as_bytes().to_vec());
-                            texture_sender.send(buffer.unwrap()).unwrap();
-                            std::thread::sleep(Duration::from_millis(30));
-                        }
-                    }
-                }
-                _ => {
-                    match image_crate::open(img_location) {
-                        Ok(img) => {
-                            texture_sender.send(img.to_rgba()).unwrap();
-                        },
-                        Err(e) => println!("ERR {:?}", e),
-                    }
-                }
-            }
-            state_sender.send(String::new()).unwrap();
-        }
-        );
-}
 
 
 /// This is not really a status, it just displays a "loading" image.
@@ -257,7 +130,7 @@ fn main() {
     let mut cursor_in_image = Vector2::new(0.0, 0.0);
     let mut scale = 1.0;
     let mut drag = false;
-    let scale_increment = 0.2;
+    let scale_increment = 0.1;
     let mut reset = false;
     let mut dimensions = (0, 0);
     let mut current_image = image_crate::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
@@ -323,17 +196,17 @@ fn main() {
             if key == Key::Right {
                 window.set_lazy(false);
                 img_location = img_shift(&img_location, 1);
-                reset = true;
                 draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
+                // reset = true;
             }
 
             if key == Key::Left {
                 window.set_lazy(false);
                 img_location = img_shift(&img_location, -1);
-                reset = true;
                 draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
+                // reset = true;
             }
         };
 
@@ -372,9 +245,11 @@ fn main() {
             if reset {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
+                let scale_factor = (window_size.x/img_size.x).min(1.0);
+                dbg!(scale_factor);
+                scale = scale_factor;
                 offset = Vector2::new(0.0, 0.0);
-                offset += window_size/2.0 - img_size/2.0;
-                scale = 1.0;
+                offset += window_size/2.0 - (img_size*scale)/2.0;
                 reset = false;
             }
 
@@ -466,6 +341,7 @@ fn main() {
         });
 
         if let Ok(_) = state_receiver.try_recv() {
+            reset  =true;
             window.set_lazy(true);
             
         }

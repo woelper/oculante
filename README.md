@@ -1,22 +1,28 @@
 # oculante
-A no-nonsense hardware-accelerated image viewer
 
+_A no-nonsense hardware-accelerated image viewer_
+
+
+I started this as a toy project to make a simple image viewer. The vision is to create something with a broad support of industry-standard files and add simple image analysis.
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
+## installation
+Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required.
 
-I started this as a toy project to make a simple image viewer. Here are the features:
+## features
 
 Image format support:
 - bmp	
-- gif (No animation support)	
-- hdr	
+- gif (animation support and correct timing, no looping yet)	
+- hdr (tonemapped)
 - ico	
 - jpeg	
 - png	
 - pnm	
 - tga	
 - tiff	
-- webp	
+- webp
+- farbfeld  
 - DDS (DXT1-5, via _dds-rs_)
 - psd (via _psd_)
 - svg (via _nsvg_)
@@ -29,7 +35,10 @@ Platform support:
 
 Misc
 - Async image loading
-- Color picker / basic image info
+- Color picker / basic image info (sample pixel position under cursor, sample color under cursor)
+- Fit image to view
+- Low cpu usage
+- Pretty fast startup/loading time
 
 Planned:
 - Custom display for images with unassociated channels
@@ -39,3 +48,12 @@ Planned:
 - Brighness/gamma adjust for HDR
 - ~~EXR support~~
 - ~~Read next image(s) in dir and advance to them~~
+
+Cheatsheet:
+> `r` = reset view
+>
+> `mouse wheel` = zoom
+>
+> `left/right` = prev/next image in folder
+
+Please submit bugs and feature requests on this github repo!
