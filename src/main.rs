@@ -87,6 +87,7 @@ fn main() {
     let mut drag = false;
     let scale_increment = 0.1;
     let mut reset = false;
+    let mut message = "Can't find image".to_string();
     let mut dimensions = (0, 0);
     let mut current_image = image_crate::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
     let mut current_color = (0, 0, 0, 0);
@@ -103,6 +104,9 @@ fn main() {
     open_image(&img_location, texture_sender.clone(), state_sender.clone());
     window.set_max_fps(45);
 
+    if img_location.is_file() {
+        message = "Loading...".to_string();
+    }
 
     while let Some(e) = window.next() {
 
@@ -293,7 +297,7 @@ fn main() {
                 if ! loaded {
                     text::Text::new_color([1.0, 1.0, 1.0, 0.7], 36)
                     .draw(
-                        "No image loaded",
+                        &message,
                         &mut glyphs,
                         &c.draw_state,
                         c.transform.trans(size.width/2.0-120.0, size.height/2.0),
