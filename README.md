@@ -7,7 +7,7 @@ I started this as a toy project to make a simple image viewer. The vision is to 
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
 ## installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required.
+Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open something, you must configure your system to open your desired image formats with oculante, or drag them onto the executable.
 
 ## features
 

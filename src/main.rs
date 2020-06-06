@@ -1,6 +1,5 @@
 #![windows_subsystem = "windows"]
 
-
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -10,41 +9,11 @@ use image_crate::{Pixel, ImageDecoder};
 
 use piston_window::*;
 mod utils;
-use utils::{scale_pt, pos_from_coord, open_image};
+use utils::{scale_pt, pos_from_coord, open_image, is_ext_compatible};
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 
-
-
-
-fn is_ext_compatible(fname: &PathBuf) -> bool {
-    match fname
-        .extension()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str() {
-        "png" => true,
-        "exr" => true,
-        "jpg" => true,
-        "jpeg" => true,
-        "psd" => true,
-        "dds" => true,
-        "gif" => true,
-        "hdr" => true,
-        "bmp" => true,
-        "ico" => true,
-        "tga" => true,
-        "tiff" => true,
-        "tif" => true,
-        "webp" => true,
-        "pnm" => true,
-        "svg" => true,
-        _ => false
-    }
-}
 
 
 fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
@@ -71,37 +40,23 @@ fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
 
 
 
-
-/// This is not really a status, it just displays a "loading" image.
-fn draw_status (img: Vec<u8>, texture_sender: Sender<image_crate::RgbaImage>) {
-    
-    let png = image_crate::png::PngDecoder::new(&*img).unwrap();
-    let mut b = vec![0; png.total_bytes() as usize];
-    let _ = png.read_image(&mut b);
-
-    let buffer: image_crate::RgbaImage = image_crate::ImageBuffer::from_raw(256, 256, b).unwrap();
-    let _ = texture_sender.send(buffer.clone());
-}
-
-
 fn main() {
     
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
-    let loading_img = include_bytes!("loading.png");
+    // let loading_img = include_bytes!("loading.png");
 
     let matches = App::new("Oculante")
         .arg(
             Arg::with_name("INPUT")
                 .help("Display this image")
-                .required(true)
+                // .required(true)
                 .index(1),
         )
         .get_matches();
 
-    let img_path = matches.value_of("INPUT").unwrap().to_string();
+    let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
 
     let opengl = OpenGL::V3_2;
-
 
     let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
@@ -142,9 +97,9 @@ fn main() {
         TextureSettings::new(),
     )
     .unwrap();
+    let mut loaded = false;
 
     let mut img_location = PathBuf::from(&img_path);
-    draw_status(loading_img.to_vec(), texture_sender.clone());
     open_image(&img_location, texture_sender.clone(), state_sender.clone());
     window.set_max_fps(45);
 
@@ -153,7 +108,6 @@ fn main() {
 
         // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
-            
             texture = Texture::from_image(
                 &mut window.create_texture_context(),
                 &img,
@@ -163,7 +117,7 @@ fn main() {
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
             offset = window_size/2.0 - img_size/2.0;
-            // now = Instant::now();
+            loaded = true;
 
         }
 
@@ -195,18 +149,16 @@ fn main() {
 
             if key == Key::Right {
                 window.set_lazy(false);
+                loaded = false;
                 img_location = img_shift(&img_location, 1);
-                draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
-                // reset = true;
             }
 
             if key == Key::Left {
                 window.set_lazy(false);
+                loaded = false;
                 img_location = img_shift(&img_location, -1);
-                draw_status(loading_img.to_vec(), texture_sender.clone());
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
-                // reset = true;
             }
         };
 
@@ -259,6 +211,7 @@ fn main() {
                 .zoom(scale);
 
                 
+            // draw the image
             if let Ok(tex) = &texture {
                 image(tex, transform, gfx);
                 dimensions = tex.get_size();
@@ -336,12 +289,26 @@ fn main() {
                 )
                 .unwrap();
 
+
+                if ! loaded {
+                    text::Text::new_color([1.0, 1.0, 1.0, 0.7], 36)
+                    .draw(
+                        "No image loaded",
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform.trans(size.width/2.0-120.0, size.height/2.0),
+                        gfx,
+                    )
+                    .unwrap();
+                }
             glyphs.factory.encoder.flush(device);
             
         });
 
         if let Ok(_) = state_receiver.try_recv() {
-            reset  =true;
+            // an image has been received
+            reset = true;
+            // loaded = true;
             window.set_lazy(true);
             
         }

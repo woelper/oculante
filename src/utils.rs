@@ -19,6 +19,35 @@ use image;
 use std::sync::mpsc::Sender;
 
 
+pub fn is_ext_compatible(fname: &PathBuf) -> bool {
+    match fname
+        .extension()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str() {
+        "png" => true,
+        "exr" => true,
+        "jpg" => true,
+        "jpeg" => true,
+        "psd" => true,
+        "dds" => true,
+        "gif" => true,
+        "hdr" => true,
+        "bmp" => true,
+        "ico" => true,
+        "tga" => true,
+        "tiff" => true,
+        "tif" => true,
+        "webp" => true,
+        "pnm" => true,
+        "svg" => true,
+        "ff" => true,
+        _ => false
+    }
+}
+
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
         [
             (px[0].powf(1.0/2.2).max(0.0).min(1.0) * 255.0) as u8,
