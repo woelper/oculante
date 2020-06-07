@@ -8,11 +8,13 @@ use ::image as image_crate;
 use image_crate::{Pixel, ImageDecoder};
 
 use piston_window::*;
+// use Event::Input;
 mod utils;
 use utils::{scale_pt, pos_from_coord, open_image, is_ext_compatible};
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
+
 
 
 
@@ -87,7 +89,7 @@ fn main() {
     let mut drag = false;
     let scale_increment = 0.1;
     let mut reset = false;
-    let mut message = "Can't find image".to_string();
+    let mut message = "Drag image here".to_string();
     let mut dimensions = (0, 0);
     let mut current_image = image_crate::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
     let mut current_color = (0, 0, 0, 0);
@@ -125,6 +127,20 @@ fn main() {
 
         }
 
+ 
+
+
+        if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
+            window.set_lazy(false);
+            message = "Loading...".to_string();
+            loaded = false;
+            img_location = p.clone();
+            open_image(&img_location, texture_sender.clone(), state_sender.clone());
+        }
+        
+        
+
+ 
 
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
@@ -184,6 +200,8 @@ fn main() {
             }
         });
 
+        // e.file_drag();
+
         e.mouse_cursor(|d| {
             cursor = Vector2::new(d[0], d[1]);
             cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
@@ -192,6 +210,8 @@ fn main() {
         // e.resize(|args| {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
+
+
 
         let size = window.size();
 
