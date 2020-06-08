@@ -5,7 +5,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use std::path::{PathBuf};
 use ::image as image_crate;
-use image_crate::{Pixel, ImageDecoder};
+use image_crate::{Pixel};
 
 use piston_window::*;
 // use Event::Input;
@@ -18,7 +18,7 @@ use nalgebra::Vector2;
 
 
 
-fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
+fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
         let mut files = std::fs::read_dir(parent)
         .unwrap()
@@ -29,7 +29,10 @@ fn img_shift(file: &PathBuf, inc: i8) -> PathBuf {
         files.sort();
         for (i, f) in files.iter().enumerate() {
             if f == file {
-                if let Some(next) = files.get( (i as i8 + inc) as usize) {
+                // dbg!(&f, i, i + inc);
+                if let Some(next) = files.get( (i as isize + inc) as usize ) {
+                    // dbg!(&next, i + inc);
+
                     return next.clone();
                 }
             }
