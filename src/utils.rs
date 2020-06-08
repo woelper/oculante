@@ -16,6 +16,7 @@ use exr::prelude::rgba_image as rgb_exr;
 use nsvg;
 // use ::image as image;
 use image;
+use image::{ImageBuffer, Rgba};
 use std::sync::mpsc::Sender;
 
 
@@ -46,6 +47,31 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
         "ff" => true,
         _ => false
     }
+}
+
+
+
+pub fn solo_channel(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, channel: usize) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let mut updated_img = img.clone();
+    // let updated_img = img.pixels();
+
+    for pixel in updated_img.pixels_mut() {
+        pixel.0[0] = pixel.0[channel];
+        pixel.0[1] = pixel.0[channel];
+        pixel.0[2] = pixel.0[channel];
+        pixel.0[3] = 255;
+    }
+    updated_img
+}
+
+pub fn unpremult(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let mut updated_img = img.clone();
+    // let updated_img = img.pixels();
+
+    for pixel in updated_img.pixels_mut() {
+        pixel.0[3] = 255;
+    }
+    updated_img
 }
 
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {

@@ -10,7 +10,7 @@ use image_crate::{Pixel, ImageDecoder};
 use piston_window::*;
 // use Event::Input;
 mod utils;
-use utils::{scale_pt, pos_from_coord, open_image, is_ext_compatible};
+use utils::{scale_pt, pos_from_coord, open_image, is_ext_compatible, solo_channel, unpremult};
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
@@ -120,6 +120,7 @@ fn main() {
                 &tx_settings,
             );
             current_image = img;
+            
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
             offset = window_size/2.0 - img_size/2.0;
@@ -140,7 +141,6 @@ fn main() {
         
         
 
- 
 
         if let Some(Button::Mouse(_)) = e.press_args() {
             drag = true;
@@ -153,7 +153,7 @@ fn main() {
         }
 
         if let Some(Button::Keyboard(key)) = e.press_args() {
-            if key == Key::R {
+            if key == Key::V {
                 reset = true;
             }
 
@@ -165,6 +165,52 @@ fn main() {
                 //TODO: Fullscreen
                 // window.window.;
                 // std::process::exit(0);
+            }
+
+            if key == Key::U {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &unpremult(&current_image),
+                    &tx_settings,
+                );
+            }
+            
+            if key == Key::R {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &solo_channel(&current_image, 0),
+                    &tx_settings,
+                );
+            }
+
+            if key == Key::G {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &solo_channel(&current_image, 1),
+                    &tx_settings,
+                );
+            }
+
+            if key == Key::B {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &solo_channel(&current_image, 2),
+                    &tx_settings,
+                );
+            }
+            if key == Key::A {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &solo_channel(&current_image, 3),
+                    &tx_settings,
+                );
+            }
+            if key == Key::C {
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &current_image,
+                    &tx_settings,
+                );
             }
 
             if key == Key::Right {

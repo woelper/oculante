@@ -50,7 +50,13 @@ Planned:
 - ~~Read next image(s) in dir and advance to them~~
 
 Cheatsheet:
-> `r` = reset view
+> `v` = reset view
+>
+> `r`,`g`,`b`,`a` = display red/green/blue/alpha channel
+>
+> `c` = display color channel
+>
+> `u` = display colors unpremultiplied
 >
 > `mouse wheel` = zoom
 >
