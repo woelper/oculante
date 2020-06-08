@@ -39,9 +39,10 @@ Misc
 - Fit image to view
 - Low cpu usage
 - Pretty fast startup/loading time
+- Display unassociated / unpremultiplied alpha (press `u`)
 
 Planned:
-- Custom display for images with unassociated channels
+- ~~Custom display for images with unassociated channels~~
 - Image rotation (and read EXIF for that)
 - Investigate PVR / ETC support
 - ~~SVG support~~
