@@ -3,7 +3,12 @@
 _A no-nonsense hardware-accelerated image viewer_
 
 
-I started this as a toy project to make a simple image viewer. The vision is to create something with a broad support of industry-standard files and add simple image analysis.
+I started this as a toy project to make a simple image viewer. The vision is to create something with a broad support of industry-standard files and gradually add more image analysis tools. Here are some reasons why this might be helpful to you:
+- Completely bloat-free
+- Available for Win, Mac, Linux
+- Supports a wide range of images
+- Can display unassociated channels correctly (For example if your image uses alpha and color channels to encode data in a special way)
+- Lets you pick pixels and displays location and color values
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
 ## installation
