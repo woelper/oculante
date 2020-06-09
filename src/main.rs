@@ -10,7 +10,7 @@ use image_crate::{Pixel};
 use piston_window::*;
 // use Event::Input;
 mod utils;
-use utils::{scale_pt, pos_from_coord, open_image, is_ext_compatible, solo_channel, unpremult};
+use utils::*;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
@@ -56,6 +56,10 @@ fn main() {
                 .help("Display this image")
                 // .required(true)
                 .index(1),
+        )
+        .arg(
+            Arg::with_name("-listen")
+                .help("Listen to port")
         )
         .get_matches();
 
