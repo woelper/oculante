@@ -65,6 +65,8 @@ Cheatsheet:
 >
 > `u` = display colors unpremultiplied
 >
+> `f` = toggle fullscreen
+>
 > `mouse wheel` = zoom
 >
 > `left/right` = prev/next image in folder

@@ -17,9 +17,14 @@ use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 
+extern crate glutin_window;
+// extern crate window;
 
+use glutin_window::GlutinWindow;
 
 fn main() {
+
+
     
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
     // let loading_img = include_bytes!("loading.png");
@@ -47,10 +52,12 @@ fn main() {
 
     let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
-        .graphics_api(opengl)
+        // .graphics_api(opengl)
         // .fullscreen(true)
         .build()
         .unwrap();
+
+
 
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
@@ -70,6 +77,7 @@ fn main() {
     tx_settings.set_mag(Filter::Nearest);
     // tx_settings.set_min(Filter::Nearest);
 
+    // These should all be a nice config struct...
     let mut offset = Vector2::new(0.0, 0.0);
     let mut cursor = Vector2::new(0.0, 0.0);
     let mut cursor_in_image = Vector2::new(0.0, 0.0);
@@ -89,6 +97,7 @@ fn main() {
     )
     .unwrap();
     let mut loaded = false;
+    let mut fullscreen = false;
 
     let mut img_location = PathBuf::from(&img_path);
     open_image(&img_location, texture_sender.clone(), state_sender.clone());
@@ -161,9 +170,40 @@ fn main() {
             }
 
             if key == Key::F {
-                //TODO: Fullscreen
-                // window.window.;
-                // std::process::exit(0);
+
+                // window.set_lazy(false);
+
+                if ! fullscreen {
+
+                    window = WindowSettings::new("Oculante", [1000, 800])
+                    .exit_on_esc(true)
+                    // .graphics_api(opengl)
+                    .fullscreen(true)
+                    .build()
+                    .unwrap();
+                    fullscreen = true;
+                } else {
+                    window = WindowSettings::new("Oculante", [1000, 800])
+                    .exit_on_esc(true)
+                    // .graphics_api(opengl)
+                    .build()
+                    .unwrap();
+                    fullscreen = false;
+                }
+                
+                // reset = true;
+                texture = Texture::from_image(
+                    &mut window.create_texture_context(),
+                    &current_image,
+                    &tx_settings,
+                );
+                glyphs = Glyphs::from_bytes(
+                    font,
+                    window.create_texture_context(),
+                    TextureSettings::new(),
+                )
+                .unwrap();
+
             }
 
             if key == Key::U {

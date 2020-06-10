@@ -7,15 +7,16 @@ edition = "2018"
 [dependencies]
 piston_window = "*"
 clap = "*"
-image = "0.23.0"
+image = "*"
 nalgebra = "*"
 dds-rs = "*"
 rgb = "*"
 psd = "*"
 exr = {git = "https://github.com/johannesvollmer/exrs.git"}
 gif-dispose = "*"
-nsvg = "0.5.1"
+nsvg = "*"
 gif = "*"
+pistoncore-glutin_window = "*"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"
