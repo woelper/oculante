@@ -38,13 +38,14 @@ Platform support:
 - Mac
 - Windows
 
-Misc
+Misc features
 - Async image loading
 - Color picker / basic image info (sample pixel position under cursor, sample color under cursor)
 - Fit image to view
 - Low cpu usage
 - Pretty fast startup/loading time
 - Display unassociated / unpremultiplied alpha (press `u`)
+- Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
 Planned:
 - ~~Custom display for images with unassociated channels~~

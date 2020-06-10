@@ -11,37 +11,11 @@ use piston_window::*;
 // use Event::Input;
 mod utils;
 use utils::*;
+mod net;
+use net::*;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-
-
-
-
-fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
-    if let Some(parent) = file.parent() {
-        let mut files = std::fs::read_dir(parent)
-        .unwrap()
-        .map(|x| x.unwrap().path().to_path_buf())
-        .filter(|x| is_ext_compatible(x))
-        .collect::<Vec<PathBuf>>()
-        ;
-        files.sort();
-        for (i, f) in files.iter().enumerate() {
-            if f == file {
-                // dbg!(&f, i, i + inc);
-                if let Some(next) = files.get( (i as isize + inc) as usize ) {
-                    // dbg!(&next, i + inc);
-
-                    return next.clone();
-                }
-            }
-        }
-    }
-    file.clone()
-
-}
-
 
 
 
@@ -58,10 +32,14 @@ fn main() {
                 .index(1),
         )
         .arg(
-            Arg::with_name("-listen")
-                .help("Listen to port")
+            Arg::with_name("l")
+            .short("l")
+            .help("Listen on port")
+            .takes_value(true)
         )
         .get_matches();
+
+
 
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
 
@@ -84,6 +62,9 @@ fn main() {
         Receiver<String>,
     ) = mpsc::channel();
 
+
+
+    
 
     let mut tx_settings = TextureSettings::new();
     tx_settings.set_mag(Filter::Nearest);
@@ -111,11 +92,23 @@ fn main() {
 
     let mut img_location = PathBuf::from(&img_path);
     open_image(&img_location, texture_sender.clone(), state_sender.clone());
-    window.set_max_fps(45);
+    window.set_max_fps(60);
 
     if img_location.is_file() {
         message = "Loading...".to_string();
     }
+
+    if let Some(port) = matches.value_of("l") {
+        match port.parse::<i32>() {
+            Ok(p) => {
+                message = format!("Listening on {}", p);
+                recv(p, texture_sender.clone(), state_sender.clone());
+            },
+            Err(e) => println!("Port must be a number")
+        }        
+    }
+
+    // dbg!(window.get)
 
     while let Some(e) = window.next() {
 
@@ -135,7 +128,7 @@ fn main() {
 
         }
 
- 
+
 
 
         if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
@@ -145,7 +138,6 @@ fn main() {
             img_location = p.clone();
             open_image(&img_location, texture_sender.clone(), state_sender.clone());
         }
-        
         
 
 
@@ -275,7 +267,6 @@ fn main() {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
                 let scale_factor = (window_size.x/img_size.x).min(1.0);
-                dbg!(scale_factor);
                 scale = scale_factor;
                 offset = Vector2::new(0.0, 0.0);
                 offset += window_size/2.0 - (img_size*scale)/2.0;
@@ -382,11 +373,17 @@ fn main() {
             
         });
 
-        if let Ok(_) = state_receiver.try_recv() {
+        if let Ok(state) = state_receiver.try_recv() {
             // an image has been received
-            reset = true;
-            // loaded = true;
-            window.set_lazy(true);
+            // window.set_lazy(false);
+            loaded = true;
+            
+            if state != "ANIM_FRAME" {
+                reset = true;
+                window.set_lazy(true);
+            } else {
+
+            }
             
         }
 
