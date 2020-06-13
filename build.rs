@@ -5,7 +5,7 @@ use windres::Build;
 
 fn main() {
     
-    #[cfg(windows)]
+    // #[cfg(windows)]
     match std::process::Command::new("convert")
     .args(vec!["res/logo.png", "icon.ico"]).spawn(){
         Ok(_b) => println!("Converted icon"),

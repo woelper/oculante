@@ -1,5 +1,6 @@
 # oculante
 
+![Logo](res/logo.png "Logo")
 _A no-nonsense hardware-accelerated image viewer_
 
 
@@ -16,7 +17,7 @@ I started this as a toy project to make a simple image viewer. The vision is to 
 
 
 ## installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open something, you must configure your system to open your desired image formats with oculante, or drag them onto the executable.
+Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window.
 
 ## features
 
@@ -43,8 +44,8 @@ Platform support:
 - Windows
 
 Misc features
-- Async image loading
-- Color picker / basic image info (sample pixel position under cursor, sample color under cursor)
+- Image info (<kbd>i</kbd>) (pixel position, color info)
+- Threaded image loading
 - Fit image to view
 - Low cpu usage
 - Pretty fast startup/loading time
