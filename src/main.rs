@@ -8,6 +8,8 @@ use ::image as image_crate;
 use image_crate::{Pixel};
 
 use piston_window::*;
+extern crate sdl2_window;
+
 // use Event::Input;
 mod utils;
 use utils::*;
@@ -16,15 +18,15 @@ use net::*;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-
-extern crate glutin_window;
+use sdl2_window::Sdl2Window;
+// extern crate glutin_window;
 // extern crate window;
 
-use glutin_window::GlutinWindow;
+// use glutin_window::GlutinWindow;
 
 fn main() {
 
-
+    let mut state = OculanteState::default();
     
     let font = include_bytes!("IBMPlexSans-Regular.ttf");
     // let loading_img = include_bytes!("loading.png");
@@ -50,14 +52,16 @@ fn main() {
 
     let opengl = OpenGL::V3_2;
 
-    let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
+    let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
         // .graphics_api(opengl)
-        // .fullscreen(true)
+        // .state.fullscreen_enabled(true)
         .build()
         .unwrap();
 
+    window.set_max_fps(60);
 
+    // dbg!(window.window);
 
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
@@ -70,25 +74,12 @@ fn main() {
     ) = mpsc::channel();
 
 
-
-    
-
+    // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
     tx_settings.set_mag(Filter::Nearest);
-    // tx_settings.set_min(Filter::Nearest);
 
     // These should all be a nice config struct...
-    let mut offset = Vector2::new(0.0, 0.0);
-    let mut cursor = Vector2::new(0.0, 0.0);
-    let mut cursor_in_image = Vector2::new(0.0, 0.0);
-    let mut scale = 1.0;
-    let mut drag = false;
-    let scale_increment = 0.1;
-    let mut reset = false;
-    let mut message = "Drag image here".to_string();
-    let mut dimensions = (0, 0);
     let mut current_image = image_crate::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
-    let mut current_color = (0, 0, 0, 0);
     let mut texture = Texture::empty(&mut window.create_texture_context());
     let mut glyphs = Glyphs::from_bytes(
         font,
@@ -96,28 +87,25 @@ fn main() {
         TextureSettings::new(),
     )
     .unwrap();
-    let mut loaded = false;
-    let mut fullscreen = false;
+
 
     let mut img_location = PathBuf::from(&img_path);
     open_image(&img_location, texture_sender.clone(), state_sender.clone());
-    window.set_max_fps(60);
 
     if img_location.is_file() {
-        message = "Loading...".to_string();
+        state.message = "Loading...".to_string();
     }
 
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                message = format!("Listening on {}", p);
+                state.message = format!("Listening on {}", p);
                 recv(p, texture_sender.clone(), state_sender.clone());
             },
             Err(e) => println!("Port must be a number")
         }        
     }
 
-    // dbg!(window.get)
 
     while let Some(e) = window.next() {
 
@@ -132,18 +120,15 @@ fn main() {
             
             let window_size = Vector2::new(window.size().width, window.size().height);
             let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
-            offset = window_size/2.0 - img_size/2.0;
-            loaded = true;
-
+            state.offset = window_size/2.0 - img_size/2.0;
+            state.is_loaded = true;
         }
-
-
 
 
         if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
             window.set_lazy(false);
-            message = "Loading...".to_string();
-            loaded = false;
+            state.message = "Loading...".to_string();
+            state.is_loaded = false;
             img_location = p.clone();
             open_image(&img_location, texture_sender.clone(), state_sender.clone());
         }
@@ -151,47 +136,45 @@ fn main() {
 
 
         if let Some(Button::Mouse(_)) = e.press_args() {
-            drag = true;
-            cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
-            current_color = current_image.get_pixel(cursor_in_image.x as u32, cursor_in_image.y as u32).channels4();            
+            state.drag_enabled = true;
+            state.cursor_relative = pos_from_coord(state.offset, state.cursor, Vector2::new(state.image_dimension.0 as f64, state.image_dimension.1 as f64), state.scale);
+            // state.sampled_color = current_image.get_pixel(state.cursor_relative.x as u32, state.cursor_relative.y as u32).channels4();            
         }
 
         if let Some(Button::Mouse(_)) = e.release_args() {
-            drag = false;
+            state.drag_enabled = false;
         }
 
         if let Some(Button::Keyboard(key)) = e.press_args() {
             if key == Key::V {
-                reset = true;
+                state.reset_image = true;
             }
-
+            // Quit
             if key == Key::Q {
                 std::process::exit(0);
             }
-
+            // Set state.fullscreen_enabled
             if key == Key::F {
+                if ! state.fullscreen_enabled {
+                    
 
-                // window.set_lazy(false);
-
-                if ! fullscreen {
-
-                    window = WindowSettings::new("Oculante", [1000, 800])
-                    .exit_on_esc(true)
-                    // .graphics_api(opengl)
-                    .fullscreen(true)
-                    .build()
-                    .unwrap();
-                    fullscreen = true;
+                    // window = WindowSettings::new("Oculante", [1000, 800])
+                    // .exit_on_esc(true)
+                    // // .graphics_api(opengl)
+                    // .fullscreen(true)
+                    // .build()
+                    // .unwrap();
+                    state.fullscreen_enabled = true;
                 } else {
-                    window = WindowSettings::new("Oculante", [1000, 800])
-                    .exit_on_esc(true)
-                    // .graphics_api(opengl)
-                    .build()
-                    .unwrap();
-                    fullscreen = false;
+                    // window = WindowSettings::new("Oculante", [1000, 800])
+                    // .exit_on_esc(true)
+                    // // .graphics_api(opengl)
+                    // .build()
+                    // .unwrap();
+                    state.fullscreen_enabled = false;
                 }
                 
-                // reset = true;
+                // state.reset_image = true;
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
                     &current_image,
@@ -205,7 +188,7 @@ fn main() {
                 .unwrap();
 
             }
-
+            // Display color unpremultiplied (just rgb without multiplying by alpha)
             if key == Key::U {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -213,7 +196,7 @@ fn main() {
                     &tx_settings,
                 );
             }
-            
+            // Only red
             if key == Key::R {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -221,7 +204,7 @@ fn main() {
                     &tx_settings,
                 );
             }
-
+            // Only green
             if key == Key::G {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -229,7 +212,7 @@ fn main() {
                     &tx_settings,
                 );
             }
-
+            // Only blue
             if key == Key::B {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -237,6 +220,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+            // Only alpha
             if key == Key::A {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -244,6 +228,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+            // Color channel (RGB)
             if key == Key::C {
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
@@ -252,16 +237,21 @@ fn main() {
                 );
             }
 
+            // Toggle extended info
+            if key == Key::I {
+                state.info_enabled = !state.info_enabled;
+            }
+
             if key == Key::Right {
                 window.set_lazy(false);
-                loaded = false;
+                state.is_loaded = false;
                 img_location = img_shift(&img_location, 1);
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
             }
 
             if key == Key::Left {
                 window.set_lazy(false);
-                loaded = false;
+                state.is_loaded = false;
                 img_location = img_shift(&img_location, -1);
                 open_image(&img_location, texture_sender.clone(), state_sender.clone());
             }
@@ -269,27 +259,30 @@ fn main() {
 
         e.mouse_scroll(|d| {
             if d[1] > 0.0 {
-                offset -= scale_pt(offset, cursor, scale, scale_increment);
-                scale += scale_increment;
+                state.offset -= scale_pt(state.offset, state.cursor, state.scale, state.scale_increment);
+                state.scale += state.scale_increment;
             } else {
-                if scale > scale_increment + 0.01 {
-                    offset += scale_pt(offset, cursor, scale, scale_increment);
-                    scale -= scale_increment;
+                if state.scale > state.scale_increment + 0.01 {
+                    state.offset += scale_pt(state.offset, state.cursor, state.scale, state.scale_increment);
+                    state.scale -= state.scale_increment;
                 }
             }
         });
 
         e.mouse_relative(|d| {
-            if drag {
-                offset += Vector2::new(d[0], d[1]);
+            if state.drag_enabled {
+                state.offset += Vector2::new(d[0], d[1]);
             }
         });
 
         // e.file_drag();
 
         e.mouse_cursor(|d| {
-            cursor = Vector2::new(d[0], d[1]);
-            cursor_in_image = pos_from_coord(offset, cursor, Vector2::new(dimensions.0 as f64, dimensions.1 as f64), scale);
+            state.cursor = Vector2::new(d[0], d[1]);
+            state.cursor_relative = pos_from_coord(state.offset, state.cursor, Vector2::new(state.image_dimension.0 as f64, state.image_dimension.1 as f64), state.scale);
+            let p = current_image.get_pixel(state.cursor_relative.x as u32, state.cursor_relative.y as u32).channels4(); 
+            state.sampled_color = [p.0 as f32, p.1 as f32, p.2 as f32, p.3 as f32];          
+
         });
 
         // e.resize(|args| {
@@ -303,44 +296,36 @@ fn main() {
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
 
-            if reset {
+            if state.reset_image {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
                 let scale_factor = (window_size.x/img_size.x).min(1.0);
-                scale = scale_factor;
-                offset = Vector2::new(0.0, 0.0);
-                offset += window_size/2.0 - (img_size*scale)/2.0;
-                reset = false;
+                state.scale = scale_factor;
+                state.offset = Vector2::new(0.0, 0.0);
+                state.offset += window_size/2.0 - (img_size*state.scale)/2.0;
+                state.reset_image = false;
             }
 
             let transform = c.
                 transform
-                .trans(offset.x as f64, offset.y as f64)
-                .zoom(scale);
+                .trans(state.offset.x as f64, state.offset.y as f64)
+                .zoom(state.scale);
 
                 
             // draw the image
             if let Ok(tex) = &texture {
                 image(tex, transform, gfx);
-                dimensions = tex.get_size();
+                state.image_dimension = tex.get_size();
             }
 
 
-            let info = format!("{} {}X{} rgba {} {} {} {} / {:.2} {:.2} {:.2} {:.2} {:.2}x{:.2} @{}X",
+            let info = format!("{} {}X{} @{}X",
                 &img_location.to_string_lossy(),
-                dimensions.0,
-                dimensions.1,
-                current_color.0,
-                current_color.1,
-                current_color.2,
-                current_color.3,
-                current_color.0 as f32 / 255.0,
-                current_color.1 as f32 / 255.0,
-                current_color.2 as f32 / 255.0,
-                current_color.3 as f32 / 255.0,
-                cursor_in_image[0].round() as i32,
-                cursor_in_image[1].round() as i32,
-                (scale * 10.0).round() / 10.0
+                state.image_dimension.0,
+                state.image_dimension.1,
+       
+               
+                (state.scale * 10.0).round() / 10.0
             );
 
             // Draw text three times to simulate outline
@@ -376,7 +361,7 @@ fn main() {
 
             for i in vec![(-2,-2), (-2,-0), (0,-2), (2,2), (2,0)] {
 
-                text::Text::new_color([0.0, 0.0, 0.0, 1.0], 18)
+                text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
                     .draw(
                         &info,
                         &mut glyphs,
@@ -387,7 +372,7 @@ fn main() {
                     .unwrap();
 
             }
-            text::Text::new_color([1.0, 1.0, 1.0, 0.7], 18)
+            text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
                 .draw(
                     &info,
                     &mut glyphs,
@@ -398,10 +383,10 @@ fn main() {
                 .unwrap();
 
 
-                if ! loaded {
-                    text::Text::new_color([1.0, 1.0, 1.0, 0.7], 36)
+                if ! state.is_loaded {
+                    text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size*2)
                     .draw(
-                        &message,
+                        &state.message,
                         &mut glyphs,
                         &c.draw_state,
                         c.transform.trans(size.width/2.0-120.0, size.height/2.0),
@@ -409,17 +394,53 @@ fn main() {
                     )
                     .unwrap();
                 }
+
+                if state.info_enabled {
+                    let mut col = state.sampled_color;
+                    col[0] = (255. - col[0])/255.; 
+                    col[1] = (255. - col[1])/255.; 
+                    col[2] = (255. - col[2])/255.; 
+                    col[3] = 1.0; 
+
+                    text::Text::new_color(col, state.font_size)
+                    .draw(
+                        &format!("Pos {},{}",
+                            state.cursor_relative[0].floor() as i32 + 1,
+                            state.cursor_relative[1].floor() as i32 + 1
+                        ),
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform.trans(state.cursor.x + 32. , state.cursor.y),
+                        gfx,
+                    )
+                    .unwrap();
+
+                    text::Text::new_color(col, state.font_size)
+                    .draw(
+                        &format!("C {} / {}",
+                            disp_col(state.sampled_color),
+                            disp_col_norm(state.sampled_color, 255.0),
+                        ),
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform.trans(state.cursor.x + 32., state.cursor.y + state.font_size as f64),
+                        gfx,
+                    )
+                    .unwrap();
+
+
+                }
             glyphs.factory.encoder.flush(device);
             
         });
 
-        if let Ok(state) = state_receiver.try_recv() {
+        if let Ok(state_msg) = state_receiver.try_recv() {
             // an image has been received
             // window.set_lazy(false);
-            loaded = true;
+            state.is_loaded = true;
             
-            if state != "ANIM_FRAME" {
-                reset = true;
+            if state_msg != "ANIM_FRAME" {
+                state.reset_image = true;
                 window.set_lazy(true);
             } else {
 

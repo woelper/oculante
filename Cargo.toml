@@ -16,7 +16,19 @@ exr = {git = "https://github.com/johannesvollmer/exrs.git"}
 gif-dispose = "*"
 nsvg = "*"
 gif = "*"
-pistoncore-glutin_window = "*"
+# pistoncore-glutin_window = "*"
+
+[dependencies.pistoncore-sdl2_window]
+git = "https://github.com/PistonDevelopers/sdl2_window"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"
+
+[profile.release]
+lto = true
+
+[package.metadata.bundle]
+name = "oculante"
+identifier = "com.github.woelper.oculante"
+icon = ["res/icon.png"]
+osx_frameworks = ["SDL2"]

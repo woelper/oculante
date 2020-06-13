@@ -17,10 +17,61 @@ use std::io::Read;
 use image;
 use image::{ImageBuffer, Rgba};
 use std::sync::mpsc::Sender;
+use std::fmt::Display;
 
 
+#[derive (Debug)]
+pub struct OculanteState {
+    pub scale: f64,
+    pub scale_increment: f64,
+    pub drag_enabled: bool,
+    pub reset_image: bool,
+    pub message: String,
+    pub fullscreen_enabled: bool,
+    pub is_loaded: bool,
+    pub offset: Vector2<f64>,
+    pub cursor: Vector2<f64>,
+    pub cursor_relative: Vector2<f64>,
+    pub image_dimension: (u32, u32),
+    pub sampled_color: [f32; 4],
+    pub info_enabled: bool,
+    pub font_size: u32,
+}
+
+impl Default for OculanteState {
+fn default() -> OculanteState {
+    OculanteState {
+        scale: 1.0,
+        scale_increment: 0.1,
+        drag_enabled: false,
+        reset_image: false,
+        message: "Drag image here".into(),
+        fullscreen_enabled: false,
+        is_loaded: false,
+        offset: Vector2::new(0.0, 0.0),
+        cursor: Vector2::new(0.0, 0.0),
+        cursor_relative: Vector2::new(0.0, 0.0),
+        image_dimension: (0,0),
+        info_enabled: false,
+        sampled_color: [0.,0.,0.,0.],
+        font_size: 18,
+
+    }
+}
+}
 
 
+pub fn disp_col(col: [f32;4]) -> String {
+    format!(
+        "{:.0} {:.0} {:.0} {:.0}",
+        col[0], col[1], col[2], col[3])
+}
+
+pub fn disp_col_norm(col: [f32;4], divisor: f32) -> String {
+    format!(
+        "{:.2} {:.2} {:.2} {:.2}",
+        col[0]/divisor, col[1]/divisor, col[2]/divisor, col[3]/divisor)
+} 
 
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {

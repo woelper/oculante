@@ -61,6 +61,8 @@ Planned:
 - ~~Read next image(s) in dir and advance to them~~
 
 Cheatsheet:
+> <kbd>i</kbd> = display extended info
+>
 > <kbd>v</kbd> = reset view
 >
 > <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display red/green/blue/alpha channel
