@@ -17,7 +17,7 @@ use std::io::Read;
 use image;
 use image::{ImageBuffer, Rgba};
 use std::sync::mpsc::Sender;
-use std::fmt::Display;
+// use std::fmt::Display;
 
 
 #[derive (Debug)]

@@ -8,7 +8,7 @@ use ::image as image_crate;
 use image_crate::{Pixel};
 
 use piston_window::*;
-extern crate sdl2_window;
+// extern crate sdl2_window;
 
 // use Event::Input;
 mod utils;
@@ -18,7 +18,7 @@ use net::*;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-use sdl2_window::Sdl2Window;
+// use sdl2_window::Sdl2Window;
 // extern crate glutin_window;
 // extern crate window;
 
@@ -50,9 +50,10 @@ fn main() {
 
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
 
-    let opengl = OpenGL::V3_2;
+    // let opengl = OpenGL::V3_2;
 
-    let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
+    // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
+    let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
         .exit_on_esc(true)
         // .graphics_api(opengl)
         // .state.fullscreen_enabled(true)
@@ -102,7 +103,7 @@ fn main() {
                 state.message = format!("Listening on {}", p);
                 recv(p, texture_sender.clone(), state_sender.clone());
             },
-            Err(e) => println!("Port must be a number")
+            Err(_) => println!("Port must be a number")
         }        
     }
 

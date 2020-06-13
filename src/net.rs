@@ -28,7 +28,7 @@ fn handle_client(
                     let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
                     false
                 }
-                Err(e) => true,
+                Err(_) => true,
             }
         }
         Err(_) => {
