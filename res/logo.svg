@@ -52,6 +52,9 @@
      inkscape:groupmode="layer"
      inkscape:label="Layer 1">
     <rect
+       inkscape:export-filename="/home/woelper/rect1039.png"
+       inkscape:export-ydpi="50.799999"
+       inkscape:export-xdpi="50.799999"
        ry="0"
        y="190.73746"
        x="27.862671"
@@ -137,22 +140,31 @@
        d="m 132.23731,175.49004 2.66548,-1.08938 -1.16479,8.71619 4.20723,-12.07006 -2.81194,1.14114 1.44638,-4.87659 -3.94931,0.14114 z"
        style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1.82499;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
     <path
-       inkscape:transform-center-y="-180.60214"
-       inkscape:transform-center-x="-9.6581257"
+       inkscape:export-filename="/home/woelper/rect1039.png"
+       inkscape:export-ydpi="50.799999"
+       inkscape:export-xdpi="50.799999"
+       inkscape:transform-center-y="-206.14318"
+       inkscape:transform-center-x="-11.023993"
        sodipodi:nodetypes="cscsc"
        id="path835-9-8"
-       d="m 34.661885,222.86873 c 0,0 10.11894,-12.97394 25.730412,-12.92429 15.611472,0.0497 25.49965,13.53848 25.49965,13.53848 0,0 -10.13293,11.46011 -25.231829,11.47611 -13.12506,0.0135 -25.998233,-12.0903 -25.998233,-12.0903 z"
-       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff004b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:3.1668;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
+       d="m 31.039367,222.92771 c 0,0 11.549977,-14.80873 29.369247,-14.75206 17.819271,0.0567 29.105851,15.45311 29.105851,15.45311 0,0 -11.565945,13.08082 -28.800154,13.09908 -14.981227,0.0154 -29.674944,-13.80013 -29.674944,-13.80013 z"
+       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff004b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:3.61465;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
     <circle
-       r="10.409612"
-       cy="222.46408"
-       cx="60.437622"
+       inkscape:export-filename="/home/woelper/rect1039.png"
+       r="11.881755"
+       inkscape:export-ydpi="50.799999"
+       inkscape:export-xdpi="50.799999"
+       cy="222.46584"
+       cx="60.46035"
        id="path940-3-0"
-       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.79481;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
+       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:2.04864;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
     <path
+       inkscape:export-filename="/home/woelper/rect1039.png"
+       inkscape:export-ydpi="50.799999"
+       inkscape:export-xdpi="50.799999"
        sodipodi:nodetypes="ccccccc"
        id="path841-4-9-6-8"
-       d="m 55.107608,224.2611 4.659608,-1.8391 -1.260127,9.05599 5.55851,-12.79346 -4.464049,1.60445 2.087888,-7.41036 z"
-       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff004b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.34931;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
+       d="m 54.376556,224.51699 5.318577,-2.09919 -1.438336,10.33671 6.344603,-14.60273 -5.095361,1.83135 2.38316,-8.45835 z"
+       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff004b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.68155;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000;stop-opacity:1" />
   </g>
 </svg>
