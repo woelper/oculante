@@ -18,9 +18,8 @@ use net::*;
 use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
-// use sdl2_window::Sdl2Window;
-// extern crate glutin_window;
-// extern crate window;
+// use piston::window::WindowSettings;
+// use glutin_window::GlutinWindow as Window;
 
 // use glutin_window::GlutinWindow;
 
@@ -52,15 +51,23 @@ fn main() {
 
     // let opengl = OpenGL::V3_2;
 
+    let mut ws = WindowSettings::new("Oculante", [1000, 800]).exit_on_esc(true);
+
     // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
-    let mut window: PistonWindow = WindowSettings::new("Oculante", [1000, 800])
-        .exit_on_esc(true)
-        // .graphics_api(opengl)
-        // .state.fullscreen_enabled(true)
+    let mut window: PistonWindow = ws
         .build()
         .unwrap();
 
-    window.set_max_fps(60);
+
+        // let window  = Window::new(
+
+		// 	&WindowSettings::new(
+		// 		"Example",
+		// 		[600, 400]
+        //     ).exit_on_esc(true)).unwrap();
+            
+         
+    // window.set_max_fps(60);
 
     // dbg!(window.window);
 
@@ -82,6 +89,8 @@ fn main() {
     // These should all be a nice config struct...
     let mut current_image = image_crate::DynamicImage::new_rgba8(1, 1).to_rgba(); //TODO: make this shorter
     let mut texture = Texture::empty(&mut window.create_texture_context());
+    let mut zoomed_texture = Texture::empty(&mut window.create_texture_context());
+
     let mut glyphs = Glyphs::from_bytes(
         font,
         window.create_texture_context(),
@@ -135,7 +144,6 @@ fn main() {
         }
         
 
-
         if let Some(Button::Mouse(_)) = e.press_args() {
             state.drag_enabled = true;
             state.cursor_relative = pos_from_coord(state.offset, state.cursor, Vector2::new(state.image_dimension.0 as f64, state.image_dimension.1 as f64), state.scale);
@@ -159,19 +167,19 @@ fn main() {
                 if ! state.fullscreen_enabled {
                     
 
-                    // window = WindowSettings::new("Oculante", [1000, 800])
-                    // .exit_on_esc(true)
-                    // // .graphics_api(opengl)
-                    // .fullscreen(true)
-                    // .build()
-                    // .unwrap();
+                    window = WindowSettings::new("Oculante", [1000, 800])
+                    .exit_on_esc(true)
+                    // .graphics_api(opengl)
+                    .fullscreen(true)
+                    .build()
+                    .unwrap();
                     state.fullscreen_enabled = true;
                 } else {
-                    // window = WindowSettings::new("Oculante", [1000, 800])
-                    // .exit_on_esc(true)
-                    // // .graphics_api(opengl)
-                    // .build()
-                    // .unwrap();
+                    window = WindowSettings::new("Oculante", [1000, 800])
+                    .exit_on_esc(true)
+                    // .graphics_api(opengl)
+                    .build()
+                    .unwrap();
                     state.fullscreen_enabled = false;
                 }
                 
@@ -259,15 +267,15 @@ fn main() {
         };
 
         e.mouse_scroll(|d| {
-            if d[1] > 0.0 {
-                state.offset -= scale_pt(state.offset, state.cursor, state.scale, state.scale_increment);
-                state.scale += state.scale_increment;
-            } else {
-                if state.scale > state.scale_increment + 0.01 {
-                    state.offset += scale_pt(state.offset, state.cursor, state.scale, state.scale_increment);
-                    state.scale -= state.scale_increment;
-                }
+            // Map zoom nicely so it does not feel awkward whan zoomed out/in
+            let delta = zoomratio(d[1], state.scale);
+            // prevent negative / small zoom
+            if delta + state.scale < 0.1 {
+                return
             }
+            // make sure we zoom to the mouse cursor
+            state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+            state.scale += delta;
         });
 
         e.mouse_relative(|d| {
@@ -276,13 +284,15 @@ fn main() {
             }
         });
 
-        // e.file_drag();
 
         e.mouse_cursor(|d| {
             state.cursor = Vector2::new(d[0], d[1]);
             state.cursor_relative = pos_from_coord(state.offset, state.cursor, Vector2::new(state.image_dimension.0 as f64, state.image_dimension.1 as f64), state.scale);
-            let p = current_image.get_pixel(state.cursor_relative.x as u32, state.cursor_relative.y as u32).channels4(); 
-            state.sampled_color = [p.0 as f32, p.1 as f32, p.2 as f32, p.3 as f32];          
+            if state.cursor_relative.x as u32 <= current_image.width() &&  state.cursor_relative.y as u32 <= current_image.height() {
+
+                let p = current_image.get_pixel(state.cursor_relative.x as u32, state.cursor_relative.y as u32).channels4(); 
+                state.sampled_color = [p.0 as f32, p.1 as f32, p.2 as f32, p.3 as f32];          
+            }
 
         });
 
@@ -315,17 +325,25 @@ fn main() {
                 
             // draw the image
             if let Ok(tex) = &texture {
-                image(tex, transform, gfx);
+                image(tex, transform, gfx);                
                 state.image_dimension = tex.get_size();
             }
+            
+            // // draw the zoomed image
+            // if let Ok(tex) = &texture {
+            //     let transform = c.transform
+            //         // .trans(state.cursor.x, state.cursor.y)
+            //     .trans(state.offset.x as f64, state.offset.y as f64)
 
+            //         .zoom(16.0);
+            //     image(tex, transform, gfx);
+            //     // state.image_dimension = tex.get_size();
+            // }
 
             let info = format!("{} {}X{} @{}X",
                 &img_location.to_string_lossy(),
                 state.image_dimension.0,
                 state.image_dimension.1,
-       
-               
                 (state.scale * 10.0).round() / 10.0
             );
 

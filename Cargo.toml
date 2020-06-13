@@ -18,8 +18,11 @@ nsvg = "*"
 gif = "*"
 # pistoncore-glutin_window = "*"
 
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
+# [dependencies.pistoncore-sdl2_window]
+# git = "https://github.com/PistonDevelopers/sdl2_window"
+
+[dependencies.pistoncore-glutin_window]
+git = "https://github.com/PistonDevelopers/glutin_window"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"

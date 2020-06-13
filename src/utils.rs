@@ -38,6 +38,7 @@ pub struct OculanteState {
     pub font_size: u32,
 }
 
+
 impl Default for OculanteState {
 fn default() -> OculanteState {
     OculanteState {
@@ -58,6 +59,11 @@ fn default() -> OculanteState {
 
     }
 }
+}
+
+pub fn zoomratio(i: f64, s: f64) -> f64 {
+    // i * i * i.signum()
+    i * s * 0.1
 }
 
 

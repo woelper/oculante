@@ -896,7 +896,7 @@ dependencies = [
  "nalgebra 0.21.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nsvg 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "piston_window 0.109.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-sdl2_window 0.64.0 (git+https://github.com/PistonDevelopers/sdl2_window)",
+ "pistoncore-glutin_window 0.64.0 (git+https://github.com/PistonDevelopers/glutin_window)",
  "psd 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "windres 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1070,6 +1070,18 @@ dependencies = [
 [[package]]
 name = "pistoncore-glutin_window"
 version = "0.64.0"
+source = "git+https://github.com/PistonDevelopers/glutin_window#4bab988f7650a709574de6527fea1e09c4c17851"
+dependencies = [
+ "gl 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glutin 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shader_version 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pistoncore-glutin_window"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gl 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1088,18 +1100,6 @@ dependencies = [
  "piston-viewport 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "pistoncore-sdl2_window"
-version = "0.64.0"
-source = "git+https://github.com/PistonDevelopers/sdl2_window#cd9d65ebbd5ce47691a027beed895543c0aaf2b1"
-dependencies = [
- "gl 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "sdl2 0.34.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "shader_version 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1331,26 +1331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "sdl2"
-version = "0.34.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.71 (registry+https://github.com/rust-lang/crates.io-index)",
- "sdl2-sys 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "sdl2-sys"
-version = "0.34.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.71 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "semver"
@@ -1819,9 +1799,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum piston2d-graphics 0.36.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1b7c7c36f6df5e0473d3ca3dd56a27acd75372903fcad1c647594f8c91ce1ff3"
 "checksum piston_window 0.109.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3525daee0fe475865fbded6a44e5785191438b0ee28484c0c8f87d0536209220"
 "checksum pistoncore-event_loop 0.50.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ca8ab6ceb70d368b5feb0873adaa9a60fb30095c32818dff5b6c25e46412e644"
+"checksum pistoncore-glutin_window 0.64.0 (git+https://github.com/PistonDevelopers/glutin_window)" = "<none>"
 "checksum pistoncore-glutin_window 0.64.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8c0bc81618a5ba65ebdb2405fc25b55cec936b23aece8b461399dc7c5b72c31b"
 "checksum pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)" = "bd3f576d1a49fe2a86716b52ae72896319b05eb4d3abe41fb01abd3241cd5f7a"
-"checksum pistoncore-sdl2_window 0.64.0 (git+https://github.com/PistonDevelopers/sdl2_window)" = "<none>"
 "checksum pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e97b73a1b92db3417f21e43e9a003d6dffdf83bb807036e81baa44e2faea30f9"
 "checksum pkg-config 0.3.17 (registry+https://github.com/rust-lang/crates.io-index)" = "05da548ad6865900e60eaba7f589cc0783590a92e940c26953ff81ddbab2d677"
 "checksum png 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f54b9600d584d3b8a739e1662a595fab051329eff43f20e7d8cc22872962145b"
@@ -1852,8 +1832,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum same-file 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 "checksum scoped_threadpool 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "1d51f5df5af43ab3f1360b429fa5e0152ac5ce8c0bd6485cae490332e96846a8"
 "checksum scopeguard 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
-"checksum sdl2 0.34.1 (registry+https://github.com/rust-lang/crates.io-index)" = "45c68e7a45838d6dd8723347a5d233f2c989f0b291f18a46158d5dfbb275ada1"
-"checksum sdl2-sys 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)" = "575db20c45cce6565d4ece46509288ded53f5571dc89e4af165a562eb0eeec26"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum serde 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)" = "c9124df5b40cbd380080b2cc6ab894c040a3070d995f5c9dc77e18c34a8ae37d"
