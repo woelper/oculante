@@ -57,18 +57,18 @@ Planned:
 - ~~Read next image(s) in dir and advance to them~~
 
 Cheatsheet:
-> `v` = reset view
+> <kbd>v</kbd> = reset view
 >
-> `r`,`g`,`b`,`a` = display red/green/blue/alpha channel
+> <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display red/green/blue/alpha channel
 >
-> `c` = display color channel
+> <kbd>c</kbd> = display color channel
 >
-> `u` = display colors unpremultiplied
+> <kbd>u</kbd> = display colors unpremultiplied
 >
-> `f` = toggle fullscreen
+> <kbd>f</kbd> = toggle fullscreen
 >
 > `mouse wheel` = zoom
 >
-> `left/right` = prev/next image in folder
+> <kbd>left</kbd>/<kbd>right</kbd> = prev/next image in folder
 
 Please submit bugs and feature requests on this github repo!
