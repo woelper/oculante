@@ -54,7 +54,7 @@ fn main() {
 
     // let opengl = OpenGL::V3_2;
 
-    let mut ws = WindowSettings::new("Oculante", [1000, 800]).exit_on_esc(true);
+    let  ws = WindowSettings::new("Oculante", [1000, 800]).exit_on_esc(true);
 
     // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
     let mut window: PistonWindow = ws.build().unwrap();
@@ -84,7 +84,6 @@ fn main() {
     // These should all be a nice config struct...
     let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba(); //TODO: make this shorter
     let mut texture = Texture::empty(&mut window.create_texture_context());
-    let mut zoomed_texture = Texture::empty(&mut window.create_texture_context());
 
     let mut glyphs = Glyphs::from_bytes(
         font,
@@ -94,7 +93,7 @@ fn main() {
     .unwrap();
 
     let mut img_location = PathBuf::from(&img_path);
-    open_image(&img_location, texture_sender.clone(), state_sender.clone());
+    open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -128,7 +127,7 @@ fn main() {
             state.message = "Loading...".to_string();
             state.is_loaded = false;
             img_location = p.clone();
-            open_image(&img_location, texture_sender.clone(), state_sender.clone());
+            open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
         }
 
         if let Some(Button::Mouse(_)) = e.press_args() {
@@ -247,14 +246,14 @@ fn main() {
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, 1);
-                open_image(&img_location, texture_sender.clone(), state_sender.clone());
+                open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
             }
 
             if key == Key::Left {
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, -1);
-                open_image(&img_location, texture_sender.clone(), state_sender.clone());
+                open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
             }
         };
 

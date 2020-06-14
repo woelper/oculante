@@ -1,18 +1,19 @@
 [package]
 name = "oculante"
-version = "0.1.6"
+version = "0.2.2"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 piston_window = "*"
 clap = "*"
-image = "*"
+image = "0.23.5"
 nalgebra = "*"
 dds-rs = "*"
 rgb = "*"
 psd = "*"
-exr = {git = "https://github.com/johannesvollmer/exrs.git"}
+#exr = {git = "https://github.com/johannesvollmer/exrs.git"}
+exr = "*"
 gif-dispose = "*"
 nsvg = "*"
 gif = "*"
@@ -23,8 +24,8 @@ piston2d-graphics = "0.36.0"
 # [dependencies.pistoncore-sdl2_window]
 # git = "https://github.com/PistonDevelopers/sdl2_window"
 
-[dependencies.pistoncore-glutin_window]
-git = "https://github.com/PistonDevelopers/glutin_window"
+#[dependencies.pistoncore-glutin_window]
+#git = "https://github.com/PistonDevelopers/glutin_window"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"
@@ -35,5 +36,4 @@ lto = true
 [package.metadata.bundle]
 name = "oculante"
 identifier = "com.github.woelper.oculante"
-icon = ["res/icon.png"]
-osx_frameworks = ["SDL2"]
+icon = ["res/logo.png"]
