@@ -7,21 +7,21 @@ license = "MIT"
 repository = "https://github.com/woelper/oculante/"
 description = "A minimalistic image viewer with analysis tools"
 readme = "README.md"
-keywords = ["graphics", "image", "image viewer"]
+keywords = ["graphics", "image", "viewer"]
 
 [dependencies]
-piston_window = "*"
-clap = "*"
+piston_window = "0.109.0"
+clap = "2.33.1"
 image = "0.23.5"
-nalgebra = "*"
-dds-rs = "*"
-rgb = "*"
-psd = "*"
+nalgebra = "0.21.1"
+dds-rs = "0.7.0"
+rgb = "0.8.18"
+psd = "0.1.9"
 #exr = {git = "https://github.com/johannesvollmer/exrs.git"}
-exr = "*"
-gif-dispose = "*"
-nsvg = "*"
-gif = "*"
+exr = "0.8.0"
+gif-dispose = "2.4.0"
+nsvg = "0.5.1"
+gif = "0.10.3"
 piston2d-graphics = "0.36.0"
 
 # pistoncore-glutin_window = "*"
