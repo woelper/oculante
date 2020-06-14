@@ -1,6 +1,7 @@
 # oculante
 
 ![Logo](res/logo.png "Logo")
+
 _A no-nonsense hardware-accelerated image viewer_
 
 
@@ -13,18 +14,34 @@ I started this as a toy project to make a simple image viewer. The vision is to 
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
 
+## Window with active info box
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
 
-## installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window.
+## Correct color channel display:
 
-## features
+Image multiplied with alpha:
+
+![Screenshot](res/pm_c.png "Screenshot")
+
+Alpha channel:
+
+![Screenshot](res/pm_a.png "Screenshot")
+
+RGB channels (with <key>u</key>)
+
+![Screenshot](res/pm_c_up.png "Screenshot")
+
+
+## Installation
+Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 5MB.
+
+## Features
 
 Image format support:
 - bmp	
 - gif (animation support and correct timing, no looping yet)	
-- hdr (tonemapped)
+- hdr, tonemapped
 - ico	
 - jpeg	
 - png	
@@ -33,10 +50,10 @@ Image format support:
 - tiff	
 - webp
 - farbfeld  
-- DDS (DXT1-5, via _dds-rs_)
-- psd (via _psd_)
-- svg (via _nsvg_)
-- exr (via _exr-rs_)
+- DDS (DXT1-5, via `dds-rs`)
+- psd (via `psd`)
+- svg (via `nsvg`)
+- exr (via `exr-rs`), tonemapped
 
 Platform support:
 - Linux
@@ -49,17 +66,10 @@ Misc features
 - Fit image to view
 - Low cpu usage
 - Pretty fast startup/loading time
-- Display unassociated / unpremultiplied alpha (press `u`)
+- Display unassociated / unpremultiplied alpha (<key>u</key>)
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
-Planned:
-- ~~Custom display for images with unassociated channels~~
-- Image rotation (and read EXIF for that)
-- Investigate PVR / ETC support
-- ~~SVG support~~
-- Brighness/gamma adjust for HDR
-- ~~EXR support~~
-- ~~Read next image(s) in dir and advance to them~~
+
 
 Cheatsheet:
 > <kbd>i</kbd> = display extended info
@@ -79,3 +89,14 @@ Cheatsheet:
 > <kbd>left</kbd>/<kbd>right</kbd> = prev/next image in folder
 
 Please submit bugs and feature requests on this github repo!
+
+Roadmap:
+- Image loading time is still worse than feh or xv
+- Tests and benchmarks
+- Image rotation (and read EXIF for that)
+- Investigate PVR / ETC support
+- Brighness/gamma adjust for HDR
+- ~~SVG support~~
+- ~~Custom display for images with unassociated channels~~
+- ~~EXR support~~
+- ~~Read next image(s) in dir and advance to them~~

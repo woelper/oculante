@@ -345,6 +345,7 @@ pub fn open_image(
 
             _ => match image::open(img_location) {
                 Ok(img) => {
+                    dbg!("LD");
                     let _ = texture_sender.send(img.to_rgba()).unwrap();
                     let _ = state_sender.send(String::new()).unwrap();
 

@@ -21,6 +21,9 @@ use net::*;
 extern crate graphics;
 // use graphics::{Image, clear, default_draw_state};
 
+#[cfg(test)]
+mod tests;
+
 // use piston::window::WindowSettings;
 // use glutin_window::GlutinWindow as Window;
 
