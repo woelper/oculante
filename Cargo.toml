@@ -16,6 +16,8 @@ exr = {git = "https://github.com/johannesvollmer/exrs.git"}
 gif-dispose = "*"
 nsvg = "*"
 gif = "*"
+piston2d-graphics = "0.36.0"
+
 # pistoncore-glutin_window = "*"
 
 # [dependencies.pistoncore-sdl2_window]

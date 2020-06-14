@@ -66,6 +66,15 @@ pub fn zoomratio(i: f64, s: f64) -> f64 {
     i * s * 0.1
 }
 
+pub fn invert_rgb_8bit(c: [f32; 4]) -> [f32;4] {
+    [
+        (255. - c[0])/255., 
+        (255. - c[1])/255., 
+        (255. - c[2])/255., 
+        1.0
+    ] 
+}
+
 
 pub fn disp_col(col: [f32;4]) -> String {
     format!(
