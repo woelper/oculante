@@ -3,6 +3,11 @@ name = "oculante"
 version = "0.2.2"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/woelper/oculante/"
+description = "A minimalistic image viewer with analysis tools"
+readme = "README.md"
+keywords = ["graphics", "image", "image viewer"]
 
 [dependencies]
 piston_window = "*"
