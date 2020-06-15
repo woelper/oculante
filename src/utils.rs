@@ -19,16 +19,19 @@ use std::io::Read;
 use std::sync::mpsc::Sender;
 // use std::fmt::Display;
 
+/// A single frame
 #[derive(Debug)]
 pub struct Frame {
     pub buffer: image::RgbaImage,
+    /// How long to paunse until the next frame
     pub delay: u16,
 }
 
-
+/// A collection of frames that can loop/repeat
 #[derive(Debug, Default)]
 pub struct FrameCollection {
     pub frames: Vec<Frame>,
+    pub repeat: bool
 }
 
 
@@ -54,6 +57,7 @@ impl Frame {
     }
 }
 
+/// The state of the application
 #[derive(Debug)]
 pub struct OculanteState {
     pub scale: f64,

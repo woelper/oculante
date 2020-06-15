@@ -1,5 +1,5 @@
 #![windows_subsystem = "windows"]
-
+#![feature(test)]
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -51,31 +51,27 @@ fn main() {
         .get_matches();
 
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
-
-    // let opengl = OpenGL::V3_2;
-
-    let  ws = WindowSettings::new("Oculante", [1000, 800]).exit_on_esc(true);
-
-    // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
-    let mut window: PistonWindow = ws.build().unwrap();
-
-    // let window  = Window::new(
-
-    // 	&WindowSettings::new(
-    // 		"Example",
-    // 		[600, 400]
-    //     ).exit_on_esc(true)).unwrap();
-
-    // window.set_max_fps(60);
-
-    // dbg!(window.window);
-
+    let mut img_location = PathBuf::from(&img_path);
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
         Receiver<image_crate::RgbaImage>,
     ) = mpsc::channel();
 
     let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
+    open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+
+
+    let opengl = OpenGL::V3_2;
+    // let dx = Dire
+
+    let  ws = WindowSettings::new("Oculante", [1000, 800])
+        .graphics_api(opengl)
+        .vsync(true)
+        .exit_on_esc(true);
+
+    // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
+    let mut window: PistonWindow = ws.build().unwrap();
+
 
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
@@ -92,8 +88,6 @@ fn main() {
     )
     .unwrap();
 
-    let mut img_location = PathBuf::from(&img_path);
-    open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -110,6 +104,7 @@ fn main() {
     }
 
     while let Some(e) = window.next() {
+
         // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
             texture = Texture::from_image(&mut window.create_texture_context(), &img, &tx_settings);
@@ -122,6 +117,7 @@ fn main() {
             state.is_loaded = true;
         }
 
+        // Receive a dragged file
         if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
             window.set_lazy(false);
             state.message = "Loading...".to_string();
@@ -287,7 +283,7 @@ fn main() {
                 state.scale,
             );
             if state.cursor_relative.x as u32 <= current_image.width()
-                && state.cursor_relative.y as u32 <= current_image.height()
+                && state.cursor_relative.y as u32 <= current_image.height() && state.info_enabled
             {
                 let p = current_image
                     .get_pixel(
