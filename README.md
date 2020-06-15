@@ -20,17 +20,9 @@ I started this as a toy project to make a simple image viewer. The vision is to 
 
 ## Correct color channel display:
 
-Image multiplied with alpha:
+Images may contain color information that is masked by the alpha channel. Although it's present you will not see it since usually RGB values are multiplied with the A channel when displayed. If you press <key>u</key> you will be able to inspect such data.
 
-![Screenshot](res/pm_c.png "Screenshot")
-
-Alpha channel:
-
-![Screenshot](res/pm_a.png "Screenshot")
-
-RGB channels (with <key>u</key>)
-
-![Screenshot](res/pm_c_up.png "Screenshot")
+![Screenshot](res/premult.png "Screenshot")
 
 
 ## Installation
@@ -72,6 +64,8 @@ Misc features
 
 
 Cheatsheet:
+> <kbd>Esc</kbd>/<kbd>q</kbd> = quit
+>
 > <kbd>i</kbd> = display extended info
 >
 > <kbd>v</kbd> = reset view
