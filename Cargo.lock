@@ -886,7 +886,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "oculante"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "clap 2.33.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "dds-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",

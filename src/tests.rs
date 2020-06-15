@@ -17,14 +17,14 @@ fn bench_load_large(b: &mut Bencher) {
     let iters = 5;
     let mut total = 0;
 
-    for _i in 0..iters {
-        let start = Instant::now();
-        open_image(&PathBuf::from("tests/isabella-juskova-bECrTveml_w-unsplash.jpg"));
-        let elapsed = Instant::now().checked_duration_since(start);
-        total += elapsed.unwrap().as_millis();
-    }
-    dbg!(total/iters);
-    total = 0; 
+    // for _i in 0..iters {
+    //     let start = Instant::now();
+    //     open_image(&PathBuf::from("tests/isabella-juskova-bECrTveml_w-unsplash.jpg"));
+    //     let elapsed = Instant::now().checked_duration_since(start);
+    //     total += elapsed.unwrap().as_millis();
+    // }
+    // dbg!(total/iters);
+    // total = 0; 
 
     for _i in 0..iters {
         let start = Instant::now();
