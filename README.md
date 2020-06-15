@@ -20,7 +20,7 @@ I started this as a toy project to make a simple image viewer. The vision is to 
 
 ## Correct color channel display:
 
-Images may contain color information that is masked by the alpha channel. Although it's present you will not see it since usually RGB values are multiplied with the A channel when displayed. If you press <key>u</key> you will be able to inspect such data.
+Images may contain color information that is masked by the alpha channel. Although it's present you will not see it since usually RGB values are multiplied with the A channel when displayed. If you press <kbd>u</kbd> you will be able to inspect such data.
 
 ![Screenshot](res/premult.png "Screenshot")
 
@@ -58,7 +58,7 @@ Misc features
 - Fit image to view
 - Low cpu usage
 - Pretty fast startup/loading time
-- Display unassociated / unpremultiplied alpha (<key>u</key>)
+- Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
 
