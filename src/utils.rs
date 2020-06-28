@@ -12,7 +12,7 @@ use gif::{ColorOutput, SetParameter};
 use gif_dispose;
 use image;
 use image::{ImageBuffer, Rgba};
-use nsvg;
+//use nsvg;
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
@@ -27,7 +27,6 @@ lazy_static! {
 }
 
 
-// use std::fmt::Display;
 
 pub struct Player {
     pub stop: Mutex<bool>,
@@ -42,23 +41,18 @@ impl Player {
         let move_image_sender = image_sender.clone();
         thread::spawn(move || {
             while let Ok(col) = frame_receiver.try_recv() { 
-                // if *self.stop.lock().unwrap() {
-                //     continue
-                // }
-
                 for frame in col.frames {
                     if Player::is_stopped() {
                         break
                     }
                     let _ = move_image_sender.send(frame.buffer);
-
                 }
             }
         });
         Player {
             stop: Mutex::new(false),
-            frame_sender: frame_sender,
-            image_sender: image_sender
+            frame_sender,
+            image_sender
         }
     }
 
@@ -118,8 +112,8 @@ impl FrameCollection {
 impl Frame {
     fn new(buffer: image::RgbaImage, delay: u16) -> Frame {
         Frame {
-            buffer: buffer,
-            delay: delay
+            buffer,
+            delay
         }
     }
 }
@@ -196,7 +190,7 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
         let mut files = std::fs::read_dir(parent)
             .unwrap()
-            .map(|x| x.unwrap().path().to_path_buf())
+            .map(|x| x.unwrap().path())
             .filter(|x| is_ext_compatible(x))
             .collect::<Vec<PathBuf>>();
         files.sort();
@@ -307,20 +301,6 @@ pub fn pos_from_coord(
 
 
 
-
-pub fn send_frame_threaded(
-    img_location: &PathBuf,
-    frame_sender: Sender<FrameCollection>,
-    state_sender: Sender<String>,
-) {
-    let loc = img_location.clone();
-    thread::spawn(move || {
-        let col = open_image(&loc);
-        let _ = frame_sender.send(col);
-        let _ = state_sender.send("".into());
-    });
-}
-
 pub fn send_image_threaded(
     img_location: &PathBuf,
     texture_sender: Sender<image::RgbaImage>,
@@ -356,9 +336,6 @@ pub fn send_image_threaded(
             }
         }
 
-
-
-        // let _ = state_sender.send("".into());
     });
 
 }
@@ -457,7 +434,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
         Some("psd") => {
             let mut file = File::open(img_location).unwrap();
             let mut contents = vec![];
-            if let Ok(_) = file.read_to_end(&mut contents) {
+            if file.read_to_end(&mut contents).is_ok() {
                 let psd = Psd::from_bytes(&contents).unwrap();
                 if let Some(buf) =
                     image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())

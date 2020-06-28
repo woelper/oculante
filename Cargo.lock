@@ -152,14 +152,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cmake"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cc 1.0.54 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "cocoa"
 version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -501,29 +493,6 @@ version = "0.6.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gl_generator 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "glfw"
-version = "0.37.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "glfw-sys 3.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.71 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "raw-window-handle 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "glfw-sys"
-version = "3.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cmake 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -923,17 +892,14 @@ dependencies = [
  "clap 2.33.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "dds-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "exr 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "gfx_device_gl 0.16.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "gif 0.10.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "gif-dispose 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nalgebra 0.21.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nsvg 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "piston-gfx_texture 0.41.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "piston2d-graphics 0.36.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "piston_window 0.109.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-glfw_window 0.66.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "psd 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "windres 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1099,18 +1065,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "pistoncore-glfw_window"
-version = "0.66.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gl 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "glfw 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "shader_version 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1732,7 +1686,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum cgl 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "55e7ec0b74fe5897894cbc207092c577e87c52f8a59e8ca8d97ef37551f60a49"
 "checksum clap 2.33.1 (registry+https://github.com/rust-lang/crates.io-index)" = "bdfa80d47f954d53a35a64987ca1422f495b8d6483c0fe9f7117b36c2a792129"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
-"checksum cmake 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)" = "0e56268c17a6248366d66d4a47a3381369d068cce8409bb1716ed77ea32163bb"
 "checksum cocoa 0.18.5 (registry+https://github.com/rust-lang/crates.io-index)" = "1706996401131526e36b3b49f0c4d912639ce110996f3ca144d78946727bce54"
 "checksum color_quant 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0dbbb57365263e881e805dc77d94697c9118fd94d8da011240555aa7b23445bd"
 "checksum concat-string 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7439becb5fafc780b6f4de382b1a7a3e70234afe783854a4702ee8adbb838609"
@@ -1772,8 +1725,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum gl_generator 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ca98bbde17256e02d17336a6bdb5a50f7d0ccacee502e191d3e3d0ec2f96f84a"
 "checksum gl_generator 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d"
 "checksum gleam 0.6.19 (registry+https://github.com/rust-lang/crates.io-index)" = "cae10d7c99d0e77b4766e850a60898a17c1abaf01075531f1066f03dc7dc5fc5"
-"checksum glfw 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "36ed2a51f1e1c5722b7a3724fc146cbfe27297584a4fbb2797ce487f62bb0320"
-"checksum glfw-sys 3.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0b567b13b593ec58ea912b2658ee6230ffe20a069fa5b771800acc69bb3a157e"
 "checksum glutin 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5371b35b309dace06be1b81b5f6adb1c9de578b7dbe1e74bf7e4ef762cf6febd"
 "checksum glutin_egl_sys 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "772edef3b28b8ad41e4ea202748e65eefe8e5ffd1f4535f1219793dbb20b3d4c"
 "checksum glutin_emscripten_sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80de4146df76e8a6c32b03007bc764ff3249dcaeb4f675d68a06caf1bac363f1"
@@ -1837,7 +1788,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum piston2d-graphics 0.36.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1b7c7c36f6df5e0473d3ca3dd56a27acd75372903fcad1c647594f8c91ce1ff3"
 "checksum piston_window 0.109.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3525daee0fe475865fbded6a44e5785191438b0ee28484c0c8f87d0536209220"
 "checksum pistoncore-event_loop 0.50.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ca8ab6ceb70d368b5feb0873adaa9a60fb30095c32818dff5b6c25e46412e644"
-"checksum pistoncore-glfw_window 0.66.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b13054b6827431304c657566123668cdd48137d02871de54588ab4e977817685"
 "checksum pistoncore-glutin_window 0.64.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8c0bc81618a5ba65ebdb2405fc25b55cec936b23aece8b461399dc7c5b72c31b"
 "checksum pistoncore-input 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)" = "bd3f576d1a49fe2a86716b52ae72896319b05eb4d3abe41fb01abd3241cd5f7a"
 "checksum pistoncore-window 0.45.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e97b73a1b92db3417f21e43e9a003d6dffdf83bb807036e81baa44e2faea30f9"

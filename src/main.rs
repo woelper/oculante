@@ -4,23 +4,18 @@
 
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-
 use ::image as image_crate;
 use image_crate::Pixel;
 use std::path::PathBuf;
-
 use piston_window::*;
 
 mod utils;
 use utils::*;
 mod net;
-use clap;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
 extern crate graphics;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 
 #[cfg(test)]
@@ -59,13 +54,19 @@ fn main() {
 
 
     // let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
-    let mut timer = std::time::Instant::now();
+    //let mut timer = std::time::Instant::now();
     // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
-    player.load_blocking(&img_location);
+    if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
+        player.load(&img_location);
+        
+    } else {
+        player.load_blocking(&img_location);
+
+    }
 
     let opengl = OpenGL::V3_2;
 
-    let mut ws = WindowSettings::new("Oculante", [1000, 800])
+    let ws = WindowSettings::new("Oculante", [1000, 800])
         .graphics_api(opengl)
         .fullscreen(false)
         .vsync(true)
@@ -96,7 +97,7 @@ fn main() {
     tx_settings.set_mag(Filter::Nearest);
 
     // These should all be a nice config struct...
-    let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba(); //TODO: make this shorter
+    let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba();
     let mut texture = Texture::empty(&mut window.create_texture_context());
 
     let mut glyphs = Glyphs::from_bytes(
@@ -119,14 +120,13 @@ fn main() {
         match port.parse::<i32>() {
             Ok(p) => {
                 state.message = format!("Listening on {}", p);
-                recv(p, texture_sender.clone());
+                recv(p, texture_sender);
             }
             Err(_) => println!("Port must be a number"),
         }
     }
 
-    // let player_channel = player(texture_sender.clone(), state_sender.clone());
-
+ 
 
 
     while let Some(e) = window.next() {
@@ -368,7 +368,7 @@ fn main() {
 
             
 
-            for i in vec![(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
+            for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
                 text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
                     .draw(
                         &info,
