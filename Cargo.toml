@@ -1,6 +1,6 @@
 [package]
 name = "oculante"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -8,6 +8,11 @@ repository = "https://github.com/woelper/oculante/"
 description = "A minimalistic image viewer with analysis tools"
 readme = "README.md"
 keywords = ["graphics", "image", "viewer"]
+
+[package.metadata.bundle]
+name = "oculante"
+identifier = "com.github.woelper.oculante"
+icon = ["res/logo.png"]
 
 [dependencies]
 piston_window = "0.109.0"
@@ -39,8 +44,3 @@ windres = "0.2"
 
 [profile.release]
 lto = true
-
-[package.metadata.bundle]
-name = "oculante"
-identifier = "com.github.woelper.oculante"
-icon = ["res/logo.png"]
