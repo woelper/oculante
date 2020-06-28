@@ -30,8 +30,8 @@ deploy:
   # draft: true
   overwrite: true
   # name: $TRAVIS_TAG
-  # on:
-  #   tags: true
+  on:
+    tags: true
   file:
     # - target/release/oculante
     - target/release/oculante.osx
