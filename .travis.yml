@@ -18,7 +18,7 @@ os:
 before_deploy:
   - cd $TRAVIS_BUILD_DIR
   - mv target/release/oculante target/release/oculante.$TRAVIS_OS_NAME
-  - ls target/release/oculante
+  - ls target/release/
   # - git tag $TRAVIS_OS_NAME-$(git log --format=%h -1)
   # - export TRAVIS_TAG=$TRAVIS_OS_NAME-$(git log --format=%h -1)
 deploy:
