@@ -313,15 +313,19 @@ pub fn send_image_threaded(
         let col = open_image(&loc);
 
         if col.repeat {
-            while !Player::is_stopped() {
+            let mut i = 0;
+            while !Player::is_stopped() && i < 200 {
                 let frames = col.frames.clone();
                 for frame in frames {
                     if Player::is_stopped() {break}
                     let _ = texture_sender.send(frame.buffer);
                     if frame.delay > 0 {
                         thread::sleep(Duration::from_millis(frame.delay as u64));
+                    } else {
+                        thread::sleep(Duration::from_millis(40 as u64));
                     }
                 }
+                i += 1;
             }
 
         } else {
@@ -446,7 +450,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
         }
         Some("gif") => {
-            // loop {
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location).unwrap();
             let mut decoder = gif::Decoder::new(file);
@@ -465,13 +468,8 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 );
                 col.add(buf.unwrap(), frame.delay * 10);
                 col.repeat = true;
-                // texture_sender.send(buf.unwrap()).unwrap();
-                // std::thread::sleep(Duration::from_millis((frame.delay * 10) as u64));
-                // let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
             }
-            // let _ = state_sender.send(String::new()).unwrap();
 
-            // }
         }
         Some("hdr") => match File::open(&img_location) {
             Ok(f) => {
