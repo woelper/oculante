@@ -10,7 +10,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       with:
-        profile: minimal 
+        profile: minimal
+        toolchain: nightly 
     - name: Build
       run: cargo build
     - name: Run tests
