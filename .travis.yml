@@ -1,6 +1,5 @@
 language: rust
 rust:
-  # - nightly-2019-06-24
   - nightly
 cache: cargo
 script:
@@ -11,6 +10,7 @@ script:
   # - export TRAVIS_TAG="latest"
   # - export TRAVIS_TAG="latest"-$TRAVIS_OS_NAME
   # - git tag $TRAVIS_OS_NAME-$(date +'%Y/%m/%d/%H-%M')
+
 os:
   - linux
   - osx
@@ -19,6 +19,8 @@ before_deploy:
   - cd $TRAVIS_BUILD_DIR
   - mv target/release/oculante target/release/oculante.$TRAVIS_OS_NAME
   - ls target/release/
+  - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+  - git tag $TRAVIS_TAG
   # - git tag $TRAVIS_OS_NAME-$(git log --format=%h -1)
   # - export TRAVIS_TAG=$TRAVIS_OS_NAME-$(git log --format=%h -1)
 deploy:
