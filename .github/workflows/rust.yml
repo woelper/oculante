@@ -9,7 +9,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+      with:
+        profile: minimal 
     - name: Build
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests
       run: cargo test --verbose
