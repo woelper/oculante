@@ -14,5 +14,11 @@ jobs:
         toolchain: nightly 
     - name: Build
       run: cargo build
+      with:
+        profile: minimal
+        toolchain: nightly
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
+      with:
+        profile: minimal
+        toolchain: nightly
