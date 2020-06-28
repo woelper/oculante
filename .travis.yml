@@ -2,7 +2,7 @@ language: rust
 rust:
   # - nightly-2019-06-24
   - nightly
-#cache: cargo
+cache: cargo
 script:
   - cargo build --release
   - ls $TRAVIS_BUILD_DIR/target/release/
