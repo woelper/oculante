@@ -16,11 +16,78 @@ use nsvg;
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+use std::sync::mpsc::{Receiver, Sender};
+
+
+lazy_static! {
+    pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
+}
+
+
 // use std::fmt::Display;
 
+pub struct Player {
+    pub stop: Mutex<bool>,
+    pub frame_sender: Sender<FrameCollection>,
+    pub image_sender: Sender<image::RgbaImage>
+}
+
+impl Player {
+
+    pub fn new(image_sender: Sender<image::RgbaImage>) -> Player {
+        let (frame_sender, frame_receiver): (Sender<FrameCollection>, Receiver<FrameCollection>) = mpsc::channel();
+        let move_image_sender = image_sender.clone();
+        thread::spawn(move || {
+            while let Ok(col) = frame_receiver.try_recv() { 
+                // if *self.stop.lock().unwrap() {
+                //     continue
+                // }
+
+                for frame in col.frames {
+                    if Player::is_stopped() {
+                        break
+                    }
+                    let _ = move_image_sender.send(frame.buffer);
+
+                }
+            }
+        });
+        Player {
+            stop: Mutex::new(false),
+            frame_sender: frame_sender,
+            image_sender: image_sender
+        }
+    }
+
+    pub fn load_blocking(&self, img_location: &PathBuf) {
+        *self.stop.lock().unwrap() = true;
+        send_image_blocking(&img_location, self.image_sender.clone());
+    }
+
+    pub fn load(&self, img_location: &PathBuf) {
+        *self.stop.lock().unwrap() = true;
+        send_image_threaded(&img_location, self.image_sender.clone());
+    }
+
+    pub fn stop() {
+        // *self.stop.lock().unwrap() = true;
+        *PLAYER_STOP.lock().unwrap() = true;
+    }
+
+    pub fn is_stopped() -> bool{
+        *PLAYER_STOP.lock().unwrap()
+    }
+
+    pub fn start() {
+        *PLAYER_STOP.lock().unwrap() = false;
+    }
+}
+
 /// A single frame
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub buffer: image::RgbaImage,
     /// How long to paunse until the next frame
@@ -28,7 +95,7 @@ pub struct Frame {
 }
 
 /// A collection of frames that can loop/repeat
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FrameCollection {
     pub frames: Vec<Frame>,
     pub repeat: bool
@@ -181,9 +248,8 @@ pub fn solo_channel(
     img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
     channel: usize,
 ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    // TODO make this FP
     let mut updated_img = img.clone();
-    // let updated_img = img.pixels();
-
     for pixel in updated_img.pixels_mut() {
         pixel.0[0] = pixel.0[channel];
         pixel.0[1] = pixel.0[channel];
@@ -194,14 +260,14 @@ pub fn solo_channel(
 }
 
 pub fn unpremult(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    // TODO make this FP
     let mut updated_img = img.clone();
-    // let updated_img = img.pixels();
-
     for pixel in updated_img.pixels_mut() {
         pixel.0[3] = 255;
     }
     updated_img
 }
+
 
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
     [
@@ -239,10 +305,25 @@ pub fn pos_from_coord(
     size
 }
 
-pub fn open_image_threaded(
+
+
+
+pub fn send_frame_threaded(
+    img_location: &PathBuf,
+    frame_sender: Sender<FrameCollection>,
+    state_sender: Sender<String>,
+) {
+    let loc = img_location.clone();
+    thread::spawn(move || {
+        let col = open_image(&loc);
+        let _ = frame_sender.send(col);
+        let _ = state_sender.send("".into());
+    });
+}
+
+pub fn send_image_threaded(
     img_location: &PathBuf,
     texture_sender: Sender<image::RgbaImage>,
-    state_sender: Sender<String>,
 ) {
 
     let loc = img_location.clone();
@@ -250,20 +331,65 @@ pub fn open_image_threaded(
     thread::spawn(move || {
 
         let col = open_image(&loc);
-        for frame in col.frames {
-            let _ = texture_sender.send(frame.buffer);
-            thread::sleep(Duration::from_millis(frame.delay as u64));
+
+        if col.repeat {
+            while !Player::is_stopped() {
+                let frames = col.frames.clone();
+                for frame in frames {
+                    if Player::is_stopped() {break}
+                    let _ = texture_sender.send(frame.buffer);
+                    if frame.delay > 0 {
+                        thread::sleep(Duration::from_millis(frame.delay as u64));
+                    }
+                }
+            }
+
+        } else {
+
+            for frame in col.frames {
+                if Player::is_stopped() {break}
+                let _ = texture_sender.send(frame.buffer);
+    
+                if frame.delay > 0 {
+                    thread::sleep(Duration::from_millis(frame.delay as u64));
+                }
+            }
         }
-        let _ = state_sender.send("".into());
+
+
+
+        // let _ = state_sender.send("".into());
     });
 
 }
 
+
+
+
+pub fn send_image_blocking(
+    img_location: &PathBuf,
+    texture_sender: Sender<image::RgbaImage>,
+) {
+    let col = open_image(&img_location);
+    for frame in col.frames {
+        if Player::is_stopped() {break}
+
+        let _ = texture_sender.send(frame.buffer);
+        // dbg!(&frame.delay);
+        if frame.delay > 0 {
+            thread::sleep(Duration::from_millis(frame.delay as u64));
+        }
+    }
+    // let _ = state_sender.send("".into());
+}
+
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &PathBuf) -> FrameCollection{
+pub fn open_image(img_location: &PathBuf) -> FrameCollection {
     let img_location = img_location.clone();
     let mut col = FrameCollection::default();
 
+    // Stop all current images being sent
+    Player::stop();
 
     match img_location.extension().unwrap_or_default().to_str() {
         Some("dds") => {
@@ -361,6 +487,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection{
                     screen.pixels.buf().as_bytes().to_vec(),
                 );
                 col.add(buf.unwrap(), frame.delay * 10);
+                col.repeat = true;
                 // texture_sender.send(buf.unwrap()).unwrap();
                 // std::thread::sleep(Duration::from_millis((frame.delay * 10) as u64));
                 // let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
@@ -407,6 +534,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection{
         },
     }
 
+    Player::start();
     col
 
 }

@@ -1,6 +1,6 @@
 [package]
 name = "oculante"
-version = "0.2.3"
+version = "0.2.5"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -23,9 +23,11 @@ gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
 piston2d-graphics = "0.36.0"
-
+gfx_device_gl = "*"
+# piston-gfx_texture = "0.41.0"
+# pistoncore-glfw_window = "0.66.0"
 # pistoncore-glutin_window = "*"
-
+lazy_static = "*"
 # [dependencies.pistoncore-sdl2_window]
 # git = "https://github.com/PistonDevelopers/sdl2_window"
 

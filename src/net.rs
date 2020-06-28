@@ -7,7 +7,6 @@ use std::thread;
 fn handle_client(
     mut stream: TcpStream,
     texture_sender: Sender<image::RgbaImage>,
-    state_sender: Sender<String>,
 ) {
     let mut data = [0 as u8; 100000]; // using 50 byte buffer
     let mut imgbuf: Vec<u8> = vec![];
@@ -25,7 +24,7 @@ fn handle_client(
                     imgbuf.clear();
                     let _ = texture_sender.send(i.to_rgba());
                     std::thread::sleep(std::time::Duration::from_millis(30));
-                    let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
+                    // let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
                     false
                 }
                 Err(_) => true,
@@ -43,7 +42,7 @@ fn handle_client(
 
 }
 
-pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>, state_sender: Sender<String>) {
+pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
     thread::spawn(move || {
         let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).unwrap();
         // accept connections and process them, spawning a new thread for each one
@@ -55,10 +54,10 @@ pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>, state_sender: S
             match stream {
                 Ok(stream) => {
                     // println!("New connection: {}", stream.peer_addr().unwrap());
-                    let (t_s, s_s) = (texture_sender.clone(), state_sender.clone());
+                    let t_s = texture_sender.clone();
                     thread::spawn(move || {
                         // connection succeeded
-                        handle_client(stream, t_s, s_s)
+                        handle_client(stream, t_s)
                     });
                     // stamp = std::time::Instant::now();
 

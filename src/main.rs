@@ -1,5 +1,7 @@
 #![windows_subsystem = "windows"]
 #![feature(test)]
+// #![feature(core_intrinsics)]
+
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -8,9 +10,7 @@ use image_crate::Pixel;
 use std::path::PathBuf;
 
 use piston_window::*;
-// extern crate sdl2_window;
 
-// use Event::Input;
 mod utils;
 use utils::*;
 mod net;
@@ -19,21 +19,18 @@ use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
 extern crate graphics;
-// use graphics::{Image, clear, default_draw_state};
+use std::sync::Arc;
+use std::sync::Mutex;
+
 
 #[cfg(test)]
 mod tests;
 
-// use piston::window::WindowSettings;
-// use glutin_window::GlutinWindow as Window;
-
-// use glutin_window::GlutinWindow;
 
 fn main() {
-    let mut state = OculanteState::default();
 
-    let font = include_bytes!("IBMPlexSans-Regular.ttf");
-    // let loading_img = include_bytes!("loading.png");
+
+    let mut state = OculanteState::default();
 
     let matches = App::new("Oculante")
         .arg(
@@ -50,6 +47,7 @@ fn main() {
         )
         .get_matches();
 
+    let font = include_bytes!("IBMPlexSans-Regular.ttf");
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
     let mut img_location = PathBuf::from(&img_path);
     let (texture_sender, texture_receiver): (
@@ -57,20 +55,40 @@ fn main() {
         Receiver<image_crate::RgbaImage>,
     ) = mpsc::channel();
 
-    let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
-    open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+    let player = Player::new(texture_sender.clone());
 
+
+    // let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
+    let mut timer = std::time::Instant::now();
+    // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+    player.load_blocking(&img_location);
 
     let opengl = OpenGL::V3_2;
-    // let dx = Dire
 
-    let  ws = WindowSettings::new("Oculante", [1000, 800])
+    let mut ws = WindowSettings::new("Oculante", [1000, 800])
         .graphics_api(opengl)
+        .fullscreen(false)
         .vsync(true)
         .exit_on_esc(true);
 
     // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
+    // let mut window: PistonWindow<WinitWindow> = ws.build().unwrap();
+    // use glfw_window::GlfwWindow;
+    // let mut window: PistonWindow<GlfwWindow> = ws.build().unwrap();
     let mut window: PistonWindow = ws.build().unwrap();
+    
+    // use winit;
+    // // winit::
+    // use winit::EventsLoop;
+    // use winit::{ControlFlow, WindowEvent};
+    // let mut events_loop = EventsLoop::new();
+    // let mut w = winit::Window::new(&events_loop).unwrap();
+    // dbg!(w.get_hidpi_factor());
+    // let dim = w.get_current_monitor().get_dimensions();
+    // // dbg!(s);
+    // // events_loop.
+    // events_loop.poll_events(|event| {});
+    // ControlFlow::Break;
 
 
     // Set inspection-friendly magnification filter
@@ -87,7 +105,11 @@ fn main() {
         TextureSettings::new(),
     )
     .unwrap();
-
+    
+// fn print_type_of<T>(_: &T) {
+//     println!("{}", unsafe { std::intrinsics::type_name::<T>() });
+// }
+//     print_type_of(&glyphs);
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -97,16 +119,22 @@ fn main() {
         match port.parse::<i32>() {
             Ok(p) => {
                 state.message = format!("Listening on {}", p);
-                recv(p, texture_sender.clone(), state_sender.clone());
+                recv(p, texture_sender.clone());
             }
             Err(_) => println!("Port must be a number"),
         }
     }
 
-    while let Some(e) = window.next() {
+    // let player_channel = player(texture_sender.clone(), state_sender.clone());
 
+
+
+    while let Some(e) = window.next() {
         // a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
+            window.set_lazy(false);
+
+            // dbg!(timer.elapsed());
             texture = Texture::from_image(&mut window.create_texture_context(), &img, &tx_settings);
             current_image = img;
 
@@ -117,13 +145,16 @@ fn main() {
             state.is_loaded = true;
         }
 
+    
+
         // Receive a dragged file
         if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
             window.set_lazy(false);
             state.message = "Loading...".to_string();
             state.is_loaded = false;
             img_location = p.clone();
-            open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+            player.load(&img_location);
+            // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
         }
 
         if let Some(Button::Mouse(_)) = e.press_args() {
@@ -152,24 +183,18 @@ fn main() {
             if key == Key::Q {
                 std::process::exit(0);
             }
+
             // Set state.fullscreen_enabled
             if key == Key::F {
                 if !state.fullscreen_enabled {
-                    window = WindowSettings::new("Oculante", [1000, 800])
-                        .exit_on_esc(true)
-                        // .graphics_api(opengl)
-                        .fullscreen(true)
-                        .build()
-                        .unwrap();
-                    state.fullscreen_enabled = true;
+                    window.set_size([1920, 1080]);
+                    window = ws.clone().fullscreen(true).build().unwrap();
                 } else {
-                    window = WindowSettings::new("Oculante", [1000, 800])
-                        .exit_on_esc(true)
-                        // .graphics_api(opengl)
-                        .build()
-                        .unwrap();
-                    state.fullscreen_enabled = false;
+                    window = ws.clone().fullscreen(false).build().unwrap();
                 }
+
+                // let d = window.
+                // dbg!(d);
 
                 // state.reset_image = true;
                 texture = Texture::from_image(
@@ -183,6 +208,7 @@ fn main() {
                     TextureSettings::new(),
                 )
                 .unwrap();
+                state.fullscreen_enabled = !state.fullscreen_enabled;
             }
             // Display color unpremultiplied (just rgb without multiplying by alpha)
             if key == Key::U {
@@ -242,14 +268,16 @@ fn main() {
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, 1);
-                open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+                player.load(&img_location);
+                // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
             }
 
             if key == Key::Left {
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, -1);
-                open_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+                player.load(&img_location);
+                // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
             }
         };
 
@@ -283,7 +311,8 @@ fn main() {
                 state.scale,
             );
             if state.cursor_relative.x as u32 <= current_image.width()
-                && state.cursor_relative.y as u32 <= current_image.height() && state.info_enabled
+                && state.cursor_relative.y as u32 <= current_image.height()
+                && state.info_enabled
             {
                 let p = current_image
                     .get_pixel(
@@ -336,32 +365,8 @@ fn main() {
 
             // Draw text three times to simulate outline
 
-            // fn draw_txt(pos: (f64, f64), size: u32, text: &String, cache: GlyphCache<TextureContext<Factory, Resources, CommandBuffer>, Texture<Resources>>) {
 
-            //     text::Text::new_color([1.0, 1.0, 1.0, 0.7], 18)
-            //     .draw(
-            //         &text,
-            //         &mut glyphs,
-            //         &c.draw_state,
-            //         c.transform.trans(10.0, 20.0),
-            //         gfx,
-            //     )
-            //     .unwrap();
-
-            // }
-
-            // fn render_text(x: f64, y: f64,
-            //     text: &str, size: u32,
-            //     c: Context, g: &mut G2d,
-            //     g: &mut glyph_cache::rusttype::GlyphCache<GfxFactory, G2dTexture>) {
-            // text::Text::new(size).draw(
-            //     text,
-            //     g,
-            //     &c.draw_state,
-            //     c.transform.trans(x, y),
-            //     g
-            // ).unwrap();
-            // }
+            
 
             for i in vec![(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
                 text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
@@ -399,7 +404,6 @@ fn main() {
 
             if state.info_enabled {
                 let col_inv = invert_rgb_8bit(state.sampled_color);
-
 
                 // draw the zoomed image
                 if let Ok(tex) = &texture {
@@ -445,12 +449,14 @@ fn main() {
                 }
 
 
+
                 text::Text::new_color(col_inv, state.font_size)
                     .draw(
                         &format!(
                             "P {},{} / {},{}",
                             state.cursor_relative[0].floor() as i32 + 1,
-                            state.image_dimension.1 as i32 - (state.cursor_relative[1].floor() as i32),
+                            state.image_dimension.1 as i32
+                                - (state.cursor_relative[1].floor() as i32),
                             state.cursor_relative[0].floor() as i32 + 1,
                             state.cursor_relative[1].floor() as i32 + 1,
                         ),
@@ -477,21 +483,20 @@ fn main() {
                         gfx,
                     )
                     .unwrap();
-
             }
             glyphs.factory.encoder.flush(device);
         });
 
-        if let Ok(state_msg) = state_receiver.try_recv() {
-            // an image has been received
-            // window.set_lazy(false);
-            state.is_loaded = true;
+        // if let Ok(state_msg) = state_receiver.try_recv() {
+        //     // an image has been received
+        //     // window.set_lazy(false);
+        //     state.is_loaded = true;
 
-            if state_msg != "ANIM_FRAME" {
-                state.reset_image = true;
-                window.set_lazy(true);
-            } else {
-            }
-        }
+        //     if state_msg != "ANIM_FRAME" {
+        //         state.reset_image = true;
+        //         window.set_lazy(true);
+        //     } else {
+        //     }
+        // }
     }
 }
