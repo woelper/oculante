@@ -265,6 +265,7 @@ fn main() {
             }
 
             if key == Key::Right {
+                state.reset_image = true;
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, 1);
@@ -273,6 +274,7 @@ fn main() {
             }
 
             if key == Key::Left {
+                state.reset_image = true;
                 window.set_lazy(false);
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, -1);
