@@ -31,7 +31,7 @@ fn bench_load_large(b: &mut Bencher) {
         open_image(&PathBuf::from("/home/woelper/Documents/oculante/tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"));
         let elapsed = Instant::now().checked_duration_since(start);
         total += elapsed.unwrap().as_millis();
-        // dbg!(elapsed); 
+        dbg!(elapsed); 
     }
     dbg!(total/iters);
 
