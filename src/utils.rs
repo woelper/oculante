@@ -398,8 +398,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             let buf = image::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
             col.add_default(buf);
 
-            // let _ = texture_sender.send(buffer);
-            // let _ = state_sender.send(String::new()).unwrap();
         }
         Some("exr") => {
             // read the image from a file and keep only the png buffer
@@ -435,6 +433,61 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             // let _ = texture_sender.send(png_buffer);
             // let _ = state_sender.send(String::new()).unwrap();
         }
+
+        Some("hdr") => match File::open(&img_location) {
+            Ok(f) => {
+                let reader = BufReader::new(f);
+                match image::hdr::HdrDecoder::new(reader) {
+                    Ok(hdr_decoder) => {
+                        let meta = hdr_decoder.metadata();
+                        let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
+                        //let mut img = image::RgbaImage::new(meta.width, meta.height);
+                        //let ldr = hdr_decoder.read_image_ldr().unwrap();
+
+
+
+                        let hdr_img = hdr_decoder.read_image_hdr().unwrap();
+                        for pixel in hdr_img {
+                            let tp = image::Rgba(tonemap_rgb(pixel.0));
+                            ldr_img.push(tp);
+                        }
+
+              
+
+                       // let s = ldr.map();
+                       let mut s: Vec<u8> = vec![];
+                       
+                    //    ldr.iter().map(|x| vec![x.0[0], x.0[1], x.0[2], 255].clone();
+                        
+                        let l = ldr_img.clone();
+
+                        for p in l {
+                            let mut x = vec![p.0[0], p.0[1], p.0[2], 255];
+                            s.append(&mut x);
+                        }
+
+                        let tonemapped_buffer = image::RgbaImage::from_raw(meta.width, meta.height, s).unwrap();
+
+
+                        // let tonemapped_buffer: image::RgbaImage = image::ImageBuffer::from_raw(
+                        //     meta.width,
+                        //     meta.height,
+                        //     ldr_img.as_rgba().as_bytes().to_vec(),
+                        // )
+                        // .unwrap();
+
+
+                        col.add_default(tonemapped_buffer);
+                        // texture_sender.send(tonemapped_buffer).unwrap();
+                        // let _ = state_sender.send(String::new()).unwrap();
+                    }
+                    Err(e) => println!("{:?}", e),
+                }
+            }
+            Err(e) => println!("{:?}", e),
+        },
+
+
         Some("psd") => {
             let mut file = File::open(img_location).unwrap();
             let mut contents = vec![];
@@ -471,34 +524,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
 
         }
-        Some("hdr") => match File::open(&img_location) {
-            Ok(f) => {
-                let reader = BufReader::new(f);
-                match image::hdr::HdrDecoder::new(reader) {
-                    Ok(hdr_decoder) => {
-                        let meta = hdr_decoder.metadata();
-                        let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
-                        let hdr_img = hdr_decoder.read_image_hdr().unwrap();
-                        for pixel in hdr_img {
-                            let tp = image::Rgba(tonemap_rgb(pixel.0));
-                            ldr_img.push(tp);
-                        }
-                        let tonemapped_buffer: image::RgbaImage = image::ImageBuffer::from_raw(
-                            meta.width,
-                            meta.height,
-                            ldr_img.as_rgba().as_bytes().to_vec(),
-                        )
-                        .unwrap();
-                        col.add_default(tonemapped_buffer);
-                        // texture_sender.send(tonemapped_buffer).unwrap();
-                        // let _ = state_sender.send(String::new()).unwrap();
-                    }
-                    Err(e) => println!("{:?}", e),
-                }
-            }
-            Err(e) => println!("{:?}", e),
-        },
-
         _ => match image::open(img_location) {
             Ok(img) => {
                 col.add_default(img.to_rgba());
