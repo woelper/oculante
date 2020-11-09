@@ -1,5 +1,5 @@
 #![windows_subsystem = "windows"]
-#![feature(test)]
+// #![feature(test)]
 // #![feature(core_intrinsics)]
 
 use std::sync::mpsc;

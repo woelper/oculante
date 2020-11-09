@@ -1,6 +1,6 @@
 [package]
 name = "oculante"
-version = "0.4.6"
+version = "0.4.7"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -15,16 +15,15 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-piston_window = "0.112.0"
+piston_window = "0.114.0"
 clap = "2.33.3"
-image = "0.23.9"
-nalgebra = "0.22.0"
+image = "0.23.11"
+nalgebra = "0.23.0"
 dds-rs = "0.7.0"
 rgb = "0.8.25"
 psd = "0.1.9"
-#exr = {git = "https://github.com/johannesvollmer/exrs.git"}
 exr = "0.9.0"
-gif-dispose = "2.4.1"
+gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
 piston2d-graphics = "0.37.0"
@@ -45,3 +44,7 @@ windres = "0.2.1"
 
 [profile.release]
 lto = true
+
+[profile.dev]
+incremental = true
+debug = false
