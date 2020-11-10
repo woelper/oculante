@@ -20,7 +20,8 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use lazy_static::lazy_static;
 use std::sync::mpsc::{Receiver, Sender};
-
+// use libwebp_image;
+use libwebp_sys::{WebPGetInfo, WebPDecodeRGBA};
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -156,6 +157,22 @@ impl Default for OculanteState {
             font_size: 18,
         }
     }
+}
+
+// Unsafe webp decoding using webp-sys
+fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
+	let mut width = 0;
+	let mut height = 0;
+	let len = buf.len();
+    let mut webp_buffer: Vec<u8> = vec![]; 
+    unsafe {
+		WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
+		let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);
+        let len = width * height * 4;
+        webp_buffer = Vec::from_raw_parts(out_buf, len as usize, len as usize);
+    }
+    image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
+    
 }
 
 pub fn zoomratio(i: f64, s: f64) -> f64 {
@@ -502,6 +519,16 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 }
             }
         }
+        Some("webp") => {
+            let mut file = File::open(&img_location).unwrap();
+            let mut contents = vec![];
+            if let Ok(_) = file.read_to_end(&mut contents) {
+                match decode_webp(&contents) {
+                    Some(webp_buf) => col.add_default(webp_buf),
+                    None => println!("Error decoding data from {:?}", img_location)
+                }
+            }
+        }
         Some("gif") => {
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location).unwrap();
@@ -523,50 +550,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 col.repeat = true;
             }
 
-        }
-        Some("hdr") => match File::open(&img_location) {
-            Ok(f) => {
-                let reader = BufReader::new(f);
-                match image::hdr::HdrDecoder::new(reader) {
-                    Ok(hdr_decoder) => {
-                        let meta = hdr_decoder.metadata();
-                        // let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
-                        let mut ldr_img = vec![];
-                        // let mut ldr_img = image::ImageBuffer::new(meta.width, meta.height);
-                        let hdr_img = hdr_decoder.read_image_hdr().unwrap();
-                        
-                        for pixel in hdr_img {
-                            let tp = image::Rgba(tonemap_rgb(pixel.0));
-                            // ldr_img.push(tp);
-                            // ldr_img.push(tp);
-                            ldr_img.push(tp.0[0]);
-                            ldr_img.push(tp.0[1]);
-                            ldr_img.push(tp.0[2]);
-                            ldr_img.push(tp.0[3]);
-                        }
-
-                        let x  = image::ImageBuffer::from_raw(meta.width, meta.height, ldr_img).unwrap();
-
-                        // let x = ldr_img.as_rgba();
-
-                        // let tonemapped_buffer: image::RgbaImage = image::ImageBuffer::from_raw(
-                        //     meta.width,
-                        //     meta.height,
-                        //     x,
-                        // )
-                        // .unwrap();
-
-                        col.add_default(x);
-                        // col.add_default(ldr_img);
-                        // texture_sender.send(tonemapped_buffer).unwrap();
-                        // let _ = state_sender.send(String::new()).unwrap();
-                    }
-                    Err(e) => println!("{:?}", e),
-                }
-            }
-            Err(e) => println!("{:?}", e),
         },
-
         _ => match image::open(img_location) {
             Ok(img) => {
                 col.add_default(img.to_rgba());

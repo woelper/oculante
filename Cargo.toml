@@ -27,17 +27,10 @@ gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
 piston2d-graphics = "0.37.0"
-#gfx_device_gl = "*"
-# piston-gfx_texture = "0.41.0"
-# pistoncore-glfw_window = "0.66.0"
-# pistoncore-glutin_window = "*"
 lazy_static = "*"
-# [dependencies.pistoncore-sdl2_window]
-# git = "https://github.com/PistonDevelopers/sdl2_window"
-
-#[dependencies.pistoncore-glutin_window]
-#git = "https://github.com/PistonDevelopers/glutin_window"
-
+#libwebp-image = {version = "*", features = ["libwebp-1_1"]}
+#libwebp = { version = "0.1.2", features = ["0_6"] }
+libwebp-sys = "0.3"
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
 windres = "0.2.1"
