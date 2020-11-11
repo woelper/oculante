@@ -32,7 +32,7 @@ Just download the executable for your system from the releases tab (https://gith
 
 Image format support:
 - bmp	
-- gif (animation support and correct timing, no looping yet)	
+- gif (animation support and correct timing)	
 - hdr, tonemapped
 - ico	
 - jpeg	
