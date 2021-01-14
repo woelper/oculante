@@ -4,6 +4,7 @@
 
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
+use gfx::format::Unorm;
 use ::image as image_crate;
 use image_crate::Pixel;
 use std::path::PathBuf;
@@ -15,12 +16,12 @@ mod net;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
-extern crate graphics;
-
+use graphics;
+use imgui_gfx_renderer::{Renderer, Shaders};
+use gfx::format::R8_G8_B8_A8;
 
 #[cfg(test)]
 mod tests;
-
 
 fn main() {
 
@@ -77,20 +78,17 @@ fn main() {
     // use glfw_window::GlfwWindow;
     // let mut window: PistonWindow<GlfwWindow> = ws.build().unwrap();
     let mut window: PistonWindow = ws.build().unwrap();
-    
-    // use winit;
-    // // winit::
-    // use winit::EventsLoop;
-    // use winit::{ControlFlow, WindowEvent};
-    // let mut events_loop = EventsLoop::new();
-    // let mut w = winit::Window::new(&events_loop).unwrap();
-    // dbg!(w.get_hidpi_factor());
-    // let dim = w.get_current_monitor().get_dimensions();
-    // // dbg!(s);
-    // // events_loop.
-    // events_loop.poll_events(|event| {});
-    // ControlFlow::Break;
+    let size = window.size();
+    let draw_size = window.draw_size();
+    let dpi_scale = size.width / draw_size.width;
+    //state.font_size = (state.font_size as f64 * dpi_scale) as u32;
+    dbg!(size, draw_size, dpi_scale);
 
+
+    let mut imgui = imgui_gfx_renderer::imgui::Context::create();
+    let shaders = imgui_gfx_renderer::Shaders::GlSl150;
+    let mut renderer: Renderer<(R8_G8_B8_A8, Unorm), _> = Renderer::init(&mut imgui, &mut window.factory, shaders).unwrap();
+    let mut encoder: gfx::Encoder<_, _> = window.factory.create_command_buffer().into();
 
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
@@ -368,8 +366,6 @@ fn main() {
             // Draw text three times to simulate outline
 
 
-            
-
             for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
                 text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
                     .draw(
@@ -381,6 +377,7 @@ fn main() {
                     )
                     .unwrap();
             }
+
             text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
                 .draw(
                     &info,
@@ -488,6 +485,8 @@ fn main() {
             }
             glyphs.factory.encoder.flush(device);
         });
+
+        renderer.render(&mut window.create_texture_context(), &mut encoder, &mut renderer, draw_data);
 
         // if let Ok(state_msg) = state_receiver.try_recv() {
         //     // an image has been received

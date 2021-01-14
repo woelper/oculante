@@ -154,7 +154,7 @@ impl Default for OculanteState {
             image_dimension: (0, 0),
             info_enabled: false,
             sampled_color: [0., 0., 0., 0.],
-            font_size: 18,
+            font_size: 14,
         }
     }
 }
