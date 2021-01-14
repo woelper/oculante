@@ -15,7 +15,7 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-piston_window = "0.116.0"
+piston_window = "0.117.0"
 clap = "2.33.3"
 image = "0.23.12"
 nalgebra = "0.23.1"
@@ -26,8 +26,8 @@ exr = "0.9.0"
 gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
-piston2d-graphics = "0.39.0"
-lazy_static = "*"
+#piston2d-graphics = "0.39.0"
+lazy_static = "1.4.0"
 #libwebp-image = {version = "*", features = ["libwebp-1_1"]}
 #libwebp = { version = "0.1.2", features = ["0_6"] }
 libwebp-sys = "0.3"

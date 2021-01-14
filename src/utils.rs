@@ -135,6 +135,7 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
+    pub path_enabled: bool,
     pub font_size: u32,
 }
 
@@ -153,6 +154,7 @@ impl Default for OculanteState {
             cursor_relative: Vector2::new(0.0, 0.0),
             image_dimension: (0, 0),
             info_enabled: false,
+            path_enabled: true,
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
         }

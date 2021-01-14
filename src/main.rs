@@ -15,17 +15,17 @@ mod net;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
-extern crate graphics;
+//use graphics;
 
 
 #[cfg(test)]
 mod tests;
 
-
 fn main() {
 
 
     let mut state = OculanteState::default();
+    state.font_size = 14;
 
     let matches = App::new("Oculante")
         .arg(
@@ -57,11 +57,9 @@ fn main() {
     //let mut timer = std::time::Instant::now();
     // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
     if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-        player.load(&img_location);
-        
+        player.load(&img_location); 
     } else {
         player.load_blocking(&img_location);
-
     }
 
     let opengl = OpenGL::V3_2;
@@ -72,24 +70,9 @@ fn main() {
         .vsync(true)
         .exit_on_esc(true);
 
-    // let mut window: PistonWindow<Sdl2Window> = WindowSettings::new("Oculante", [1000, 800])
-    // let mut window: PistonWindow<WinitWindow> = ws.build().unwrap();
-    // use glfw_window::GlfwWindow;
-    // let mut window: PistonWindow<GlfwWindow> = ws.build().unwrap();
+   
     let mut window: PistonWindow = ws.build().unwrap();
     
-    // use winit;
-    // // winit::
-    // use winit::EventsLoop;
-    // use winit::{ControlFlow, WindowEvent};
-    // let mut events_loop = EventsLoop::new();
-    // let mut w = winit::Window::new(&events_loop).unwrap();
-    // dbg!(w.get_hidpi_factor());
-    // let dim = w.get_current_monitor().get_dimensions();
-    // // dbg!(s);
-    // // events_loop.
-    // events_loop.poll_events(|event| {});
-    // ControlFlow::Break;
 
 
     // Set inspection-friendly magnification filter
@@ -179,6 +162,12 @@ fn main() {
             if key == Key::V {
                 state.reset_image = true;
             }
+            
+            if key == Key::P {
+                state.path_enabled = !state.path_enabled;
+            }
+
+
             // Quit
             if key == Key::Q {
                 std::process::exit(0);
@@ -368,10 +357,11 @@ fn main() {
             // Draw text three times to simulate outline
 
 
-            
+            if state.path_enabled {
 
-            for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
-                text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
+                
+                for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
+                    text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
                     .draw(
                         &info,
                         &mut glyphs,
@@ -380,8 +370,9 @@ fn main() {
                         gfx,
                     )
                     .unwrap();
-            }
-            text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
+                }
+                
+                text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
                 .draw(
                     &info,
                     &mut glyphs,
@@ -390,7 +381,8 @@ fn main() {
                     gfx,
                 )
                 .unwrap();
-
+            }
+                
             if !state.is_loaded {
                 text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size * 2)
                     .draw(
