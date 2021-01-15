@@ -1,13 +1,10 @@
-use std::io::Read;
 use std::convert::TryInto;
+use std::io::Read;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::thread;
 
-fn handle_client(
-    mut stream: TcpStream,
-    texture_sender: Sender<image::RgbaImage>,
-) {
+fn handle_client(mut stream: TcpStream, texture_sender: Sender<image::RgbaImage>) {
     let mut data = [0 as u8; 100000]; // using 50 byte buffer
     let mut imgbuf: Vec<u8> = vec![];
     while match stream.read(&mut data) {
@@ -22,7 +19,7 @@ fn handle_client(
                 Ok(i) => {
                     // println!("got image");
                     imgbuf.clear();
-                    let _ = texture_sender.send(i.to_rgba());
+                    let _ = texture_sender.send(i.to_rgba8());
                     std::thread::sleep(std::time::Duration::from_millis(30));
                     // let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
                     false
@@ -39,7 +36,6 @@ fn handle_client(
             false
         }
     } {}
-
 }
 
 pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
@@ -50,7 +46,6 @@ pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
         // let mut stamp = std::time::Instant::now();
 
         for stream in listener.incoming() {
-            
             match stream {
                 Ok(stream) => {
                     // println!("New connection: {}", stream.peer_addr().unwrap());
@@ -60,7 +55,6 @@ pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
                         handle_client(stream, t_s)
                     });
                     // stamp = std::time::Instant::now();
-
                 }
                 Err(e) => {
                     println!("Filed connection: {}", e);
@@ -73,7 +67,6 @@ pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
             // let _ = state_sender.send(String::from("done")).unwrap();
         }
         // dbg!("yo");
-
 
         // close the socket server
         drop(listener);

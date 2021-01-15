@@ -13,38 +13,36 @@ use gif_dispose;
 use image;
 use image::{ImageBuffer, Rgba};
 //use nsvg;
+use lazy_static::lazy_static;
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
 use std::sync::mpsc;
-use std::sync::Mutex;
-use lazy_static::lazy_static;
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Mutex;
 // use libwebp_image;
-use libwebp_sys::{WebPGetInfo, WebPDecodeRGBA};
+use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
 
-
-
 pub struct Player {
     pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
-    pub image_sender: Sender<image::RgbaImage>
+    pub image_sender: Sender<image::RgbaImage>,
 }
 
 impl Player {
-
     pub fn new(image_sender: Sender<image::RgbaImage>) -> Player {
-        let (frame_sender, frame_receiver): (Sender<FrameCollection>, Receiver<FrameCollection>) = mpsc::channel();
+        let (frame_sender, frame_receiver): (Sender<FrameCollection>, Receiver<FrameCollection>) =
+            mpsc::channel();
         let move_image_sender = image_sender.clone();
         thread::spawn(move || {
-            while let Ok(col) = frame_receiver.try_recv() { 
+            while let Ok(col) = frame_receiver.try_recv() {
                 for frame in col.frames {
                     if Player::is_stopped() {
-                        break
+                        break;
                     }
                     let _ = move_image_sender.send(frame.buffer);
                 }
@@ -53,7 +51,7 @@ impl Player {
         Player {
             stop: Mutex::new(false),
             frame_sender,
-            image_sender
+            image_sender,
         }
     }
 
@@ -72,7 +70,7 @@ impl Player {
         *PLAYER_STOP.lock().unwrap() = true;
     }
 
-    pub fn is_stopped() -> bool{
+    pub fn is_stopped() -> bool {
         *PLAYER_STOP.lock().unwrap()
     }
 
@@ -93,29 +91,21 @@ pub struct Frame {
 #[derive(Debug, Default, Clone)]
 pub struct FrameCollection {
     pub frames: Vec<Frame>,
-    pub repeat: bool
+    pub repeat: bool,
 }
-
 
 impl FrameCollection {
     fn add(&mut self, buffer: image::RgbaImage, delay: u16) {
-        self.frames.push(
-            Frame::new(buffer, delay)
-        )
+        self.frames.push(Frame::new(buffer, delay))
     }
     fn add_default(&mut self, buffer: image::RgbaImage) {
-        self.frames.push(
-            Frame::new(buffer, 0)
-        )
+        self.frames.push(Frame::new(buffer, 0))
     }
 }
 
 impl Frame {
     fn new(buffer: image::RgbaImage, delay: u16) -> Frame {
-        Frame {
-            buffer,
-            delay
-        }
+        Frame { buffer, delay }
     }
 }
 
@@ -163,18 +153,17 @@ impl Default for OculanteState {
 
 // Unsafe webp decoding using webp-sys
 fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
-	let mut width = 0;
-	let mut height = 0;
-	let len = buf.len();
-    let mut webp_buffer: Vec<u8> = vec![]; 
+    let mut width = 0;
+    let mut height = 0;
+    let len = buf.len();
+    let mut webp_buffer: Vec<u8> = vec![];
     unsafe {
-		WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
-		let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);
+        WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
+        let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);
         let len = width * height * 4;
         webp_buffer = Vec::from_raw_parts(out_buf, len as usize, len as usize);
     }
     image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
-    
 }
 
 pub fn zoomratio(i: f64, s: f64) -> f64 {
@@ -281,7 +270,6 @@ pub fn unpremult(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, 
     updated_img
 }
 
-
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
     [
         (px[0].powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8,
@@ -318,17 +306,10 @@ pub fn pos_from_coord(
     size
 }
 
-
-
-pub fn send_image_threaded(
-    img_location: &PathBuf,
-    texture_sender: Sender<image::RgbaImage>,
-) {
-
+pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
     let loc = img_location.clone();
 
     thread::spawn(move || {
-
         let col = open_image(&loc);
 
         if col.repeat {
@@ -336,7 +317,9 @@ pub fn send_image_threaded(
             while !Player::is_stopped() && i < 200 {
                 let frames = col.frames.clone();
                 for frame in frames {
-                    if Player::is_stopped() {break}
+                    if Player::is_stopped() {
+                        break;
+                    }
                     let _ = texture_sender.send(frame.buffer);
                     if frame.delay > 0 {
                         thread::sleep(Duration::from_millis(frame.delay as u64));
@@ -346,33 +329,27 @@ pub fn send_image_threaded(
                 }
                 i += 1;
             }
-
         } else {
-
             for frame in col.frames {
-                if Player::is_stopped() {break}
+                if Player::is_stopped() {
+                    break;
+                }
                 let _ = texture_sender.send(frame.buffer);
-    
+
                 if frame.delay > 0 {
                     thread::sleep(Duration::from_millis(frame.delay as u64));
                 }
             }
         }
-
     });
-
 }
 
-
-
-
-pub fn send_image_blocking(
-    img_location: &PathBuf,
-    texture_sender: Sender<image::RgbaImage>,
-) {
+pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
     let col = open_image(&img_location);
     for frame in col.frames {
-        if Player::is_stopped() {break}
+        if Player::is_stopped() {
+            break;
+        }
 
         let _ = texture_sender.send(frame.buffer);
         // dbg!(&frame.delay);
@@ -398,7 +375,9 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             let dds = DDS::decode(&mut reader).unwrap();
             if let Some(main_layer) = dds.layers.get(0) {
                 let buf = main_layer.as_bytes();
-                let buf = image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into()).unwrap();
+                let buf =
+                    image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
+                        .unwrap();
                 col.add_default(buf);
                 // let _ = texture_sender.send(buffer.clone());
                 // let _ = state_sender.send(String::new()).unwrap();
@@ -416,7 +395,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             let raw = image.into_raw();
             let buf = image::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
             col.add_default(buf);
-
         }
         Some("exr") => {
             // read the image from a file and keep only the png buffer
@@ -463,21 +441,17 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                         //let mut img = image::RgbaImage::new(meta.width, meta.height);
                         //let ldr = hdr_decoder.read_image_ldr().unwrap();
 
-
-
                         let hdr_img = hdr_decoder.read_image_hdr().unwrap();
                         for pixel in hdr_img {
                             let tp = image::Rgba(tonemap_rgb(pixel.0));
                             ldr_img.push(tp);
                         }
 
-              
+                        // let s = ldr.map();
+                        let mut s: Vec<u8> = vec![];
 
-                       // let s = ldr.map();
-                       let mut s: Vec<u8> = vec![];
-                       
-                    //    ldr.iter().map(|x| vec![x.0[0], x.0[1], x.0[2], 255].clone();
-                        
+                        //    ldr.iter().map(|x| vec![x.0[0], x.0[1], x.0[2], 255].clone();
+
                         let l = ldr_img.clone();
 
                         for p in l {
@@ -485,8 +459,8 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                             s.append(&mut x);
                         }
 
-                        let tonemapped_buffer = image::RgbaImage::from_raw(meta.width, meta.height, s).unwrap();
-
+                        let tonemapped_buffer =
+                            image::RgbaImage::from_raw(meta.width, meta.height, s).unwrap();
 
                         // let tonemapped_buffer: image::RgbaImage = image::ImageBuffer::from_raw(
                         //     meta.width,
@@ -494,7 +468,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                         //     ldr_img.as_rgba().as_bytes().to_vec(),
                         // )
                         // .unwrap();
-
 
                         col.add_default(tonemapped_buffer);
                         // texture_sender.send(tonemapped_buffer).unwrap();
@@ -505,7 +478,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
             Err(e) => println!("{:?}", e),
         },
-
 
         Some("psd") => {
             let mut file = File::open(img_location).unwrap();
@@ -527,7 +499,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             if let Ok(_) = file.read_to_end(&mut contents) {
                 match decode_webp(&contents) {
                     Some(webp_buf) => col.add_default(webp_buf),
-                    None => println!("Error decoding data from {:?}", img_location)
+                    None => println!("Error decoding data from {:?}", img_location),
                 }
             }
         }
@@ -551,8 +523,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 col.add(buf.unwrap(), frame.delay * 10);
                 col.repeat = true;
             }
-
-        },
+        }
         _ => match image::open(img_location) {
             Ok(img) => {
                 col.add_default(img.to_rgba());
@@ -565,5 +536,4 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
 
     Player::start();
     col
-
 }

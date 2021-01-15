@@ -1,29 +1,26 @@
 #![windows_subsystem = "windows"]
-// #![feature(test)]
-// #![feature(core_intrinsics)]
 
+use ::image as image_crate;
+// use events::handle_events;
+use image_crate::Pixel;
+use piston_window::*;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-use ::image as image_crate;
-use image_crate::Pixel;
-use std::path::PathBuf;
-use piston_window::*;
 
 mod utils;
 use utils::*;
+// mod events;
 mod net;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
 //use graphics;
 
-
 #[cfg(test)]
 mod tests;
 
 fn main() {
-
-
     let mut state = OculanteState::default();
     state.font_size = 14;
 
@@ -52,12 +49,11 @@ fn main() {
 
     let player = Player::new(texture_sender.clone());
 
-
     // let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
     //let mut timer = std::time::Instant::now();
     // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
     if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-        player.load(&img_location); 
+        player.load(&img_location);
     } else {
         player.load_blocking(&img_location);
     }
@@ -70,17 +66,16 @@ fn main() {
         .vsync(true)
         .exit_on_esc(true);
 
-   
     let mut window: PistonWindow = ws.build().unwrap();
-    
 
+    let scale_factor = window.draw_size().width/window.size().width;
 
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
     tx_settings.set_mag(Filter::Nearest);
 
     // These should all be a nice config struct...
-    let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba();
+    let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba8();
     let mut texture = Texture::empty(&mut window.create_texture_context());
 
     let mut glyphs = Glyphs::from_bytes(
@@ -89,11 +84,6 @@ fn main() {
         TextureSettings::new(),
     )
     .unwrap();
-    
-// fn print_type_of<T>(_: &T) {
-//     println!("{}", unsafe { std::intrinsics::type_name::<T>() });
-// }
-//     print_type_of(&glyphs);
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -109,26 +99,23 @@ fn main() {
         }
     }
 
- 
-
-
+    // Event loop
     while let Some(e) = window.next() {
-        // a new texture has been sent
+        // check if a new texture has been sent
         if let Ok(img) = texture_receiver.try_recv() {
             window.set_lazy(false);
 
-            // dbg!(timer.elapsed());
             texture = Texture::from_image(&mut window.create_texture_context(), &img, &tx_settings);
             current_image = img;
 
-            let window_size = Vector2::new(window.size().width, window.size().height);
+            let draw_size = window.size();
+
+            let window_size = Vector2::new(draw_size.width, draw_size.height);
             let img_size =
                 Vector2::new(current_image.width() as f64, current_image.height() as f64);
             state.offset = window_size / 2.0 - img_size / 2.0;
             state.is_loaded = true;
         }
-
-    
 
         // Receive a dragged file
         if let Event::Input(Input::FileDrag(FileDrag::Drop(p)), None) = &e {
@@ -154,6 +141,8 @@ fn main() {
             // state.sampled_color = current_image.get_pixel(state.cursor_relative.x as u32, state.cursor_relative.y as u32).channels4();
         }
 
+        //handle_events(&mut state, &e);
+
         if let Some(Button::Mouse(_)) = e.release_args() {
             state.drag_enabled = false;
         }
@@ -162,11 +151,10 @@ fn main() {
             if key == Key::V {
                 state.reset_image = true;
             }
-            
+
             if key == Key::P {
                 state.path_enabled = !state.path_enabled;
             }
-
 
             // Quit
             if key == Key::Q {
@@ -182,15 +170,13 @@ fn main() {
                     window = ws.clone().fullscreen(false).build().unwrap();
                 }
 
-                // let d = window.
-                // dbg!(d);
-
                 // state.reset_image = true;
                 texture = Texture::from_image(
                     &mut window.create_texture_context(),
                     &current_image,
                     &tx_settings,
                 );
+
                 glyphs = Glyphs::from_bytes(
                     font,
                     window.create_texture_context(),
@@ -199,6 +185,7 @@ fn main() {
                 .unwrap();
                 state.fullscreen_enabled = !state.fullscreen_enabled;
             }
+
             // Display color unpremultiplied (just rgb without multiplying by alpha)
             if key == Key::U {
                 texture = Texture::from_image(
@@ -207,6 +194,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+
             // Only red
             if key == Key::R {
                 texture = Texture::from_image(
@@ -215,6 +203,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+
             // Only green
             if key == Key::G {
                 texture = Texture::from_image(
@@ -223,6 +212,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+
             // Only blue
             if key == Key::B {
                 texture = Texture::from_image(
@@ -231,6 +221,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+
             // Only alpha
             if key == Key::A {
                 texture = Texture::from_image(
@@ -239,6 +230,7 @@ fn main() {
                     &tx_settings,
                 );
             }
+
             // Color channel (RGB)
             if key == Key::C {
                 texture = Texture::from_image(
@@ -286,12 +278,12 @@ fn main() {
 
         e.mouse_relative(|d| {
             if state.drag_enabled {
-                state.offset += Vector2::new(d[0], d[1]);
+                state.offset += Vector2::new(d[0]/scale_factor, d[1]/scale_factor);
             }
         });
 
         e.mouse_cursor(|d| {
-            state.cursor = Vector2::new(d[0], d[1]);
+            state.cursor = Vector2::new(d[0]/scale_factor, d[1]/scale_factor);
             state.cursor_relative = pos_from_coord(
                 state.offset,
                 state.cursor,
@@ -318,6 +310,9 @@ fn main() {
         // e.resize(|args| {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
+
+        //dbg!(window.size());
+        //dbg!(window.draw_size());
 
         let size = window.size();
 
@@ -356,33 +351,30 @@ fn main() {
 
             // Draw text three times to simulate outline
 
-
             if state.path_enabled {
-
-                
                 for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
                     text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
+                        .draw(
+                            &info,
+                            &mut glyphs,
+                            &c.draw_state,
+                            c.transform.trans(10.0 + i.0 as f64, 20.0 + i.1 as f64),
+                            gfx,
+                        )
+                        .unwrap();
+                }
+
+                text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
                     .draw(
                         &info,
                         &mut glyphs,
                         &c.draw_state,
-                        c.transform.trans(10.0 + i.0 as f64, 20.0 + i.1 as f64),
+                        c.transform.trans(10.0, 20.0),
                         gfx,
                     )
                     .unwrap();
-                }
-                
-                text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
-                .draw(
-                    &info,
-                    &mut glyphs,
-                    &c.draw_state,
-                    c.transform.trans(10.0, 20.0),
-                    gfx,
-                )
-                .unwrap();
             }
-                
+
             if !state.is_loaded {
                 text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size * 2)
                     .draw(
@@ -391,6 +383,18 @@ fn main() {
                         &c.draw_state,
                         c.transform
                             .trans(size.width / 2.0 - 120.0, size.height / 2.0),
+                        gfx,
+                    )
+                    .unwrap();
+
+
+                    text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
+                    .draw(
+                        "Press i to toggle info, r,g,b,a to toggle channels",
+                        &mut glyphs,
+                        &c.draw_state,
+                        c.transform
+                            .trans(size.width / 2.0 - 120.0, size.height - 50.),
                         gfx,
                     )
                     .unwrap();
@@ -442,8 +446,6 @@ fn main() {
                     );
                 }
 
-
-
                 text::Text::new_color(col_inv, state.font_size)
                     .draw(
                         &format!(
@@ -491,6 +493,7 @@ fn main() {
         //         window.set_lazy(true);
         //     } else {
         //     }
+
         // }
     }
 }
