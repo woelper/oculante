@@ -15,12 +15,17 @@ mod net;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
-//use graphics;
+
+mod update;
+
 
 #[cfg(test)]
 mod tests;
 
 fn main() {
+
+    //update::update();
+
     let mut state = OculanteState::default();
     state.font_size = 14;
 
