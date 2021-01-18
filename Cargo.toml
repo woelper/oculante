@@ -31,7 +31,7 @@ lazy_static = "*"
 #libwebp-image = {version = "*", features = ["libwebp-1_1"]}
 #libwebp = { version = "0.1.2", features = ["0_6"] }
 libwebp-sys = "0.3"
-imgui-gfx-renderer = "*"
+imgui-gfx-renderer = "0.6.1"
 
 gfx = "0.18"
 #gfx_device_gl = "0.16"
@@ -41,11 +41,11 @@ gfx = "0.18"
 #imgui-winit-support = "*"
 #old_school_gfx_glutin_ext = "0.26"
 
-[features]
-opengl = ["imgui-gfx-renderer/opengl"]
-# FIXME
-# directx = ["imgui-gfx-renderer/directx"]
-default = ["opengl"]
+# [features]
+# opengl = ["imgui-gfx-renderer/opengl"]
+# # FIXME
+# # directx = ["imgui-gfx-renderer/directx"]
+# default = ["opengl"]
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved

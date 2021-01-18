@@ -87,7 +87,7 @@ fn main() {
 
     let mut imgui = imgui_gfx_renderer::imgui::Context::create();
     let shaders = imgui_gfx_renderer::Shaders::GlSl150;
-    let mut renderer: Renderer<(R8_G8_B8_A8, Unorm), _> = Renderer::init(&mut imgui, &mut window.factory, shaders).unwrap();
+    let mut renderer: Renderer<(R8_G8_B8_A8, gfx::format::Srgb), _> = Renderer::init(&mut imgui, &mut window.factory, shaders).unwrap();
     let mut encoder: gfx::Encoder<_, _> = window.factory.create_command_buffer().into();
 
     // Set inspection-friendly magnification filter
@@ -484,9 +484,21 @@ fn main() {
                     .unwrap();
             }
             glyphs.factory.encoder.flush(device);
+        
+        
+            // imgui specifics
+            let mut ui = imgui.frame();
+            let draw_data = ui.render();
+    
+            renderer.render(
+        &mut window.create_texture_context(),
+                &mut encoder,
+                &mut window.output_color,
+                draw_data
+            );
+        
         });
 
-        renderer.render(&mut window.create_texture_context(), &mut encoder, &mut renderer, draw_data);
 
         // if let Ok(state_msg) = state_receiver.try_recv() {
         //     // an image has been received
