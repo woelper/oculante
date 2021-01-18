@@ -3,7 +3,6 @@
 use ::image as image_crate;
 // use events::handle_events;
 use image_crate::Pixel;
-use math::Matrix2d;
 use piston_window::*;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -22,31 +21,7 @@ mod update;
 #[cfg(test)]
 mod tests;
 
-struct TextInstruction {
-    text: String,
-    color: types::Color,
-    position: Matrix2d,
-    size: u32,
-}
 
-impl TextInstruction {
-    fn new(t: &str, position: Matrix2d) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: 14,
-        }
-    }
-    fn new_all(t: &str, position: Matrix2d, size: u32) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: size,
-        }
-    }
-}
 
 fn main() {
     //update::update();
@@ -116,6 +91,7 @@ fn main() {
     .unwrap();
 
     let mut text_draw_list: Vec<TextInstruction> = vec![];
+    let mut frames_elapsed = 0;
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -277,6 +253,11 @@ fn main() {
                 state.info_enabled = !state.info_enabled;
             }
 
+            // Toggle tooltip
+            if key == Key::H {
+                state.tooltip = !state.tooltip;
+            }
+
             if key == Key::Right {
                 state.reset_image = true;
                 window.set_lazy(false);
@@ -388,28 +369,43 @@ fn main() {
             }
 
             if !state.is_loaded {
-                text_draw_list.push(TextInstruction::new_all(
+                text_draw_list.push(TextInstruction::new_size(
                     &state.message,
                     c.transform
                         .trans(size.width / 2.0 - 120.0, size.height / 2.0),
                     state.font_size * 2,
                 ));
+            }
 
-                text_draw_list.push(TextInstruction::new(
+            if frames_elapsed < 50 || state.tooltip {
+
+
+                let mut a = 1.0 - frames_elapsed as f32/50.;
+                if state.tooltip {
+                    a = 1.0;
+                } 
+                text_draw_list.push(TextInstruction::new_color(
+                    "Press h to toggle this help!",
+                    c.transform
+                        .trans(50., size.height - 100.),
+                        [0.6, 0.6, 1.0, a]
+                ));
+
+                text_draw_list.push(TextInstruction::new_color(
                     "Press i to toggle info, r,g,b,a to toggle channels, c for all channels",
                     c.transform
-                        .trans(50., size.height - 50.),
+                        .trans(50., size.height - 80.),
+                        [1.0, 1.0, 1.0, a]
                 ));
 
-                text_draw_list.push(TextInstruction::new(
+                text_draw_list.push(TextInstruction::new_color(
                     "Press u for unpremultiplied alpha, v to reset view, <- -> to view next/prev image",
                     c.transform
-                        .trans(50., size.height - 80.),
+                        .trans(50., size.height - 60.),
+                        [1.0, 1.0, 1.0, a]
                 ));
-
-
-
             }
+
 
             if state.info_enabled {
                 let col_inv = invert_rgb_8bit(state.sampled_color);
@@ -497,7 +493,7 @@ fn main() {
                     (-2, -2),
                 ] {
                     // draw black
-                    text::Text::new_color([0.0, 0.0, 0.0, 1.0], t.size)
+                    text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
                         .draw(
                             &t.text,
                             &mut glyphs,
@@ -508,11 +504,12 @@ fn main() {
                         .unwrap();
                 }
 
-                text::Text::new_color([1.0, 1.0, 1.0, 1.0], t.size)
+                text::Text::new_color(t.color, t.size)
                     .draw(&t.text, &mut glyphs, &c.draw_state, t.position, gfx)
                     .unwrap();
             }
             text_draw_list.clear();
+            frames_elapsed += 1 ;
 
             glyphs.factory.encoder.flush(device);
         });

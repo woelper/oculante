@@ -12,6 +12,8 @@ use gif::{ColorOutput, SetParameter};
 use gif_dispose;
 use image;
 use image::{ImageBuffer, Rgba};
+use crate::math::Matrix2d;
+use crate::types::Color;
 //use nsvg;
 use lazy_static::lazy_static;
 use psd::Psd;
@@ -26,6 +28,42 @@ use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
+
+
+pub struct TextInstruction {
+    pub text: String,
+    pub color: Color,
+    pub position: Matrix2d,
+    pub size: u32,
+}
+
+impl TextInstruction {
+    pub fn new(t: &str, position: Matrix2d) -> TextInstruction {
+        TextInstruction {
+            text: t.to_string(),
+            color: [1.0, 1.0, 1.0, 0.7],
+            position,
+            size: 14,
+        }
+    }
+    pub fn new_size(t: &str, position: Matrix2d, size: u32) -> TextInstruction {
+        TextInstruction {
+            text: t.to_string(),
+            color: [1.0, 1.0, 1.0, 0.7],
+            position,
+            size: size,
+        }
+    }
+    pub fn new_color(t: &str, position: Matrix2d, color: Color) -> TextInstruction {
+        TextInstruction {
+            text: t.to_string(),
+            color,
+            position,
+            size: 14,
+        }
+    }
+}
+
 
 pub struct Player {
     pub stop: Mutex<bool>,
@@ -127,6 +165,7 @@ pub struct OculanteState {
     pub info_enabled: bool,
     pub path_enabled: bool,
     pub font_size: u32,
+    pub tooltip: bool
 }
 
 impl Default for OculanteState {
@@ -147,6 +186,7 @@ impl Default for OculanteState {
             path_enabled: true,
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
+            tooltip: false
         }
     }
 }
