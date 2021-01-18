@@ -3,6 +3,7 @@
 use ::image as image_crate;
 // use events::handle_events;
 use image_crate::Pixel;
+use math::Matrix2d;
 use piston_window::*;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -18,12 +19,36 @@ use net::*;
 
 mod update;
 
-
 #[cfg(test)]
 mod tests;
 
-fn main() {
+struct TextInstruction {
+    text: String,
+    color: types::Color,
+    position: Matrix2d,
+    size: u32,
+}
 
+impl TextInstruction {
+    fn new(t: &str, position: Matrix2d) -> TextInstruction {
+        TextInstruction {
+            text: t.to_string(),
+            color: [1.0, 1.0, 1.0, 0.7],
+            position,
+            size: 14,
+        }
+    }
+    fn new_all(t: &str, position: Matrix2d, size: u32) -> TextInstruction {
+        TextInstruction {
+            text: t.to_string(),
+            color: [1.0, 1.0, 1.0, 0.7],
+            position,
+            size: size,
+        }
+    }
+}
+
+fn main() {
     //update::update();
 
     let mut state = OculanteState::default();
@@ -73,7 +98,7 @@ fn main() {
 
     let mut window: PistonWindow = ws.build().unwrap();
 
-    let scale_factor = window.draw_size().width/window.size().width;
+    let scale_factor = window.draw_size().width / window.size().width;
 
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
@@ -89,6 +114,8 @@ fn main() {
         TextureSettings::new(),
     )
     .unwrap();
+
+    let mut text_draw_list: Vec<TextInstruction> = vec![];
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
@@ -283,12 +310,12 @@ fn main() {
 
         e.mouse_relative(|d| {
             if state.drag_enabled {
-                state.offset += Vector2::new(d[0]/scale_factor, d[1]/scale_factor);
+                state.offset += Vector2::new(d[0] / scale_factor, d[1] / scale_factor);
             }
         });
 
         e.mouse_cursor(|d| {
-            state.cursor = Vector2::new(d[0]/scale_factor, d[1]/scale_factor);
+            state.cursor = Vector2::new(d[0] / scale_factor, d[1] / scale_factor);
             state.cursor_relative = pos_from_coord(
                 state.offset,
                 state.cursor,
@@ -316,8 +343,6 @@ fn main() {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
 
-        //dbg!(window.size());
-        //dbg!(window.draw_size());
 
         let size = window.size();
 
@@ -354,55 +379,36 @@ fn main() {
                 (state.scale * 10.0).round() / 10.0
             );
 
-            // Draw text three times to simulate outline
-
             if state.path_enabled {
-                for i in &[(-2, -2), (-2, -0), (0, -2), (2, 2), (2, 0)] {
-                    text::Text::new_color([0.0, 0.0, 0.0, 1.0], state.font_size)
-                        .draw(
-                            &info,
-                            &mut glyphs,
-                            &c.draw_state,
-                            c.transform.trans(10.0 + i.0 as f64, 20.0 + i.1 as f64),
-                            gfx,
-                        )
-                        .unwrap();
-                }
+                text_draw_list.push(TextInstruction::new(
+                    &info,
+                    c.transform.trans(10.0 as f64, 20.0 as f64),
+                ));
 
-                text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
-                    .draw(
-                        &info,
-                        &mut glyphs,
-                        &c.draw_state,
-                        c.transform.trans(10.0, 20.0),
-                        gfx,
-                    )
-                    .unwrap();
             }
 
             if !state.is_loaded {
-                text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size * 2)
-                    .draw(
-                        &state.message,
-                        &mut glyphs,
-                        &c.draw_state,
-                        c.transform
-                            .trans(size.width / 2.0 - 120.0, size.height / 2.0),
-                        gfx,
-                    )
-                    .unwrap();
+                text_draw_list.push(TextInstruction::new_all(
+                    &state.message,
+                    c.transform
+                        .trans(size.width / 2.0 - 120.0, size.height / 2.0),
+                    state.font_size * 2,
+                ));
+
+                text_draw_list.push(TextInstruction::new(
+                    "Press i to toggle info, r,g,b,a to toggle channels, c for all channels",
+                    c.transform
+                        .trans(50., size.height - 50.),
+                ));
+
+                text_draw_list.push(TextInstruction::new(
+                    "Press u for unpremultiplied alpha, v to reset view, <- -> to view next/prev image",
+                    c.transform
+                        .trans(50., size.height - 80.),
+                ));
 
 
-                    text::Text::new_color([1.0, 1.0, 1.0, 0.7], state.font_size)
-                    .draw(
-                        "Press i to toggle info, r,g,b,a to toggle channels",
-                        &mut glyphs,
-                        &c.draw_state,
-                        c.transform
-                            .trans(size.width / 2.0 - 120.0, size.height - 50.),
-                        gfx,
-                    )
-                    .unwrap();
+
             }
 
             if state.info_enabled {
@@ -435,8 +441,11 @@ fn main() {
                         .transform
                         .trans(cur.x + rect_size / 2., cur.y + rect_size / 2.)
                         .zoom(1.0);
+
+                    // A small rect covering the picked pixel
                     let pixel_rect = Rectangle::new(col_inv);
-                    let frame = Rectangle::new_border([0.0, 0.0, 0.0, 0.5], 2.);
+                    // A frame over the magnified texture
+                    let frame = Rectangle::new_border([0.0, 0.0, 0.0, 0.5], 1.);
                     frame.draw(
                         [0.0, 0.0, rect_size, rect_size],
                         &draw_state::DrawState::default(),
@@ -451,40 +460,60 @@ fn main() {
                     );
                 }
 
-                text::Text::new_color(col_inv, state.font_size)
-                    .draw(
-                        &format!(
-                            "P {},{} / {},{}",
-                            state.cursor_relative[0].floor() as i32 + 1,
-                            state.image_dimension.1 as i32
-                                - (state.cursor_relative[1].floor() as i32),
-                            state.cursor_relative[0].floor() as i32 + 1,
-                            state.cursor_relative[1].floor() as i32 + 1,
-                        ),
-                        &mut glyphs,
-                        &c.draw_state,
-                        c.transform.trans(state.cursor.x, state.cursor.y - 4.),
-                        gfx,
-                    )
-                    .unwrap();
+                text_draw_list.push(TextInstruction::new(
+                    &format!(
+                        "P {},{} / {},{}",
+                        state.cursor_relative[0].floor() as i32 + 1,
+                        state.image_dimension.1 as i32 - (state.cursor_relative[1].floor() as i32),
+                        state.cursor_relative[0].floor() as i32 + 1,
+                        state.cursor_relative[1].floor() as i32 + 1,
+                    ),
+                    c.transform.trans(state.cursor.x, state.cursor.y - 4.),
+                ));
 
-                text::Text::new_color(col_inv, state.font_size)
-                    .draw(
-                        &format!(
-                            "C {} / {}",
-                            disp_col(state.sampled_color),
-                            disp_col_norm(state.sampled_color, 255.0),
-                        ),
-                        &mut glyphs,
-                        &c.draw_state,
-                        c.transform.trans(
-                            state.cursor.x,
-                            state.cursor.y - state.font_size as f64 * 1.05,
-                        ),
-                        gfx,
-                    )
+                text_draw_list.push(TextInstruction::new(
+                    &format!(
+                        "C {} / {}",
+                        disp_col(state.sampled_color),
+                        disp_col_norm(state.sampled_color, 255.0),
+                    ),
+                    c.transform.trans(
+                        state.cursor.x,
+                        state.cursor.y - state.font_size as f64 * 1.05,
+                    ),
+                ));
+            }
+
+            // Draw all text
+            for t in &text_draw_list {
+                for i in &[
+                    (0, -2),
+                    (0, 2),
+                    (-2, 0),
+                    (2, 0),
+                    (2, 2),
+                    (-2, 2),
+                    (2, -2),
+                    (-2, -2),
+                ] {
+                    // draw black
+                    text::Text::new_color([0.0, 0.0, 0.0, 1.0], t.size)
+                        .draw(
+                            &t.text,
+                            &mut glyphs,
+                            &c.draw_state,
+                            t.position.trans(i.0 as f64, i.1 as f64),
+                            gfx,
+                        )
+                        .unwrap();
+                }
+
+                text::Text::new_color([1.0, 1.0, 1.0, 1.0], t.size)
+                    .draw(&t.text, &mut glyphs, &c.draw_state, t.position, gfx)
                     .unwrap();
             }
+            text_draw_list.clear();
+
             glyphs.factory.encoder.flush(device);
         });
 
