@@ -80,6 +80,18 @@ jobs:
         asset_path: oculante_app.zip
         asset_name: oculante_mac.zip
         asset_content_type: application/zip
+    - name: Upload Mac Binary
+      if: matrix.os == 'macOS-latest'
+      id: upload-release-asset-bin
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: target/release/oculante
+        asset_name: oculante_mac
+        asset_content_type: application/zip
+
 
     - name: Upload Windows Release
       if: matrix.os == 'windows-latest'

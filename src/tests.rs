@@ -2,7 +2,7 @@
 // use test::{Bencher, black_box};
 use super::*;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+//use std::time::{Duration, Instant};
 
 #[test]
 fn load() {
