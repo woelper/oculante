@@ -1,19 +1,20 @@
 use exr;
 use nalgebra::{clamp, Vector2};
+use piston_window::{Character, CharacterCache, DrawState, Graphics, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
+use crate::math::Matrix2d;
+use crate::types::Color;
 use dds::DDS;
 use exr::prelude::rgba_image as rgb_exr;
 use gif::{ColorOutput, SetParameter};
 use gif_dispose;
 use image;
 use image::{ImageBuffer, Rgba};
-use crate::math::Matrix2d;
-use crate::types::Color;
 //use nsvg;
 use lazy_static::lazy_static;
 use psd::Psd;
@@ -28,7 +29,6 @@ use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
-
 
 pub struct TextInstruction {
     pub text: String,
@@ -63,7 +63,6 @@ impl TextInstruction {
         }
     }
 }
-
 
 pub struct Player {
     pub stop: Mutex<bool>,
@@ -147,6 +146,48 @@ impl Frame {
     }
 }
 
+pub trait TextExt {
+    fn width<C>(
+        &self,
+        text: &str,
+        cache: &mut C,
+    ) -> (f64,f64) 
+    where C: CharacterCache,
+    {
+        unimplemented!()
+    }
+}
+
+impl TextExt for Text {
+    /// Draws text with a character cache
+    fn width<C>(
+        &self,
+        text: &str,
+        cache: &mut C,
+    ) -> (f64,f64)
+    where
+        C: CharacterCache,
+    {
+
+        let mut x = 0.0;
+        let mut y = 0.0;
+        for ch in text.chars() {
+            //let character = cache.character(self.font_size, ch)?;
+            let c2= cache.character(self.font_size, ch);
+            if let Ok(character) = c2 {
+                x += character.advance_width();
+                y += character.advance_height();
+
+                y = y.max(character.top());
+
+            }
+     
+        }
+
+        (x,y)
+    }
+}
+
 /// The state of the application
 #[derive(Debug)]
 pub struct OculanteState {
@@ -165,7 +206,7 @@ pub struct OculanteState {
     pub info_enabled: bool,
     pub path_enabled: bool,
     pub font_size: u32,
-    pub tooltip: bool
+    pub tooltip: bool,
 }
 
 impl Default for OculanteState {
@@ -186,7 +227,7 @@ impl Default for OculanteState {
             path_enabled: true,
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
-            tooltip: false
+            tooltip: false,
         }
     }
 }

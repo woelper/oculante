@@ -1699,7 +1699,7 @@ checksum = "8d3b63360ec3cb337817c2dbd47ab4a0f170d285d8e5a2064600f3def1402397"
 
 [[package]]
 name = "oculante"
-version = "0.4.13"
+version = "0.4.14"
 dependencies = [
  "clap",
  "dds-rs",

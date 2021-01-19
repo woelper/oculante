@@ -21,8 +21,6 @@ mod update;
 #[cfg(test)]
 mod tests;
 
-
-
 fn main() {
     //update::update();
 
@@ -44,7 +42,7 @@ fn main() {
         )
         .get_matches();
 
-    let font = include_bytes!("IBMPlexSans-Regular.ttf");
+    let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
     let mut img_location = PathBuf::from(&img_path);
     let (texture_sender, texture_receiver): (
@@ -83,8 +81,8 @@ fn main() {
     let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba8();
     let mut texture = Texture::empty(&mut window.create_texture_context());
 
-    let mut glyphs = Glyphs::from_bytes(
-        font,
+    let mut glyphs_regular = Glyphs::from_bytes(
+        font_regular,
         window.create_texture_context(),
         TextureSettings::new(),
     )
@@ -185,12 +183,14 @@ fn main() {
                     &tx_settings,
                 );
 
-                glyphs = Glyphs::from_bytes(
-                    font,
+                glyphs_regular = Glyphs::from_bytes(
+                    font_regular,
                     window.create_texture_context(),
                     TextureSettings::new(),
                 )
                 .unwrap();
+
+
                 state.fullscreen_enabled = !state.fullscreen_enabled;
             }
 
@@ -323,7 +323,6 @@ fn main() {
         // e.resize(|args| {
         //     println!("Resized '{}, {}'", args.window_size[0], args.window_size[1])
         // });
-
 
         let size = window.size();
 
@@ -475,43 +474,71 @@ fn main() {
                     ),
                     c.transform.trans(
                         state.cursor.x,
-                        state.cursor.y - state.font_size as f64 * 1.05,
+                        state.cursor.y - state.font_size as f64 * 1.5,
                     ),
                 ));
             }
 
             // Draw all text
             for t in &text_draw_list {
-                for i in &[
-                    (0, -2),
-                    (0, 2),
-                    (-2, 0),
-                    (2, 0),
-                    (2, 2),
-                    (-2, 2),
-                    (2, -2),
-                    (-2, -2),
-                ] {
-                    // draw black
-                    text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
-                        .draw(
-                            &t.text,
-                            &mut glyphs,
-                            &c.draw_state,
-                            t.position.trans(i.0 as f64, i.1 as f64),
-                            gfx,
-                        )
-                        .unwrap();
-                }
+                
+                // for i in &[
+                //     (0, -2),
+                //     (0, 2),
+                //     (-2, 0),
+                //     (2, 0),
+                //     // (2, 2),
+                //     // (-2, 2),
+                //     // (2, -2),
+                //     // (-2, -2),
+                // ] {
+                //     // draw black
+                //     text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
+                //         .draw(
+                //             &t.text,
+                //             &mut glyphs_regular,
+                //             &c.draw_state,
+                //             t.position.trans(i.0 as f64, i.1 as f64),
+                //             gfx,
+                //         )
+                //         .unwrap();
+                // }
+
+
+                // // draw black
+                // text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
+                // .draw(
+                //     &t.text,
+                //     &mut glyphs_bold,
+                //     &c.draw_state,
+                //     t.position,
+                //     gfx,
+                // )
+                // .unwrap();
+
+
+                let text_rect = Rectangle::new([0.,0.,0.,0.3]);
+                // A frame over the magnified texture
+          
+                let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
+                
+                let margin = 5.;
+                text_rect.draw(
+                    [-margin, margin, x.0 + margin*2., -(x.1 + margin)],
+                    &draw_state::DrawState::default(),
+                    t.position,
+                    gfx,
+                );
 
                 text::Text::new_color(t.color, t.size)
-                    .draw(&t.text, &mut glyphs, &c.draw_state, t.position, gfx)
+                    .draw(&t.text, &mut glyphs_regular, &c.draw_state, t.position, gfx)
                     .unwrap();
-            }
+
+                }
             text_draw_list.clear();
             frames_elapsed += 1 ;
 
-            glyphs.factory.encoder.flush(device);
+            glyphs_regular.factory.encoder.flush(device);
         });
 
         // if let Ok(state_msg) = state_receiver.try_recv() {
