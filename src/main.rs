@@ -392,7 +392,7 @@ fn main() {
                 ));
             }
 
-            if frames_elapsed < 0 || state.tooltip {
+            if frames_elapsed < 100 || state.tooltip {
 
 
                 let mut a = 1.0 - frames_elapsed as f32/50.;
@@ -416,6 +416,13 @@ fn main() {
                     "Press u for unpremultiplied alpha, v to reset view, <- -> to view next/prev image",
                     c.transform
                         .trans(50., size.height - 60.),
+                        [1.0, 1.0, 1.0, a]
+                ));
+
+                text_draw_list.push(TextInstruction::new_color(
+                    "Press ',' (comma) to update from latest github release",
+                    c.transform
+                        .trans(50., size.height - 40.),
                         [1.0, 1.0, 1.0, a]
                 ));
             }
