@@ -21,6 +21,11 @@ mod update;
 #[cfg(test)]
 mod tests;
 
+fn set_title(window: &mut PistonWindow, text: &str) {
+    let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
+    window.set_title(title);
+}
+
 fn main() {
     //update::update();
 
@@ -63,6 +68,7 @@ fn main() {
 
     let opengl = OpenGL::V3_2;
 
+
     let ws = WindowSettings::new("Oculante", [1000, 800])
         .graphics_api(opengl)
         .fullscreen(false)
@@ -70,6 +76,8 @@ fn main() {
         .exit_on_esc(true);
 
     let mut window: PistonWindow = ws.build().unwrap();
+    set_title(&mut window, "No image");
+
 
     let scale_factor = window.draw_size().width / window.size().width;
 
@@ -93,6 +101,8 @@ fn main() {
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
+        set_title(&mut window, &img_location.to_string_lossy().to_string());
+
     }
 
     if let Some(port) = matches.value_of("l") {
@@ -130,6 +140,8 @@ fn main() {
             state.is_loaded = false;
             img_location = p.clone();
             player.load(&img_location);
+            // window.set_title(img_location.to_string_lossy().to_string());
+            set_title(&mut window, &img_location.to_string_lossy().to_string());
             // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
         }
 
@@ -264,7 +276,7 @@ fn main() {
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, 1);
                 player.load(&img_location);
-                // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+                set_title(&mut window, &img_location.to_string_lossy().to_string());
             }
 
             if key == Key::Left {
@@ -273,7 +285,11 @@ fn main() {
                 state.is_loaded = false;
                 img_location = img_shift(&img_location, -1);
                 player.load(&img_location);
-                // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+                set_title(&mut window, &img_location.to_string_lossy().to_string());
+            }
+
+            if key == Key::Comma {
+                update::update();
             }
         };
 
@@ -353,7 +369,7 @@ fn main() {
 
             let info = format!(
                 "{} {}X{} @{}X",
-                &img_location.to_string_lossy(),
+                &img_location.file_name().unwrap_or_default().to_string_lossy(),
                 state.image_dimension.0,
                 state.image_dimension.1,
                 (state.scale * 10.0).round() / 10.0
@@ -376,13 +392,12 @@ fn main() {
                 ));
             }
 
-            if frames_elapsed < 50 || state.tooltip {
+            if frames_elapsed < 0 || state.tooltip {
 
 
                 let mut a = 1.0 - frames_elapsed as f32/50.;
-                if state.tooltip {
-                    a = 1.0;
-                } 
+                if state.tooltip {a = 1.0;}
+
                 text_draw_list.push(TextInstruction::new_color(
                     "Press h to toggle this help!",
                     c.transform
@@ -517,7 +532,7 @@ fn main() {
                 // .unwrap();
 
 
-                let text_rect = Rectangle::new([0.,0.,0.,0.3]);
+                let text_rect = Rectangle::new([0.,0.,0., 0.5*t.color[3]]);
                 // A frame over the magnified texture
           
                 let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
@@ -533,7 +548,6 @@ fn main() {
                 text::Text::new_color(t.color, t.size)
                     .draw(&t.text, &mut glyphs_regular, &c.draw_state, t.position, gfx)
                     .unwrap();
-
                 }
             text_draw_list.clear();
             frames_elapsed += 1 ;
