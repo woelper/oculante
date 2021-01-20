@@ -1,6 +1,6 @@
 use exr;
 use nalgebra::{clamp, Vector2};
-use piston_window::{Character, CharacterCache, DrawState, Graphics, Text};
+use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -204,7 +204,6 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
-    pub path_enabled: bool,
     pub font_size: u32,
     pub tooltip: bool,
 }
@@ -224,7 +223,6 @@ impl Default for OculanteState {
             cursor_relative: Vector2::new(0.0, 0.0),
             image_dimension: (0, 0),
             info_enabled: false,
-            path_enabled: true,
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
             tooltip: false,
@@ -607,7 +605,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
         }
         _ => match image::open(img_location) {
             Ok(img) => {
-                col.add_default(img.to_rgba());
+                col.add_default(img.to_rgba8());
                 // let _ = texture_sender.send(img.to_rgba()).unwrap();
                 // let _ = state_sender.send(String::new()).unwrap();
             }

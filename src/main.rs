@@ -170,9 +170,6 @@ fn main() {
                 state.reset_image = true;
             }
 
-            if key == Key::P {
-                state.path_enabled = !state.path_enabled;
-            }
 
             // Quit
             if key == Key::Q {
@@ -375,7 +372,7 @@ fn main() {
                 (state.scale * 10.0).round() / 10.0
             );
 
-            if state.path_enabled {
+            if state.info_enabled {
                 text_draw_list.push(TextInstruction::new(
                     &info,
                     c.transform.trans(10.0 as f64, 20.0 as f64),
@@ -392,7 +389,7 @@ fn main() {
                 ));
             }
 
-            if frames_elapsed < 100 || state.tooltip {
+            if frames_elapsed < 180 || state.tooltip {
 
 
                 let mut a = 1.0 - frames_elapsed as f32/50.;
