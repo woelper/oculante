@@ -26,6 +26,17 @@ use std::sync::Mutex;
 // use libwebp_image;
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
+
+pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
+
+    // let rel_0 = a.0/b.0;
+    // let rel_0 = a.1/b.1;
+
+    let rel_0 = v/r1.1;
+
+    rel_0 * r2.1
+}
+
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
@@ -189,7 +200,7 @@ impl TextExt for Text {
 }
 
 /// The state of the application
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OculanteState {
     pub scale: f64,
     pub scale_increment: f64,
@@ -206,6 +217,8 @@ pub struct OculanteState {
     pub info_enabled: bool,
     pub font_size: u32,
     pub tooltip: bool,
+    pub toast: String,
+    //pub toast: Option<String>
 }
 
 impl Default for OculanteState {
@@ -226,6 +239,7 @@ impl Default for OculanteState {
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
             tooltip: false,
+            toast: "".to_string()
         }
     }
 }

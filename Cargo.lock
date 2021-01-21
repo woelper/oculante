@@ -1699,7 +1699,7 @@ checksum = "8d3b63360ec3cb337817c2dbd47ab4a0f170d285d8e5a2064600f3def1402397"
 
 [[package]]
 name = "oculante"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "clap",
  "dds-rs",
@@ -1715,6 +1715,7 @@ dependencies = [
  "psd",
  "rgb",
  "self_update",
+ "splines",
  "windres",
 ]
 
@@ -2570,6 +2571,12 @@ dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "splines"
+version = "3.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "922ec2e51791609cdcbc0ab24f00ea8648d17e4ec2f391e256cab701c2783dfa"
 
 [[package]]
 name = "strsim"

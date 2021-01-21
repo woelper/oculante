@@ -28,7 +28,10 @@ nsvg = "0.5.1"
 gif = "0.10.3"
 lazy_static = "1.4.0"
 libwebp-sys = "0.3"
-self_update = "*"
+self_update = "0.23.0"
+# piston2d-gfx_graphics = "*"
+# gfx_device_gl = "0.16.2"
+splines = "*"
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved

@@ -1,9 +1,11 @@
 #![windows_subsystem = "windows"]
 
+// use gfx_graphics::GfxGraphics;
 use ::image as image_crate;
 // use events::handle_events;
 use image_crate::Pixel;
 use piston_window::*;
+// use types::Matrix2d;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -15,22 +17,78 @@ mod net;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
+use splines::{Interpolation, Spline};
 
 mod update;
 
 #[cfg(test)]
 mod tests;
 
+
 fn set_title(window: &mut PistonWindow, text: &str) {
     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
     window.set_title(title);
 }
+
+// fn toast(window: &mut PistonWindow, text: &str, drawlist: &mut Vec<TextInstruction>, ds: DrawState, cb: &mut GfxGraphics<Resources, CommandBuffer>) {
+//     let pixel_rect = Rectangle::new([0.5,0.5,1.0,1.0]);
+// }
+
+
+// pub fn render(event: &Event, window: &mut PistonWindow, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
+
+
+//     // let text_rect = Rectangle::new([0.,0.,0., 0.5]);
+
+//     // // let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
+    
+//     // let margin = 5.;
+//     // text_rect.draw(
+//     //     [0, 0, 100, 100],
+//     //     // &draw_state::DrawState::default(),
+//     //     Matrix2d::default(),
+//     //     graphics,
+//     // );
+
+//     window.draw_2d(event, |context, graphics, _| {
+//         clear([0.0, 0.0, 0.0, 1.0], graphics);
+//         let center = context.transform;
+//         let square = rectangle::square(0.0, 0.0, 100.0);
+//         let red = [1.0, 0.0, 0.0, 1.0];
+//         rectangle(
+//             red,
+//             square,
+//             center.trans(0.0, 0.0).trans(-50.0, -50.0),
+//             graphics,
+//         );
+//     });
+
+// }
+
+
+// pub fn rectrender(cache: &mut gfx_graphics::GlyphCache<TextureContext<Factory, gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>, Texture<gfx_device_gl::Resources>>, state: &DrawState, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
+
+//         clear([0.0, 0.6, 0.0, 1.0], graphics);
+//         let center = Matrix2d::default();
+//         let square = rectangle::square(0.0, 0.0, 400.0);
+//         let red = [1.0, 0.0, 0.0, 1.0];
+//         rectangle(
+//             red,
+//             square,
+//             center,
+//             graphics,
+//         );
+// }
+
+
 
 fn main() {
     //update::update();
 
     let mut state = OculanteState::default();
     state.font_size = 14;
+    
+    let mut toast_time = std::time::Instant::now();
 
     let matches = App::new("Oculante")
         .arg(
@@ -48,6 +106,15 @@ fn main() {
         .get_matches();
 
     let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
+
+    // animation
+    let k1 = splines::Key::new(0., 0., Interpolation::Cosine);
+    let k2 = splines::Key::new(0.5, 80., Interpolation::default());
+    let k3 = splines::Key::new(3.5, 80., Interpolation::default());
+    let k4 = splines::Key::new(4., 0., Interpolation::default());
+    let spline = Spline::from_vec(vec![k1, k2, k3, k4]);
+
+
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
     let mut img_location = PathBuf::from(&img_path);
     let (texture_sender, texture_receiver): (
@@ -55,11 +122,14 @@ fn main() {
         Receiver<image_crate::RgbaImage>,
     ) = mpsc::channel();
 
+    let (toast_sender, toast_receiver): (
+        Sender<String>,
+        Receiver<String>,
+    ) = mpsc::channel();
+
     let player = Player::new(texture_sender.clone());
 
-    // let (state_sender, state_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
-    //let mut timer = std::time::Instant::now();
-    // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+
     if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
         player.load(&img_location);
     } else {
@@ -67,7 +137,6 @@ fn main() {
     }
 
     let opengl = OpenGL::V3_2;
-
 
     let ws = WindowSettings::new("Oculante", [1000, 800])
         .graphics_api(opengl)
@@ -77,7 +146,6 @@ fn main() {
 
     let mut window: PistonWindow = ws.build().unwrap();
     set_title(&mut window, "No image");
-
 
     let scale_factor = window.draw_size().width / window.size().width;
 
@@ -97,12 +165,10 @@ fn main() {
     .unwrap();
 
     let mut text_draw_list: Vec<TextInstruction> = vec![];
-    let mut frames_elapsed = 0;
 
     if img_location.is_file() {
         state.message = "Loading...".to_string();
         set_title(&mut window, &img_location.to_string_lossy().to_string());
-
     }
 
     if let Some(port) = matches.value_of("l") {
@@ -114,6 +180,10 @@ fn main() {
             Err(_) => println!("Port must be a number"),
         }
     }
+
+
+    let _ = toast_sender.clone().send("Press 'h' to toggle help!".to_string());
+
 
     // Event loop
     while let Some(e) = window.next() {
@@ -170,7 +240,6 @@ fn main() {
                 state.reset_image = true;
             }
 
-
             // Quit
             if key == Key::Q {
                 std::process::exit(0);
@@ -199,8 +268,9 @@ fn main() {
                 )
                 .unwrap();
 
-
                 state.fullscreen_enabled = !state.fullscreen_enabled;
+                // pause so we don't enter a fullscreen loop - otherwise some OSes crash
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
 
             // Display color unpremultiplied (just rgb without multiplying by alpha)
@@ -262,31 +332,44 @@ fn main() {
                 state.info_enabled = !state.info_enabled;
             }
 
+            // Toggle extended info
+            if key == Key::T {
+                let _ = toast_sender.clone().send("Test!!".to_owned());
+            }
+
             // Toggle tooltip
             if key == Key::H {
                 state.tooltip = !state.tooltip;
             }
 
+            // Next image
             if key == Key::Right {
-                state.reset_image = true;
-                window.set_lazy(false);
-                state.is_loaded = false;
-                img_location = img_shift(&img_location, 1);
-                player.load(&img_location);
-                set_title(&mut window, &img_location.to_string_lossy().to_string());
+                let next_img = img_shift(&img_location, 1);
+                if next_img != img_location {
+                    state.reset_image = true;
+                    window.set_lazy(false);
+                    state.is_loaded = false;
+                    img_location = next_img;
+                    player.load(&img_location);
+                    set_title(&mut window, &img_location.to_string_lossy().to_string());
+                }
             }
 
+            // Prev image
             if key == Key::Left {
-                state.reset_image = true;
-                window.set_lazy(false);
-                state.is_loaded = false;
-                img_location = img_shift(&img_location, -1);
-                player.load(&img_location);
-                set_title(&mut window, &img_location.to_string_lossy().to_string());
+                let next_img = img_shift(&img_location, -1);
+                if next_img != img_location {
+                    state.reset_image = true;
+                    window.set_lazy(false);
+                    state.is_loaded = false;
+                    img_location = next_img;
+                    player.load(&img_location);
+                    set_title(&mut window, &img_location.to_string_lossy().to_string());
+                }
             }
 
             if key == Key::Comma {
-                update::update();
+                update::update(toast_sender.clone());
             }
         };
 
@@ -339,9 +422,11 @@ fn main() {
 
         let size = window.size();
 
+        
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
-
+            
+            
             if state.reset_image {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size =
@@ -388,39 +473,25 @@ fn main() {
                     state.font_size * 2,
                 ));
             }
+  
 
-            if frames_elapsed < 180 || state.tooltip {
-
-
-                let mut a = 1.0 - frames_elapsed as f32/50.;
-                if state.tooltip {a = 1.0;}
-
-                text_draw_list.push(TextInstruction::new_color(
-                    "Press h to toggle this help!",
-                    c.transform
-                        .trans(50., size.height - 100.),
-                        [0.6, 0.6, 1.0, a]
-                ));
-
-                text_draw_list.push(TextInstruction::new_color(
+            if state.tooltip {
+                text_draw_list.push(TextInstruction::new(
                     "Press i to toggle info, r,g,b,a to toggle channels, c for all channels",
                     c.transform
                         .trans(50., size.height - 80.),
-                        [1.0, 1.0, 1.0, a]
                 ));
 
-                text_draw_list.push(TextInstruction::new_color(
+                text_draw_list.push(TextInstruction::new(
                     "Press u for unpremultiplied alpha, v to reset view, <- -> to view next/prev image",
                     c.transform
                         .trans(50., size.height - 60.),
-                        [1.0, 1.0, 1.0, a]
                 ));
 
-                text_draw_list.push(TextInstruction::new_color(
+                text_draw_list.push(TextInstruction::new(
                     "Press ',' (comma) to update from latest github release",
                     c.transform
                         .trans(50., size.height - 40.),
-                        [1.0, 1.0, 1.0, a]
                 ));
             }
 
@@ -498,48 +569,46 @@ fn main() {
                 ));
             }
 
+
+            // The toast system
+            {
+                if let Ok(toast) = toast_receiver.try_recv() {
+                    toast_time = std::time::Instant::now();
+                    state.toast = toast;
+                }
+                if state.toast != "" {
+                    let range = 4.;
+                    let elapsed = toast_time.elapsed().as_secs_f64();
+
+                    if elapsed < range {
+                        let text_rect = Rectangle::new([0.,0.,0.,0.7]);
+                        text_rect.draw(
+                            [0., 0., size.width, -100.],
+                            &draw_state::DrawState::default(),
+                            c.transform.trans(0., spline.clamped_sample(elapsed).unwrap() + 10.),
+                            gfx,
+                        );
+    
+                        let text_size = text::Text::new( 14).width(&state.toast,&mut glyphs_regular);
+
+                        text_draw_list.push(TextInstruction::new(
+                            &state.toast,
+                    c.transform.trans(size.width/2. - text_size.0/2., spline.clamped_sample(elapsed).unwrap()),
+                        ));
+                    }
+                }
+            }
+
+
+            
+
             // Draw all text
             for t in &text_draw_list {
-                
-                // for i in &[
-                //     (0, -2),
-                //     (0, 2),
-                //     (-2, 0),
-                //     (2, 0),
-                //     // (2, 2),
-                //     // (-2, 2),
-                //     // (2, -2),
-                //     // (-2, -2),
-                // ] {
-                //     // draw black
-                //     text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
-                //         .draw(
-                //             &t.text,
-                //             &mut glyphs_regular,
-                //             &c.draw_state,
-                //             t.position.trans(i.0 as f64, i.1 as f64),
-                //             gfx,
-                //         )
-                //         .unwrap();
-                // }
-
-
-                // // draw black
-                // text::Text::new_color([0.0, 0.0, 0.0, t.color[3]], t.size)
-                // .draw(
-                //     &t.text,
-                //     &mut glyphs_bold,
-                //     &c.draw_state,
-                //     t.position,
-                //     gfx,
-                // )
-                // .unwrap();
-
 
                 let text_rect = Rectangle::new([0.,0.,0., 0.5*t.color[3]]);
                 // A frame over the magnified texture
           
-                let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
+                let x = text::Text::new( t.size).width(&t.text,&mut glyphs_regular);
                 
                 let margin = 5.;
                 text_rect.draw(
@@ -554,7 +623,11 @@ fn main() {
                     .unwrap();
                 }
             text_draw_list.clear();
-            frames_elapsed += 1 ;
+
+            // rectrender(&c.draw_state, gfx);
+
+    
+
 
             glyphs_regular.factory.encoder.flush(device);
         });

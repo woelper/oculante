@@ -1,10 +1,7 @@
 use self_update::cargo_crate_version;
-use std::thread;
+use std::{sync::mpsc::Sender, thread};
 
-fn gh_update() -> Result<(), Box<dyn std::error::Error>> {
-    
-
-    
+fn gh_update() -> Result<String, Box<dyn std::error::Error>> {
     
     let target = "";
     #[cfg(target_os = "linux")]
@@ -23,19 +20,17 @@ fn gh_update() -> Result<(), Box<dyn std::error::Error>> {
         .build()?
         .update()?;
     println!("Update status: `{}`!", status.version());
-    Ok(())
+    Ok(format!("{:?}", status))
 }
 
 
-
-pub fn update() {
+pub fn update(sender: Sender<String>) {
     
     thread::spawn(move || {
 
         match gh_update() {
-            Ok(_) => {dbg!("update");},
-            Err(e) => {dbg!(e);},
-
+            Ok(s) => {let _ = sender.send(s);},
+            Err(e) => {let _ = sender.send(format!("{:?}", e));},
         }
     
     });
