@@ -38,7 +38,8 @@ Image format support:
 - jpeg	
 - png	
 - pnm	
-- tga	
+- tga
+- avif
 - tiff	
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
 - farbfeld  

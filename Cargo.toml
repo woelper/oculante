@@ -17,12 +17,12 @@ icon = ["res/logo.png"]
 [dependencies]
 piston_window = "0.117.0"
 clap = "2.33.3"
-image = "0.23.12"
+image = "0.23.13"
 nalgebra = "0.24.0"
 dds-rs = "0.7.0"
 rgb = "0.8.25"
 psd = "0.1.9"
-exr = "0.9.0"
+exr = "1.1.0"
 gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
@@ -44,3 +44,4 @@ lto = true
 [profile.dev]
 incremental = true
 debug = false
+opt-level = 1

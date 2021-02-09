@@ -152,6 +152,7 @@ fn main() {
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
     tx_settings.set_mag(Filter::Nearest);
+    tx_settings.set_min(Filter::Linear);
 
     // These should all be a nice config struct...
     let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba8();
