@@ -17,7 +17,7 @@ use utils::*;
 mod mac;
 mod net;
 use clap::{App, Arg};
-use log::LevelFilter;
+use log::{info};
 use nalgebra::Vector2;
 use net::*;
 use splines::{Interpolation, Spline};
@@ -82,11 +82,16 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 fn main() {
     //update::update();
 
-    simple_logging::log_to_file("oculante.log", LevelFilter::Info);
+    //simple_logging::log_to_file("/Users/king2/oculante.log", LevelFilter::Info);
+    
+    info!("Starting oculante.");
+    
     let mut state = OculanteState::default();
     state.font_size = 14;
-
     let mut toast_time = std::time::Instant::now();
+    
+    info!("Now matching arguments {:?}", std::env::args());
+    let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
     let matches = App::new("Oculante")
         .arg(
@@ -108,7 +113,10 @@ fn main() {
                 .short("c")
                 .help("Chainload on Mac"),
         )
-        .get_matches();
+        .get_matches_from(args);
+
+    info!("Completed argument parsing.");
+    
 
     let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
 
@@ -121,8 +129,7 @@ fn main() {
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-    //let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
-    //let mut img_location = PathBuf::from(&img_path);
+
 
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
@@ -133,8 +140,16 @@ fn main() {
 
     let player = Player::new(texture_sender.clone());
 
+    // info!("Chainload {:?} img_loc {:?}", !matches.is_present("chainload"), maybe_img_location);
+    // info!("present and none? {:?}", !matches.is_present("chainload") && maybe_img_location.is_none());
+    // info!("chainload missing? {:?}", !matches.is_present("chainload"));
+    // info!("No image passed? {:?}", maybe_img_location.is_none());
+
+    info!("Image is: {:?}", maybe_img_location);
+
     #[cfg(target_os = "macos")]
-    if !matches.is_present("chainload") && !matches.is_present("INPUT") {
+    if !matches.is_present("chainload") && maybe_img_location.is_none() {
+        info!("Chainload not specified, and no input file present. Invoking mac hack.");
         // MacOS needs an incredible dance performed just to open a file
         let _ = mac::launch();
     }

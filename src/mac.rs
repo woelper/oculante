@@ -1,6 +1,7 @@
 use fruitbasket::FruitApp;
 use fruitbasket::FruitCallbackKey;
 use fruitbasket::RunPeriod;
+use log::info;
 use std::process::Command;
 use std::{
     error::Error,
@@ -8,6 +9,9 @@ use std::{
 };
 
 pub fn launch() -> Result<(), Box<dyn Error>> {
+
+    info!("Starting MacOS integration");
+    
     let file_arg: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
     let mut app = FruitApp::new();
@@ -16,6 +20,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     app.register_callback(
         FruitCallbackKey::Method("applicationDidFinishLaunching:"),
         Box::new(move |_event| {
+            info!("Application finished launching, sending stop.");
             // Send stop when app finishes launching
             stopper.stop();
         }),
@@ -28,8 +33,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         FruitCallbackKey::Method("application:openFile:"),
         Box::new(move |file| {
             let file = fruitbasket::nsstring_to_string(file);
-            dbg!(&file);
-
+            info!("Received {}. Stopping", file);
             let mut f = farg.lock().unwrap();
             *f = Some(file.clone());
             stopper.stop();
@@ -43,9 +47,11 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     if let Ok(oculante_exe) = std::env::current_exe() {
         match file_arg.lock().unwrap().as_ref() {
             Some(f) => {
+                info!("Chainloaing {:?} with {}", oculante_exe, f);
                 let _ = Command::new(oculante_exe).args(&[&f, "-c"]).spawn();
             }
             None => {
+                info!("Chainloaing {:?} with -c arg", oculante_exe);
                 let _ = Command::new(oculante_exe).args(&["-c"]).spawn();
             }
         }
