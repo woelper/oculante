@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>English</string>
+  <key>CFBundleDisplayName</key>
+  <string>oculante</string>
+  <key>CFBundleExecutable</key>
+  <string>oculante</string>
+  <key>CFBundleIconFile</key>
+  <string>oculante.icns</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.github.woelper.oculante</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>oculante</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.5.3</string>
+  <key>CFBundleVersion</key>
+  <string>20210302.215419</string>
+  <key>CSResourcesFileMapped</key>
+  <true/>
+  <key>LSRequiresCarbon</key>
+  <true/>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>CFBundleDocumentTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>GIF image</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>com.compuserve.gif</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>JPEG image</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>public.jpeg</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>PNG image</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>public.png</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>SVG document</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>public.svg-image</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>WebP image</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>org.webmproject.webp</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>All images</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>public.images</string>
+				</array>
+			</dict>
+		</array>
+</dict>
+</plist>

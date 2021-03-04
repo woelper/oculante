@@ -22,7 +22,7 @@ nalgebra = "0.24.0"
 dds-rs = "0.7.0"
 rgb = "0.8.25"
 psd = "0.1.9"
-exr = "1.1.0"
+exr = "0.9.0"
 gif-dispose = "2.4.0"
 nsvg = "0.5.1"
 gif = "0.10.3"
@@ -32,6 +32,11 @@ self_update = "0.23.0"
 # piston2d-gfx_graphics = "*"
 # gfx_device_gl = "0.16.2"
 splines = "*"
+log = "*"
+simple-logging = "*"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
