@@ -13,10 +13,11 @@ use std::sync::mpsc::{Receiver, Sender};
 mod utils;
 use utils::*;
 // mod events;
-mod net;
 #[cfg(target_os = "macos")]
 mod mac;
+mod net;
 use clap::{App, Arg};
+use log::LevelFilter;
 use nalgebra::Vector2;
 use net::*;
 use splines::{Interpolation, Spline};
@@ -25,7 +26,6 @@ mod update;
 
 #[cfg(test)]
 mod tests;
-
 
 fn set_title(window: &mut PistonWindow, text: &str) {
     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
@@ -36,14 +36,12 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 //     let pixel_rect = Rectangle::new([0.5,0.5,1.0,1.0]);
 // }
 
-
 // pub fn render(event: &Event, window: &mut PistonWindow, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
-
 
 //     // let text_rect = Rectangle::new([0.,0.,0., 0.5]);
 
 //     // // let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
-    
+
 //     // let margin = 5.;
 //     // text_rect.draw(
 //     //     [0, 0, 100, 100],
@@ -67,7 +65,6 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 
 // }
 
-
 // pub fn rectrender(cache: &mut gfx_graphics::GlyphCache<TextureContext<Factory, gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>, Texture<gfx_device_gl::Resources>>, state: &DrawState, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
 
 //         clear([0.0, 0.6, 0.0, 1.0], graphics);
@@ -82,15 +79,13 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 //         );
 // }
 
-
-
 fn main() {
     //update::update();
 
-
+    simple_logging::log_to_file("oculante.log", LevelFilter::Info);
     let mut state = OculanteState::default();
     state.font_size = 14;
-    
+
     let mut toast_time = std::time::Instant::now();
 
     let matches = App::new("Oculante")
@@ -111,7 +106,7 @@ fn main() {
                 .required(false)
                 .takes_value(false)
                 .short("c")
-                .help("Chainload on Mac")
+                .help("Chainload on Mac"),
         )
         .get_matches();
 
@@ -124,36 +119,32 @@ fn main() {
     let k4 = splines::Key::new(4., 0., Interpolation::default());
     let spline = Spline::from_vec(vec![k1, k2, k3, k4]);
 
+    let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-    let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
-    let mut img_location = PathBuf::from(&img_path);
-    
+    //let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
+    //let mut img_location = PathBuf::from(&img_path);
+
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
         Receiver<image_crate::RgbaImage>,
     ) = mpsc::channel();
 
-    let (toast_sender, toast_receiver): (
-        Sender<String>,
-        Receiver<String>,
-    ) = mpsc::channel();
+    let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
 
-    
-    
     let player = Player::new(texture_sender.clone());
-    
+
     #[cfg(target_os = "macos")]
-    if !matches.is_present("chainload")  && !matches.is_present("INPUT") {
+    if !matches.is_present("chainload") && !matches.is_present("INPUT") {
         // MacOS needs an incredible dance performed just to open a file
-            let _ = mac::launch();
-    } 
+        let _ = mac::launch();
+    }
 
- 
-
-    if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-        player.load(&img_location);
-    } else {
-        player.load_blocking(&img_location);
+    if let Some(ref img_location) = maybe_img_location {
+        if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
+            player.load(&img_location);
+        } else {
+            player.load_blocking(&img_location);
+        }
     }
 
     let opengl = OpenGL::V3_2;
@@ -187,9 +178,11 @@ fn main() {
 
     let mut text_draw_list: Vec<TextInstruction> = vec![];
 
-    if img_location.is_file() {
-        state.message = "Loading...".to_string();
-        set_title(&mut window, &img_location.to_string_lossy().to_string());
+    if let Some(img_location) = maybe_img_location.as_ref() {
+        if img_location.is_file() {
+            state.message = "Loading...".to_string();
+            set_title(&mut window, &img_location.to_string_lossy().to_string());
+        }
     }
 
     if let Some(port) = matches.value_of("l") {
@@ -202,9 +195,9 @@ fn main() {
         }
     }
 
-
-    let _ = toast_sender.clone().send("Press 'h' to toggle help!".to_string());
-
+    let _ = toast_sender
+        .clone()
+        .send("Press 'h' to toggle help!".to_string());
 
     // Event loop
     while let Some(e) = window.next() {
@@ -229,11 +222,8 @@ fn main() {
             window.set_lazy(false);
             state.message = "Loading...".to_string();
             state.is_loaded = false;
-            img_location = p.clone();
-            player.load(&img_location);
-            // window.set_title(img_location.to_string_lossy().to_string());
-            set_title(&mut window, &img_location.to_string_lossy().to_string());
-            // send_image_threaded(&img_location, texture_sender.clone(), state_sender.clone());
+            player.load(&p);
+            set_title(&mut window, &p.to_string_lossy().to_string());
         }
 
         if let Some(Button::Mouse(_)) = e.press_args() {
@@ -365,27 +355,33 @@ fn main() {
 
             // Next image
             if key == Key::Right {
-                let next_img = img_shift(&img_location, 1);
-                if next_img != img_location {
-                    state.reset_image = true;
-                    window.set_lazy(false);
-                    state.is_loaded = false;
-                    img_location = next_img;
-                    player.load(&img_location);
-                    set_title(&mut window, &img_location.to_string_lossy().to_string());
+                if let Some(img_location) = maybe_img_location.as_mut() {
+                    let next_img = img_shift(&img_location, 1);
+                    // prevent reload if at last or first
+                    if &next_img != img_location {
+                        state.reset_image = true;
+                        window.set_lazy(false);
+                        state.is_loaded = false;
+                        *img_location = next_img;
+                        player.load(&img_location);
+                        set_title(&mut window, &img_location.to_string_lossy().to_string());
+                    }
                 }
             }
 
             // Prev image
             if key == Key::Left {
-                let next_img = img_shift(&img_location, -1);
-                if next_img != img_location {
-                    state.reset_image = true;
-                    window.set_lazy(false);
-                    state.is_loaded = false;
-                    img_location = next_img;
-                    player.load(&img_location);
-                    set_title(&mut window, &img_location.to_string_lossy().to_string());
+                if let Some( img_location) = maybe_img_location.as_mut() {
+                    let next_img = img_shift(&img_location, -1);
+                    // prevent reload if at last or first
+                    if &next_img != img_location {
+                        state.reset_image = true;
+                        window.set_lazy(false);
+                        state.is_loaded = false;
+                        *img_location = next_img;
+                        player.load(&img_location);
+                        set_title(&mut window, &img_location.to_string_lossy().to_string());
+                    }
                 }
             }
 
@@ -443,7 +439,6 @@ fn main() {
 
         let size = window.size();
 
-        
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
             
@@ -470,9 +465,11 @@ fn main() {
                 state.image_dimension = tex.get_size();
             }
 
+            let default_path = PathBuf::from("No image");
+            let filename = maybe_img_location.as_ref().unwrap_or(&default_path).file_name().unwrap_or_default().to_string_lossy();
             let info = format!(
                 "{} {}X{} @{}X",
-                &img_location.file_name().unwrap_or_default().to_string_lossy(),
+                filename,
                 state.image_dimension.0,
                 state.image_dimension.1,
                 (state.scale * 10.0).round() / 10.0

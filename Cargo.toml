@@ -33,6 +33,7 @@ self_update = "0.23.0"
 # gfx_device_gl = "0.16.2"
 splines = "*"
 log = "*"
+simple-logging = "*"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = { git = "https://github.com/jorgenpt/fruitbasket", branch = "open-file-support" }

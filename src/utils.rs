@@ -26,13 +26,11 @@ use std::sync::Mutex;
 // use libwebp_image;
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
-
 pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
-
     // let rel_0 = a.0/b.0;
     // let rel_0 = a.1/b.1;
 
-    let rel_0 = v/r1.1;
+    let rel_0 = v / r1.1;
 
     rel_0 * r2.1
 }
@@ -158,12 +156,9 @@ impl Frame {
 }
 
 pub trait TextExt {
-    fn width<C>(
-        &self,
-        text: &str,
-        cache: &mut C,
-    ) -> (f64,f64) 
-    where C: CharacterCache,
+    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
+    where
+        C: CharacterCache,
     {
         unimplemented!()
     }
@@ -171,31 +166,24 @@ pub trait TextExt {
 
 impl TextExt for Text {
     /// Draws text with a character cache
-    fn width<C>(
-        &self,
-        text: &str,
-        cache: &mut C,
-    ) -> (f64,f64)
+    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
     where
         C: CharacterCache,
     {
-
         let mut x = 0.0;
         let mut y = 0.0;
         for ch in text.chars() {
             //let character = cache.character(self.font_size, ch)?;
-            let c2= cache.character(self.font_size, ch);
+            let c2 = cache.character(self.font_size, ch);
             if let Ok(character) = c2 {
                 x += character.advance_width();
                 y += character.advance_height();
 
                 y = y.max(character.top());
-
             }
-     
         }
 
-        (x,y)
+        (x, y)
     }
 }
 
@@ -239,7 +227,7 @@ impl Default for OculanteState {
             sampled_color: [0., 0., 0., 0.],
             font_size: 18,
             tooltip: false,
-            toast: "".to_string()
+            toast: "".to_string(),
         }
     }
 }
