@@ -14,6 +14,8 @@ mod utils;
 use utils::*;
 // mod events;
 mod net;
+#[cfg(target_os = "macos")]
+mod mac;
 use clap::{App, Arg};
 use nalgebra::Vector2;
 use net::*;
@@ -85,6 +87,7 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 fn main() {
     //update::update();
 
+
     let mut state = OculanteState::default();
     state.font_size = 14;
     
@@ -103,6 +106,13 @@ fn main() {
                 .help("Listen on port")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("chainload")
+                .required(false)
+                .takes_value(false)
+                .short("c")
+                .help("Chainload on Mac")
+        )
         .get_matches();
 
     let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
@@ -117,6 +127,7 @@ fn main() {
 
     let img_path = matches.value_of("INPUT").unwrap_or_default().to_string();
     let mut img_location = PathBuf::from(&img_path);
+    
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
         Receiver<image_crate::RgbaImage>,
@@ -127,8 +138,17 @@ fn main() {
         Receiver<String>,
     ) = mpsc::channel();
 
+    
+    
     let player = Player::new(texture_sender.clone());
+    
+    #[cfg(target_os = "macos")]
+    if !matches.is_present("chainload")  && !matches.is_present("INPUT") {
+        // MacOS needs an incredible dance performed just to open a file
+            let _ = mac::launch();
+    } 
 
+ 
 
     if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
         player.load(&img_location);

@@ -617,13 +617,13 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 col.repeat = true;
             }
         }
-        _ => match image::open(img_location) {
+        _ => match image::open(&img_location) {
             Ok(img) => {
                 col.add_default(img.to_rgba8());
                 // let _ = texture_sender.send(img.to_rgba()).unwrap();
                 // let _ = state_sender.send(String::new()).unwrap();
             }
-            Err(e) => println!("ERR {:?}", e),
+            Err(e) => println!("Can't open image {:?} from {:?}", e, img_location),
         },
     }
 
