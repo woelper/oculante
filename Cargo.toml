@@ -36,7 +36,7 @@ log = "*"
 simple-logging = "*"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-fruitbasket = { git = "https://github.com/jorgenpt/fruitbasket", branch = "open-file-support" }
+fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
