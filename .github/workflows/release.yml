@@ -46,11 +46,8 @@ jobs:
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Build
-      run: cargo build --release
-
     - name: Build Mac Bundle
-      run: cargo bundle --release
+      run: ./build_mac.sh
       if: matrix.os == 'macOS-latest'
 
     - name: Zip Mac Bundle
