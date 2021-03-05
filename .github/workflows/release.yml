@@ -41,6 +41,7 @@ jobs:
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
+      if: matrix.os == 'macOS-latest'
 
     - name: Install xcb
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
