@@ -45,6 +45,7 @@ windres = "0.2.1"
 [profile.release]
 incremental = true
 lto = true
+codegen-units = 1
 
 [profile.dev]
 incremental = true
