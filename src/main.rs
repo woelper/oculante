@@ -472,7 +472,7 @@ fn main() {
                 ));
 
                 text_draw_list.push(TextInstruction::new(
-                    "Press u for unpremultiplied alpha, v to reset view, <- -> to view next/prev image",
+                    "Press u for unpremultiplied alpha, v to reset view, 1 for 100% zoom, <- -> to view next/prev image",
                     c.transform
                         .trans(50., size.height - 60.),
                 ));
