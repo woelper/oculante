@@ -1,11 +1,12 @@
 #![windows_subsystem = "windows"]
 
-// use gfx_graphics::GfxGraphics;
 use ::image as image_crate;
-// use events::handle_events;
+use clap::{App, Arg};
 use image_crate::Pixel;
+use log::info;
+use nalgebra::Vector2;
 use piston_window::*;
-// use types::Matrix2d;
+use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -16,22 +17,17 @@ use utils::*;
 #[cfg(target_os = "macos")]
 mod mac;
 mod net;
-use clap::{App, Arg};
-use log::info;
-use nalgebra::Vector2;
 use net::*;
-use splines::{Interpolation, Spline};
-
-mod update;
-
 #[cfg(test)]
 mod tests;
+mod update;
+
+const TOAST_TIME: f64 = 2.3;
 
 fn set_title(window: &mut PistonWindow, text: &str) {
     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
     window.set_title(title);
 }
-
 
 fn main() {
     //update::update();
@@ -75,9 +71,9 @@ fn main() {
 
     // animation
     let k1 = splines::Key::new(0., 0., Interpolation::Cosine);
-    let k2 = splines::Key::new(0.5, 80., Interpolation::default());
-    let k3 = splines::Key::new(3.5, 80., Interpolation::default());
-    let k4 = splines::Key::new(4., 0., Interpolation::default());
+    let k2 = splines::Key::new(TOAST_TIME * 0.125, 80., Interpolation::default());
+    let k3 = splines::Key::new(TOAST_TIME * 0.875, 80., Interpolation::default());
+    let k4 = splines::Key::new(TOAST_TIME, 0., Interpolation::default());
     let spline = Spline::from_vec(vec![k1, k2, k3, k4]);
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
@@ -120,8 +116,8 @@ fn main() {
     set_title(&mut window, "No image");
 
     let scale_factor = 1.0;
-    #[cfg(target_os = "macos")]
-    let scale_factor = window.draw_size().width / window.size().width;
+    // #[cfg(target_os = "macos")]
+    // let scale_factor = window.draw_size().width / window.size().width;
 
     // Set inspection-friendly magnification filter
     let mut tx_settings = TextureSettings::new();
@@ -310,7 +306,7 @@ fn main() {
 
             // Toggle extended info
             if key == Key::D1 {
-                state.scale =  window.size().width / window.draw_size().width;
+                state.scale = window.size().width / window.draw_size().width;
                 let window_size = Vector2::new(window.size().width, window.size().height);
                 let img_size =
                     Vector2::new(current_image.width() as f64, current_image.height() as f64);
@@ -566,10 +562,9 @@ fn main() {
                     state.toast = toast;
                 }
                 if state.toast != "" {
-                    let range = 4.;
                     let elapsed = toast_time.elapsed().as_secs_f64();
 
-                    if elapsed < range {
+                    if elapsed < TOAST_TIME {
                         let text_rect = Rectangle::new([0.,0.,0.,0.7]);
                         text_rect.draw(
                             [0., 0., size.width, -100.],
