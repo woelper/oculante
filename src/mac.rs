@@ -9,9 +9,8 @@ use std::{
 };
 
 pub fn launch() -> Result<(), Box<dyn Error>> {
-
     info!("Starting MacOS integration");
-    
+
     let file_arg: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
     let mut app = FruitApp::new();

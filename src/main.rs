@@ -17,7 +17,7 @@ use utils::*;
 mod mac;
 mod net;
 use clap::{App, Arg};
-use log::{info};
+use log::info;
 use nalgebra::Vector2;
 use net::*;
 use splines::{Interpolation, Spline};
@@ -32,64 +32,18 @@ fn set_title(window: &mut PistonWindow, text: &str) {
     window.set_title(title);
 }
 
-// fn toast(window: &mut PistonWindow, text: &str, drawlist: &mut Vec<TextInstruction>, ds: DrawState, cb: &mut GfxGraphics<Resources, CommandBuffer>) {
-//     let pixel_rect = Rectangle::new([0.5,0.5,1.0,1.0]);
-// }
-
-// pub fn render(event: &Event, window: &mut PistonWindow, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
-
-//     // let text_rect = Rectangle::new([0.,0.,0., 0.5]);
-
-//     // // let x = text::Text::new_color(t.color, t.size).width(&t.text,&mut glyphs_regular);
-
-//     // let margin = 5.;
-//     // text_rect.draw(
-//     //     [0, 0, 100, 100],
-//     //     // &draw_state::DrawState::default(),
-//     //     Matrix2d::default(),
-//     //     graphics,
-//     // );
-
-//     window.draw_2d(event, |context, graphics, _| {
-//         clear([0.0, 0.0, 0.0, 1.0], graphics);
-//         let center = context.transform;
-//         let square = rectangle::square(0.0, 0.0, 100.0);
-//         let red = [1.0, 0.0, 0.0, 1.0];
-//         rectangle(
-//             red,
-//             square,
-//             center.trans(0.0, 0.0).trans(-50.0, -50.0),
-//             graphics,
-//         );
-//     });
-
-// }
-
-// pub fn rectrender(cache: &mut gfx_graphics::GlyphCache<TextureContext<Factory, gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>, Texture<gfx_device_gl::Resources>>, state: &DrawState, graphics: &mut gfx_graphics::GfxGraphics<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>) {
-
-//         clear([0.0, 0.6, 0.0, 1.0], graphics);
-//         let center = Matrix2d::default();
-//         let square = rectangle::square(0.0, 0.0, 400.0);
-//         let red = [1.0, 0.0, 0.0, 1.0];
-//         rectangle(
-//             red,
-//             square,
-//             center,
-//             graphics,
-//         );
-// }
 
 fn main() {
     //update::update();
 
     //simple_logging::log_to_file("/Users/king2/oculante.log", LevelFilter::Info);
-    
+
     info!("Starting oculante.");
-    
+
     let mut state = OculanteState::default();
     state.font_size = 14;
     let mut toast_time = std::time::Instant::now();
-    
+
     info!("Now matching arguments {:?}", std::env::args());
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
@@ -116,7 +70,6 @@ fn main() {
         .get_matches_from(args);
 
     info!("Completed argument parsing.");
-    
 
     let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
 
@@ -129,8 +82,6 @@ fn main() {
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-
-
     let (texture_sender, texture_receiver): (
         Sender<image_crate::RgbaImage>,
         Receiver<image_crate::RgbaImage>,
@@ -139,11 +90,6 @@ fn main() {
     let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
 
     let player = Player::new(texture_sender.clone());
-
-    // info!("Chainload {:?} img_loc {:?}", !matches.is_present("chainload"), maybe_img_location);
-    // info!("present and none? {:?}", !matches.is_present("chainload") && maybe_img_location.is_none());
-    // info!("chainload missing? {:?}", !matches.is_present("chainload"));
-    // info!("No image passed? {:?}", maybe_img_location.is_none());
 
     info!("Image is: {:?}", maybe_img_location);
 
@@ -173,6 +119,8 @@ fn main() {
     let mut window: PistonWindow = ws.build().unwrap();
     set_title(&mut window, "No image");
 
+    let scale_factor = 1.0;
+    #[cfg(target_os = "macos")]
     let scale_factor = window.draw_size().width / window.size().width;
 
     // Set inspection-friendly magnification filter
@@ -206,7 +154,7 @@ fn main() {
                 state.message = format!("Listening on {}", p);
                 recv(p, texture_sender);
             }
-            Err(_) => println!("Port must be a number"),
+            Err(_) => eprintln!("Port must be a number"),
         }
     }
 
@@ -229,6 +177,7 @@ fn main() {
             let img_size =
                 Vector2::new(current_image.width() as f64, current_image.height() as f64);
             state.offset = window_size / 2.0 - img_size / 2.0;
+            state.reset_image = true;
             state.is_loaded = true;
         }
 
@@ -241,6 +190,7 @@ fn main() {
             set_title(&mut window, &p.to_string_lossy().to_string());
         }
 
+        // Initiate a pan operation
         if let Some(Button::Mouse(_)) = e.press_args() {
             state.drag_enabled = true;
             state.cursor_relative = pos_from_coord(
@@ -359,8 +309,12 @@ fn main() {
             }
 
             // Toggle extended info
-            if key == Key::T {
-                let _ = toast_sender.clone().send("Test!!".to_owned());
+            if key == Key::D1 {
+                state.scale =  window.size().width / window.draw_size().width;
+                let window_size = Vector2::new(window.size().width, window.size().height);
+                let img_size =
+                    Vector2::new(current_image.width() as f64, current_image.height() as f64);
+                state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             }
 
             // Toggle tooltip
@@ -386,7 +340,7 @@ fn main() {
 
             // Prev image
             if key == Key::Left {
-                if let Some( img_location) = maybe_img_location.as_mut() {
+                if let Some(img_location) = maybe_img_location.as_mut() {
                     let next_img = img_shift(&img_location, -1);
                     // prevent reload if at last or first
                     if &next_img != img_location {
@@ -405,6 +359,8 @@ fn main() {
             }
         };
 
+        // TODO: rate-limit zoom (for trackpads, as they fire zoom events really fast)
+        // TODO: clamp cursor position to image bounds for zoom
         e.mouse_scroll(|d| {
             // Map zoom nicely so it does not feel awkward whan zoomed out/in
             let delta = zoomratio(d[1], state.scale);
@@ -462,7 +418,7 @@ fn main() {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size =
                     Vector2::new(current_image.width() as f64, current_image.height() as f64);
-                let scale_factor = (window_size.x / img_size.x).min(1.0);
+                let scale_factor = (window_size.x / img_size.x).min(window_size.y / img_size.y).min(1.0);
                 state.scale = scale_factor;
                 state.offset = Vector2::new(0.0, 0.0);
                 state.offset += window_size / 2.0 - (img_size * state.scale) / 2.0;
