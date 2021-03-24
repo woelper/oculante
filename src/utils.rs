@@ -474,8 +474,19 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             let dimensions = image.dimensions();
             // This is just to convert between different crate versions of "image". TODO: remove if crates catch up
             let raw = image.into_raw();
-            let buf = image::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
+            //let buf = image::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
+            //col.add_default(buf);
+
+
+            let mut opt = usvg::Options::default();
+            let rtree = usvg::Tree::from_file(&img_location, &opt).unwrap();
+            let mut pixmap_size = rtree.svg_node().size.to_screen_size();
+            pixmap_size.
+            let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
+            resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
+            let buf: ImageBuffer<Rgba<u8>, Vec<u8>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec()).unwrap();
             col.add_default(buf);
+
         }
         Some("exr") => {
             // read the image from a file and keep only the png buffer
