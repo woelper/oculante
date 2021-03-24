@@ -466,17 +466,23 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
         }
         Some("svg") => {
-
+            // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
-            let (width,height) = (3000, 3000);
+            //let (width, height) = (3000, 3000);
             let opt = usvg::Options::default();
-            let rtree = usvg::Tree::from_file(&img_location, &opt).unwrap();
-            let pixmap_size = rtree.svg_node().size.to_screen_size().scale_to(ScreenSize::new(width, height).unwrap());
-            let mut pixmap = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).unwrap();
-            resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
-            let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec());
-            if let Some(valid_buf) = buf {
-                col.add_default(valid_buf);
+            if let Ok(rtree) = usvg::Tree::from_file(&img_location, &opt) {
+                let pixmap_size = rtree.svg_node().size.to_screen_size()
+                // .scale_to(ScreenSize::new(width, height).unwrap())
+                ;
+                
+                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
+                    resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
+                    // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
+                    let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec());
+                    if let Some(valid_buf) = buf {
+                        col.add_default(valid_buf);
+                    }
+                }
             }
         }
         Some("exr") => {
