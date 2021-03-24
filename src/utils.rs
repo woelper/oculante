@@ -1,6 +1,7 @@
 use exr;
 use nalgebra::{clamp, Vector2};
 use piston_window::{CharacterCache, Text};
+use resvg::ScreenSize;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -465,17 +466,24 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
         }
         Some("svg") => {
-            // Load and parse the svg
-            let svg = nsvg::parse_file(&img_location, nsvg::Units::Pixel, 96.0).unwrap();
-
-            // Create a scaled raster
-            let scale = 3.0;
-            let image = svg.rasterize(scale).unwrap();
-            let dimensions = image.dimensions();
-            // This is just to convert between different crate versions of "image". TODO: remove if crates catch up
-            let raw = image.into_raw();
-            let buf = image::ImageBuffer::from_raw(dimensions.0, dimensions.1, raw).unwrap();
-            col.add_default(buf);
+            // TODO: Should the svg be scaled? if so by what number?
+            // This should be specified in a smarter way, maybe resolution * x?
+            //let (width, height) = (3000, 3000);
+            let opt = usvg::Options::default();
+            if let Ok(rtree) = usvg::Tree::from_file(&img_location, &opt) {
+                let pixmap_size = rtree.svg_node().size.to_screen_size()
+                // .scale_to(ScreenSize::new(width, height).unwrap())
+                ;
+                
+                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
+                    resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
+                    // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
+                    let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec());
+                    if let Some(valid_buf) = buf {
+                        col.add_default(valid_buf);
+                    }
+                }
+            }
         }
         Some("exr") => {
             // read the image from a file and keep only the png buffer

@@ -24,7 +24,6 @@ rgb = "0.8.25"
 psd = "0.1.9"
 exr = "0.9.0"
 gif-dispose = "2.4.0"
-nsvg = "0.5.1"
 gif = "0.10.3"
 lazy_static = "1.4.0"
 libwebp-sys = "0.3"
@@ -34,6 +33,9 @@ self_update = "0.23.0"
 splines = "*"
 log = "*"
 simple-logging = "*"
+usvg = "*"
+resvg = "*"
+tiny-skia = "*"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
