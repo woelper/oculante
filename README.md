@@ -45,7 +45,7 @@ Image format support:
 - farbfeld  
 - DDS (DXT1-5, via `dds-rs`)
 - psd (via `psd`)
-- svg (via `nsvg`)
+- svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
 
 Platform support:
