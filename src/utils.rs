@@ -2,7 +2,7 @@ use exr;
 use nalgebra::{clamp, Vector2};
 use piston_window::{CharacterCache, Text};
 use resvg::ScreenSize;
-use std::fs::File;
+use std::{collections::HashMap, fs::File};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
@@ -78,6 +78,7 @@ pub struct Player {
     pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<image::RgbaImage>,
+    pub cache: HashMap<PathBuf, image::RgbImage>
 }
 
 impl Player {
@@ -99,7 +100,12 @@ impl Player {
             stop: Mutex::new(false),
             frame_sender,
             image_sender,
+            cache: HashMap::new()
         }
+    }
+
+    pub fn cache(&mut self, p: &PathBuf) {
+
     }
 
     pub fn load_blocking(&self, img_location: &PathBuf) {
@@ -276,6 +282,7 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
+/// Increment or decrement an image
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
         let mut files = std::fs::read_dir(parent)
@@ -434,18 +441,16 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image:
         }
 
         let _ = texture_sender.send(frame.buffer);
-        // dbg!(&frame.delay);
         if frame.delay > 0 {
             thread::sleep(Duration::from_millis(frame.delay as u64));
         }
     }
-    // let _ = state_sender.send("".into());
 }
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &PathBuf) -> FrameCollection {
     let img_location = img_location.clone();
-    let mut col = FrameCollection::default();
+    let mut frame_collection = FrameCollection::default();
 
     // Stop all current images being sent
     Player::stop();
@@ -460,7 +465,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
                         .unwrap();
-                col.add_default(buf);
+                frame_collection.add_default(buf);
                 // let _ = texture_sender.send(buffer.clone());
                 // let _ = state_sender.send(String::new()).unwrap();
             }
@@ -480,7 +485,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                     // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
                     let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec());
                     if let Some(valid_buf) = buf {
-                        col.add_default(valid_buf);
+                        frame_collection.add_default(valid_buf);
                     }
                 }
             }
@@ -514,7 +519,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             )
             .unwrap();
 
-            col.add_default(png_buffer);
+            frame_collection.add_default(png_buffer);
 
             // let _ = texture_sender.send(png_buffer);
             // let _ = state_sender.send(String::new()).unwrap();
@@ -558,7 +563,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                         // )
                         // .unwrap();
 
-                        col.add_default(tonemapped_buffer);
+                        frame_collection.add_default(tonemapped_buffer);
                         // texture_sender.send(tonemapped_buffer).unwrap();
                         // let _ = state_sender.send(String::new()).unwrap();
                     }
@@ -576,7 +581,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 if let Some(buf) =
                     image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 {
-                    col.add_default(buf);
+                    frame_collection.add_default(buf);
                     // let _ = texture_sender.send(buf.clone());
                     // let _ = state_sender.send(String::new()).unwrap();
                 }
@@ -587,7 +592,7 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             let mut contents = vec![];
             if let Ok(_) = file.read_to_end(&mut contents) {
                 match decode_webp(&contents) {
-                    Some(webp_buf) => col.add_default(webp_buf),
+                    Some(webp_buf) => frame_collection.add_default(webp_buf),
                     None => println!("Error decoding data from {:?}", img_location),
                 }
             }
@@ -609,13 +614,13 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                     dim.1,
                     screen.pixels.buf().as_bytes().to_vec(),
                 );
-                col.add(buf.unwrap(), frame.delay * 10);
-                col.repeat = true;
+                frame_collection.add(buf.unwrap(), frame.delay * 10);
+                frame_collection.repeat = true;
             }
         }
         _ => match image::open(&img_location) {
             Ok(img) => {
-                col.add_default(img.to_rgba8());
+                frame_collection.add_default(img.to_rgba8());
                 // let _ = texture_sender.send(img.to_rgba()).unwrap();
                 // let _ = state_sender.send(String::new()).unwrap();
             }
@@ -624,5 +629,5 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
     }
 
     Player::start();
-    col
+    frame_collection
 }
