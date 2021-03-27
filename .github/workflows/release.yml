@@ -42,6 +42,10 @@ jobs:
     - name: Install cargo bundle
       run: cargo install cargo-bundle
       if: matrix.os == 'macOS-latest'
+    
+    - name: Install cargo strip
+      run: cargo install cargo-strip
+      if: matrix.os != 'windows-latest'
 
     - name: Install xcb
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev
@@ -49,6 +53,10 @@ jobs:
 
     - name: Build Application
       run: cargo build --release
+
+    - name: Strip Application
+      run: cargo strip
+      if: matrix.os != 'windows-latest'
 
     - name: Build Mac Bundle
       run: ./build_mac.sh
