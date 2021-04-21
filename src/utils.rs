@@ -2,7 +2,7 @@ use exr;
 use nalgebra::{clamp, Vector2};
 use piston_window::{CharacterCache, Text};
 use resvg::ScreenSize;
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, sync::Arc};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
@@ -38,6 +38,7 @@ pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
+    pub static ref CACHE: Arc<Mutex<HashMap<PathBuf, FrameCollection>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
 pub struct TextInstruction {
@@ -78,7 +79,6 @@ pub struct Player {
     pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<image::RgbaImage>,
-    pub cache: HashMap<PathBuf, image::RgbImage>
 }
 
 impl Player {
@@ -100,17 +100,16 @@ impl Player {
             stop: Mutex::new(false),
             frame_sender,
             image_sender,
-            cache: HashMap::new()
         }
     }
 
-    pub fn cache(&mut self, p: &PathBuf) {
 
-    }
+
+
 
     pub fn load_blocking(&self, img_location: &PathBuf) {
         *self.stop.lock().unwrap() = true;
-        send_image_blocking(&img_location, self.image_sender.clone());
+        let collection = send_image_blocking(&img_location, self.image_sender.clone());
     }
 
     pub fn load(&self, img_location: &PathBuf) {
@@ -399,7 +398,7 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
     let loc = img_location.clone();
 
     thread::spawn(move || {
-        let col = open_image(&loc);
+        let col = open_image_cached(&loc);
 
         if col.repeat {
             let mut i = 0;
@@ -419,35 +418,57 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
                 i += 1;
             }
         } else {
-            for frame in col.frames {
-                if Player::is_stopped() {
-                    break;
-                }
-                let _ = texture_sender.send(frame.buffer);
-
-                if frame.delay > 0 {
-                    thread::sleep(Duration::from_millis(frame.delay as u64));
-                }
-            }
+            send_frame_collection(&col, texture_sender);
         }
     });
 }
 
-pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
-    let col = open_image(&img_location);
-    for frame in col.frames {
+pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) -> FrameCollection {
+    let col = open_image_cached(&img_location);
+    send_frame_collection(&col, texture_sender);
+    col
+}
+
+
+fn send_frame_collection(collection: &FrameCollection, texture_sender: Sender<image::RgbaImage>) {
+    for frame in &collection.frames {
         if Player::is_stopped() {
             break;
         }
-
-        let _ = texture_sender.send(frame.buffer);
+        let _ = texture_sender.send(frame.buffer.clone());
         if frame.delay > 0 {
             thread::sleep(Duration::from_millis(frame.delay as u64));
         }
     }
 }
 
-/// Open an image from disk and send it somewhere
+fn cache_preload(p: &PathBuf) {
+    let next = img_shift(&p, 1);
+    let prev = img_shift(&p, 1);
+    thread::spawn(move || {
+        let n = open_image(&next);
+        CACHE.lock().unwrap().insert(next, n);
+        let p = open_image(&prev);
+        CACHE.lock().unwrap().insert(prev, p);
+    });
+}
+
+fn open_image_cached(p: &PathBuf) -> FrameCollection {
+
+    if CACHE.lock().unwrap().contains_key(p) {
+        println!("cache hit for {:?}", p);
+        CACHE.lock().unwrap().get(p).unwrap().clone()
+    } else {
+        println!("cache miss for {:?}", p);
+        let f = open_image(p);
+        CACHE.lock().unwrap().insert(p.clone(), f.clone());
+        f
+    }
+
+}
+
+
+/// Open an image from disk and return a collection of Frames
 pub fn open_image(img_location: &PathBuf) -> FrameCollection {
     let img_location = img_location.clone();
     let mut frame_collection = FrameCollection::default();
