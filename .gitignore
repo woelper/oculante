@@ -3,4 +3,3 @@
 .history
 .DS_Store
 *.log
-Cargo.lock
