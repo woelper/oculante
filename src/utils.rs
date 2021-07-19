@@ -1,4 +1,5 @@
 use exr;
+use log::error;
 use nalgebra::{clamp, Vector2};
 use piston_window::{CharacterCache, Text};
 use resvg::ScreenSize;
@@ -11,7 +12,11 @@ use std::time::Duration;
 use crate::math::Matrix2d;
 use crate::types::Color;
 use dds::DDS;
-use exr::prelude::rgba_image as rgb_exr;
+// use exr::prelude::rgba_image as rgb_exr;
+
+use exr::prelude as exrs;
+use exr::prelude::*;
+
 use gif::{ColorOutput, SetParameter};
 use gif_dispose;
 use image;
@@ -157,6 +162,7 @@ impl Frame {
 }
 
 pub trait TextExt {
+    #[allow(unused_variables)]
     fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
     where
         C: CharacterCache,
@@ -474,11 +480,17 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                 let pixmap_size = rtree.svg_node().size.to_screen_size()
                 // .scale_to(ScreenSize::new(width, height).unwrap())
                 ;
-                
-                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
+
+                if let Some(mut pixmap) =
+                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
+                {
                     resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
                     // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
-                    let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(pixmap_size.width(), pixmap_size.height(), pixmap.data().to_vec());
+                    let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(
+                        pixmap_size.width(),
+                        pixmap_size.height(),
+                        pixmap.data().to_vec(),
+                    );
                     if let Some(valid_buf) = buf {
                         col.add_default(valid_buf);
                     }
@@ -486,38 +498,53 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
         }
         Some("exr") => {
-            // read the image from a file and keep only the png buffer
-            let (_info, png_buffer) = rgb_exr::ImageInfo::read_pixels_from_file(
-                &img_location,
-                rgb_exr::read_options::high(),
-                // how to create an empty png buffer from exr image meta data (used for loading the exr image)
-                |info: &rgb_exr::ImageInfo| -> image::RgbaImage {
-                    image::ImageBuffer::new(
-                        info.resolution.width() as u32,
-                        info.resolution.height() as u32,
-                    )
-                },
-                // set each pixel in the png buffer from the exr file
-                |png_pixels: &mut image::RgbaImage,
-                 position: rgb_exr::Vec2<usize>,
-                 pixel: rgb_exr::Pixel| {
-                    png_pixels.put_pixel(
-                        position.x() as u32,
-                        position.y() as u32,
-                        image::Rgba(tonemap_rgb([
-                            pixel.red.to_f32(),
-                            pixel.green.to_f32(),
-                            pixel.blue.to_f32(),
-                        ])),
-                    );
-                },
-            )
-            .unwrap();
+            /// compress any possible f32 into the range of [0,1].
+            /// and then convert it to an unsigned byte.
+            fn tone_map(linear: f32) -> u8 {
+                // TODO does the `image` crate expect gamma corrected data?
+                let clamped = (linear - 0.5).tanh() * 0.5 + 0.5;
+                (clamped * 255.0) as u8
+            }
 
-            col.add_default(png_buffer);
+            let reader = exrs::read()
+                .no_deep_data()
+                .largest_resolution_level()
+                .rgba_channels(
+                    |resolution, _channels: &RgbaChannels| -> image::RgbaImage {
+                        image::ImageBuffer::new(
+                            resolution.width() as u32,
+                            resolution.height() as u32,
+                        )
+                    },
+                    // set each pixel in the png buffer from the exr file
+                    |png_pixels, position, (r, g, b, a): (f32, f32, f32, f32)| {
+                        png_pixels.put_pixel(
+                            position.x() as u32,
+                            position.y() as u32,
+                            // exr's tonemap:
+                            // image::Rgba([tone_map(r), tone_map(g), tone_map(b), (a * 255.0) as u8]),
+                        image::Rgba(tonemap_rgba([r,g,b,a])),
+                        );
+                    },
+                )
+                .first_valid_layer()
+                .all_attributes();
 
-            // let _ = texture_sender.send(png_buffer);
-            // let _ = state_sender.send(String::new()).unwrap();
+                
+
+            // an image that contains a single layer containing an png rgba buffer
+            let maybe_image: Result<Image<Layer<SpecificChannels<image::RgbaImage, RgbaChannels>>>> =
+                reader.from_file(&img_location);
+
+                match maybe_image {
+                    Ok(image) => {
+                        let png_buffer = image.layer_data.channel_data.pixels;
+                        col.add_default(png_buffer);
+                    },
+                    Err(e) => error!("{} from {:?}", e, img_location)
+                }
+
+            
         }
 
         Some("hdr") => match File::open(&img_location) {

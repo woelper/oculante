@@ -408,8 +408,8 @@ fn main() {
 
         window.draw_2d(&e, |c, gfx, device| {
             clear([0.2; 4], gfx);
-            
-            
+
+
             if state.reset_image {
                 let window_size = Vector2::new(size.width, size.height);
                 let img_size =
@@ -458,7 +458,7 @@ fn main() {
                     state.font_size * 2,
                 ));
             }
-  
+
 
             if state.tooltip {
                 text_draw_list.push(TextInstruction::new(
@@ -572,7 +572,7 @@ fn main() {
                             c.transform.trans(0., spline.clamped_sample(elapsed).unwrap() + 10.),
                             gfx,
                         );
-    
+
                         let text_size = text::Text::new( 14).width(&state.toast,&mut glyphs_regular);
 
                         text_draw_list.push(TextInstruction::new(
@@ -584,16 +584,16 @@ fn main() {
             }
 
 
-            
+
 
             // Draw all text
             for t in &text_draw_list {
 
                 let text_rect = Rectangle::new([0.,0.,0., 0.5*t.color[3]]);
                 // A frame over the magnified texture
-          
+
                 let x = text::Text::new( t.size).width(&t.text,&mut glyphs_regular);
-                
+
                 let margin = 5.;
                 text_rect.draw(
                     [-margin, margin, x.0 + margin*2., -(x.1 + margin)],
@@ -610,7 +610,7 @@ fn main() {
 
             // rectrender(&c.draw_state, gfx);
 
-    
+
 
 
             glyphs_regular.factory.encoder.flush(device);
