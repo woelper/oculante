@@ -30,7 +30,6 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 }
 
 fn main() {
-
     std::env::set_var("RUST_LOG", "warning");
     #[cfg(debug_assertions)]
     std::env::set_var("RUST_LOG", "info");
@@ -38,7 +37,6 @@ fn main() {
     let _ = env_logger::try_init();
 
     //update::update();
-
 
     info!("Starting oculante.");
 
@@ -190,7 +188,7 @@ fn main() {
             state.is_loaded = false;
             player.load(&p);
             set_title(&mut window, &p.to_string_lossy().to_string());
-            
+
             maybe_img_location = Some(p.clone());
         }
 
@@ -330,12 +328,11 @@ fn main() {
             if key == Key::Right {
                 info!("right");
                 if let Some(img_location) = maybe_img_location.as_mut() {
-                info!("| {:?}",img_location);
+                    info!("| {:?}", img_location);
 
                     let next_img = img_shift(&img_location, 1);
                     info!("|> {:?}", next_img);
-                    
-                    
+
                     // prevent reload if at last or first
                     if &next_img != img_location {
                         state.reset_image = true;

@@ -1,3 +1,6 @@
+use crate::math::Matrix2d;
+use crate::types::Color;
+use dds::DDS;
 use exr;
 use log::error;
 use nalgebra::{clamp, Vector2};
@@ -8,10 +11,6 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-
-use crate::math::Matrix2d;
-use crate::types::Color;
-use dds::DDS;
 // use exr::prelude::rgba_image as rgb_exr;
 
 use exr::prelude as exrs;
@@ -30,6 +29,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 // use libwebp_image;
+use anyhow::{anyhow, Error, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
 pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
@@ -398,7 +398,7 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
     let loc = img_location.clone();
 
     thread::spawn(move || {
-        let col = open_image(&loc);
+        let col = open_image(&loc).expect("Opening failed");
 
         if col.repeat {
             let mut i = 0;
@@ -433,23 +433,27 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
 }
 
 pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
-    let col = open_image(&img_location);
-    for frame in col.frames {
-        if Player::is_stopped() {
-            break;
-        }
+    match open_image(&img_location) {
+        Ok(col) => {
+            for frame in col.frames {
+                if Player::is_stopped() {
+                    break;
+                }
 
-        let _ = texture_sender.send(frame.buffer);
-        // dbg!(&frame.delay);
-        if frame.delay > 0 {
-            thread::sleep(Duration::from_millis(frame.delay as u64));
+                let _ = texture_sender.send(frame.buffer);
+                // dbg!(&frame.delay);
+                if frame.delay > 0 {
+                    thread::sleep(Duration::from_millis(frame.delay as u64));
+                }
+            }
+            // let _ = state_sender.send("".into());
         }
+        Err(e) => error!("Error {:?} from {:?}", e, img_location),
     }
-    // let _ = state_sender.send("".into());
 }
 
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &PathBuf) -> FrameCollection {
+pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     let img_location = img_location.clone();
     let mut col = FrameCollection::default();
 
@@ -458,17 +462,15 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
 
     match img_location.extension().unwrap_or_default().to_str() {
         Some("dds") => {
-            let file = File::open(img_location).unwrap();
+            let file = File::open(img_location)?;
             let mut reader = BufReader::new(file);
-            let dds = DDS::decode(&mut reader).unwrap();
+            let dds = DDS::decode(&mut reader).map_err(|e| anyhow!("{:?}", e))?;
             if let Some(main_layer) = dds.layers.get(0) {
                 let buf = main_layer.as_bytes();
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
-                        .unwrap();
+                        .ok_or(anyhow!("Can't create DDS ImageBuffer with given res"))?;
                 col.add_default(buf);
-                // let _ = texture_sender.send(buffer.clone());
-                // let _ = state_sender.send(String::new()).unwrap();
             }
         }
         Some("svg") => {
@@ -476,16 +478,18 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             // This should be specified in a smarter way, maybe resolution * x?
             //let (width, height) = (3000, 3000);
             let opt = usvg::Options::default();
-            if let Ok(rtree) = usvg::Tree::from_file(&img_location, &opt) {
+            let svg_data = std::fs::read(&img_location)?;
+            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
                 let pixmap_size = rtree.svg_node().size.to_screen_size()
-                // .scale_to(ScreenSize::new(width, height).unwrap())
+                // .scale_to(ScreenSize::new(width, height)?)
                 ;
 
                 if let Some(mut pixmap) =
                     tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
                 {
-                    resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut()).unwrap();
-                    // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut()).unwrap();
+                    resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut())
+                        .ok_or(anyhow!("Can't render SVG"))?;
+                    // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut())?;
                     let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(
                         pixmap_size.width(),
                         pixmap_size.height(),
@@ -498,14 +502,6 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
             }
         }
         Some("exr") => {
-            /// compress any possible f32 into the range of [0,1].
-            /// and then convert it to an unsigned byte.
-            fn tone_map(linear: f32) -> u8 {
-                // TODO does the `image` crate expect gamma corrected data?
-                let clamped = (linear - 0.5).tanh() * 0.5 + 0.5;
-                (clamped * 255.0) as u8
-            }
-
             let reader = exrs::read()
                 .no_deep_data()
                 .largest_resolution_level()
@@ -523,94 +519,65 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
                             position.y() as u32,
                             // exr's tonemap:
                             // image::Rgba([tone_map(r), tone_map(g), tone_map(b), (a * 255.0) as u8]),
-                        image::Rgba(tonemap_rgba([r,g,b,a])),
+                            image::Rgba(tonemap_rgba([r, g, b, a])),
                         );
                     },
                 )
                 .first_valid_layer()
                 .all_attributes();
 
-                
-
             // an image that contains a single layer containing an png rgba buffer
-            let maybe_image: Result<Image<Layer<SpecificChannels<image::RgbaImage, RgbaChannels>>>> =
-                reader.from_file(&img_location);
+            let maybe_image: Result<
+                Image<Layer<SpecificChannels<image::RgbaImage, RgbaChannels>>>,
+                exrs::Error,
+            > = reader.from_file(&img_location);
 
-                match maybe_image {
-                    Ok(image) => {
-                        let png_buffer = image.layer_data.channel_data.pixels;
-                        col.add_default(png_buffer);
-                    },
-                    Err(e) => error!("{} from {:?}", e, img_location)
+            match maybe_image {
+                Ok(image) => {
+                    let png_buffer = image.layer_data.channel_data.pixels;
+                    col.add_default(png_buffer);
                 }
-
-            
+                Err(e) => error!("{} from {:?}", e, img_location),
+            }
         }
 
-        Some("hdr") => match File::open(&img_location) {
-            Ok(f) => {
-                let reader = BufReader::new(f);
-                match image::hdr::HdrDecoder::new(reader) {
-                    Ok(hdr_decoder) => {
-                        let meta = hdr_decoder.metadata();
-                        let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
-                        //let mut img = image::RgbaImage::new(meta.width, meta.height);
-                        //let ldr = hdr_decoder.read_image_ldr().unwrap();
+        Some("hdr") => {
+            let f = File::open(&img_location)?;
+            let reader = BufReader::new(f);
+            let hdr_decoder = image::hdr::HdrDecoder::new(reader)?;
+            let meta = hdr_decoder.metadata();
+            let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
 
-                        let hdr_img = hdr_decoder.read_image_hdr().unwrap();
-                        for pixel in hdr_img {
-                            let tp = image::Rgba(tonemap_rgb(pixel.0));
-                            ldr_img.push(tp);
-                        }
-
-                        // let s = ldr.map();
-                        let mut s: Vec<u8> = vec![];
-
-                        //    ldr.iter().map(|x| vec![x.0[0], x.0[1], x.0[2], 255].clone();
-
-                        let l = ldr_img.clone();
-
-                        for p in l {
-                            let mut x = vec![p.0[0], p.0[1], p.0[2], 255];
-                            s.append(&mut x);
-                        }
-
-                        let tonemapped_buffer =
-                            image::RgbaImage::from_raw(meta.width, meta.height, s).unwrap();
-
-                        // let tonemapped_buffer: image::RgbaImage = image::ImageBuffer::from_raw(
-                        //     meta.width,
-                        //     meta.height,
-                        //     ldr_img.as_rgba().as_bytes().to_vec(),
-                        // )
-                        // .unwrap();
-
-                        col.add_default(tonemapped_buffer);
-                        // texture_sender.send(tonemapped_buffer).unwrap();
-                        // let _ = state_sender.send(String::new()).unwrap();
-                    }
-                    Err(e) => println!("{:?}", e),
-                }
+            let hdr_img = hdr_decoder.read_image_hdr()?;
+            for pixel in hdr_img {
+                let tp = image::Rgba(tonemap_rgb(pixel.0));
+                ldr_img.push(tp);
             }
-            Err(e) => println!("{:?}", e),
-        },
+            let mut s: Vec<u8> = vec![];
+            let l = ldr_img.clone();
+            for p in l {
+                let mut x = vec![p.0[0], p.0[1], p.0[2], 255];
+                s.append(&mut x);
+            }
 
+            let tonemapped_buffer = image::RgbaImage::from_raw(meta.width, meta.height, s)
+                .ok_or(anyhow!("Failed to create RgbaImage with given dimensions"))?;
+            col.add_default(tonemapped_buffer);
+        }
         Some("psd") => {
-            let mut file = File::open(img_location).unwrap();
+            let mut file = File::open(img_location)?;
             let mut contents = vec![];
             if file.read_to_end(&mut contents).is_ok() {
-                let psd = Psd::from_bytes(&contents).unwrap();
+                let psd = Psd::from_bytes(&contents).map_err(|e| anyhow!("{:?}", e))?;
                 if let Some(buf) =
                     image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 {
                     col.add_default(buf);
-                    // let _ = texture_sender.send(buf.clone());
-                    // let _ = state_sender.send(String::new()).unwrap();
                 }
             }
         }
         Some("webp") => {
-            let mut file = File::open(&img_location).unwrap();
+            let mut file = File::open(&img_location)?;
             let mut contents = vec![];
             if let Ok(_) = file.read_to_end(&mut contents) {
                 match decode_webp(&contents) {
@@ -621,35 +588,36 @@ pub fn open_image(img_location: &PathBuf) -> FrameCollection {
         }
         Some("gif") => {
             // of course this is shit. Don't reload the image all the time.
-            let file = File::open(&img_location).unwrap();
+            let file = File::open(&img_location)?;
             let mut decoder = gif::Decoder::new(file);
             // let mut decoder = gif::Decoder::new(r.by_ref());
             decoder.set(ColorOutput::Indexed);
-            let mut reader = decoder.read_info().unwrap();
+            let mut reader = decoder.read_info()?;
             let mut screen = gif_dispose::Screen::new_reader(&reader);
             let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
 
-            while let Some(frame) = reader.read_next_frame().unwrap() {
-                screen.blit_frame(&frame).unwrap();
+            while let Some(frame) = reader.read_next_frame()? {
+                screen.blit_frame(&frame)?;
                 let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
                     dim.0,
                     dim.1,
                     screen.pixels.buf().as_bytes().to_vec(),
                 );
-                col.add(buf.unwrap(), frame.delay * 10);
+                col.add(
+                    buf.ok_or(anyhow!("Can't read gif frame"))?,
+                    frame.delay * 10,
+                );
                 col.repeat = true;
             }
         }
         _ => match image::open(&img_location) {
             Ok(img) => {
                 col.add_default(img.to_rgba8());
-                // let _ = texture_sender.send(img.to_rgba()).unwrap();
-                // let _ = state_sender.send(String::new()).unwrap();
             }
             Err(e) => println!("Can't open image {:?} from {:?}", e, img_location),
         },
     }
 
     Player::start();
-    col
+    Ok(col)
 }
