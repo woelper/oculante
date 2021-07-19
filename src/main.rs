@@ -30,9 +30,15 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 }
 
 fn main() {
+
+    std::env::set_var("RUST_LOG", "warning");
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_LOG", "info");
+
+    let _ = env_logger::try_init();
+
     //update::update();
 
-    //simple_logging::log_to_file("/Users/king2/oculante.log", LevelFilter::Info);
 
     info!("Starting oculante.");
 
@@ -184,9 +190,11 @@ fn main() {
             state.is_loaded = false;
             player.load(&p);
             set_title(&mut window, &p.to_string_lossy().to_string());
+            
+            maybe_img_location = Some(p.clone());
         }
 
-        // Initiate a pan operation
+        // Initiate a pan operation on any button
         if let Some(Button::Mouse(_)) = e.press_args() {
             state.drag_enabled = true;
             state.cursor_relative = pos_from_coord(
@@ -320,8 +328,14 @@ fn main() {
 
             // Next image
             if key == Key::Right {
+                info!("right");
                 if let Some(img_location) = maybe_img_location.as_mut() {
+                info!("| {:?}",img_location);
+
                     let next_img = img_shift(&img_location, 1);
+                    info!("|> {:?}", next_img);
+                    
+                    
                     // prevent reload if at last or first
                     if &next_img != img_location {
                         state.reset_image = true;
