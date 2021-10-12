@@ -226,9 +226,9 @@ impl Default for OculanteState {
             message: "Drag image here".into(),
             fullscreen_enabled: false,
             is_loaded: false,
-            offset: Vector2::new(0.0, 0.0),
-            cursor: Vector2::new(0.0, 0.0),
-            cursor_relative: Vector2::new(0.0, 0.0),
+            offset: Vector2::default(),
+            cursor: Vector2::default(),
+            cursor_relative: Vector2::default(),
             image_dimension: (0, 0),
             info_enabled: false,
             sampled_color: [0., 0., 0., 0.],
@@ -479,7 +479,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             //let (width, height) = (3000, 3000);
             let opt = usvg::Options::default();
             let svg_data = std::fs::read(&img_location)?;
-            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
+            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt.to_ref()) {
                 let pixmap_size = rtree.svg_node().size.to_screen_size()
                 // .scale_to(ScreenSize::new(width, height)?)
                 ;
