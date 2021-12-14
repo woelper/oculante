@@ -50,9 +50,9 @@ checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
 
 [[package]]
 name = "ansi_term"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
 dependencies = [
  "winapi 0.3.9",
 ]
@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.33.3"
+version = "2.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
+checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
 dependencies = [
  "ansi_term",
  "atty",
@@ -517,6 +517,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deflate"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c86f7e25f518f4b81808a2cf1c50996a61f5c2eb394b2393bd87f2a4780a432f"
+dependencies = [
+ "adler32",
+]
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -698,12 +707,12 @@ dependencies = [
 
 [[package]]
 name = "exr"
-version = "1.3.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cbc54309b002d43ab3a05b26a411a9f9db030eaa79c45120733df5833499558"
+checksum = "d4badb9489a465cb2c555af1f00f0bfd8cecd6fc12ac11da9d5b40c5dd5f0200"
 dependencies = [
  "bit_field",
- "deflate 0.9.1",
+ "deflate 1.0.0",
  "flume",
  "half",
  "inflate",
@@ -1094,9 +1103,9 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "1.7.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
+checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "hashbrown"
@@ -1403,9 +1412,9 @@ dependencies = [
 
 [[package]]
 name = "libwebp-sys"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8f5c1a5fdedaa24e77fcbe1c2acbb22543afa737fce87ca29b137cfb33816d"
+checksum = "439fd1885aa28937e7edcd68d2e793cb4a22f8733460d2519fbafd2b215672bf"
 dependencies = [
  "cc",
 ]
@@ -2116,9 +2125,9 @@ dependencies = [
 
 [[package]]
 name = "piston2d-gfx_graphics"
-version = "0.73.0"
+version = "0.74.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84b79261cc8dfd181ad82640a1cac6fcbdb57f3ef447673ec8ec6926e5b33a8d"
+checksum = "b52e8fb88ea6cf0bbc488dc9545d63c4c504eeaa31b4f64c76549b77014493a5"
 dependencies = [
  "draw_state",
  "gfx",
@@ -2130,9 +2139,9 @@ dependencies = [
 
 [[package]]
 name = "piston2d-graphics"
-version = "0.40.0"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beb104512055b3bf44fc3d8dad9af88abda16a468d048626ae9b49f634802c67"
+checksum = "ce4a4b60559223e6dae56520d222c1fb27ee3c9662174d5fa657e2169ec38c35"
 dependencies = [
  "fnv",
  "interpolation",
@@ -2145,9 +2154,9 @@ dependencies = [
 
 [[package]]
 name = "piston_window"
-version = "0.120.0"
+version = "0.121.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96675d1e6ea52d59751e1fb956c3600b8d67a5d62cacbfb553f2ef07374d93f5"
+checksum = "7377d83fbdd20db837e77491fd36513e56fbea9246128cdf0d335ea670248423"
 dependencies = [
  "gfx",
  "gfx_device_gl",
@@ -2494,9 +2503,9 @@ dependencies = [
 
 [[package]]
 name = "rgb"
-version = "0.8.27"
+version = "0.8.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fddb3b23626145d1776addfc307e1a1851f60ef6ca64f376bcb889697144cf0"
+checksum = "08a9852b34c4628f8ad76797a933577059163651ec5a7dace462adc365bee66c"
 dependencies = [
  "bytemuck",
 ]
