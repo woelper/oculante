@@ -807,9 +807,8 @@ dependencies = [
 
 [[package]]
 name = "fruitbasket"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "451f4b055bb3539c86b1280ee6b4af4d77a78c97f5cba6b5e49b30c4b9222f4c"
+version = "0.9.2-rc"
+source = "git+https://github.com/mrmekon/fruitbasket.git#e2609374112d06eec62247a02b62b85e27ad07c2"
 dependencies = [
  "dirs 2.0.2",
  "objc",
