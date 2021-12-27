@@ -807,8 +807,9 @@ dependencies = [
 
 [[package]]
 name = "fruitbasket"
-version = "0.9.2-rc"
-source = "git+https://github.com/woelper/fruitbasket?branch=open-file-support#c192cd4fbf2c7a8dc94684d5400f679106565429"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "451f4b055bb3539c86b1280ee6b4af4d77a78c97f5cba6b5e49b30c4b9222f4c"
 dependencies = [
  "dirs 2.0.2",
  "objc",
@@ -1899,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "oculante"
-version = "0.5.15"
+version = "0.5.16"
 dependencies = [
  "anyhow",
  "clap",

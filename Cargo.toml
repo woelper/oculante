@@ -38,7 +38,8 @@ env_logger = "0.9.0"
 anyhow = "1.0.42"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
+# fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
+fruitbasket = "0.9.1"
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
