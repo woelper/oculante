@@ -2472,9 +2472,9 @@ dependencies = [
 
 [[package]]
 name = "resvg"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256cc9203115db152290219f35f3362e729301b59e2a391fb2721fe3fa155352"
+checksum = "d94a32ca845cdda27237a40beba9bd3d3858ac8fc5356eb9442bdeecfe34d9e0"
 dependencies = [
  "jpeg-decoder",
  "log",
@@ -2482,6 +2482,7 @@ dependencies = [
  "png 0.17.2",
  "rgb",
  "svgfilters",
+ "svgtypes",
  "tiny-skia",
  "usvg",
 ]
@@ -3162,9 +3163,9 @@ dependencies = [
 
 [[package]]
 name = "usvg"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f472f6f5d41d3eaef059bc893dcd2382eefcdda3e04ebe0b2860c56b538e491e"
+checksum = "00f064d38f79ff69e3160e2fba884e4ede897061c15178041a3976371c68cab1"
 dependencies = [
  "base64",
  "data-url",

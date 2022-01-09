@@ -487,7 +487,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 if let Some(mut pixmap) =
                     tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
                 {
-                    resvg::render(&rtree, usvg::FitTo::Original, pixmap.as_mut())
+                    resvg::render(&rtree, usvg::FitTo::Original,tiny_skia::Transform::identity() ,pixmap.as_mut())
                         .ok_or(anyhow!("Can't render SVG"))?;
                     // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut())?;
                     let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(
