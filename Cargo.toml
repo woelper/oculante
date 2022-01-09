@@ -27,7 +27,7 @@ gif-dispose = "2.4.0"
 gif = "0.10.3"
 lazy_static = "1.4.0"
 libwebp-sys = "0.4.2"
-self_update = "0.27.0"
+self_update = "0.28.0"
 splines = "4.0"
 log = "0.4.14"
 simple-logging = "2.0.2"
@@ -39,8 +39,8 @@ anyhow = "1.0.42"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
-# fruitbasket = "0.9.1"
-fruitbasket = { git = "https://github.com/mrmekon/fruitbasket.git" }
+fruitbasket = "0.10.0"
+# fruitbasket = { git = "https://github.com/mrmekon/fruitbasket.git" }
 
 
 
