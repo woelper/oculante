@@ -30,7 +30,12 @@ fn set_title(window: &mut PistonWindow, text: &str) {
 }
 
 fn main() {
-    std::env::set_var("RUST_LOG", "warning");
+    // hack for wayland
+    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "warning");
+    }  
     #[cfg(debug_assertions)]
     std::env::set_var("RUST_LOG", "info");
 
@@ -108,10 +113,10 @@ fn main() {
         }
     }
 
-    let opengl = OpenGL::V3_2;
+    let opengl_version = OpenGL::V3_2;
 
     let ws = WindowSettings::new("Oculante", [1000, 800])
-        .graphics_api(opengl)
+        .graphics_api(opengl_version)
         .fullscreen(false)
         .vsync(true)
         .exit_on_esc(true);
