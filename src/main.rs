@@ -5,6 +5,7 @@ use clap::{App, Arg};
 use image_crate::Pixel;
 use log::info;
 use nalgebra::Vector2;
+use piston_window::types::{Color, Matrix2d};
 use piston_window::*;
 use splines::{Interpolation, Spline};
 use std::path::PathBuf;
@@ -35,7 +36,7 @@ fn main() {
 
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
-    }  
+    }
     #[cfg(debug_assertions)]
     std::env::set_var("RUST_LOG", "info");
 
@@ -144,7 +145,6 @@ fn main() {
     )
     .unwrap();
 
-    let mut text_draw_list: Vec<TextInstruction> = vec![];
 
     if let Some(img_location) = maybe_img_location.as_ref() {
         if img_location.is_file() {
@@ -459,43 +459,37 @@ fn main() {
             );
 
             if state.info_enabled {
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular, &TextInstruction::new(
                     &info,
-                    c.transform.trans(10.0 as f64, 20.0 as f64),
+                    (10.0, 20.0),
                 ));
-
             }
 
             if !state.is_loaded {
-                text_draw_list.push(TextInstruction::new_size(
+                draw_text(&c, gfx, &mut glyphs_regular, &TextInstruction::new_size(
                     &state.message,
-                    c.transform
-                        .trans(size.width / 2.0 - 120.0, size.height / 2.0),
+                    (size.width / 2.0 - 120.0, size.height / 2.0),
                     state.font_size * 2,
                 ));
             }
 
 
             if state.tooltip {
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                     "Press i to toggle info, r,g,b,a to toggle channels, c for all channels",
-                    c.transform
-                        .trans(50., size.height - 80.),
+                        (50., size.height - 80.)
                 ));
 
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                     "Press u for unpremultiplied alpha, v to reset view, 1 for 100% zoom, <- -> to view next/prev image",
-                    c.transform
-                        .trans(50., size.height - 60.),
+                    (50., size.height - 60.),
                 ));
 
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                     "Press ',' (comma) to update from latest github release",
-                    c.transform
-                        .trans(50., size.height - 40.),
+                    (50., size.height - 40.),
                 ));
             }
-
 
             if state.info_enabled {
                 let col_inv = invert_rgb_8bit(state.sampled_color);
@@ -546,7 +540,7 @@ fn main() {
                     );
                 }
 
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                     &format!(
                         "P {},{} / {},{}",
                         state.cursor_relative[0].floor() as i32 + 1,
@@ -554,16 +548,16 @@ fn main() {
                         state.cursor_relative[0].floor() as i32 + 1,
                         state.cursor_relative[1].floor() as i32 + 1,
                     ),
-                    c.transform.trans(state.cursor.x, state.cursor.y - 4.),
+                    (state.cursor.x, state.cursor.y - 4.),
                 ));
 
-                text_draw_list.push(TextInstruction::new(
+                draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                     &format!(
                         "C {} / {}",
                         disp_col(state.sampled_color),
                         disp_col_norm(state.sampled_color, 255.0),
                     ),
-                    c.transform.trans(
+                    (
                         state.cursor.x,
                         state.cursor.y - state.font_size as f64 * 1.5,
                     ),
@@ -591,40 +585,14 @@ fn main() {
 
                         let text_size = text::Text::new( 14).width(&state.toast,&mut glyphs_regular);
 
-                        text_draw_list.push(TextInstruction::new(
+                        draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
                             &state.toast,
-                    c.transform.trans(size.width/2. - text_size.0/2., spline.clamped_sample(elapsed).unwrap()),
+                    (size.width/2. - text_size.0/2., spline.clamped_sample(elapsed).unwrap()),
                         ));
                     }
                 }
             }
 
-
-
-
-            // Draw all text
-            for t in &text_draw_list {
-
-                let text_rect = Rectangle::new([0.,0.,0., 0.5*t.color[3]]);
-                // A frame over the magnified texture
-
-                let x = text::Text::new( t.size).width(&t.text,&mut glyphs_regular);
-
-                let margin = 5.;
-                text_rect.draw(
-                    [-margin, margin, x.0 + margin*2., -(x.1 + margin)],
-                    &draw_state::DrawState::default(),
-                    t.position,
-                    gfx,
-                );
-
-                text::Text::new_color(t.color, t.size)
-                    .draw(&t.text, &mut glyphs_regular, &c.draw_state, t.position, gfx)
-                    .unwrap();
-                }
-            text_draw_list.clear();
-
-            // rectrender(&c.draw_state, gfx);
 
 
 
@@ -645,4 +613,39 @@ fn main() {
 
         // }
     }
+}
+
+pub fn draw_text(
+    ctx: &Context,
+    graphics: &mut G2d,
+    glyphs: &mut Glyphs,
+    instructions: &TextInstruction,
+) {
+    let text_rect = Rectangle::new([0., 0., 0., 0.5 * instructions.color[3]]);
+
+    let text = text::Text::new_color(instructions.color, instructions.size);
+
+    let text_width = text.width(&instructions.text, glyphs);
+
+    let margin = 5.;
+    text_rect.draw(
+        [
+            -margin,
+            margin,
+            text_width.0 + margin * 2.,
+            -(text_width.1 + margin),
+        ],
+        &draw_state::DrawState::default(),
+        ctx.transform.trans(instructions.position.0 as f64, instructions.position.1 as f64),
+        graphics,
+    );
+
+    text.draw(
+        &instructions.text,
+        glyphs,
+        &ctx.draw_state,
+        ctx.transform.trans(instructions.position.0 as f64, instructions.position.1 as f64),
+        graphics,
+    )
+    .unwrap();
 }

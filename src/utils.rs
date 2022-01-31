@@ -48,12 +48,12 @@ lazy_static! {
 pub struct TextInstruction {
     pub text: String,
     pub color: Color,
-    pub position: Matrix2d,
+    pub position: (f64,f64),
     pub size: u32,
 }
 
 impl TextInstruction {
-    pub fn new(t: &str, position: Matrix2d) -> TextInstruction {
+    pub fn new(t: &str, position: (f64,f64)) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color: [1.0, 1.0, 1.0, 0.7],
@@ -61,7 +61,8 @@ impl TextInstruction {
             size: 14,
         }
     }
-    pub fn new_size(t: &str, position: Matrix2d, size: u32) -> TextInstruction {
+
+    pub fn new_size(t: &str, position: (f64,f64), size: u32) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color: [1.0, 1.0, 1.0, 0.7],
@@ -69,7 +70,7 @@ impl TextInstruction {
             size: size,
         }
     }
-    pub fn new_color(t: &str, position: Matrix2d, color: Color) -> TextInstruction {
+    pub fn new_color(t: &str, position: (f64,f64), color: Color) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color,
@@ -487,8 +488,13 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 if let Some(mut pixmap) =
                     tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
                 {
-                    resvg::render(&rtree, usvg::FitTo::Original,tiny_skia::Transform::identity() ,pixmap.as_mut())
-                        .ok_or(anyhow!("Can't render SVG"))?;
+                    resvg::render(
+                        &rtree,
+                        usvg::FitTo::Original,
+                        tiny_skia::Transform::identity(),
+                        pixmap.as_mut(),
+                    )
+                    .ok_or(anyhow!("Can't render SVG"))?;
                     // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut())?;
                     let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(
                         pixmap_size.width(),
