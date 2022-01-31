@@ -55,22 +55,22 @@ fn main() {
 
     let matches = App::new("Oculante")
         .arg(
-            Arg::with_name("INPUT")
+            Arg::new("INPUT")
                 .help("Display this image")
                 // .required(true)
                 .index(1),
         )
         .arg(
-            Arg::with_name("l")
-                .short("l")
+            Arg::new("l")
+                .short('l')
                 .help("Listen on port")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("chainload")
+            Arg::new("chainload")
                 .required(false)
                 .takes_value(false)
-                .short("c")
+                .short('c')
                 .help("Chainload on Mac"),
         )
         .get_matches_from(args);
