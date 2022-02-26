@@ -857,33 +857,12 @@ dependencies = [
 
 [[package]]
 name = "gif"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "471d90201b3b223f3451cd4ad53e34295f16a1df17b1edf3736d47761c3981af"
-dependencies = [
- "color_quant",
- "lzw",
-]
-
-[[package]]
-name = "gif"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3a7187e78088aead22ceedeee99779455b23fc231fe13ec443f99bb71694e5b"
 dependencies = [
  "color_quant",
  "weezl",
-]
-
-[[package]]
-name = "gif-dispose"
-version = "2.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28fe151fd5060bef0f9a04682700fa93bcb7c9db46debc1b2f483d1ba320e8d2"
-dependencies = [
- "gif 0.10.3",
- "imgref",
- "rgb",
 ]
 
 [[package]]
@@ -1133,7 +1112,7 @@ dependencies = [
  "byteorder",
  "color_quant",
  "exr",
- "gif 0.11.3",
+ "gif",
  "jpeg-decoder 0.2.2",
  "num-iter",
  "num-rational",
@@ -1142,12 +1121,6 @@ dependencies = [
  "scoped_threadpool",
  "tiff",
 ]
-
-[[package]]
-name = "imgref"
-version = "1.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d0c0db6c932f8262e0ed8909f2e7f8c0e9b1cfb4da884267ce09a10be54365"
 
 [[package]]
 name = "indexmap"
@@ -1350,12 +1323,6 @@ checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if 1.0.0",
 ]
-
-[[package]]
-name = "lzw"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d947cbb889ed21c2a84be6ffbaebf5b4e0f4340638cba0444907e38b56be084"
 
 [[package]]
 name = "malloc_buf"
@@ -1810,8 +1777,6 @@ dependencies = [
  "env_logger",
  "exr",
  "fruitbasket",
- "gif 0.10.3",
- "gif-dispose",
  "image",
  "lazy_static",
  "libwebp-sys",
@@ -2344,7 +2309,7 @@ version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e702d1e8e00a3a0717b96244cba840f34f542d8f23097c8903266c4e2975658"
 dependencies = [
- "gif 0.11.3",
+ "gif",
  "jpeg-decoder 0.2.2",
  "log",
  "pico-args",

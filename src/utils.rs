@@ -1,11 +1,10 @@
-use crate::math::Matrix2d;
 use crate::types::Color;
 use dds::DDS;
 use exr;
-use log::error;
+use image::codecs::gif::GifDecoder;
+use log::{error, info};
 use nalgebra::{clamp, Vector2};
 use piston_window::{CharacterCache, Text};
-use resvg::ScreenSize;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -16,9 +15,7 @@ use std::time::Duration;
 use exr::prelude as exrs;
 use exr::prelude::*;
 
-use gif::{ColorOutput, SetParameter};
-use gif_dispose;
-use image;
+use image::{self, AnimationDecoder};
 use image::{ImageBuffer, Rgba};
 //use nsvg;
 use lazy_static::lazy_static;
@@ -48,12 +45,12 @@ lazy_static! {
 pub struct TextInstruction {
     pub text: String,
     pub color: Color,
-    pub position: (f64,f64),
+    pub position: (f64, f64),
     pub size: u32,
 }
 
 impl TextInstruction {
-    pub fn new(t: &str, position: (f64,f64)) -> TextInstruction {
+    pub fn new(t: &str, position: (f64, f64)) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color: [1.0, 1.0, 1.0, 0.7],
@@ -62,7 +59,7 @@ impl TextInstruction {
         }
     }
 
-    pub fn new_size(t: &str, position: (f64,f64), size: u32) -> TextInstruction {
+    pub fn new_size(t: &str, position: (f64, f64), size: u32) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color: [1.0, 1.0, 1.0, 0.7],
@@ -70,7 +67,7 @@ impl TextInstruction {
             size: size,
         }
     }
-    pub fn new_color(t: &str, position: (f64,f64), color: Color) -> TextInstruction {
+    pub fn new_color(t: &str, position: (f64, f64), color: Color) -> TextInstruction {
         TextInstruction {
             text: t.to_string(),
             color,
@@ -593,26 +590,16 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
         Some("gif") => {
+
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location)?;
-            let mut decoder = gif::Decoder::new(file);
-            // let mut decoder = gif::Decoder::new(r.by_ref());
-            decoder.set(ColorOutput::Indexed);
-            let mut reader = decoder.read_info()?;
-            let mut screen = gif_dispose::Screen::new_reader(&reader);
-            let dim = (screen.pixels.width() as u32, screen.pixels.height() as u32);
-
-            while let Some(frame) = reader.read_next_frame()? {
-                screen.blit_frame(&frame)?;
-                let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
-                    dim.0,
-                    dim.1,
-                    screen.pixels.buf().as_bytes().to_vec(),
-                );
-                col.add(
-                    buf.ok_or(anyhow!("Can't read gif frame"))?,
-                    frame.delay * 10,
-                );
+            let gif_decoder = GifDecoder::new(file)?;
+            let frames = gif_decoder.into_frames().collect_frames()?;
+            for f in frames {
+                let delay = f.delay().numer_denom_ms().0 as u16;
+                // let delay= 10;
+                info!("{delay}");
+                col.add(f.into_buffer(), delay);
                 col.repeat = true;
             }
         }
