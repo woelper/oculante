@@ -550,7 +550,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
         Some("hdr") => {
             let f = File::open(&img_location)?;
             let reader = BufReader::new(f);
-            let hdr_decoder = image::hdr::HdrDecoder::new(reader)?;
+            let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
             let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
 

@@ -15,9 +15,9 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-piston_window = "0.121.0"
+piston_window = "0.123.0"
 clap = "3.0.13"
-image = "0.23.14"
+image = "0.24.1"
 nalgebra = "0.30.0"
 dds-rs = "0.7.0"
 rgb = "0.8.30"
