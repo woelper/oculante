@@ -1,9 +1,10 @@
-use crate::types::Color;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
 use log::{error, info};
 use nalgebra::{clamp, Vector2};
+use notan::AppState;
+use notan::graphics::Texture;
 use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
@@ -42,40 +43,8 @@ lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
 
-pub struct TextInstruction {
-    pub text: String,
-    pub color: Color,
-    pub position: (f64, f64),
-    pub size: u32,
-}
 
-impl TextInstruction {
-    pub fn new(t: &str, position: (f64, f64)) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: 14,
-        }
-    }
 
-    pub fn new_size(t: &str, position: (f64, f64), size: u32) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: size,
-        }
-    }
-    pub fn new_color(t: &str, position: (f64, f64), color: Color) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color,
-            position,
-            size: 14,
-        }
-    }
-}
 
 pub struct Player {
     pub stop: Mutex<bool>,
@@ -193,7 +162,7 @@ impl TextExt for Text {
 }
 
 /// The state of the application
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, AppState)]
 pub struct OculanteState {
     pub scale: f64,
     pub scale_increment: f64,
@@ -211,6 +180,7 @@ pub struct OculanteState {
     pub font_size: u32,
     pub tooltip: bool,
     pub toast: String,
+    pub texture: Option<Texture>
     //pub toast: Option<String>
 }
 
@@ -233,6 +203,7 @@ impl Default for OculanteState {
             font_size: 18,
             tooltip: false,
             toast: "".to_string(),
+            texture: None
         }
     }
 }
