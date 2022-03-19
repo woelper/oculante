@@ -1,6 +1,8 @@
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
+use image::RgbaImage;
+
 use log::{error, info};
 use nalgebra::{clamp, Vector2};
 use notan::AppState;
@@ -45,7 +47,7 @@ lazy_static! {
 
 
 
-
+#[derive(Debug)]
 pub struct Player {
     pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
@@ -162,7 +164,7 @@ impl TextExt for Text {
 }
 
 /// The state of the application
-#[derive(Debug, Clone, AppState)]
+#[derive(Debug, AppState)]
 pub struct OculanteState {
     pub scale: f64,
     pub scale_increment: f64,
@@ -180,12 +182,18 @@ pub struct OculanteState {
     pub font_size: u32,
     pub tooltip: bool,
     pub toast: String,
-    pub texture: Option<Texture>
+    pub texture: Option<Texture>,
+    pub texture_channel: (
+        Sender<RgbaImage>,
+        Receiver<RgbaImage>,
+    ),
+    pub player: Player,
     //pub toast: Option<String>
 }
 
 impl Default for OculanteState {
     fn default() -> OculanteState {
+        let tx_channel = mpsc::channel();
         OculanteState {
             scale: 1.0,
             scale_increment: 0.1,
@@ -203,7 +211,9 @@ impl Default for OculanteState {
             font_size: 18,
             tooltip: false,
             toast: "".to_string(),
-            texture: None
+            texture: None,
+            player: Player::new(tx_channel.0.clone()),
+            texture_channel: tx_channel,
         }
     }
 }

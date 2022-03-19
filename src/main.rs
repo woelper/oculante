@@ -1,14 +1,18 @@
 #![windows_subsystem = "windows"]
 
-use ::image as image_crate;
-use clap::{App, Arg};
-use image_crate::Pixel;
+use clap::Arg;
+use clap::Command;
+use image::DynamicImage;
+use image::Pixel;
+use image::RgbaImage;
 use log::info;
 use nalgebra::Vector2;
+use notan::app::Event;
 // use piston_window::types::{Color, Matrix2d};
 // use piston_window::*;
 use notan::draw::*;
 use notan::prelude::*;
+use notan::prelude::keyboard::KeyCode;
 use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -32,6 +36,111 @@ struct State {
     texture: Option<Texture>,
 }
 
+#[notan_main]
+fn main() -> Result<(), String> {
+    // hack for wayland
+    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "warning");
+    }
+    // on debug builds, override log level
+    #[cfg(debug_assertions)]
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+
+    info!("Starting oculante.");
+    notan::init_with(init)
+        .set_config(DrawConfig)
+        .draw(drawx)
+        // .event(event)
+        .update(update)
+        .build()
+}
+
+fn init(gfx: &mut Graphics) -> OculanteState {
+    info!("Now matching arguments {:?}", std::env::args());
+    let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
+
+    let matches = Command::new("Oculante")
+        .arg(
+            Arg::new("INPUT")
+                .help("Display this image")
+                // .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::new("l")
+                .short('l')
+                .help("Listen on port")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("chainload")
+                .required(false)
+                .takes_value(false)
+                .short('c')
+                .help("Chainload on Mac"),
+        )
+        .get_matches_from(args);
+
+    info!("Completed argument parsing.");
+
+    let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
+
+    let (texture_sender, texture_receiver): (Sender<RgbaImage>, Receiver<RgbaImage>) =
+        mpsc::channel();
+    let player = Player::new(texture_sender.clone());
+
+    info!("Image is: {:?}", maybe_img_location);
+
+    #[cfg(target_os = "macos")]
+    if !matches.is_present("chainload") && maybe_img_location.is_none() {
+        info!("Chainload not specified, and no input file present. Invoking mac hack.");
+        // MacOS needs an incredible dance performed just to open a file
+        let _ = mac::launch();
+    }
+
+    if let Some(ref img_location) = maybe_img_location {
+        if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
+            player.load(&img_location);
+        } else {
+            player.load_blocking(&img_location);
+        }
+    }
+
+    let texture = gfx
+        .create_texture()
+        .from_image(include_bytes!("../tests/rust.png"))
+        .build()
+        .unwrap();
+
+    // Create the a[[ state]]
+    OculanteState {
+        texture: Some(texture),
+        player,
+        ..Default::default()
+    }
+}
+
+// fn event(state: &mut State, event: Event) {
+//     match event {
+//         Event::ReceivedCharacter(c) if c != '\u{7f}' => {
+//             // state.msg.push(c);
+//         }
+//         _ => {}
+//     }
+// }
+
+fn update(app: &mut App, state: &mut OculanteState) {
+    // TODO use delta
+    if app.keyboard.is_down(KeyCode::W) {}
+}
+
+// fn update(app: &mut App, state: &mut State) {
+//     if app.keyboard.was_pressed(KeyCode::Back) && !state.msg.is_empty() {
+//         state.msg.pop();
+//     }
+// }
 
 // fn set_title(window: &mut PistonWindow, text: &str) {
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
@@ -42,51 +151,26 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     draw.clear(Color::AQUA);
     if let Some(texture) = &state.texture {
         draw.image(texture).position(250.0, 200.0);
-
     }
+
+    // if let Some(Button::Mouse(_)) = e.release_args() {
+    //     state.drag_enabled = false;
+    // }
+
     gfx.render(&draw);
 }
 
-fn init(gfx: &mut Graphics) -> OculanteState {
-    let texture = gfx
-        .create_texture()
-        .from_image(include_bytes!("../tests/rust.png"))
-        .build()
-        .unwrap();
-    OculanteState::default()
-}
-
-#[notan_main]
-fn main() -> Result<(), String> {
-    // hack for wayland
-    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
-
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "warning");
-    }
-    #[cfg(debug_assertions)]
-    std::env::set_var("RUST_LOG", "info");
-
-    let _ = env_logger::try_init();
-
-    info!("Starting oculante.");
-    notan::init_with(init).set_config(DrawConfig).draw(drawx).build()
-}
-
 fn _init(gfx: &mut Graphics) {
-
-
-
     //update::update();
 
-
     let mut state = OculanteState::default();
+    state.font_size = 14;
     let mut toast_time = std::time::Instant::now();
 
     info!("Now matching arguments {:?}", std::env::args());
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
-    let matches = App::new("Oculante")
+    let matches = Command::new("Oculante")
         .arg(
             Arg::new("INPUT")
                 .help("Display this image")
@@ -121,10 +205,8 @@ fn _init(gfx: &mut Graphics) {
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-    let (texture_sender, texture_receiver): (
-        Sender<image_crate::RgbaImage>,
-        Receiver<image_crate::RgbaImage>,
-    ) = mpsc::channel();
+    let (texture_sender, texture_receiver): (Sender<RgbaImage>, Receiver<RgbaImage>) =
+        mpsc::channel();
 
     let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = mpsc::channel();
 
@@ -156,7 +238,6 @@ fn _init(gfx: &mut Graphics) {
     // let mut window: PistonWindow = ws.build().unwrap();
     // set_title(&mut window, "No image");
 
-    let scale_factor = 1.0;
     // #[cfg(target_os = "macos")]
     // let scale_factor = window.draw_size().width / window.size().width;
 
@@ -166,7 +247,7 @@ fn _init(gfx: &mut Graphics) {
     // tx_settings.set_min(Filter::Linear);
 
     // These should all be a nice config struct...
-    let mut current_image = image_crate::DynamicImage::new_rgba8(8, 8).to_rgba8();
+    let mut current_image = DynamicImage::new_rgba8(8, 8).to_rgba8();
     let mut texture = gfx.create_texture().with_size(256, 256).build().unwrap();
 
     if let Some(img_location) = maybe_img_location.as_ref() {
@@ -191,8 +272,6 @@ fn _init(gfx: &mut Graphics) {
         .clone()
         .send("Press 'h' to toggle help!".to_string());
 }
-
-
 
 // fn _main(gfx: &mut Graphics) {
 //     // Event loop
@@ -453,7 +532,6 @@ fn _init(gfx: &mut Graphics) {
 //         window.draw_2d(&e, |c, gfx, device| {
 //             clear([0.2; 4], gfx);
 
-
 //             if state.reset_image {
 //                 let window_size = Vector2::new(size.width, size.height);
 //                 let img_size =
@@ -500,7 +578,6 @@ fn _init(gfx: &mut Graphics) {
 //                     state.font_size * 2,
 //                 ));
 //             }
-
 
 //             if state.tooltip {
 //                 draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
@@ -592,7 +669,6 @@ fn _init(gfx: &mut Graphics) {
 //                 ));
 //             }
 
-
 //             // The toast system
 //             {
 //                 if let Ok(toast) = toast_receiver.try_recv() {
@@ -620,10 +696,6 @@ fn _init(gfx: &mut Graphics) {
 //                     }
 //                 }
 //             }
-
-
-
-
 
 //             glyphs_regular.factory.encoder.flush(device);
 //         });
