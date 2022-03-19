@@ -5,15 +5,17 @@ use clap::Command;
 use image::DynamicImage;
 use image::Pixel;
 use image::RgbaImage;
+use log::error;
 use log::info;
 use nalgebra::Vector2;
 use notan::app::Event;
 // use piston_window::types::{Color, Matrix2d};
 // use piston_window::*;
 use notan::draw::*;
-use notan::prelude::*;
 use notan::prelude::keyboard::KeyCode;
-use splines::{Interpolation, Spline};
+use notan::prelude::mouse::MouseButton;
+use notan::prelude::*;
+// use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -31,11 +33,6 @@ mod update;
 
 const TOAST_TIME: f64 = 2.3;
 
-#[derive(AppState)]
-struct State {
-    texture: Option<Texture>,
-}
-
 #[notan_main]
 fn main() -> Result<(), String> {
     // hack for wayland
@@ -52,7 +49,7 @@ fn main() -> Result<(), String> {
     notan::init_with(init)
         .set_config(DrawConfig)
         .draw(drawx)
-        // .event(event)
+        .event(event)
         .update(update)
         .build()
 }
@@ -87,9 +84,20 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-    let (texture_sender, texture_receiver): (Sender<RgbaImage>, Receiver<RgbaImage>) =
-        mpsc::channel();
-    let player = Player::new(texture_sender.clone());
+    let texture = gfx
+        .create_texture()
+        .from_image(include_bytes!("../tests/rust.png"))
+        .build()
+        .unwrap();
+
+    let mut state = OculanteState {
+        texture_channel: mpsc::channel(),
+        ..Default::default()
+    };
+
+    state.player = Player::new(state.texture_channel.0.clone());
+
+    // let player = Player::new(texture_sender.clone());
 
     info!("Image is: {:?}", maybe_img_location);
 
@@ -102,24 +110,13 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
     if let Some(ref img_location) = maybe_img_location {
         if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-            player.load(&img_location);
+            state.player.load(&img_location);
         } else {
-            player.load_blocking(&img_location);
+            state.player.load_blocking(&img_location);
         }
     }
 
-    let texture = gfx
-        .create_texture()
-        .from_image(include_bytes!("../tests/rust.png"))
-        .build()
-        .unwrap();
-
-    // Create the a[[ state]]
-    OculanteState {
-        texture: Some(texture),
-        player,
-        ..Default::default()
-    }
+    state
 }
 
 // fn event(state: &mut State, event: Event) {
@@ -131,9 +128,62 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 //     }
 // }
 
+fn event(state: &mut OculanteState, evt: Event) {
+    match evt {
+        Event::MouseWheel { delta_x, delta_y } => {
+            state.scale += delta_y;
+        }
+        _ => {}
+    }
+}
+
 fn update(app: &mut App, state: &mut OculanteState) {
+    let mouse_pos = app.mouse.position();
+
+    state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
+    state.cursor = Vector2::new(mouse_pos.0, mouse_pos.1);
+
     // TODO use delta
-    if app.keyboard.is_down(KeyCode::W) {}
+    if app.keyboard.is_down(KeyCode::V) {
+        state.reset_image = true;
+    }
+
+    if app.keyboard.is_down(KeyCode::Q) {
+        std::process::exit(0);
+    }
+
+    // TODO: fullscreen
+    if app.keyboard.was_pressed(KeyCode::F) {
+        info!("Fullscreen");
+        // TODO: does not work
+
+        if app.window().is_fullscreen() {
+            app.window().set_fullscreen(false)
+        } else {
+            app.window().set_fullscreen(true)
+        }
+    }
+
+    if app.mouse.is_down(MouseButton::Left) {
+        state.drag_enabled = true;
+        state.cursor_relative = pos_from_coord(
+            state.offset,
+            state.cursor,
+            Vector2::new(
+                state.image_dimension.0 as f32,
+                state.image_dimension.1 as f32,
+            ),
+            state.scale,
+        );
+        state.offset += state.mouse_delta;
+        // app.mouse.
+    }
+
+    // if app.mouse.
+
+    if app.mouse.was_released(MouseButton::Left) {
+        state.drag_enabled = false;
+    }
 }
 
 // fn update(app: &mut App, state: &mut State) {
@@ -149,13 +199,38 @@ fn update(app: &mut App, state: &mut OculanteState) {
 fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     draw.clear(Color::AQUA);
+
     if let Some(texture) = &state.texture {
-        draw.image(texture).position(250.0, 200.0);
+        draw.image(texture)
+            .position(0.0, 0.0)
+            .scale(state.scale, state.scale)
+            .translate(state.offset.x as f32, state.offset.y as f32);
     }
 
-    // if let Some(Button::Mouse(_)) = e.release_args() {
-    //     state.drag_enabled = false;
-    // }
+    // check if a new texture has been sent
+    if let Ok(img) = state.texture_channel.1.try_recv() {
+        info!("Received image buffer");
+
+        state.image_dimension = (img.width(), img.height());
+        state.texture = gfx
+            .create_texture()
+            .from_bytes(&img, img.width() as i32, img.height() as i32)
+            .build()
+            .ok();
+
+        // TODO: exose this
+        //current_image = img;
+
+        // state.texture =
+
+        // let draw_size = gfx.size();
+
+        // let window_size = Vector2::new(draw_size.width, draw_size.height);
+        // let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
+        // state.offset = window_size / 2.0 - img_size / 2.0;
+        state.reset_image = true;
+        state.is_loaded = true;
+    }
 
     gfx.render(&draw);
 }
@@ -197,11 +272,11 @@ fn _init(gfx: &mut Graphics) {
     let font_regular = include_bytes!("IBMPlexSans-Regular.ttf");
 
     // animation
-    let k1 = splines::Key::new(0., 0., Interpolation::Cosine);
-    let k2 = splines::Key::new(TOAST_TIME * 0.125, 80., Interpolation::default());
-    let k3 = splines::Key::new(TOAST_TIME * 0.875, 80., Interpolation::default());
-    let k4 = splines::Key::new(TOAST_TIME, 0., Interpolation::default());
-    let spline = Spline::from_vec(vec![k1, k2, k3, k4]);
+    // let k1 = splines::Key::new(0., 0., Interpolation::Cosine);
+    // let k2 = splines::Key::new(TOAST_TIME * 0.125, 80., Interpolation::default());
+    // let k3 = splines::Key::new(TOAST_TIME * 0.875, 80., Interpolation::default());
+    // let k4 = splines::Key::new(TOAST_TIME, 0., Interpolation::default());
+    // let spline = Spline::from_vec(vec![k1, k2, k3, k4]);
 
     let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
@@ -537,7 +612,7 @@ fn _init(gfx: &mut Graphics) {
 //                 let img_size =
 //                     Vector2::new(current_image.width() as f64, current_image.height() as f64);
 //                 let scale_factor = (window_size.x / img_size.x).min(window_size.y / img_size.y).min(1.0);
-//                 state.scale = scale_factor;
+//                 state.scale = scale_factor;cursor_relative
 //                 state.offset = Vector2::new(0.0, 0.0);
 //                 state.offset += window_size / 2.0 - (img_size * state.scale) / 2.0;
 //                 state.reset_image = false;

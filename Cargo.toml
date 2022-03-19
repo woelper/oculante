@@ -15,7 +15,7 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-piston_window = "0.123.0"
+# piston_window = "0.123.0"
 clap = "3.0.13"
 image = "0.24.1"
 nalgebra = "0.30.0"
@@ -26,7 +26,7 @@ exr = "1.4.1"
 lazy_static = "1.4.0"
 libwebp-sys = "0.5.0"
 self_update = "0.28.0"
-splines = "4.0"
+# splines = "4.0"
 log = "0.4.14"
 simple-logging = "2.0.2"
 usvg = "0.22.0"

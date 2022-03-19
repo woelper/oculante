@@ -7,7 +7,7 @@ use log::{error, info};
 use nalgebra::{clamp, Vector2};
 use notan::AppState;
 use notan::graphics::Texture;
-use piston_window::{CharacterCache, Text};
+// use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -130,52 +130,52 @@ impl Frame {
     }
 }
 
-pub trait TextExt {
-    #[allow(unused_variables)]
-    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-    where
-        C: CharacterCache,
-    {
-        unimplemented!()
-    }
-}
+// pub trait TextExt {
+//     #[allow(unused_variables)]
+//     fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
+//     where
+//         C: CharacterCache,
+//     {
+//         unimplemented!()
+//     }
+// }
 
-impl TextExt for Text {
-    /// Draws text with a character cache
-    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-    where
-        C: CharacterCache,
-    {
-        let mut x = 0.0;
-        let mut y = 0.0;
-        for ch in text.chars() {
-            //let character = cache.character(self.font_size, ch)?;
-            let c2 = cache.character(self.font_size, ch);
-            if let Ok(character) = c2 {
-                x += character.advance_width();
-                y += character.advance_height();
+// impl TextExt for Text {
+//     /// Draws text with a character cache
+//     fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
+//     where
+//         C: CharacterCache,
+//     {
+//         let mut x = 0.0;
+//         let mut y = 0.0;
+//         for ch in text.chars() {
+//             //let character = cache.character(self.font_size, ch)?;
+//             let c2 = cache.character(self.font_size, ch);
+//             if let Ok(character) = c2 {
+//                 x += character.advance_width();
+//                 y += character.advance_height();
 
-                y = y.max(character.top());
-            }
-        }
+//                 y = y.max(character.top());
+//             }
+//         }
 
-        (x, y)
-    }
-}
+//         (x, y)
+//     }
+// }
 
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
-    pub scale: f64,
-    pub scale_increment: f64,
+    pub scale: f32,
+    pub scale_increment: f32,
     pub drag_enabled: bool,
     pub reset_image: bool,
     pub message: String,
     pub fullscreen_enabled: bool,
     pub is_loaded: bool,
-    pub offset: Vector2<f64>,
-    pub cursor: Vector2<f64>,
-    pub cursor_relative: Vector2<f64>,
+    pub offset: Vector2<f32>,
+    pub cursor: Vector2<f32>,
+    pub cursor_relative: Vector2<f32>,
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
@@ -183,6 +183,7 @@ pub struct OculanteState {
     pub tooltip: bool,
     pub toast: String,
     pub texture: Option<Texture>,
+    pub mouse_delta: Vector2<f32>,
     pub texture_channel: (
         Sender<RgbaImage>,
         Receiver<RgbaImage>,
@@ -214,6 +215,8 @@ impl Default for OculanteState {
             texture: None,
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
+            mouse_delta: Vector2::default(),
+
         }
     }
 }
@@ -353,20 +356,20 @@ fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
 }
 
 pub fn scale_pt(
-    origin: Vector2<f64>,
-    pt: Vector2<f64>,
-    scale: f64,
-    scale_inc: f64,
-) -> Vector2<f64> {
+    origin: Vector2<f32>,
+    pt: Vector2<f32>,
+    scale: f32,
+    scale_inc: f32,
+) -> Vector2<f32> {
     ((pt - origin) * scale_inc) / scale
 }
 
 pub fn pos_from_coord(
-    origin: Vector2<f64>,
-    pt: Vector2<f64>,
-    bounds: Vector2<f64>,
-    scale: f64,
-) -> Vector2<f64> {
+    origin: Vector2<f32>,
+    pt: Vector2<f32>,
+    bounds: Vector2<f32>,
+    scale: f32,
+) -> Vector2<f32> {
     let mut size = (pt - origin) / scale;
     size.x = clamp(size.x, 0.0, bounds.x - 1.0);
     size.y = clamp(size.y, 0.0, bounds.y - 1.0);
