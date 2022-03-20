@@ -200,12 +200,6 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     draw.clear(Color::AQUA);
 
-    if let Some(texture) = &state.texture {
-        draw.image(texture)
-            .position(0.0, 0.0)
-            .scale(state.scale, state.scale)
-            .translate(state.offset.x as f32, state.offset.y as f32);
-    }
 
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
@@ -218,10 +212,10 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
             .build()
             .ok();
 
-        // TODO: exose this
-        //current_image = img;
 
-        // state.texture =
+        state.current_image = Some(img);
+
+    
 
         // let draw_size = gfx.size();
 
@@ -231,6 +225,15 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
         state.reset_image = true;
         state.is_loaded = true;
     }
+
+
+    if let Some(texture) = &state.texture {
+        draw.image(texture)
+            .position(0.0, 0.0)
+            .scale(state.scale, state.scale)
+            .translate(state.offset.x as f32, state.offset.y as f32);
+    }
+
 
     gfx.render(&draw);
 }
