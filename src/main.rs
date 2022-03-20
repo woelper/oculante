@@ -200,7 +200,6 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     draw.clear(Color::AQUA);
 
-
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
         info!("Received image buffer");
@@ -213,19 +212,15 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
             .ok();
 
 
-        state.current_image = Some(img);
-
-    
-
-        // let draw_size = gfx.size();
-
-        // let window_size = Vector2::new(draw_size.width, draw_size.height);
-        // let img_size = Vector2::new(current_image.width() as f64, current_image.height() as f64);
-        // state.offset = window_size / 2.0 - img_size / 2.0;
+        //center the image
+        state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
+        
+        
+        
         state.reset_image = true;
         state.is_loaded = true;
+        state.current_image = Some(img);
     }
-
 
     if let Some(texture) = &state.texture {
         draw.image(texture)
@@ -233,7 +228,6 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
             .scale(state.scale, state.scale)
             .translate(state.offset.x as f32, state.offset.y as f32);
     }
-
 
     gfx.render(&draw);
 }

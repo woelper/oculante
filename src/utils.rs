@@ -600,3 +600,20 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     Player::start();
     Ok(col)
 }
+
+pub trait ImageExt {
+    fn size_vec(&self) -> Vector2<f32> {
+        unimplemented!()
+    }
+}
+
+impl ImageExt for RgbaImage {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.width() as f32, self.height() as f32)
+    }
+}
+impl ImageExt for (i32,i32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0 as f32, self.1 as f32)
+    }
+}
