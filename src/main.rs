@@ -84,8 +84,6 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
     let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-
-
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
         ..Default::default()
@@ -121,6 +119,8 @@ fn event(state: &mut OculanteState, evt: Event) {
             state.scale += delta;
             state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
             // state.scale += delta_y;
+
+            // state.offset.x -= state.cursor.x/2.;
         }
         _ => {}
     }
@@ -198,7 +198,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 // }
 fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
-    draw.clear(Color::AQUA);
+    draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
 
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
@@ -212,7 +212,7 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
             .ok();
 
         //center the image
-        state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
+        // state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
 
         state.reset_image = true;
         state.is_loaded = true;
@@ -221,9 +221,11 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
 
     if let Some(texture) = &state.texture {
         draw.image(texture)
-            .position(0.0, 0.0)
+            // .position(0.0, 0.0)
+            .translate(state.offset.x as f32, state.offset.y as f32)
             .scale(state.scale, state.scale)
-            .translate(state.offset.x as f32, state.offset.y as f32);
+            
+            ;
     }
 
     gfx.render(&draw);
