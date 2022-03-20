@@ -238,7 +238,7 @@ fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
     image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
 }
 
-pub fn zoomratio(i: f64, s: f64) -> f64 {
+pub fn zoomratio(i: f32, s: f32) -> f32 {
     // i * i * i.signum()
     i * s * 0.1
 }
@@ -615,5 +615,11 @@ impl ImageExt for RgbaImage {
 impl ImageExt for (i32,i32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0 as f32, self.1 as f32)
+    }
+}
+
+impl ImageExt for (f32,f32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0, self.1)
     }
 }

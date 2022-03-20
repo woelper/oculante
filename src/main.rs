@@ -82,13 +82,9 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
     info!("Completed argument parsing.");
 
-    let mut maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
+    let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
-    let texture = gfx
-        .create_texture()
-        .from_image(include_bytes!("../tests/rust.png"))
-        .build()
-        .unwrap();
+
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
@@ -96,8 +92,6 @@ fn init(gfx: &mut Graphics) -> OculanteState {
     };
 
     state.player = Player::new(state.texture_channel.0.clone());
-
-    // let player = Player::new(texture_sender.clone());
 
     info!("Image is: {:?}", maybe_img_location);
 
@@ -119,19 +113,14 @@ fn init(gfx: &mut Graphics) -> OculanteState {
     state
 }
 
-// fn event(state: &mut State, event: Event) {
-//     match event {
-//         Event::ReceivedCharacter(c) if c != '\u{7f}' => {
-//             // state.msg.push(c);
-//         }
-//         _ => {}
-//     }
-// }
-
 fn event(state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_x, delta_y } => {
-            state.scale += delta_y;
+            let delta = zoomratio(delta_y, state.scale);
+
+            state.scale += delta;
+            state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+            // state.scale += delta_y;
         }
         _ => {}
     }
@@ -141,7 +130,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
-    state.cursor = Vector2::new(mouse_pos.0, mouse_pos.1);
+    state.cursor = mouse_pos.size_vec();
+    // info!("{}", state.cursor);
+    // state.cursor = app.mouse.local_position(m)
 
     // TODO use delta
     if app.keyboard.is_down(KeyCode::V) {
@@ -184,13 +175,22 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.was_released(MouseButton::Left) {
         state.drag_enabled = false;
     }
-}
 
-// fn update(app: &mut App, state: &mut State) {
-//     if app.keyboard.was_pressed(KeyCode::Back) && !state.msg.is_empty() {
-//         state.msg.pop();
-//     }
-// }
+    if state.reset_image {
+        let window_size = app.window().size().size_vec();
+
+        if let Some(current_image) = &state.current_image {
+            let img_size = current_image.size_vec();
+            let scale_factor = (window_size.x / img_size.x)
+                .min(window_size.y / img_size.y)
+                .min(1.0);
+            state.scale = scale_factor;
+            state.offset = Vector2::new(0.0, 0.0);
+            state.offset += window_size / 2.0 - (img_size * state.scale) / 2.0;
+            state.reset_image = false;
+        }
+    }
+}
 
 // fn set_title(window: &mut PistonWindow, text: &str) {
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
@@ -211,12 +211,9 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
             .build()
             .ok();
 
-
         //center the image
         state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
-        
-        
-        
+
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
