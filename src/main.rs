@@ -3,7 +3,6 @@
 use clap::Arg;
 use clap::Command;
 use image::DynamicImage;
-use image::Pixel;
 use image::RgbaImage;
 use log::error;
 use log::info;
@@ -45,12 +44,21 @@ fn main() -> Result<(), String> {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
 
+    let window_config = WindowConfig::new()
+        .title("Oculante")
+        .size(1026, 600) // window's size
+        .vsync() // enable vsync
+        .resizable() // window can be resized
+        .min_size(600, 400); // Set a minimum window size
+
     info!("Starting oculante.");
     notan::init_with(init)
-        .set_config(DrawConfig)
-        .draw(drawx)
+        .add_config(window_config)
+        .add_config(DrawConfig)
         .event(event)
         .update(update)
+        .draw(drawx)
+        .add_plugin(FpsPlugin::new(60))
         .build()
 }
 
@@ -86,6 +94,7 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
+        // current_path: maybe_img_location.cloned(/),
         ..Default::default()
     };
 
@@ -101,6 +110,7 @@ fn init(gfx: &mut Graphics) -> OculanteState {
     }
 
     if let Some(ref img_location) = maybe_img_location {
+        state.current_path = Some(img_location.clone());
         if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
             state.player.load(&img_location);
         } else {
@@ -113,15 +123,40 @@ fn init(gfx: &mut Graphics) -> OculanteState {
 
 fn event(state: &mut OculanteState, evt: Event) {
     match evt {
-        Event::MouseWheel { delta_x, delta_y } => {
+        Event::MouseWheel { delta_y, .. } => {
             let delta = zoomratio(delta_y, state.scale);
-
-            state.scale += delta;
             state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-            // state.scale += delta_y;
-
-            // state.offset.x -= state.cursor.x/2.;
+            state.scale += delta;
         }
+        Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
+        Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
+        Event::KeyDown { key: KeyCode::Left } => {
+            if let Some(img_location) = state.current_path.as_mut() {
+                let next_img = img_shift(&img_location, -1);
+                // prevent reload if at last or first
+                if &next_img != img_location {
+                    state.is_loaded = false;
+                    *img_location = next_img;
+                    state.player.load(&img_location);
+                    // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                }
+            }
+        }
+        Event::KeyDown {
+            key: KeyCode::Right,
+        } => {
+            if let Some(img_location) = state.current_path.as_mut() {
+                let next_img = img_shift(&img_location, 1);
+                // prevent reload if at last or first
+                if &next_img != img_location {
+                    state.is_loaded = false;
+                    *img_location = next_img;
+                    state.player.load(&img_location);
+                    // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                }
+            }
+        }
+
         _ => {}
     }
 }
@@ -131,28 +166,17 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
-    // info!("{}", state.cursor);
-    // state.cursor = app.mouse.local_position(m)
-
-    // TODO use delta
-    if app.keyboard.is_down(KeyCode::V) {
-        state.reset_image = true;
-    }
-
-    if app.keyboard.is_down(KeyCode::Q) {
-        std::process::exit(0);
-    }
 
     // TODO: fullscreen
     if app.keyboard.was_pressed(KeyCode::F) {
         info!("Fullscreen");
-        // TODO: does not work
 
         if app.window().is_fullscreen() {
             app.window().set_fullscreen(false)
         } else {
             app.window().set_fullscreen(true)
         }
+        state.reset_image = true;
     }
 
     if app.mouse.is_down(MouseButton::Left) {
@@ -167,10 +191,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.scale,
         );
         state.offset += state.mouse_delta;
-        // app.mouse.
     }
-
-    // if app.mouse.
 
     if app.mouse.was_released(MouseButton::Left) {
         state.drag_enabled = false;
@@ -178,6 +199,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     if state.reset_image {
         let window_size = app.window().size().size_vec();
+        // let window_size = app.backend.
 
         if let Some(current_image) = &state.current_image {
             let img_size = current_image.size_vec();
@@ -196,6 +218,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
 //     window.set_title(title);
 // }
+
 fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
@@ -223,9 +246,7 @@ fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
         draw.image(texture)
             // .position(0.0, 0.0)
             .translate(state.offset.x as f32, state.offset.y as f32)
-            .scale(state.scale, state.scale)
-            
-            ;
+            .scale(state.scale, state.scale);
     }
 
     gfx.render(&draw);

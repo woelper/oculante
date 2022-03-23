@@ -5,8 +5,8 @@ use image::RgbaImage;
 
 use log::{error, info};
 use nalgebra::{clamp, Vector2};
-use notan::AppState;
 use notan::graphics::Texture;
+use notan::AppState;
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
@@ -44,8 +44,6 @@ pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
-
-
 
 #[derive(Debug)]
 pub struct Player {
@@ -182,13 +180,11 @@ pub struct OculanteState {
     pub font_size: u32,
     pub tooltip: bool,
     pub current_image: Option<RgbaImage>,
+    pub current_path: Option<PathBuf>,
     pub toast: String,
     pub texture: Option<Texture>,
     pub mouse_delta: Vector2<f32>,
-    pub texture_channel: (
-        Sender<RgbaImage>,
-        Receiver<RgbaImage>,
-    ),
+    pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub player: Player,
     //pub toast: Option<String>
 }
@@ -218,7 +214,7 @@ impl Default for OculanteState {
             texture_channel: tx_channel,
             mouse_delta: Default::default(),
             current_image: Default::default(),
-
+            current_path: Default::default(),
         }
     }
 }
@@ -576,7 +572,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
         Some("gif") => {
-
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location)?;
             let gif_decoder = GifDecoder::new(file)?;
@@ -612,13 +607,13 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 }
-impl ImageExt for (i32,i32) {
+impl ImageExt for (i32, i32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0 as f32, self.1 as f32)
     }
 }
 
-impl ImageExt for (f32,f32) {
+impl ImageExt for (f32, f32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0, self.1)
     }
