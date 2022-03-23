@@ -11,6 +11,7 @@ use notan::app::Event;
 // use piston_window::types::{Color, Matrix2d};
 // use piston_window::*;
 use notan::draw::*;
+use notan::egui::{self, *};
 use notan::prelude::keyboard::KeyCode;
 use notan::prelude::mouse::MouseButton;
 use notan::prelude::*;
@@ -54,15 +55,15 @@ fn main() -> Result<(), String> {
     info!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
+        .add_config(EguiConfig)
         .add_config(DrawConfig)
         .event(event)
         .update(update)
-        .draw(drawx)
-        .add_plugin(FpsPlugin::new(60))
+        .draw(drawe)
         .build()
 }
 
-fn init(gfx: &mut Graphics) -> OculanteState {
+fn init(_gfx: &mut Graphics) -> OculanteState {
     info!("Now matching arguments {:?}", std::env::args());
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
@@ -211,6 +212,61 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.offset += window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
         }
+    }
+}
+
+fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
+    let mut draw = gfx.create_draw();
+
+    // check if a new texture has been sent
+    if let Ok(img) = state.texture_channel.1.try_recv() {
+        info!("Received image buffer");
+
+        state.image_dimension = (img.width(), img.height());
+        state.texture = gfx
+            .create_texture()
+            .from_bytes(&img, img.width() as i32, img.height() as i32)
+            .build()
+            .ok();
+
+        //center the image
+        // state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
+
+        state.reset_image = true;
+        state.is_loaded = true;
+        state.current_image = Some(img);
+    }
+
+    if let Some(texture) = &state.texture {
+        draw.image(texture)
+            // .position(0.0, 0.0)
+            .translate(state.offset.x as f32, state.offset.y as f32)
+            .scale(state.scale, state.scale);
+    }
+
+    let egui_output = plugins.egui(|ctx| {
+        egui::SidePanel::left("side_panel").show(&ctx, |ui| {
+            ui.heading("Egui Plugin Example");
+
+            ui.separator();
+            if ui.button("Quit").clicked() {
+                app.exit();
+            }
+
+            ui.separator();
+            ui.label("Welcome to a basic example of how to use Egui with notan.");
+
+            ui.separator();
+            ui.label("Check the source code to learn more about how it works");
+        });
+    });
+
+    // output.clear_color(Color::BLACK);
+
+    if egui_output.needs_repaint() {
+        draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
+        gfx.render(&draw);
+        gfx.render(&egui_output);
     }
 }
 
