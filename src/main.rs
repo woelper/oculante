@@ -223,11 +223,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         info!("Received image buffer");
 
         state.image_dimension = (img.width(), img.height());
-        state.texture = gfx
-            .create_texture()
-            .from_bytes(&img, img.width() as i32, img.height() as i32)
-            .build()
-            .ok();
+        state.texture = img.to_texture(gfx);
 
         //center the image
         // state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
@@ -246,28 +242,52 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-            ui.heading("Egui Plugin Example");
+            ui.heading("Tools");
 
-            ui.separator();
-            if ui.button("Quit").clicked() {
-                app.exit();
+            ui.horizontal(|ui| {
+                if ui.button("r").clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.texture = solo_channel(img, 0).to_texture(gfx);
+                    }
+                }
+                if ui.button("g").clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.texture = solo_channel(img, 1).to_texture(gfx);
+                    }
+                }
+                if ui.button("b").clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.texture = solo_channel(img, 2).to_texture(gfx);
+                    }
+                }
+                if ui.button("a").clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.texture = solo_channel(img, 3).to_texture(gfx);
+                    }
+                }
+            });
+
+            if ui.button("unpremultiplied").clicked() {
+                if let Some(img) = &state.current_image {
+                    state.texture = unpremult(img).to_texture(gfx);
+                }
+            }
+            if ui.button("normal").clicked() {
+                if let Some(img) = &state.current_image {
+                    state.texture = img.to_texture(gfx);
+                }
             }
 
             ui.separator();
-            ui.label("Welcome to a basic example of how to use Egui with notan.");
-
-            ui.separator();
-            ui.label("Check the source code to learn more about how it works");
         });
     });
 
     // output.clear_color(Color::BLACK);
 
-    if egui_output.needs_repaint() {
-        draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
-        gfx.render(&draw);
-        gfx.render(&egui_output);
-    }
+    draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
+    gfx.render(&draw);
+    gfx.render(&egui_output);
+    if egui_output.needs_repaint() {}
 }
 
 // fn set_title(window: &mut PistonWindow, text: &str) {

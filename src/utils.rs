@@ -6,6 +6,7 @@ use image::RgbaImage;
 use log::{error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
+use notan::prelude::Graphics;
 use notan::AppState;
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;
@@ -600,11 +601,22 @@ pub trait ImageExt {
     fn size_vec(&self) -> Vector2<f32> {
         unimplemented!()
     }
+
+    fn to_texture(&self, _: &mut Graphics) -> Option<Texture> {
+        unimplemented!()
+    }
 }
 
 impl ImageExt for RgbaImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
+    }
+
+    fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.create_texture()
+            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .build()
+            .ok()
     }
 }
 impl ImageExt for (i32, i32) {
