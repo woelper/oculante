@@ -130,6 +130,7 @@ fn event(state: &mut OculanteState, evt: Event) {
             state.scale += delta;
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
+
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::Left } => {
             if let Some(img_location) = state.current_path.as_mut() {
@@ -245,34 +246,34 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             ui.heading("Tools");
 
             ui.horizontal(|ui| {
-                if ui.button("r").clicked() {
+                if ui.button("r").clicked() || app.keyboard.was_pressed(KeyCode::R) {
                     if let Some(img) = &state.current_image {
                         state.texture = solo_channel(img, 0).to_texture(gfx);
                     }
                 }
-                if ui.button("g").clicked() {
+                if ui.button("g").clicked() || app.keyboard.was_pressed(KeyCode::G) {
                     if let Some(img) = &state.current_image {
                         state.texture = solo_channel(img, 1).to_texture(gfx);
                     }
                 }
-                if ui.button("b").clicked() {
+                if ui.button("b").clicked() || app.keyboard.was_pressed(KeyCode::B) {
                     if let Some(img) = &state.current_image {
                         state.texture = solo_channel(img, 2).to_texture(gfx);
                     }
                 }
-                if ui.button("a").clicked() {
+                if ui.button("a").clicked() || app.keyboard.was_pressed(KeyCode::A) {
                     if let Some(img) = &state.current_image {
                         state.texture = solo_channel(img, 3).to_texture(gfx);
                     }
                 }
             });
 
-            if ui.button("unpremultiplied").clicked() {
+            if ui.button("Unpremultiplied").clicked() || app.keyboard.was_pressed(KeyCode::U) {
                 if let Some(img) = &state.current_image {
                     state.texture = unpremult(img).to_texture(gfx);
                 }
             }
-            if ui.button("normal").clicked() {
+            if ui.button("All colors").clicked() || app.keyboard.was_pressed(KeyCode::C) {
                 if let Some(img) = &state.current_image {
                     state.texture = img.to_texture(gfx);
                 }
