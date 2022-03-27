@@ -244,8 +244,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-
-
             ui.heading("Channels");
 
             ui.horizontal(|ui| {
@@ -284,8 +282,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
             ui.separator();
 
-            ui.label(format!("Size: {}x{}",state.image_dimension.0, state.image_dimension.1));
+            ui.label(format!(
+                "Size: {}x{}",
+                state.image_dimension.0, state.image_dimension.1
+            ));
 
+            if let Some(path) = &state.current_path {
+                ui.label(format!("Path: {}", path.display()));
+            }
         });
     });
 
