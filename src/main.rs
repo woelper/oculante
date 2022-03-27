@@ -48,7 +48,8 @@ fn main() -> Result<(), String> {
     let window_config = WindowConfig::new()
         .title("Oculante")
         .size(1026, 600) // window's size
-        .vsync() // enable vsync
+        // .vsync() // enable vsync
+        .lazy_loop()
         .resizable() // window can be resized
         .min_size(600, 400); // Set a minimum window size
 
