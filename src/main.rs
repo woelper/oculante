@@ -227,16 +227,22 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
         info!("Received image buffer");
-
         state.image_dimension = (img.width(), img.height());
         state.texture = img.to_texture(gfx);
 
         //center the image
-        // state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
+        state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
 
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
+
+    }
+
+    // redraw constantly until the image is fully loaded or it's reset on canvac
+    if !state.is_loaded || state.reset_image{
+        app.window().request_frame();
+
     }
 
     if let Some(texture) = &state.texture {
@@ -325,7 +331,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if let Some(texture) = &state.texture {
                    
+                    let desired_width = 200.;
                     let img_size: egui::Vec2 = texture.size().into();
+                    let scale = desired_width / img_size.x;
+                    let img_size = img_size * scale;
+
                     let tex_id = gfx.egui_register_texture(&texture);
 
                     let uv =  (state.cursor_relative.x/state.image_dimension.0 as f32, state.cursor_relative.y/state.image_dimension.1 as f32);
@@ -343,17 +353,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
 
 
-              
-                // if let Some(tex) = &state.texture {
-                //     //  let m = Matrix3::
-                //     // app.mouse.local_position(m)
-
-                //     draw.draw
-                //         .image(texture)
-                //         // .position(0.0, 0.0)
-                //         .translate(state.offset.x as f32, state.offset.y as f32)
-                //         .scale(state.scale, state.scale);
-                // }
+   
             }
 
         });
@@ -374,38 +374,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 //     window.set_title(title);
 // }
 
-fn drawx(gfx: &mut Graphics, state: &mut OculanteState) {
-    let mut draw = gfx.create_draw();
-    draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
 
-    // check if a new texture has been sent
-    if let Ok(img) = state.texture_channel.1.try_recv() {
-        info!("Received image buffer");
-
-        state.image_dimension = (img.width(), img.height());
-        state.texture = gfx
-            .create_texture()
-            .from_bytes(&img, img.width() as i32, img.height() as i32)
-            .build()
-            .ok();
-
-        //center the image
-        // state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
-
-        state.reset_image = true;
-        state.is_loaded = true;
-        state.current_image = Some(img);
-    }
-
-    if let Some(texture) = &state.texture {
-        draw.image(texture)
-            // .position(0.0, 0.0)
-            .translate(state.offset.x as f32, state.offset.y as f32)
-            .scale(state.scale, state.scale);
-    }
-
-    gfx.render(&draw);
-}
 
 fn _init(gfx: &mut Graphics) {
     //update::update();
@@ -609,59 +578,7 @@ fn _init(gfx: &mut Graphics) {
 //                 std::thread::sleep(std::time::Duration::from_millis(100));
 //             }
 
-//             // Display color unpremultiplied (just rgb without multiplying by alpha)
-//             if key == Key::U {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &unpremult(&current_image),
-//                     &tx_settings,
-//                 );
-//             }
 
-//             // Only red
-//             if key == Key::R {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &solo_channel(&current_image, 0),
-//                     &tx_settings,
-//                 );
-//             }
-
-//             // Only green
-//             if key == Key::G {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &solo_channel(&current_image, 1),
-//                     &tx_settings,
-//                 );
-//             }
-
-//             // Only blue
-//             if key == Key::B {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &solo_channel(&current_image, 2),
-//                     &tx_settings,
-//                 );
-//             }
-
-//             // Only alpha
-//             if key == Key::A {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &solo_channel(&current_image, 3),
-//                     &tx_settings,
-//                 );
-//             }
-
-//             // Color channel (RGB)
-//             if key == Key::C {
-//                 texture = Texture::from_image(
-//                     &mut window.create_texture_context(),
-//                     &current_image,
-//                     &tx_settings,
-//                 );
-//             }
 
 //             // Toggle extended info
 //             if key == Key::I {
