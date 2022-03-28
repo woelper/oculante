@@ -131,7 +131,6 @@ fn event(state: &mut OculanteState, evt: Event) {
             state.scale += delta;
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
-
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::Left } => {
             if let Some(img_location) = state.current_path.as_mut() {
@@ -184,6 +183,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     if app.mouse.is_down(MouseButton::Left) {
         state.drag_enabled = true;
+ 
+        state.offset += state.mouse_delta;
+    }
+
+    if state.info_enabled {
+
         state.cursor_relative = pos_from_coord(
             state.offset,
             state.cursor,
@@ -193,7 +198,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
             ),
             state.scale,
         );
-        state.offset += state.mouse_delta;
     }
 
     if app.mouse.was_released(MouseButton::Left) {
@@ -290,6 +294,68 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if let Some(path) = &state.current_path {
                 ui.label(format!("Path: {}", path.display()));
             }
+
+            ui.checkbox(&mut state.info_enabled, "Show extended info");
+
+            if app.keyboard.was_pressed(KeyCode::I) {
+                state.info_enabled = !state.info_enabled;
+            }
+
+            if state.info_enabled {
+
+                if let Some(img) = &state.current_image {
+                    if let Some(p) = img
+                        .get_pixel_checked(
+                            state.cursor_relative.x as u32,
+                            state.cursor_relative.y as u32,
+                        ) {
+                            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+                        }
+                        
+                    
+                }
+
+
+                // let texture = gfx
+                // .create_texture()
+                // .from_image(include_bytes!("../tests/rust.png"))
+                // .with_premultiplied_alpha()
+                // .build()
+                // .unwrap();
+
+                if let Some(texture) = &state.texture {
+                   
+                    let img_size: egui::Vec2 = texture.size().into();
+                    let tex_id = gfx.egui_register_texture(&texture);
+
+                    let uv =  (state.cursor_relative.x/state.image_dimension.0 as f32, state.cursor_relative.y/state.image_dimension.1 as f32);
+                    
+                    ui.label(format!("UV: {:?}", uv));
+                    ui.label(format!("PX: {:?}", state.cursor_relative));
+                    ui.label(format!("CLR: {:?}", state.sampled_color));
+                    ui.add(
+                        egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(uv.0-0.1..=uv.0+0.1, uv.1-0.1..=uv.1+0.1)).bg_fill(egui::Color32::WHITE)
+                    );
+                    // ui.image(tex_id, img_size);
+
+
+                }
+
+
+
+              
+                // if let Some(tex) = &state.texture {
+                //     //  let m = Matrix3::
+                //     // app.mouse.local_position(m)
+
+                //     draw.draw
+                //         .image(texture)
+                //         // .position(0.0, 0.0)
+                //         .translate(state.offset.x as f32, state.offset.y as f32)
+                //         .scale(state.scale, state.scale);
+                // }
+            }
+
         });
     });
 
@@ -298,7 +364,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);
-    if egui_output.needs_repaint() {}
+    if egui_output.needs_repaint() {
+        app.window().request_frame();
+    }
 }
 
 // fn set_title(window: &mut PistonWindow, text: &str) {
@@ -343,7 +411,6 @@ fn _init(gfx: &mut Graphics) {
     //update::update();
 
     let mut state = OculanteState::default();
-    state.font_size = 14;
     let mut toast_time = std::time::Instant::now();
 
     info!("Now matching arguments {:?}", std::env::args());

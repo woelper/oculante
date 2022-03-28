@@ -177,7 +177,6 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
-    pub font_size: u32,
     pub tooltip: bool,
     pub current_image: Option<RgbaImage>,
     pub current_path: Option<PathBuf>,
@@ -205,7 +204,6 @@ impl Default for OculanteState {
             image_dimension: (0, 0),
             info_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            font_size: 18,
             tooltip: Default::default(),
             toast: Default::default(),
             texture: Default::default(),
@@ -627,4 +625,10 @@ impl ImageExt for (f32, f32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0, self.1)
     }
+}
+
+    impl ImageExt for (u32, u32) {
+        fn size_vec(&self) -> Vector2<f32> {
+            Vector2::new(self.0 as f32, self.1 as f32)
+        }
 }
