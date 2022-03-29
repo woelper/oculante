@@ -64,7 +64,7 @@ fn main() -> Result<(), String> {
         .build()
 }
 
-fn init(_gfx: &mut Graphics) -> OculanteState {
+fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     info!("Now matching arguments {:?}", std::env::args());
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
@@ -120,6 +120,30 @@ fn init(_gfx: &mut Graphics) -> OculanteState {
         }
     }
 
+    // Set up egui style
+    plugins.egui(|ctx| {
+        let mut fonts = FontDefinitions::default();
+
+        fonts.font_data.insert(
+            "customfont".to_owned(),
+            FontData::from_static(include_bytes!("NotoSans-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "customfont".into());
+
+        let mut style: egui::Style = (*ctx.style()).clone();
+
+        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18.;
+        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
+        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
+        ctx.set_style(style);
+        ctx.set_fonts(fonts);
+    });
+
     state
 }
 
@@ -132,32 +156,7 @@ fn event(state: &mut OculanteState, evt: Event) {
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
-        Event::KeyDown { key: KeyCode::Left } => {
-            if let Some(img_location) = state.current_path.as_mut() {
-                let next_img = img_shift(&img_location, -1);
-                // prevent reload if at last or first
-                if &next_img != img_location {
-                    state.is_loaded = false;
-                    *img_location = next_img;
-                    state.player.load(&img_location);
-                    // set_title(&mut window, &img_location.to_string_lossy().to_string());
-                }
-            }
-        }
-        Event::KeyDown {
-            key: KeyCode::Right,
-        } => {
-            if let Some(img_location) = state.current_path.as_mut() {
-                let next_img = img_shift(&img_location, 1);
-                // prevent reload if at last or first
-                if &next_img != img_location {
-                    state.is_loaded = false;
-                    *img_location = next_img;
-                    state.player.load(&img_location);
-                    // set_title(&mut window, &img_location.to_string_lossy().to_string());
-                }
-            }
-        }
+        Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
 
         _ => {}
     }
@@ -169,26 +168,13 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
 
-    // TODO: fullscreen
-    if app.keyboard.was_pressed(KeyCode::F) {
-        info!("Fullscreen");
-
-        if app.window().is_fullscreen() {
-            app.window().set_fullscreen(false)
-        } else {
-            app.window().set_fullscreen(true)
-        }
-        state.reset_image = true;
-    }
-
     if app.mouse.is_down(MouseButton::Left) {
         state.drag_enabled = true;
- 
+
         state.offset += state.mouse_delta;
     }
 
     if state.info_enabled {
-
         state.cursor_relative = pos_from_coord(
             state.offset,
             state.cursor,
@@ -228,7 +214,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(img) = state.texture_channel.1.try_recv() {
         info!("Received image buffer");
         state.image_dimension = (img.width(), img.height());
-        state.texture = img.to_texture(gfx);
+        state.current_texture = img.to_texture(gfx);
 
         //center the image
         state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
@@ -236,101 +222,117 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
-
     }
 
-    // redraw constantly until the image is fully loaded or it's reset on canvac
-    if !state.is_loaded || state.reset_image{
+    // redraw constantly until the image is fully loaded or it's reset on canvas
+    if !state.is_loaded || state.reset_image {
         app.window().request_frame();
-
     }
 
-    if let Some(texture) = &state.texture {
+    if let Some(texture) = &state.current_texture {
         draw.image(texture)
-            // .position(0.0, 0.0)
+            .blend_mode(BlendMode::NORMAL)
             .translate(state.offset.x as f32, state.offset.y as f32)
             .scale(state.scale, state.scale);
     }
 
     let egui_output = plugins.egui(|ctx| {
-        egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-            ui.heading("Channels");
-
+        egui::TopBottomPanel::top("menu").show(&ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.button("r").clicked() || app.keyboard.was_pressed(KeyCode::R) {
+                ui.heading("Channels");
+
+                if ui.button("R").clicked() || app.keyboard.was_pressed(KeyCode::R) {
                     if let Some(img) = &state.current_image {
-                        state.texture = solo_channel(img, 0).to_texture(gfx);
+                        state.current_texture = solo_channel(img, 0).to_texture(gfx);
                     }
                 }
-                if ui.button("g").clicked() || app.keyboard.was_pressed(KeyCode::G) {
+                if ui.button("G").clicked() || app.keyboard.was_pressed(KeyCode::G) {
                     if let Some(img) = &state.current_image {
-                        state.texture = solo_channel(img, 1).to_texture(gfx);
+                        state.current_texture = solo_channel(img, 1).to_texture(gfx);
                     }
                 }
-                if ui.button("b").clicked() || app.keyboard.was_pressed(KeyCode::B) {
+                if ui.button("B").clicked() || app.keyboard.was_pressed(KeyCode::B) {
                     if let Some(img) = &state.current_image {
-                        state.texture = solo_channel(img, 2).to_texture(gfx);
+                        state.current_texture = solo_channel(img, 2).to_texture(gfx);
                     }
                 }
-                if ui.button("a").clicked() || app.keyboard.was_pressed(KeyCode::A) {
+                if ui.button("A").clicked() || app.keyboard.was_pressed(KeyCode::A) {
                     if let Some(img) = &state.current_image {
-                        state.texture = solo_channel(img, 3).to_texture(gfx);
+                        state.current_texture = solo_channel(img, 3).to_texture(gfx);
+                    }
+                }
+
+                if ui.button("Unpremultiplied").clicked() || app.keyboard.was_pressed(KeyCode::U) {
+                    if let Some(img) = &state.current_image {
+                        state.current_texture = unpremult(img).to_texture(gfx);
+                    }
+                }
+                if ui.button("RGBA").clicked() || app.keyboard.was_pressed(KeyCode::C) {
+                    if let Some(img) = &state.current_image {
+                        state.current_texture = img.to_texture(gfx);
+                    }
+                }
+
+                ui.add(egui::Separator::default().vertical());
+
+                if ui.button("⛶").clicked() || app.keyboard.was_pressed(KeyCode::F) {
+                    let fullscreen = app.window().is_fullscreen();
+                    app.window().set_fullscreen(!fullscreen);
+                    state.reset_image = true;
+                }
+
+                ui.checkbox(&mut state.info_enabled, "Show extended info");
+
+                if ui.button("◀").clicked() || app.keyboard.was_pressed(KeyCode::Left) {
+                    if let Some(img_location) = state.current_path.as_mut() {
+                        let next_img = img_shift(&img_location, -1);
+                        // prevent reload if at last or first
+                        if &next_img != img_location {
+                            state.is_loaded = false;
+                            *img_location = next_img;
+                            state.player.load(&img_location);
+                            // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                        }
+                    }
+                }
+                if ui.button("▶").clicked() || app.keyboard.was_pressed(KeyCode::Right) {
+                    if let Some(img_location) = state.current_path.as_mut() {
+                        let next_img = img_shift(&img_location, 1);
+                        // prevent reload if at last or first
+                        if &next_img != img_location {
+                            state.is_loaded = false;
+                            *img_location = next_img;
+                            state.player.load(&img_location);
+                            // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                        }
                     }
                 }
             });
+        });
 
-            if ui.button("Unpremultiplied").clicked() || app.keyboard.was_pressed(KeyCode::U) {
-                if let Some(img) = &state.current_image {
-                    state.texture = unpremult(img).to_texture(gfx);
-                }
-            }
-            if ui.button("All colors").clicked() || app.keyboard.was_pressed(KeyCode::C) {
-                if let Some(img) = &state.current_image {
-                    state.texture = img.to_texture(gfx);
-                }
-            }
+        if state.info_enabled {
+            egui::SidePanel::left("side_panel").show(&ctx, |ui| {
+                ui.separator();
 
-            ui.separator();
+                ui.label(format!(
+                    "Size: {}x{}",
+                    state.image_dimension.0, state.image_dimension.1
+                ));
 
-            ui.label(format!(
-                "Size: {}x{}",
-                state.image_dimension.0, state.image_dimension.1
-            ));
-
-            if let Some(path) = &state.current_path {
-                ui.label(format!("Path: {}", path.display()));
-            }
-
-            ui.checkbox(&mut state.info_enabled, "Show extended info");
-
-            if app.keyboard.was_pressed(KeyCode::I) {
-                state.info_enabled = !state.info_enabled;
-            }
-
-            if state.info_enabled {
-
-                if let Some(img) = &state.current_image {
-                    if let Some(p) = img
-                        .get_pixel_checked(
-                            state.cursor_relative.x as u32,
-                            state.cursor_relative.y as u32,
-                        ) {
-                            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-                        }
-                        
-                    
+                if let Some(path) = &state.current_path {
+                    ui.label(format!("Path: {}", path.display()));
                 }
 
+                if let Some(img) = &state.current_image {
+                    if let Some(p) = img.get_pixel_checked(
+                        state.cursor_relative.x as u32,
+                        state.cursor_relative.y as u32,
+                    ) {
+                        state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+                    }
+                }
 
-                // let texture = gfx
-                // .create_texture()
-                // .from_image(include_bytes!("../tests/rust.png"))
-                // .with_premultiplied_alpha()
-                // .build()
-                // .unwrap();
-
-                if let Some(texture) = &state.texture {
-                   
+                if let Some(texture) = &state.current_texture {
                     let desired_width = 200.;
                     let img_size: egui::Vec2 = texture.size().into();
                     let scale = desired_width / img_size.x;
@@ -338,25 +340,29 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     let tex_id = gfx.egui_register_texture(&texture);
 
-                    let uv =  (state.cursor_relative.x/state.image_dimension.0 as f32, state.cursor_relative.y/state.image_dimension.1 as f32);
-                    
-                    ui.label(format!("UV: {:?}", uv));
-                    ui.label(format!("PX: {:?}", state.cursor_relative));
+                    let uv = (
+                        state.cursor_relative.x / state.image_dimension.0 as f32,
+                        state.cursor_relative.y / state.image_dimension.1 as f32,
+                    );
+
+                    ui.label(format!("UV: {:.3},{:.3}", uv.0, uv.1));
+                    ui.label(format!(
+                        "PX: {:.0},{:.0}",
+                        state.cursor_relative.x, state.cursor_relative.y
+                    ));
                     ui.label(format!("CLR: {:?}", state.sampled_color));
                     ui.add(
-                        egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(uv.0-0.1..=uv.0+0.1, uv.1-0.1..=uv.1+0.1)).bg_fill(egui::Color32::WHITE)
+                        egui::Image::new(tex_id, img_size)
+                            .uv(egui::Rect::from_x_y_ranges(
+                                uv.0 - 0.1..=uv.0 + 0.1,
+                                uv.1 - 0.1..=uv.1 + 0.1,
+                            ))
+                            .bg_fill(egui::Color32::GRAY),
                     );
                     // ui.image(tex_id, img_size);
-
-
                 }
-
-
-
-   
-            }
-
-        });
+            });
+        }
     });
 
     // output.clear_color(Color::BLACK);
@@ -373,8 +379,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
 //     window.set_title(title);
 // }
-
-
 
 fn _init(gfx: &mut Graphics) {
     //update::update();
@@ -578,8 +582,6 @@ fn _init(gfx: &mut Graphics) {
 //                 std::thread::sleep(std::time::Duration::from_millis(100));
 //             }
 
-
-
 //             // Toggle extended info
 //             if key == Key::I {
 //                 state.info_enabled = !state.info_enabled;
@@ -739,23 +741,6 @@ fn _init(gfx: &mut Graphics) {
 //                     &state.message,
 //                     (size.width / 2.0 - 120.0, size.height / 2.0),
 //                     state.font_size * 2,
-//                 ));
-//             }
-
-//             if state.tooltip {
-//                 draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
-//                     "Press i to toggle info, r,g,b,a to toggle channels, c for all channels",
-//                         (50., size.height - 80.)
-//                 ));
-
-//                 draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
-//                     "Press u for unpremultiplied alpha, v to reset view, 1 for 100% zoom, <- -> to view next/prev image",
-//                     (50., size.height - 60.),
-//                 ));
-
-//                 draw_text(&c, gfx, &mut glyphs_regular,&TextInstruction::new(
-//                     "Press ',' (comma) to update from latest github release",
-//                     (50., size.height - 40.),
 //                 ));
 //             }
 

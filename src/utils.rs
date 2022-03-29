@@ -177,14 +177,12 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
-    pub tooltip: bool,
-    pub current_image: Option<RgbaImage>,
-    pub current_path: Option<PathBuf>,
-    pub toast: String,
-    pub texture: Option<Texture>,
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub player: Player,
+    pub current_texture: Option<Texture>,
+    pub current_path: Option<PathBuf>,
+    pub current_image: Option<RgbaImage>,
     //pub toast: Option<String>
 }
 
@@ -204,12 +202,10 @@ impl Default for OculanteState {
             image_dimension: (0, 0),
             info_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            tooltip: Default::default(),
-            toast: Default::default(),
-            texture: Default::default(),
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
             mouse_delta: Default::default(),
+            current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
         }
