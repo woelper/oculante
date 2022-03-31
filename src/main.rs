@@ -4,6 +4,7 @@ use clap::Arg;
 use clap::Command;
 use image::DynamicImage;
 use image::RgbaImage;
+use log::debug;
 use log::error;
 use log::info;
 use nalgebra::Vector2;
@@ -128,7 +129,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
             }
-            Err(_) => eprintln!("Port must be a number"),
+            Err(_) => error!("Port must be a number"),
         }
     }
 
@@ -231,9 +232,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
-            info!("Done reset");
+            debug!("Done reset");
         }
-        info!("fs? {}", app.window().is_fullscreen());
     }
 
     let mut draw = gfx.create_draw();
