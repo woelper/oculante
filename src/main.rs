@@ -30,7 +30,6 @@ use net::*;
 mod tests;
 mod update;
 
-
 #[notan_main]
 fn main() -> Result<(), String> {
     // hack for wayland
@@ -194,7 +193,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     if app.mouse.is_down(MouseButton::Left) {
         state.drag_enabled = true;
-
         state.offset += state.mouse_delta;
     }
 
@@ -356,31 +354,57 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 }
 
                 if let Some(texture) = &state.current_texture {
-                    let desired_width = 200.;
-                    let img_size: egui::Vec2 = texture.size().into();
-                    let scale = desired_width / img_size.x;
-                    let img_size = img_size * scale;
-
-                    let tex_id = gfx.egui_register_texture(&texture);
-
-                    let uv = (
-                        state.cursor_relative.x / state.image_dimension.0 as f32,
-                        state.cursor_relative.y / state.image_dimension.1 as f32,
-                    );
-
-                    ui.label(format!("UV: {:.3},{:.3}", uv.0, uv.1));
                     ui.label(format!(
                         "PX: {:.0},{:.0}",
                         state.cursor_relative.x, state.cursor_relative.y
                     ));
                     ui.label(format!("CLR: {:?}", state.sampled_color));
-                    ui.add(
-                        egui::Image::new(tex_id, img_size)
-                            .uv(egui::Rect::from_x_y_ranges(
-                                uv.0 - 0.1..=uv.0 + 0.1,
-                                uv.1 - 0.1..=uv.1 + 0.1,
-                            ))
-                            .bg_fill(egui::Color32::GRAY),
+
+                    let tex_id = gfx.egui_register_texture(&texture);
+
+                    // width of image widget
+                    let desired_width = 200.;
+
+                    let scale = (desired_width / 5.) / texture.size().0;
+                    let img_size = egui::Vec2::new(desired_width, desired_width);
+
+                    let uv_center = (
+                        state.cursor_relative.x / state.image_dimension.0 as f32,
+                        state.cursor_relative.y / state.image_dimension.1 as f32,
+                    );
+
+                    ui.label(format!("UV: {:.3},{:.3}", uv_center.0, uv_center.1));
+                    // make sure aspect ratio is compensated for the square preview
+                    let ratio = texture.size().0 / texture.size().1;
+                    let uv_size = (scale, scale * ratio);
+                    let x = ui
+                        .add(
+                            egui::Image::new(tex_id, img_size)
+                                .uv(egui::Rect::from_x_y_ranges(
+                                    uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
+                                    uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
+                                ))
+                                // .bg_fill(egui::Color32::RED),
+                        )
+                        .rect;
+
+                    let stroke_color = Color32::from_white_alpha(240);
+                    let bg_color = Color32::BLACK.linear_multiply(0.5);
+                    ui.painter_at(x).line_segment(
+                        [x.center_bottom(), x.center_top()],
+                        Stroke::new(4., bg_color),
+                    );
+                    ui.painter_at(x).line_segment(
+                        [x.left_center(), x.right_center()],
+                        Stroke::new(4., bg_color),
+                    );
+                    ui.painter_at(x).line_segment(
+                        [x.center_bottom(), x.center_top()],
+                        Stroke::new(1., stroke_color),
+                    );
+                    ui.painter_at(x).line_segment(
+                        [x.left_center(), x.right_center()],
+                        Stroke::new(1., stroke_color),
                     );
                     // ui.image(tex_id, img_size);
                 }
@@ -426,4 +450,3 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
 //     window.set_title(title);
 // }
-
