@@ -32,8 +32,8 @@ resvg = "0.22.0"
 tiny-skia = "0.6.1"
 env_logger = "0.9.0"
 anyhow = "1.0.42"
-# notan = "0.1.0"
-notan = {git = "https://github.com/Nazariglez/notan.git", branch="develop", features = ["egui"]}
+notan = {version = "0.2.1", features = ["drop_files", "egui"]}
+# notan = {git = "https://github.com/Nazariglez/notan.git", branch="develop", features = ["egui"]}
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }

@@ -15,6 +15,7 @@ use notan::egui::{self, *};
 use notan::prelude::keyboard::KeyCode;
 use notan::prelude::mouse::MouseButton;
 use notan::prelude::*;
+use std::ffi::OsStr;
 // use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -157,6 +158,20 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
+        Event::WindowResize { width, height } => {
+            let window_size = (width, height).size_vec();
+            if let Some(current_image) = &state.current_image {
+                let img_size = current_image.size_vec();
+                state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
+            }
+        }
+        Event::Drop(file) => {
+            if let Some(p) = file.path {
+                state.is_loaded = false;
+                state.player.load(&p);
+                state.current_path = Some(p);
+            }
+        }
 
         _ => {}
     }
@@ -189,7 +204,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.was_released(MouseButton::Left) {
         state.drag_enabled = false;
     }
+}
 
+fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     if state.reset_image {
         let window_size = app.window().size().size_vec();
         // let window_size = app.backend.
@@ -200,15 +217,20 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 .min(window_size.y / img_size.y)
                 .min(1.0);
             state.scale = scale_factor;
-            state.offset = Vector2::new(0.0, 0.0);
-            state.offset += window_size / 2.0 - (img_size * state.scale) / 2.0;
+            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
+            info!("Done reset");
+        }
+        info!("fs? {}", app.window().is_fullscreen());
+    }
+
+    let mut draw = gfx.create_draw();
+
+    if let Some(p) = &state.current_path {
+        if p.extension() == Some(OsStr::new("gif")) {
+            app.window().request_frame();
         }
     }
-}
-
-fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
-    let mut draw = gfx.create_draw();
 
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
@@ -222,11 +244,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
-    }
-
-    // redraw constantly until the image is fully loaded or it's reset on canvas
-    if !state.is_loaded || state.reset_image {
-        app.window().request_frame();
     }
 
     if let Some(texture) = &state.current_texture {
@@ -278,7 +295,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 if ui.button("⛶").clicked() || app.keyboard.was_pressed(KeyCode::F) {
                     let fullscreen = app.window().is_fullscreen();
                     app.window().set_fullscreen(!fullscreen);
-                    state.reset_image = true;
+                    // state.reset_image = true;
                 }
 
                 ui.checkbox(&mut state.info_enabled, "Show extended info");
@@ -312,8 +329,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         if state.info_enabled {
             egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-                ui.separator();
-
                 ui.label(format!(
                     "Size: {}x{}",
                     state.image_dimension.0, state.image_dimension.1
@@ -371,6 +386,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
+        app.window().request_frame();
+    }
+
+    // redraw constantly until the image is fully loaded or it's reset on canvas
+    if !state.is_loaded || state.reset_image {
         app.window().request_frame();
     }
 }

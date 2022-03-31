@@ -993,9 +993,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.20.2"
+version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4fa84eead97d5412b2a20aed4d66612a97a9e41e08eababdb9ae2bf88667490"
+checksum = "3412e74893a912839a67e975aca0c88561e20e5461d2d358a5fa6d3b229fae59"
 
 [[package]]
 name = "glow"
@@ -1578,6 +1578,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
+name = "mime_guess"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4192263c238a5f0d0c6bfd21f336a313a4ce1c450542449ca191bb657b4642ef"
+dependencies = [
+ "mime",
+ "unicase",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1763,8 +1773,9 @@ dependencies = [
 
 [[package]]
 name = "notan"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cf227ee4a437b41ba493f1a79d6b10814e5e968bddb0a4620b94974f0af4461"
 dependencies = [
  "notan_app",
  "notan_backend",
@@ -1779,13 +1790,16 @@ dependencies = [
 
 [[package]]
 name = "notan_app"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a56d72535649b63a20cf92538c1cb39a4d719bd2d4990d275e6e01d9d34a49d"
 dependencies = [
  "downcast-rs",
  "futures",
+ "futures-util",
  "hashbrown 0.12.0",
  "indexmap",
+ "js-sys",
  "log",
  "notan_graphics",
  "notan_macro",
@@ -1793,12 +1807,15 @@ dependencies = [
  "notan_utils",
  "parking_lot 0.12.0",
  "platter",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
 name = "notan_backend"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b36fc3f374706b4ecfdac2dd48e2e15d3122111f79be0ebb74e908a25b81124"
 dependencies = [
  "notan_web",
  "notan_winit",
@@ -1806,8 +1823,9 @@ dependencies = [
 
 [[package]]
 name = "notan_draw"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9ece5314e26deb131078b88c990039dc02627c8a5ce15a9972757b094ed1847"
 dependencies = [
  "log",
  "lyon",
@@ -1823,8 +1841,9 @@ dependencies = [
 
 [[package]]
 name = "notan_egui"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2feedd8468616188653507b13b25754dffdc29fcce885ebdcf25576c4c3a08ef"
 dependencies = [
  "bytemuck",
  "egui",
@@ -1835,8 +1854,9 @@ dependencies = [
 
 [[package]]
 name = "notan_glow"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52bd13af19080aa26e9c3c820398a936289ede10a1497b1a8698fa761181f00f"
 dependencies = [
  "bytemuck",
  "glow",
@@ -1850,8 +1870,9 @@ dependencies = [
 
 [[package]]
 name = "notan_glyph"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3e0996ba4048772bd082023dec53d6f5c198969d096ff07b090830d06c99766"
 dependencies = [
  "bytemuck",
  "glyph_brush",
@@ -1863,8 +1884,9 @@ dependencies = [
 
 [[package]]
 name = "notan_graphics"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0812355d15809582782c22ae58b8d3af8c3979124cffcefbf7896302940fe43b"
 dependencies = [
  "bytemuck",
  "image",
@@ -1876,8 +1898,9 @@ dependencies = [
 
 [[package]]
 name = "notan_log"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe4626c96ff7425fa6c41011dddbf8ffbb5fe07559b5886cc30c3b60ffecfad3"
 dependencies = [
  "chrono",
  "console_log",
@@ -1889,8 +1912,9 @@ dependencies = [
 
 [[package]]
 name = "notan_macro"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33ee8308cb4f31b167729e161aa7b795546fc6fb1578d2e752e531073dd2d232"
 dependencies = [
  "glsl-to-spirv",
  "num",
@@ -1903,8 +1927,9 @@ dependencies = [
 
 [[package]]
 name = "notan_math"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc1a5af7219a913c7b0a5b52593ed36eacd0ba64a7804c620e590cbf7d0c45f8"
 dependencies = [
  "getrandom",
  "glam",
@@ -1914,8 +1939,9 @@ dependencies = [
 
 [[package]]
 name = "notan_text"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed3f1f8783595e6a17b24f18ab800160e8e3c4b03ceb3aba86c3d7e9f284c620"
 dependencies = [
  "log",
  "notan_app",
@@ -1926,16 +1952,18 @@ dependencies = [
 
 [[package]]
 name = "notan_utils"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f77f8ebf7164277812e0e514515108111eaed6668914943a4fa364e75134376"
 dependencies = [
  "instant",
 ]
 
 [[package]]
 name = "notan_web"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c17fdaaa41760b03d2a6209baacdd01b49116d56510907d25416db26db7391e"
 dependencies = [
  "console_error_panic_hook",
  "futures-util",
@@ -1951,12 +1979,14 @@ dependencies = [
 
 [[package]]
 name = "notan_winit"
-version = "0.2.0"
-source = "git+https://github.com/Nazariglez/notan.git?branch=develop#9c25ef2f1a55cc2e88abd7d050e1858d968033cb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73b7cfbf0330601adb90415af22caba9d89de953bd4654f7e16864a8dec9f802"
 dependencies = [
  "crossbeam-channel",
  "glutin",
  "log",
+ "mime_guess",
  "notan_app",
  "notan_glow",
  "winit",
@@ -2462,9 +2492,9 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fba75eee94a9d5273a68c9e1e105d9cffe1ef700532325788389e5a83e2522b7"
+checksum = "b800beb9b6e7d2df1fe337c9e3d04e3af22a124460fb4c30fcc22c9117cefb41"
 dependencies = [
  "cty",
 ]
@@ -3197,6 +3227,15 @@ name = "ucd-trie"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56dee185309b50d1f11bfedef0fe6d036842e3fb77413abef29f8f8d1c5d4c1c"
+
+[[package]]
+name = "unicase"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50f37be617794602aabbeee0be4f259dc1778fabe05e2d67ee8f79326d5cb4f6"
+dependencies = [
+ "version_check",
+]
 
 [[package]]
 name = "unicode-bidi"
