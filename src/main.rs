@@ -47,7 +47,7 @@ fn main() -> Result<(), String> {
     let _ = env_logger::try_init();
 
     let window_config = WindowConfig::new()
-        .title("Oculante")
+        .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
         // .vsync() // enable vsync
         .lazy_loop()
@@ -121,6 +121,17 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         }
     }
 
+    if let Some(port) = matches.value_of("l") {
+        match port.parse::<i32>() {
+            Ok(p) => {
+                state.message = format!("Listening on {}", p);
+                recv(p, state.texture_channel.0.clone());
+                state.current_path = Some(PathBuf::from(&format!("network port {p}")));
+            }
+            Err(_) => eprintln!("Port must be a number"),
+        }
+    }
+
     // Set up egui style
     plugins.egui(|ctx| {
         let mut fonts = FontDefinitions::default();
@@ -168,6 +179,7 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 state.is_loaded = false;
+                state.current_image = None;
                 state.player.load(&p);
                 state.current_path = Some(p);
             }
@@ -377,6 +389,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     // ui.image(tex_id, img_size);
                 }
             });
+        }
+
+        if !state.is_loaded {
+            egui::Window::new("")
+                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+                .collapsible(false)
+                .resizable(false)
+                .default_width(400.)
+                .title_bar(false)
+                .show(&ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::Spinner::default());
+
+                        ui.label(format!(
+                            "Loading {}",
+                            state.current_path.clone().unwrap_or_default().display()
+                        ));
+                    });
+                });
         }
     });
 
