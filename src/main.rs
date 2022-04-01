@@ -63,6 +63,7 @@ fn main() -> Result<(), String> {
 
 fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     info!("Now matching arguments {:?}", std::env::args());
+    // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
     let matches = Command::new("Oculante")
@@ -87,7 +88,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         )
         .get_matches_from(args);
 
-    info!("Completed argument parsing.");
+    debug!("Completed argument parsing.");
 
     let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
@@ -148,6 +149,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18.;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
+        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22.;
         ctx.set_style(style);
         ctx.set_fonts(fonts);
     });
@@ -240,7 +242,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
-        info!("Received image buffer");
+        debug!("Received image buffer");
         state.image_dimension = (img.width(), img.height());
         state.current_texture = img.to_texture(gfx);
 
@@ -298,37 +300,61 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 ui.add(egui::Separator::default().vertical());
 
-                if ui.button("⛶").clicked() || app.keyboard.was_pressed(KeyCode::F) {
+                if ui.button("⛶").on_hover_text("Full screen (f)").clicked()
+                    || app.keyboard.was_pressed(KeyCode::F)
+                {
                     let fullscreen = app.window().is_fullscreen();
                     app.window().set_fullscreen(!fullscreen);
                     // state.reset_image = true;
                 }
 
-                ui.checkbox(&mut state.info_enabled, "Show extended info");
+                if state.current_image.is_some() {
+                    ui.checkbox(&mut state.info_enabled, "ℹ toggle info")
+                        .on_hover_text("Show extended info (i)");
 
-                if ui.button("◀").clicked() || app.keyboard.was_pressed(KeyCode::Left) {
-                    if let Some(img_location) = state.current_path.as_mut() {
-                        let next_img = img_shift(&img_location, -1);
-                        // prevent reload if at last or first
-                        if &next_img != img_location {
-                            state.is_loaded = false;
-                            *img_location = next_img;
-                            state.player.load(&img_location);
-                            // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                    if ui
+                        .button("◀")
+                        .on_hover_text("Previous image (Left Arrow)")
+                        .clicked()
+                        || app.keyboard.was_pressed(KeyCode::Left)
+                    {
+                        if let Some(img_location) = state.current_path.as_mut() {
+                            let next_img = img_shift(&img_location, -1);
+                            // prevent reload if at last or first
+                            if &next_img != img_location {
+                                state.is_loaded = false;
+                                *img_location = next_img;
+                                state.player.load(&img_location);
+                                // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                            }
+                        }
+                    }
+                    if ui
+                        .button("▶")
+                        .on_hover_text("Next image (Right Arrow)")
+                        .clicked()
+                        || app.keyboard.was_pressed(KeyCode::Right)
+                    {
+                        if let Some(img_location) = state.current_path.as_mut() {
+                            let next_img = img_shift(&img_location, 1);
+                            // prevent reload if at last or first
+                            if &next_img != img_location {
+                                state.is_loaded = false;
+                                *img_location = next_img;
+                                state.player.load(&img_location);
+                                // set_title(&mut window, &img_location.to_string_lossy().to_string());
+                            }
                         }
                     }
                 }
-                if ui.button("▶").clicked() || app.keyboard.was_pressed(KeyCode::Right) {
-                    if let Some(img_location) = state.current_path.as_mut() {
-                        let next_img = img_shift(&img_location, 1);
-                        // prevent reload if at last or first
-                        if &next_img != img_location {
-                            state.is_loaded = false;
-                            *img_location = next_img;
-                            state.player.load(&img_location);
-                            // set_title(&mut window, &img_location.to_string_lossy().to_string());
-                        }
-                    }
+
+                ui.add(egui::Separator::default().vertical());
+                if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten() {
+                    ui.label(format!("{}", file.to_string_lossy()));
+                    ui.label(format!(
+                        "{}x{}",
+                        state.image_dimension.0, state.image_dimension.1
+                    ));
                 }
             });
         });
@@ -354,18 +380,46 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 }
 
                 if let Some(texture) = &state.current_texture {
-                    ui.label(format!(
-                        "PX: {:.0},{:.0}",
-                        state.cursor_relative.x, state.cursor_relative.y
-                    ));
-                    ui.label(format!("CLR: {:?}", state.sampled_color));
+                    ui.horizontal(|ui| {
+                        ui.label("Pos");
+                        ui.label(
+                            RichText::new(format!(
+                                "{:.0},{:.0}",
+                                state.cursor_relative.x, state.cursor_relative.y
+                            ))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                        );
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("RGBA");
+                        ui.label(
+                            RichText::new(format!("{}", disp_col(state.sampled_color)))
+                                .monospace()
+                                .background_color(Color32::from_rgba_unmultiplied(
+                                    255, 255, 255, 6,
+                                )),
+                        );
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("RGBA 0-1");
+                        ui.label(
+                            RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
+                                .monospace()
+                                .background_color(Color32::from_rgba_unmultiplied(
+                                    255, 255, 255, 6,
+                                )),
+                        );
+                    });
 
                     let tex_id = gfx.egui_register_texture(&texture);
 
                     // width of image widget
                     let desired_width = 200.;
 
-                    let scale = (desired_width / 5.) / texture.size().0;
+                    let scale = (desired_width / 8.) / texture.size().0;
                     let img_size = egui::Vec2::new(desired_width, desired_width);
 
                     let uv_center = (
@@ -373,18 +427,26 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         state.cursor_relative.y / state.image_dimension.1 as f32,
                     );
 
-                    ui.label(format!("UV: {:.3},{:.3}", uv_center.0, uv_center.1));
+                    ui.horizontal(|ui| {
+                        ui.label("UV");
+                        ui.label(
+                            RichText::new(format!("{:.3},{:.3}", uv_center.0, uv_center.1))
+                                .monospace()
+                                .background_color(Color32::from_rgba_unmultiplied(
+                                    255, 255, 255, 6,
+                                )),
+                        );
+                    });
+
                     // make sure aspect ratio is compensated for the square preview
                     let ratio = texture.size().0 / texture.size().1;
                     let uv_size = (scale, scale * ratio);
                     let x = ui
                         .add(
-                            egui::Image::new(tex_id, img_size)
-                                .uv(egui::Rect::from_x_y_ranges(
-                                    uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                                    uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                                ))
-                                // .bg_fill(egui::Color32::RED),
+                            egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
+                                uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
+                                uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
+                            )), // .bg_fill(egui::Color32::RED),
                         )
                         .rect;
 
@@ -419,14 +481,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .default_width(400.)
                 .title_bar(false)
                 .show(&ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.add(egui::Spinner::default());
-
-                        ui.label(format!(
-                            "Loading {}",
-                            state.current_path.clone().unwrap_or_default().display()
-                        ));
-                    });
+                    if state.current_path.is_some() {
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Spinner::default());
+                            ui.label(format!(
+                                "Loading {}",
+                                state.current_path.clone().unwrap_or_default().display()
+                            ));
+                        });
+                    } else {
+                        ui.heading("🖼 Please drag an image here!");
+                    }
                 });
         }
     });

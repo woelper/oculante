@@ -232,22 +232,15 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
-pub fn invert_rgb_8bit(c: [f32; 4]) -> [f32; 4] {
-    [
-        (255. - c[0]) / 255.,
-        (255. - c[1]) / 255.,
-        (255. - c[2]) / 255.,
-        1.0,
-    ]
-}
+
 
 pub fn disp_col(col: [f32; 4]) -> String {
-    format!("{:.0} {:.0} {:.0} {:.0}", col[0], col[1], col[2], col[3])
+    format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
 }
 
 pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     format!(
-        "{:.2} {:.2} {:.2} {:.2}",
+        "{:.2},{:.2},{:.2},{:.2}",
         col[0] / divisor,
         col[1] / divisor,
         col[2] / divisor,
