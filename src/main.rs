@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 use clap::Arg;
 use clap::Command;
@@ -42,13 +42,23 @@ fn main() -> Result<(), String> {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
 
-    let window_config = WindowConfig::new()
+    let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
         // .vsync() // enable vsync
-        .lazy_loop()
+        // .lazy_loop()
         .resizable() // window can be resized
         .min_size(600, 400); // Set a minimum window size
+
+    #[cfg(target_os = "windows")]
+    {
+        window_config = window_config.vsync();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        window_config = window_config.lazy_loop();
+    }
 
     info!("Starting oculante.");
     notan::init_with(init)
@@ -216,10 +226,13 @@ fn update(app: &mut App, state: &mut OculanteState) {
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
+    // redraw constantly until the image is fully loaded or it's reset on canvas
+    if !state.is_loaded || state.reset_image {
+        app.window().request_frame();
+    }
+
     if state.reset_image {
         let window_size = app.window().size().size_vec();
-        // let window_size = app.backend.
-
         if let Some(current_image) = &state.current_image {
             let img_size = current_image.size_vec();
             let scale_factor = (window_size.x / img_size.x)
@@ -234,6 +247,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let mut draw = gfx.create_draw();
 
+    // reload constantly if gif so we keep receiving
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
             app.window().request_frame();
@@ -305,7 +319,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 {
                     let fullscreen = app.window().is_fullscreen();
                     app.window().set_fullscreen(!fullscreen);
-                    // state.reset_image = true;
                 }
 
                 if state.current_image.is_some() {
@@ -325,7 +338,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 state.is_loaded = false;
                                 *img_location = next_img;
                                 state.player.load(&img_location);
-                                // set_title(&mut window, &img_location.to_string_lossy().to_string());
                             }
                         }
                     }
@@ -342,7 +354,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 state.is_loaded = false;
                                 *img_location = next_img;
                                 state.player.load(&img_location);
-                                // set_title(&mut window, &img_location.to_string_lossy().to_string());
                             }
                         }
                     }
@@ -493,20 +504,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui.heading("🖼 Please drag an image here!");
                     }
                 });
+            app.window().request_frame();
         }
     });
-
-    // output.clear_color(Color::BLACK);
 
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
-        app.window().request_frame();
-    }
-
-    // redraw constantly until the image is fully loaded or it's reset on canvas
-    if !state.is_loaded || state.reset_image {
         app.window().request_frame();
     }
 }

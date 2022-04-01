@@ -232,8 +232,6 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
-
-
 pub fn disp_col(col: [f32; 4]) -> String {
     format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
 }
@@ -616,8 +614,8 @@ impl ImageExt for (f32, f32) {
     }
 }
 
-    impl ImageExt for (u32, u32) {
-        fn size_vec(&self) -> Vector2<f32> {
-            Vector2::new(self.0 as f32, self.1 as f32)
-        }
+impl ImageExt for (u32, u32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0 as f32, self.1 as f32)
+    }
 }
