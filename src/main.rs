@@ -7,8 +7,6 @@ use log::error;
 use log::info;
 use nalgebra::Vector2;
 use notan::app::Event;
-// use piston_window::types::{Color, Matrix2d};
-// use piston_window::*;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::keyboard::KeyCode;
@@ -28,7 +26,9 @@ mod net;
 use net::*;
 #[cfg(test)]
 mod tests;
+mod ui;
 mod update;
+use ui::*;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -135,7 +135,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                state.message = format!("Listening on {}", p);
+                state.message = Some(format!("Listening on {}", p));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
             }
@@ -180,8 +180,7 @@ fn event(state: &mut OculanteState, evt: Event) {
             if new_scale > 0.05 && new_scale < 40. {
                 state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
                 state.scale += delta;
-            } 
-            
+            }
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
@@ -368,6 +367,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 }
 
                 ui.add(egui::Separator::default().vertical());
+
+                if ui.button("⛭").clicked() {
+                    state.settings_enabled = !state.settings_enabled;
+                }
+
                 if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten() {
                     ui.label(format!("{}", file.to_string_lossy()));
                     ui.label(format!(
@@ -400,19 +404,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if let Some(texture) = &state.current_texture {
                     ui.horizontal(|ui| {
-                        ui.label("Pos");
-                        ui.label(
-                            RichText::new(format!(
-                                "{:.0},{:.0}",
-                                state.cursor_relative.x, state.cursor_relative.y
-                            ))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                        );
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("RGBA");
+                        ui.label("🌗 RGBA");
                         ui.label(
                             RichText::new(format!("{}", disp_col(state.sampled_color)))
                                 .monospace()
@@ -423,13 +415,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     });
 
                     ui.horizontal(|ui| {
-                        ui.label("RGBA 0-1");
+                        ui.label("🌗 RGBA");
                         ui.label(
                             RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
                                 .monospace()
                                 .background_color(Color32::from_rgba_unmultiplied(
                                     255, 255, 255, 6,
                                 )),
+                        );
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("⊞ Pos");
+                        ui.label(
+                            RichText::new(format!(
+                                "{:.0},{:.0}",
+                                state.cursor_relative.x, state.cursor_relative.y
+                            ))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                         );
                     });
 
@@ -447,7 +451,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     );
 
                     ui.horizontal(|ui| {
-                        ui.label("UV");
+                        ui.label(" UV");
                         ui.label(
                             RichText::new(format!("{:.3},{:.3}", uv_center.0, uv_center.1))
                                 .monospace()
@@ -514,6 +518,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
             app.window().request_frame();
         }
+
+        settings_ui(ctx, state);
     });
 
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));

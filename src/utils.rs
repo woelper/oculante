@@ -129,38 +129,7 @@ impl Frame {
     }
 }
 
-// pub trait TextExt {
-//     #[allow(unused_variables)]
-//     fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-//     where
-//         C: CharacterCache,
-//     {
-//         unimplemented!()
-//     }
-// }
 
-// impl TextExt for Text {
-//     /// Draws text with a character cache
-//     fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-//     where
-//         C: CharacterCache,
-//     {
-//         let mut x = 0.0;
-//         let mut y = 0.0;
-//         for ch in text.chars() {
-//             //let character = cache.character(self.font_size, ch)?;
-//             let c2 = cache.character(self.font_size, ch);
-//             if let Ok(character) = c2 {
-//                 x += character.advance_width();
-//                 y += character.advance_height();
-
-//                 y = y.max(character.top());
-//             }
-//         }
-
-//         (x, y)
-//     }
-// }
 
 /// The state of the application
 #[derive(Debug, AppState)]
@@ -169,7 +138,7 @@ pub struct OculanteState {
     pub scale_increment: f32,
     pub drag_enabled: bool,
     pub reset_image: bool,
-    pub message: String,
+    pub message: Option<String>,
     pub is_loaded: bool,
     pub offset: Vector2<f32>,
     pub cursor: Vector2<f32>,
@@ -177,6 +146,7 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
+    pub settings_enabled: bool,
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub player: Player,
@@ -194,13 +164,14 @@ impl Default for OculanteState {
             scale_increment: 0.1,
             drag_enabled: Default::default(),
             reset_image: Default::default(),
-            message: "Drag image here".into(),
+            message: Default::default(),
             is_loaded: Default::default(),
             offset: Default::default(),
             cursor: Default::default(),
             cursor_relative: Default::default(),
             image_dimension: (0, 0),
             info_enabled: Default::default(),
+            settings_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
