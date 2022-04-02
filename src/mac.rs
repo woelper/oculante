@@ -1,7 +1,10 @@
+use clap::Arg;
 use fruitbasket::FruitApp;
 use fruitbasket::FruitCallbackKey;
 use fruitbasket::RunPeriod;
+use log::debug;
 use log::info;
+use std::path::PathBuf;
 use std::process::Command;
 use std::{
     error::Error,
@@ -10,6 +13,41 @@ use std::{
 
 pub fn launch() -> Result<(), Box<dyn Error>> {
     info!("Starting MacOS integration");
+
+
+    // It's not good design that the MacOS workaround does it's own argument parsing again,
+    // However, the notan (and possibly other engines/libraries) structure prefer argument parsing
+    // in an init funcion, from which fruitbasked panics internally. For this reason this extra
+    // module keeps everything self-contained and barebones so it can be called independently
+    // early on.
+
+    info!("Mac: Now matching arguments {:?}", std::env::args());
+    // Filter out strange mac args
+    let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
+    let matches = clap::Command::new("Oculante")
+        .arg(
+            Arg::new("INPUT")
+                .help("Display this image")
+                // .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::new("chainload")
+                .required(false)
+                .takes_value(false)
+                .short('c')
+                .help("Chainload on Mac"),
+        )
+        .get_matches_from(args);
+
+    debug!("Completed argument parsing.");
+    let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
+
+    if !matches.is_present("chainload") && maybe_img_location.is_none() {
+        info!("Chainload not specified, and no input file present. Invoking mac hack.");
+    } else {
+        return Ok(())
+    }
 
     let file_arg: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 

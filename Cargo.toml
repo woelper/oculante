@@ -15,16 +15,17 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-clap = "3.1.6"
+# clap = "3.1.6"
+clap ="3.1.8"
 image = "0.24.1"
 nalgebra = "0.30.1"
 dds-rs = "0.7.0"
-rgb = "0.8.30"
+rgb = "0.8.32"
 psd = "0.3.0"
 exr = "1.4.1"
 lazy_static = "1.4.0"
 libwebp-sys = "0.5.0"
-self_update = "0.28.0"
+self_update = "0.29.0"
 log = "0.4.14"
 # simple-logging = "2.0.2"
 usvg = "0.22.0"
@@ -51,7 +52,7 @@ windres = "0.2.1"
 incremental = true
 # lto = true
 # codegen-units = 1
-strip="debuginfo"
+strip = true
 
 [profile.dev]
 incremental = true

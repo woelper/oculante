@@ -60,6 +60,17 @@ fn main() -> Result<(), String> {
         window_config = window_config.lazy_loop();
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        window_config = window_config.lazy_loop().vsync();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // MacOS needs an incredible dance performed just to open a file
+        let _ = mac::launch();
+    }
+
     info!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
@@ -111,13 +122,6 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     state.player = Player::new(state.texture_channel.0.clone());
 
     info!("Image is: {:?}", maybe_img_location);
-
-    #[cfg(target_os = "macos")]
-    if !matches.is_present("chainload") && maybe_img_location.is_none() {
-        info!("Chainload not specified, and no input file present. Invoking mac hack.");
-        // MacOS needs an incredible dance performed just to open a file
-        let _ = mac::launch();
-    }
 
     if let Some(ref img_location) = maybe_img_location {
         state.current_path = Some(img_location.clone());
@@ -171,8 +175,13 @@ fn event(state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_y, .. } => {
             let delta = zoomratio(delta_y, state.scale);
-            state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-            state.scale += delta;
+            let new_scale = state.scale + delta;
+            // limit scale
+            if new_scale > 0.05 && new_scale < 40. {
+                state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+                state.scale += delta;
+            } 
+            
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
@@ -262,7 +271,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         //center the image
         state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
-
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
