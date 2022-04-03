@@ -26,7 +26,7 @@ Images may contain color information that is masked by the alpha channel. Althou
 
 
 ## Installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 5MB.
+Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 10MB.
 
 ## Features
 

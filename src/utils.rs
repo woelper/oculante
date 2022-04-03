@@ -1,10 +1,14 @@
-use crate::types::Color;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
+use image::RgbaImage;
+
 use log::{error, info};
 use nalgebra::{clamp, Vector2};
-use piston_window::{CharacterCache, Text};
+use notan::graphics::Texture;
+use notan::prelude::Graphics;
+use notan::AppState;
+// use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -26,57 +30,15 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 // use libwebp_image;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
-pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
-    // let rel_0 = a.0/b.0;
-    // let rel_0 = a.1/b.1;
-
-    let rel_0 = v / r1.1;
-
-    rel_0 * r2.1
-}
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
 
-pub struct TextInstruction {
-    pub text: String,
-    pub color: Color,
-    pub position: (f64, f64),
-    pub size: u32,
-}
-
-impl TextInstruction {
-    pub fn new(t: &str, position: (f64, f64)) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: 14,
-        }
-    }
-
-    pub fn new_size(t: &str, position: (f64, f64), size: u32) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color: [1.0, 1.0, 1.0, 0.7],
-            position,
-            size: size,
-        }
-    }
-    pub fn new_color(t: &str, position: (f64, f64), color: Color) -> TextInstruction {
-        TextInstruction {
-            text: t.to_string(),
-            color,
-            position,
-            size: 14,
-        }
-    }
-}
-
+#[derive(Debug)]
 pub struct Player {
     pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
@@ -159,80 +121,56 @@ impl Frame {
     }
 }
 
-pub trait TextExt {
-    #[allow(unused_variables)]
-    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-    where
-        C: CharacterCache,
-    {
-        unimplemented!()
-    }
-}
 
-impl TextExt for Text {
-    /// Draws text with a character cache
-    fn width<C>(&self, text: &str, cache: &mut C) -> (f64, f64)
-    where
-        C: CharacterCache,
-    {
-        let mut x = 0.0;
-        let mut y = 0.0;
-        for ch in text.chars() {
-            //let character = cache.character(self.font_size, ch)?;
-            let c2 = cache.character(self.font_size, ch);
-            if let Ok(character) = c2 {
-                x += character.advance_width();
-                y += character.advance_height();
-
-                y = y.max(character.top());
-            }
-        }
-
-        (x, y)
-    }
-}
 
 /// The state of the application
-#[derive(Debug, Clone)]
+#[derive(Debug, AppState)]
 pub struct OculanteState {
-    pub scale: f64,
-    pub scale_increment: f64,
+    pub scale: f32,
+    pub scale_increment: f32,
     pub drag_enabled: bool,
     pub reset_image: bool,
-    pub message: String,
-    pub fullscreen_enabled: bool,
+    pub message: Option<String>,
     pub is_loaded: bool,
-    pub offset: Vector2<f64>,
-    pub cursor: Vector2<f64>,
-    pub cursor_relative: Vector2<f64>,
+    pub offset: Vector2<f32>,
+    pub cursor: Vector2<f32>,
+    pub cursor_relative: Vector2<f32>,
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
-    pub font_size: u32,
-    pub tooltip: bool,
-    pub toast: String,
+    pub settings_enabled: bool,
+    pub mouse_delta: Vector2<f32>,
+    pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
+    pub player: Player,
+    pub current_texture: Option<Texture>,
+    pub current_path: Option<PathBuf>,
+    pub current_image: Option<RgbaImage>,
     //pub toast: Option<String>
 }
 
 impl Default for OculanteState {
     fn default() -> OculanteState {
+        let tx_channel = mpsc::channel();
         OculanteState {
             scale: 1.0,
             scale_increment: 0.1,
-            drag_enabled: false,
-            reset_image: false,
-            message: "Drag image here".into(),
-            fullscreen_enabled: false,
-            is_loaded: false,
-            offset: Vector2::default(),
-            cursor: Vector2::default(),
-            cursor_relative: Vector2::default(),
+            drag_enabled: Default::default(),
+            reset_image: Default::default(),
+            message: Default::default(),
+            is_loaded: Default::default(),
+            offset: Default::default(),
+            cursor: Default::default(),
+            cursor_relative: Default::default(),
             image_dimension: (0, 0),
-            info_enabled: false,
+            info_enabled: Default::default(),
+            settings_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            font_size: 18,
-            tooltip: false,
-            toast: "".to_string(),
+            player: Player::new(tx_channel.0.clone()),
+            texture_channel: tx_channel,
+            mouse_delta: Default::default(),
+            current_texture: Default::default(),
+            current_image: Default::default(),
+            current_path: Default::default(),
         }
     }
 }
@@ -252,27 +190,18 @@ fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
     image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
 }
 
-pub fn zoomratio(i: f64, s: f64) -> f64 {
+pub fn zoomratio(i: f32, s: f32) -> f32 {
     // i * i * i.signum()
     i * s * 0.1
 }
 
-pub fn invert_rgb_8bit(c: [f32; 4]) -> [f32; 4] {
-    [
-        (255. - c[0]) / 255.,
-        (255. - c[1]) / 255.,
-        (255. - c[2]) / 255.,
-        1.0,
-    ]
-}
-
 pub fn disp_col(col: [f32; 4]) -> String {
-    format!("{:.0} {:.0} {:.0} {:.0}", col[0], col[1], col[2], col[3])
+    format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
 }
 
 pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     format!(
-        "{:.2} {:.2} {:.2} {:.2}",
+        "{:.2},{:.2},{:.2},{:.2}",
         col[0] / divisor,
         col[1] / divisor,
         col[2] / divisor,
@@ -372,20 +301,20 @@ fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
 }
 
 pub fn scale_pt(
-    origin: Vector2<f64>,
-    pt: Vector2<f64>,
-    scale: f64,
-    scale_inc: f64,
-) -> Vector2<f64> {
+    origin: Vector2<f32>,
+    pt: Vector2<f32>,
+    scale: f32,
+    scale_inc: f32,
+) -> Vector2<f32> {
     ((pt - origin) * scale_inc) / scale
 }
 
 pub fn pos_from_coord(
-    origin: Vector2<f64>,
-    pt: Vector2<f64>,
-    bounds: Vector2<f64>,
-    scale: f64,
-) -> Vector2<f64> {
+    origin: Vector2<f32>,
+    pt: Vector2<f32>,
+    bounds: Vector2<f32>,
+    scale: f32,
+) -> Vector2<f32> {
     let mut size = (pt - origin) / scale;
     size.x = clamp(size.x, 0.0, bounds.x - 1.0);
     size.y = clamp(size.y, 0.0, bounds.y - 1.0);
@@ -590,7 +519,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
         Some("gif") => {
-
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location)?;
             let gif_decoder = GifDecoder::new(file)?;
@@ -613,4 +541,44 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
 
     Player::start();
     Ok(col)
+}
+
+pub trait ImageExt {
+    fn size_vec(&self) -> Vector2<f32> {
+        unimplemented!()
+    }
+
+    fn to_texture(&self, _: &mut Graphics) -> Option<Texture> {
+        unimplemented!()
+    }
+}
+
+impl ImageExt for RgbaImage {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.width() as f32, self.height() as f32)
+    }
+
+    fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.create_texture()
+            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .build()
+            .ok()
+    }
+}
+impl ImageExt for (i32, i32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0 as f32, self.1 as f32)
+    }
+}
+
+impl ImageExt for (f32, f32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0, self.1)
+    }
+}
+
+impl ImageExt for (u32, u32) {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.0 as f32, self.1 as f32)
+    }
 }

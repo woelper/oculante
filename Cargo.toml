@@ -15,42 +15,45 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-piston_window = "0.123.0"
-clap = "3.0.13"
+clap ="3.1.8"
 image = "0.24.1"
-nalgebra = "0.30.0"
+nalgebra = "0.30.1"
 dds-rs = "0.7.0"
-rgb = "0.8.30"
+rgb = "0.8.32"
 psd = "0.3.0"
 exr = "1.4.1"
 lazy_static = "1.4.0"
 libwebp-sys = "0.5.0"
-self_update = "0.28.0"
-splines = "4.0"
+self_update = "0.29.0"
 log = "0.4.14"
-simple-logging = "2.0.2"
+# simple-logging = "2.0.2"
 usvg = "0.22.0"
 resvg = "0.22.0"
 tiny-skia = "0.6.1"
 env_logger = "0.9.0"
 anyhow = "1.0.42"
+notan = {version = "0.2.1", features = ["drop_files", "egui"]}
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
 fruitbasket = "0.10.0"
-# fruitbasket = { git = "https://github.com/mrmekon/fruitbasket.git" }
-
-
 
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
 windres = "0.2.1"
 
+[build-dependencies]
+log = "0.4.14"
+env_logger = "0.9.0"
+
+
 [profile.release]
 incremental = true
 lto = true
 codegen-units = 1
+strip = true
+# opt-level = "z"
+panic = "abort"
 
 [profile.dev]
 incremental = true

@@ -54,10 +54,6 @@ jobs:
     - name: Build Application
       run: cargo build --release
 
-    - name: Strip Application
-      run: cargo strip
-      if: matrix.os != 'windows-latest'
-
     - name: Build Mac Bundle
       run: ./build_mac.sh
       if: matrix.os == 'macOS-latest'
