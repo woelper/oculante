@@ -30,17 +30,9 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 // use libwebp_image;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
-pub fn ease(v: f64, r1: (f64, f64), r2: (f64, f64)) -> f64 {
-    // let rel_0 = a.0/b.0;
-    // let rel_0 = a.1/b.1;
-
-    let rel_0 = v / r1.1;
-
-    rel_0 * r2.1
-}
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
