@@ -15,7 +15,6 @@ identifier = "com.github.woelper.oculante"
 icon = ["res/logo.png"]
 
 [dependencies]
-# clap = "3.1.6"
 clap ="3.1.8"
 image = "0.24.1"
 nalgebra = "0.30.1"
@@ -34,19 +33,19 @@ tiny-skia = "0.6.1"
 env_logger = "0.9.0"
 anyhow = "1.0.42"
 notan = {version = "0.2.1", features = ["drop_files", "egui"]}
-# notan = {git = "https://github.com/Nazariglez/notan.git", branch="develop", features = ["egui"]}
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# fruitbasket = { git = "https://github.com/woelper/fruitbasket", branch = "open-file-support" }
 fruitbasket = "0.10.0"
-# fruitbasket = { git = "https://github.com/mrmekon/fruitbasket.git" }
-
-
 
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
 windres = "0.2.1"
+
+[build-dependencies]
+log = "0.4.14"
+env_logger = "0.9.0"
+
 
 [profile.release]
 incremental = true
