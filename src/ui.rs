@@ -19,6 +19,10 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                 update::update(None);
             }
 
+            if ui.button("Close").clicked() {
+                state.settings_enabled = false;
+            }
+
             });
     }
 

@@ -287,33 +287,33 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             ui.horizontal(|ui| {
                 ui.heading("Channels");
 
-                if ui.button("R").clicked() || app.keyboard.was_pressed(KeyCode::R) {
+                if ui.button("R").on_hover_text("Show only red channel (r)").clicked() || app.keyboard.was_pressed(KeyCode::R) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 0).to_texture(gfx);
                     }
                 }
-                if ui.button("G").clicked() || app.keyboard.was_pressed(KeyCode::G) {
+                if ui.button("G").on_hover_text("Show only green channel (g)").clicked() || app.keyboard.was_pressed(KeyCode::G) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 1).to_texture(gfx);
                     }
                 }
-                if ui.button("B").clicked() || app.keyboard.was_pressed(KeyCode::B) {
+                if ui.button("B").on_hover_text("Show only blue channel (b)").clicked() || app.keyboard.was_pressed(KeyCode::B) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 2).to_texture(gfx);
                     }
                 }
-                if ui.button("A").clicked() || app.keyboard.was_pressed(KeyCode::A) {
+                if ui.button("A").on_hover_text("Show only alpha channel (a)").clicked() || app.keyboard.was_pressed(KeyCode::A) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 3).to_texture(gfx);
                     }
                 }
 
-                if ui.button("Unpremultiplied").clicked() || app.keyboard.was_pressed(KeyCode::U) {
+                if ui.button("Unpremultiplied").on_hover_text("Show only RGB channels without alpha applied (u)").clicked() || app.keyboard.was_pressed(KeyCode::U) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = unpremult(img).to_texture(gfx);
                     }
                 }
-                if ui.button("RGBA").clicked() || app.keyboard.was_pressed(KeyCode::C) {
+                if ui.button("RGBA").on_hover_text("Show all channels (c)").clicked() || app.keyboard.was_pressed(KeyCode::C) {
                     if let Some(img) = &state.current_image {
                         state.current_texture = img.to_texture(gfx);
                     }
