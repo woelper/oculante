@@ -275,6 +275,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_image = Some(img);
     }
 
+    // check if a new texture has been sent
+    if let Ok(msg) = state.message_channel.1.try_recv() {
+        debug!("Received message");
+        state.message = Some(msg);
+    }
+
+
     if let Some(texture) = &state.current_texture {
         draw.image(texture)
             .blend_mode(BlendMode::NORMAL)
@@ -287,33 +294,63 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             ui.horizontal(|ui| {
                 ui.heading("Channels");
 
-                if ui.button("R").on_hover_text("Show only red channel (r)").clicked() || app.keyboard.was_pressed(KeyCode::R) {
+                if ui
+                    .button("R")
+                    .on_hover_text("Show only red channel (r)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::R)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 0).to_texture(gfx);
                     }
                 }
-                if ui.button("G").on_hover_text("Show only green channel (g)").clicked() || app.keyboard.was_pressed(KeyCode::G) {
+                if ui
+                    .button("G")
+                    .on_hover_text("Show only green channel (g)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::G)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 1).to_texture(gfx);
                     }
                 }
-                if ui.button("B").on_hover_text("Show only blue channel (b)").clicked() || app.keyboard.was_pressed(KeyCode::B) {
+                if ui
+                    .button("B")
+                    .on_hover_text("Show only blue channel (b)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::B)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 2).to_texture(gfx);
                     }
                 }
-                if ui.button("A").on_hover_text("Show only alpha channel (a)").clicked() || app.keyboard.was_pressed(KeyCode::A) {
+                if ui
+                    .button("A")
+                    .on_hover_text("Show only alpha channel (a)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::A)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = solo_channel(img, 3).to_texture(gfx);
                     }
                 }
 
-                if ui.button("Unpremultiplied").on_hover_text("Show only RGB channels without alpha applied (u)").clicked() || app.keyboard.was_pressed(KeyCode::U) {
+                if ui
+                    .button("RGB")
+                    .on_hover_text("Show only RGB channels without alpha applied (u)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::U)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = unpremult(img).to_texture(gfx);
                     }
                 }
-                if ui.button("RGBA").on_hover_text("Show all channels (c)").clicked() || app.keyboard.was_pressed(KeyCode::C) {
+                if ui
+                    .button("RGBA")
+                    .on_hover_text("Show all channels (c)")
+                    .clicked()
+                    || app.keyboard.was_pressed(KeyCode::C)
+                {
                     if let Some(img) = &state.current_image {
                         state.current_texture = img.to_texture(gfx);
                     }
@@ -381,6 +418,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 }
             });
         });
+
+        if let Some(message) = &state.message.clone() {
+            egui::TopBottomPanel::bottom("toast").show(&ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(message);
+                    ui.spacing();
+
+                    if ui.add(egui::Button::new("❌").frame(false)).clicked() {
+                        state.message = None;
+
+                    }
+
+                });
+            });
+        }
 
         if state.info_enabled {
             egui::SidePanel::left("side_panel").show(&ctx, |ui| {
