@@ -3,7 +3,7 @@ use exr;
 use image::codecs::gif::GifDecoder;
 use image::RgbaImage;
 
-use log::{error, info};
+use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
@@ -33,14 +33,12 @@ use std::sync::Mutex;
 use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 
-
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
 }
 
 #[derive(Debug)]
 pub struct Player {
-    pub stop: Mutex<bool>,
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<image::RgbaImage>,
 }
@@ -61,24 +59,22 @@ impl Player {
             }
         });
         Player {
-            stop: Mutex::new(false),
             frame_sender,
             image_sender,
         }
     }
 
     pub fn load_blocking(&self, img_location: &PathBuf) {
-        *self.stop.lock().unwrap() = true;
+        Self::stop();
         send_image_blocking(&img_location, self.image_sender.clone());
     }
 
     pub fn load(&self, img_location: &PathBuf) {
-        *self.stop.lock().unwrap() = true;
+        Self::stop();
         send_image_threaded(&img_location, self.image_sender.clone());
     }
 
     pub fn stop() {
-        // *self.stop.lock().unwrap() = true;
         *PLAYER_STOP.lock().unwrap() = true;
     }
 
@@ -121,8 +117,6 @@ impl Frame {
     }
 }
 
-
-
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
@@ -138,7 +132,6 @@ pub struct OculanteState {
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
-    pub settings_enabled: bool,
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub message_channel: (Sender<String>, Receiver<String>),
@@ -146,6 +139,7 @@ pub struct OculanteState {
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
+    pub settings_enabled: bool,
     //pub toast: Option<String>
 }
 
@@ -164,7 +158,6 @@ impl Default for OculanteState {
             cursor_relative: Default::default(),
             image_dimension: (0, 0),
             info_enabled: Default::default(),
-            settings_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
@@ -173,6 +166,7 @@ impl Default for OculanteState {
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
+            settings_enabled: false,
         }
     }
 }
@@ -335,6 +329,7 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
                 let frames = col.frames.clone();
                 for frame in frames {
                     if Player::is_stopped() {
+                        i = 200;
                         break;
                     }
                     let _ = texture_sender.send(frame.buffer);
@@ -527,8 +522,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let frames = gif_decoder.into_frames().collect_frames()?;
             for f in frames {
                 let delay = f.delay().numer_denom_ms().0 as u16;
-                // let delay= 10;
-                info!("{delay}");
+                debug!(" Frame delay {delay}");
                 col.add(f.into_buffer(), delay);
                 col.repeat = true;
             }
