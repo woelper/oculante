@@ -13,6 +13,7 @@ use notan::prelude::keyboard::KeyCode;
 use notan::prelude::mouse::MouseButton;
 use notan::prelude::*;
 use std::ffi::OsStr;
+use strum::IntoEnumIterator;
 // use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -281,7 +282,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.message = Some(msg);
     }
 
-
     if let Some(texture) = &state.current_texture {
         draw.image(texture)
             .blend_mode(BlendMode::NORMAL)
@@ -290,73 +290,83 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     let egui_output = plugins.egui(|ctx| {
-        egui::TopBottomPanel::top("menu").show(&ctx, |ui| {
+        egui::TopBottomPanel::top("menu").min_height(25.).show(&ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Channels");
 
-                if ui
-                    .button("R")
-                    .on_hover_text("Show only red channel (r)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::R)
-                {
-                    if let Some(img) = &state.current_image {
-                        state.current_texture = solo_channel(img, 0).to_texture(gfx);
-                    }
+                let mut changed_channels = false;
+
+                if app.keyboard.was_pressed(KeyCode::R) {
+                    state.current_channel = Channel::Red;
+                    changed_channels = true;
                 }
-                if ui
-                    .button("G")
-                    .on_hover_text("Show only green channel (g)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::G)
-                {
-                    if let Some(img) = &state.current_image {
-                        state.current_texture = solo_channel(img, 1).to_texture(gfx);
-                    }
+                if app.keyboard.was_pressed(KeyCode::G) {
+                    state.current_channel = Channel::Green;
+                    changed_channels = true;
                 }
-                if ui
-                    .button("B")
-                    .on_hover_text("Show only blue channel (b)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::B)
-                {
-                    if let Some(img) = &state.current_image {
-                        state.current_texture = solo_channel(img, 2).to_texture(gfx);
-                    }
+                if app.keyboard.was_pressed(KeyCode::B) {
+                    state.current_channel = Channel::Blue;
+                    changed_channels = true;
                 }
-                if ui
-                    .button("A")
-                    .on_hover_text("Show only alpha channel (a)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::A)
-                {
+                if app.keyboard.was_pressed(KeyCode::A) {
+                    state.current_channel = Channel::Alpha;
+                    changed_channels = true;
+                }
+
+                if app.keyboard.was_pressed(KeyCode::U) {
+                    state.current_channel = Channel::RGB;
+                    changed_channels = true;
+                }
+                if app.keyboard.was_pressed(KeyCode::C) {
+                    state.current_channel = Channel::RGBA;
+                    changed_channels = true;
+                }
+
+                egui::ComboBox::from_id_source("channels")
+                    .selected_text(format!("{:?}", state.current_channel))
+                    .show_ui(ui, |ui| {
+                        for channel in Channel::iter() {
+                            if ui
+                                .selectable_value(
+                                    &mut state.current_channel,
+                                    channel.clone(),
+                                    channel.to_string(),
+                                )
+                                .on_hover_ui(|ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Hotkey:");
+                                        ui.label(
+                                            RichText::new(channel.hotkey())
+                                                .monospace()
+                                                .color(Color32::WHITE)
+                                                .background_color(
+                                                    ui.style().visuals.selection.bg_fill
+                                                ),
+                                        );
+                                    });
+                                })
+                                .clicked()
+                            {
+                                changed_channels = true;
+                            }
+                        }
+                    });
+
+                if changed_channels {
                     if let Some(img) = &state.current_image {
-                        state.current_texture = solo_channel(img, 3).to_texture(gfx);
+                        match &state.current_channel {
+                            Channel::RGB => state.current_texture = unpremult(img).to_texture(gfx),
+                            Channel::RGBA => state.current_texture = img.to_texture(gfx),
+                            _ => {
+                                state.current_texture =
+                                    solo_channel(img, *&state.current_channel as usize)
+                                        .to_texture(gfx)
+                            }
+                        }
                     }
                 }
 
-                if ui
-                    .button("RGB")
-                    .on_hover_text("Show only RGB channels without alpha applied (u)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::U)
-                {
-                    if let Some(img) = &state.current_image {
-                        state.current_texture = unpremult(img).to_texture(gfx);
-                    }
-                }
-                if ui
-                    .button("RGBA")
-                    .on_hover_text("Show all channels (c)")
-                    .clicked()
-                    || app.keyboard.was_pressed(KeyCode::C)
-                {
-                    if let Some(img) = &state.current_image {
-                        state.current_texture = img.to_texture(gfx);
-                    }
-                }
-
-                ui.add(egui::Separator::default().vertical());
+                // ui.add(egui::Separator::default().vertical());
 
                 if ui.button("⛶").on_hover_text("Full screen (f)").clicked()
                     || app.keyboard.was_pressed(KeyCode::F)
@@ -403,9 +413,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 }
 
-                ui.add(egui::Separator::default().vertical());
+                // ui.add(egui::Separator::default().vertical());
 
-                if ui.button("⛭").clicked() {
+                if ui.button("⛭").on_hover_text("Open settings").clicked() {
                     state.settings_enabled = !state.settings_enabled;
                 }
 
@@ -427,9 +437,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     if ui.add(egui::Button::new("❌").frame(false)).clicked() {
                         state.message = None;
-
                     }
-
                 });
             });
         }

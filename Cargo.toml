@@ -33,6 +33,8 @@ tiny-skia = "0.6.1"
 env_logger = "0.9.0"
 anyhow = "1.0.42"
 notan = {version = "0.2.1", features = ["drop_files", "egui"]}
+strum = { version = "0.24", features = ["derive"] }
+strum_macros = "0.24"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"

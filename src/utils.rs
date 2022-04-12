@@ -32,6 +32,9 @@ use std::sync::Mutex;
 // use libwebp_image;
 use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
+use strum::{IntoEnumIterator, Display};
+use strum_macros::EnumIter;
+
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -117,6 +120,29 @@ impl Frame {
     }
 }
 
+#[derive(Debug, PartialEq, EnumIter, Display, Clone, Copy)]
+pub enum Channel {
+    Red,
+    Green,
+    Blue,
+    Alpha,
+    RGB,
+    RGBA,
+}
+
+impl Channel {
+    pub fn hotkey(&self) -> &str{
+        match self {
+            Self::Red => "r",
+            Self::Green => "g",
+            Self::Blue => "b",
+            Self::Alpha => "a",
+            Self::RGB => "c",
+            Self::RGBA => "u",
+        }
+    }
+}
+
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
@@ -139,8 +165,8 @@ pub struct OculanteState {
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
+    pub current_channel: Channel,
     pub settings_enabled: bool,
-    //pub toast: Option<String>
 }
 
 impl Default for OculanteState {
@@ -166,6 +192,7 @@ impl Default for OculanteState {
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
+            current_channel: Channel::RGBA,
             settings_enabled: false,
         }
     }
