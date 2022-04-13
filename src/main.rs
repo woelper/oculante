@@ -290,144 +290,138 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     let egui_output = plugins.egui(|ctx| {
-        egui::TopBottomPanel::top("menu").min_height(25.).show(&ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("Channels");
+        egui::TopBottomPanel::top("menu")
+            .min_height(25.)
+            .show(&ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading("Channels");
 
-                let mut changed_channels = false;
+                    let mut changed_channels = false;
 
-                if app.keyboard.was_pressed(KeyCode::R) {
-                    state.current_channel = Channel::Red;
-                    changed_channels = true;
-                }
-                if app.keyboard.was_pressed(KeyCode::G) {
-                    state.current_channel = Channel::Green;
-                    changed_channels = true;
-                }
-                if app.keyboard.was_pressed(KeyCode::B) {
-                    state.current_channel = Channel::Blue;
-                    changed_channels = true;
-                }
-                if app.keyboard.was_pressed(KeyCode::A) {
-                    state.current_channel = Channel::Alpha;
-                    changed_channels = true;
-                }
+                    if app.keyboard.was_pressed(KeyCode::R) {
+                        state.current_channel = Channel::Red;
+                        changed_channels = true;
+                    }
+                    if app.keyboard.was_pressed(KeyCode::G) {
+                        state.current_channel = Channel::Green;
+                        changed_channels = true;
+                    }
+                    if app.keyboard.was_pressed(KeyCode::B) {
+                        state.current_channel = Channel::Blue;
+                        changed_channels = true;
+                    }
+                    if app.keyboard.was_pressed(KeyCode::A) {
+                        state.current_channel = Channel::Alpha;
+                        changed_channels = true;
+                    }
 
-                if app.keyboard.was_pressed(KeyCode::U) {
-                    state.current_channel = Channel::RGB;
-                    changed_channels = true;
-                }
-                if app.keyboard.was_pressed(KeyCode::C) {
-                    state.current_channel = Channel::RGBA;
-                    changed_channels = true;
-                }
+                    if app.keyboard.was_pressed(KeyCode::U) {
+                        state.current_channel = Channel::RGB;
+                        changed_channels = true;
+                    }
+                    if app.keyboard.was_pressed(KeyCode::C) {
+                        state.current_channel = Channel::RGBA;
+                        changed_channels = true;
+                    }
 
-                egui::ComboBox::from_id_source("channels")
-                    .selected_text(format!("{:?}", state.current_channel))
-                    .show_ui(ui, |ui| {
-                        for channel in Channel::iter() {
-                            if ui
-                                .selectable_value(
+                    egui::ComboBox::from_id_source("channels")
+                        .selected_text(format!("{:?}", state.current_channel))
+                        .show_ui(ui, |ui| {
+                            for channel in Channel::iter() {
+                                let r = ui.selectable_value(
                                     &mut state.current_channel,
                                     channel.clone(),
                                     channel.to_string(),
-                                )
-                                .on_hover_ui(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Hotkey:");
-                                        ui.label(
-                                            RichText::new(channel.hotkey())
-                                                .monospace()
-                                                .color(Color32::WHITE)
-                                                .background_color(
-                                                    ui.style().visuals.selection.bg_fill
-                                                ),
-                                        );
-                                    });
-                                })
-                                .clicked()
-                            {
-                                changed_channels = true;
-                            }
-                        }
-                    });
+                                );
 
-                if changed_channels {
-                    if let Some(img) = &state.current_image {
-                        match &state.current_channel {
-                            Channel::RGB => state.current_texture = unpremult(img).to_texture(gfx),
-                            Channel::RGBA => state.current_texture = img.to_texture(gfx),
-                            _ => {
-                                state.current_texture =
-                                    solo_channel(img, *&state.current_channel as usize)
-                                        .to_texture(gfx)
+                                if tooltip(r, &channel.to_string(), channel.hotkey(), ui).clicked()
+                                {
+                                    changed_channels = true;
+                                }
+                            }
+                        });
+
+                    if changed_channels {
+                        if let Some(img) = &state.current_image {
+                            match &state.current_channel {
+                                Channel::RGB => {
+                                    state.current_texture = unpremult(img).to_texture(gfx)
+                                }
+                                Channel::RGBA => state.current_texture = img.to_texture(gfx),
+                                _ => {
+                                    state.current_texture =
+                                        solo_channel(img, *&state.current_channel as usize)
+                                            .to_texture(gfx)
+                                }
                             }
                         }
                     }
-                }
 
-                // ui.add(egui::Separator::default().vertical());
+                    // ui.add(egui::Separator::default().vertical());
 
-                if ui.button("⛶").on_hover_text("Full screen (f)").clicked()
-                    || app.keyboard.was_pressed(KeyCode::F)
-                {
-                    let fullscreen = app.window().is_fullscreen();
-                    app.window().set_fullscreen(!fullscreen);
-                }
+                    if state.current_image.is_some() {
+                        if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
+                            .clicked()
+                            || app.keyboard.was_pressed(KeyCode::Left)
+                        {
+                            if let Some(img_location) = state.current_path.as_mut() {
+                                let next_img = img_shift(&img_location, -1);
+                                // prevent reload if at last or first
+                                if &next_img != img_location {
+                                    state.is_loaded = false;
+                                    *img_location = next_img;
+                                    state.player.load(&img_location);
+                                }
+                            }
+                        }
+                        if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
+                            .clicked()
+                            || app.keyboard.was_pressed(KeyCode::Right)
+                        {
+                            if let Some(img_location) = state.current_path.as_mut() {
+                                let next_img = img_shift(&img_location, 1);
+                                // prevent reload if at last or first
+                                if &next_img != img_location {
+                                    state.is_loaded = false;
+                                    *img_location = next_img;
+                                    state.player.load(&img_location);
+                                }
+                            }
+                        }
+                        tooltip(
+                            ui.checkbox(&mut state.info_enabled, "Extended info"),
+                            "Show extended info",
+                            "i",
+                            ui,
+                        );
+                    }
 
-                if state.current_image.is_some() {
-                    ui.checkbox(&mut state.info_enabled, "ℹ toggle info")
-                        .on_hover_text("Show extended info (i)");
+                    // ui.add(egui::Separator::default().vertical());
 
-                    if ui
-                        .button("◀")
-                        .on_hover_text("Previous image (Left Arrow)")
-                        .clicked()
-                        || app.keyboard.was_pressed(KeyCode::Left)
+                    if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
+                        || app.keyboard.was_pressed(KeyCode::F)
                     {
-                        if let Some(img_location) = state.current_path.as_mut() {
-                            let next_img = img_shift(&img_location, -1);
-                            // prevent reload if at last or first
-                            if &next_img != img_location {
-                                state.is_loaded = false;
-                                *img_location = next_img;
-                                state.player.load(&img_location);
-                            }
-                        }
+                        let fullscreen = app.window().is_fullscreen();
+                        app.window().set_fullscreen(!fullscreen);
                     }
-                    if ui
-                        .button("▶")
-                        .on_hover_text("Next image (Right Arrow)")
-                        .clicked()
-                        || app.keyboard.was_pressed(KeyCode::Right)
+
+                    if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten()
                     {
-                        if let Some(img_location) = state.current_path.as_mut() {
-                            let next_img = img_shift(&img_location, 1);
-                            // prevent reload if at last or first
-                            if &next_img != img_location {
-                                state.is_loaded = false;
-                                *img_location = next_img;
-                                state.player.load(&img_location);
-                            }
-                        }
+                        ui.label(format!("{}", file.to_string_lossy()));
+                        ui.label(format!(
+                            "{}x{}",
+                            state.image_dimension.0, state.image_dimension.1
+                        ));
                     }
-                }
 
-                // ui.add(egui::Separator::default().vertical());
-
-                if ui.button("⛭").on_hover_text("Open settings").clicked() {
-                    state.settings_enabled = !state.settings_enabled;
-                }
-
-                if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten() {
-                    ui.label(format!("{}", file.to_string_lossy()));
-                    ui.label(format!(
-                        "{}x{}",
-                        state.image_dimension.0, state.image_dimension.1
-                    ));
-                }
+                    if unframed_button("⛭", ui)
+                        .on_hover_text("Open settings")
+                        .clicked()
+                    {
+                        state.settings_enabled = !state.settings_enabled;
+                    }
+                });
             });
-        });
 
         if let Some(message) = &state.message.clone() {
             egui::TopBottomPanel::bottom("toast").show(&ctx, |ui| {
@@ -435,7 +429,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.label(message);
                     ui.spacing();
 
-                    if ui.add(egui::Button::new("❌").frame(false)).clicked() {
+                    if unframed_button("❌", ui).clicked() {
                         state.message = None;
                     }
                 });

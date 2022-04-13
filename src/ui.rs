@@ -24,3 +24,25 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
             });
     }
 }
+
+
+pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, ui: &mut Ui, ) -> Response {
+    r.on_hover_ui(|ui| {
+        ui.horizontal(|ui| {
+            ui.label(tooltip);
+            ui.label(
+                RichText::new(hotkey)
+                    .monospace()
+                    .color(Color32::WHITE)
+                    .background_color(
+                        ui.style().visuals.selection.bg_fill,
+                    ),
+            );
+        });
+    })
+}
+
+
+pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui, ) -> Response {
+    ui.add(egui::Button::new(text).frame(false))
+}
