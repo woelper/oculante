@@ -32,9 +32,8 @@ use std::sync::Mutex;
 // use libwebp_image;
 use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
-use strum::{IntoEnumIterator, Display};
+use strum::{Display};
 use strum_macros::EnumIter;
-
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -131,7 +130,7 @@ pub enum Channel {
 }
 
 impl Channel {
-    pub fn hotkey(&self) -> &str{
+    pub fn hotkey(&self) -> &str {
         match self {
             Self::Red => "r",
             Self::Green => "g",
@@ -218,10 +217,12 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+/// Display RGBA values nicely
 pub fn disp_col(col: [f32; 4]) -> String {
     format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
 }
 
+/// Normalized RGB values (0-1)
 pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     format!(
         "{:.2},{:.2},{:.2},{:.2}",
@@ -232,6 +233,7 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
+/// Advance to the prev/next image
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
         let mut files = std::fs::read_dir(parent)
@@ -242,10 +244,7 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
         files.sort();
         for (i, f) in files.iter().enumerate() {
             if f == file {
-                // dbg!(&f, i, i + inc);
                 if let Some(next) = files.get((i as isize + inc) as usize) {
-                    // dbg!(&next, i + inc);
-
                     return next.clone();
                 }
             }
@@ -285,9 +284,9 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
 }
 
 pub fn solo_channel(
-    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    img: &RgbaImage,
     channel: usize,
-) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+) -> RgbaImage {
     // TODO make this FP
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
@@ -299,7 +298,7 @@ pub fn solo_channel(
     updated_img
 }
 
-pub fn unpremult(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+pub fn unpremult(img: &RgbaImage) -> RgbaImage {
     // TODO make this FP
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
@@ -446,7 +445,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                     )
                     .ok_or(anyhow!("Can't render SVG"))?;
                     // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut())?;
-                    let buf: Option<ImageBuffer<Rgba<u8>, Vec<u8>>> = image::ImageBuffer::from_raw(
+                    let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
                         pixmap_size.width(),
                         pixmap_size.height(),
                         pixmap.data().to_vec(),
