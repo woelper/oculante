@@ -8,6 +8,7 @@ use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
 use notan::AppState;
+use std::collections::{HashSet};
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
@@ -20,7 +21,7 @@ use exr::prelude as exrs;
 use exr::prelude::*;
 
 use image::{self, AnimationDecoder};
-use image::{ImageBuffer, Rgba};
+use image::{Rgba};
 //use nsvg;
 use lazy_static::lazy_static;
 use psd::Psd;
@@ -32,11 +33,47 @@ use std::sync::Mutex;
 // use libwebp_image;
 use anyhow::{anyhow, Result};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
-use strum::{Display};
+use strum::Display;
 use strum_macros::EnumIter;
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
+}
+
+fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
+    // dbg!(p.0.iter());
+    p.0 == [0,0,0,0]
+    // p.0[3] == 0 &&
+}
+
+#[derive(Debug)]
+pub struct ExtendedImageInfo {
+    pub num_pixels: usize,
+    pub num_transparent_pixels: usize,
+    pub num_colors: usize,
+}
+
+impl ExtendedImageInfo {
+    pub fn from_image(img: &RgbaImage) -> Self {
+        let mut colors: HashSet<Rgba<u8>> = HashSet::default();
+        let mut num_pixels = 0;
+        let mut num_transparent_pixels = 0;
+        for p in img.pixels() {
+            if is_pixel_fully_transparent(p) {
+                num_transparent_pixels += 1;
+            }
+
+            let mut p = p.clone();
+            p.0[3] = 255;
+            colors.insert(p.clone());
+            num_pixels += 1;
+        }
+        Self {
+            num_pixels,
+            num_transparent_pixels,
+            num_colors: colors.len()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -166,6 +203,8 @@ pub struct OculanteState {
     pub current_image: Option<RgbaImage>,
     pub current_channel: Channel,
     pub settings_enabled: bool,
+    pub edit_enabled: bool,
+    pub image_info: Option<ExtendedImageInfo>
 }
 
 impl Default for OculanteState {
@@ -193,6 +232,8 @@ impl Default for OculanteState {
             current_path: Default::default(),
             current_channel: Channel::RGBA,
             settings_enabled: false,
+            edit_enabled: false,
+            image_info: None,
         }
     }
 }
@@ -283,10 +324,7 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
     }
 }
 
-pub fn solo_channel(
-    img: &RgbaImage,
-    channel: usize,
-) -> RgbaImage {
+pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
     // TODO make this FP
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
@@ -299,10 +337,39 @@ pub fn solo_channel(
 }
 
 pub fn unpremult(img: &RgbaImage) -> RgbaImage {
-    // TODO make this FP
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
         pixel.0[3] = 255;
+    }
+    updated_img
+}
+
+/// Mark pixels with no alpha but color info
+pub fn highlight_bleed(img: &RgbaImage) -> RgbaImage {
+    let mut updated_img = img.clone();
+    for pixel in updated_img.pixels_mut() {
+        if pixel.0[3] == 0 {
+            if pixel.0[0] != 0 || pixel.0[1] != 0 || pixel.0[2] != 0 {
+                // pixel.0 = [0, 255, 0, 255];
+                pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
+                pixel.0[3] = 255;
+            }
+        }
+    }
+    updated_img
+}
+
+/// Mark pixels with transparency
+pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
+    let mut updated_img = img.clone();
+    for pixel in updated_img.pixels_mut() {
+        if pixel.0[3] != 0 && pixel.0[3] != 255 {
+                // pixel.0 = [0, 255, 0, 255];
+                // pixel.0[1] += 100;
+                pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
+                pixel.0[3] = pixel.0[1].checked_add(100).unwrap_or(255);
+
+        }
     }
     updated_img
 }

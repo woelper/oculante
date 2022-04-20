@@ -268,6 +268,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         debug!("Received image buffer");
         state.image_dimension = (img.width(), img.height());
         state.current_texture = img.to_texture(gfx);
+        state.image_info = None;
 
         //center the image
         state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
@@ -546,7 +547,37 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         Stroke::new(1., stroke_color),
                     );
                     // ui.image(tex_id, img_size);
+
+
+                
                 }
+
+                ui.vertical_centered_justified(|ui| {
+
+                    if let Some(img) = &state.current_image {
+                        if ui.button("Calculate extended info").on_hover_text("Count unique colors in image").clicked() {
+                            state.image_info = Some(ExtendedImageInfo::from_image(img));
+                        }
+                        if ui.button("Show alpha bleed").on_hover_text("Highlight pixels with zero alpha and color information").clicked() {
+                            state.current_texture = highlight_bleed(img).to_texture(gfx);
+                        }
+                        if ui.button("Show semi-transparent pixels").on_hover_text("Highlight pixels that are neither fully opaque not fully transparent").clicked() {
+                            state.current_texture = highlight_semitrans(img).to_texture(gfx);
+                        }
+                        if ui.button("Reset image").clicked() {
+                            state.current_texture = img.to_texture(gfx);
+                        }
+                    }
+                });
+
+                if let Some(info) = &state.image_info {
+                    ui.label(format!("Number of colors: {}", info.num_colors));
+                    ui.label(format!("Fully transparent: {:.2}%", (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.));
+                    ui.label(format!("Pixels: {}", info.num_pixels));
+                 }
+
+
+
             });
         }
 
