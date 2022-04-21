@@ -492,6 +492,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         );
                     });
 
+                    // texture.
                     let tex_id = gfx.egui_register_texture(&texture);
 
                     // width of image widget
@@ -570,12 +571,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 });
 
-                if let Some(info) = &state.image_info {
-                    ui.label(format!("Number of colors: {}", info.num_colors));
-                    ui.label(format!("Fully transparent: {:.2}%", (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.));
-                    ui.label(format!("Pixels: {}", info.num_pixels));
-                 }
-
+       
+                advanced_ui(ui, state);
 
 
             });

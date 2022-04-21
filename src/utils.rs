@@ -5,10 +5,11 @@ use image::RgbaImage;
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::graphics::Texture;
+use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
-use std::collections::{HashSet};
+use rgb::alt::Gray;
+use std::collections::{HashSet, HashMap};
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
@@ -51,11 +52,14 @@ pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
     pub num_colors: usize,
+    pub histogram: Vec<(i32, i32)>
 }
 
 impl ExtendedImageInfo {
     pub fn from_image(img: &RgbaImage) -> Self {
-        let mut colors: HashSet<Rgba<u8>> = HashSet::default();
+        let mut colors: HashSet<Rgba<u8>> = Default::default();
+        let mut histogram: HashMap<u8, usize> = Default::default();
+
         let mut num_pixels = 0;
         let mut num_transparent_pixels = 0;
         for p in img.pixels() {
@@ -63,15 +67,23 @@ impl ExtendedImageInfo {
                 num_transparent_pixels += 1;
             }
 
+            let luma_p = p.0.as_gray().as_bytes();
+            *histogram.entry(luma_p[0]).or_default() += 1;
+
             let mut p = p.clone();
             p.0[3] = 255;
             colors.insert(p.clone());
             num_pixels += 1;
         }
+
+        let mut hist: Vec<(i32, i32)> = histogram.iter().map(|(k,v)| (*k as i32, *v as i32)).collect();
+        hist.sort_by(|a,b| a.0.cmp(&b.0));
+
         Self {
             num_pixels,
             num_transparent_pixels,
-            num_colors: colors.len()
+            num_colors: colors.len(),
+            histogram: hist     
         }
     }
 }
@@ -328,6 +340,15 @@ pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
     // TODO make this FP
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
+        // for i in 0..=2 {
+        //     if i == channel {
+        //         pixel.0[i] = pixel.0[channel];
+
+        //     } else {
+        //         pixel.0[i] = 0;
+                
+        //     }
+        // }
         pixel.0[0] = pixel.0[channel];
         pixel.0[1] = pixel.0[channel];
         pixel.0[2] = pixel.0[channel];
@@ -650,6 +671,8 @@ impl ImageExt for RgbaImage {
     fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.create_texture()
             .from_bytes(&self, self.width() as i32, self.height() as i32)
+            // .with_premultiplied_alpha()
+            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             .build()
             .ok()
     }
