@@ -6,5 +6,6 @@ git add Cargo.toml
 cargo update
 cargo check
 git add Cargo.lock
+git commit -m Lockfile
 git push --tags
 git push
