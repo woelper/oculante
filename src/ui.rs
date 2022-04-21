@@ -1,3 +1,4 @@
+use egui::plot::{Line, Plot, Value, Values};
 use notan::egui::{self, *};
 
 use crate::{update, utils::OculanteState};
@@ -32,8 +33,6 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
         ));
         ui.label(format!("Pixels: {}", info.num_pixels));
-
-        use egui::plot::{Line, Plot, Value, Values};
 
         let hist_vals = info
             .histogram
