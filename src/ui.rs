@@ -78,6 +78,10 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     }
 }
 
+pub fn edit_advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
+//    ui.color_edit_button_rgb(rgb)
+}
+
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
         ui.horizontal(|ui| {
