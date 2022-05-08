@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install deps
+        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev librust-alsa-sys-dev libasound2-dev
+
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
