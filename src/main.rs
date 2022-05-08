@@ -9,12 +9,9 @@ use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
-use notan::prelude::keyboard::KeyCode;
-use notan::prelude::mouse::MouseButton;
 use notan::prelude::*;
 use std::ffi::OsStr;
 use strum::IntoEnumIterator;
-// use splines::{Interpolation, Spline};
 use std::path::PathBuf;
 use std::sync::mpsc;
 

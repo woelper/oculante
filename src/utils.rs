@@ -9,7 +9,7 @@ use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
 use rgb::alt::Gray;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
@@ -21,8 +21,8 @@ use std::time::Duration;
 use exr::prelude as exrs;
 use exr::prelude::*;
 
+use image::Rgba;
 use image::{self, AnimationDecoder};
-use image::{Rgba};
 //use nsvg;
 use lazy_static::lazy_static;
 use psd::Psd;
@@ -43,8 +43,16 @@ lazy_static! {
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     // dbg!(p.0.iter());
-    p.0 == [0,0,0,0]
+    p.0 == [0, 0, 0, 0]
     // p.0[3] == 0 &&
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
+pub enum HistogramData {
+    Red(u8),
+    Green(u8),
+    Blue(u8),
+    Gray(u8),
 }
 
 #[derive(Debug)]
@@ -52,13 +60,20 @@ pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
     pub num_colors: usize,
-    pub histogram: Vec<(i32, i32)>
+    pub grey_histogram: Vec<(i32, i32)>,
+    pub red_histogram: Vec<(i32, i32)>,
+    pub green_histogram: Vec<(i32, i32)>,
+    pub blue_histogram: Vec<(i32, i32)>,
 }
 
 impl ExtendedImageInfo {
     pub fn from_image(img: &RgbaImage) -> Self {
         let mut colors: HashSet<Rgba<u8>> = Default::default();
-        let mut histogram: HashMap<u8, usize> = Default::default();
+        // let mut histogram: HashMap<u8, usize> = Default::default();
+        let mut grey_histogram: HashMap<u8, usize> = Default::default();
+        let mut red_histogram: HashMap<u8, usize> = Default::default();
+        let mut green_histogram: HashMap<u8, usize> = Default::default();
+        let mut blue_histogram: HashMap<u8, usize> = Default::default();
 
         let mut num_pixels = 0;
         let mut num_transparent_pixels = 0;
@@ -67,8 +82,11 @@ impl ExtendedImageInfo {
                 num_transparent_pixels += 1;
             }
 
-            let luma_p = p.0.as_gray().as_bytes();
-            *histogram.entry(luma_p[0]).or_default() += 1;
+            let luma_p = ((p.0[0] as i32 + p.0[1] as i32 + p.0[2] as i32) / 3).min(255);
+            *grey_histogram.entry(luma_p as u8).or_default() += 1;
+            *red_histogram.entry(p.0[0]).or_default() += 1;
+            *green_histogram.entry(p.0[1]).or_default() += 1;
+            *blue_histogram.entry(p.0[2]).or_default() += 1;
 
             let mut p = p.clone();
             p.0[3] = 255;
@@ -76,14 +94,38 @@ impl ExtendedImageInfo {
             num_pixels += 1;
         }
 
-        let mut hist: Vec<(i32, i32)> = histogram.iter().map(|(k,v)| (*k as i32, *v as i32)).collect();
-        hist.sort_by(|a,b| a.0.cmp(&b.0));
+        let mut grey_histogram: Vec<(i32, i32)> = grey_histogram
+            .iter()
+            .map(|(k, v)| (*k as i32, *v as i32))
+            .collect();
+        grey_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut green_histogram: Vec<(i32, i32)> = green_histogram
+            .iter()
+            .map(|(k, v)| (*k as i32, *v as i32))
+            .collect();
+        green_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut red_histogram: Vec<(i32, i32)> = red_histogram
+            .iter()
+            .map(|(k, v)| (*k as i32, *v as i32))
+            .collect();
+        red_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut blue_histogram: Vec<(i32, i32)> = blue_histogram
+            .iter()
+            .map(|(k, v)| (*k as i32, *v as i32))
+            .collect();
+        blue_histogram.sort_by(|a, b| a.0.cmp(&b.0));
 
         Self {
             num_pixels,
             num_transparent_pixels,
             num_colors: colors.len(),
-            histogram: hist     
+            grey_histogram,
+            blue_histogram,
+            green_histogram,
+            red_histogram,
         }
     }
 }
@@ -216,7 +258,7 @@ pub struct OculanteState {
     pub current_channel: Channel,
     pub settings_enabled: bool,
     pub edit_enabled: bool,
-    pub image_info: Option<ExtendedImageInfo>
+    pub image_info: Option<ExtendedImageInfo>,
 }
 
 impl Default for OculanteState {
@@ -346,7 +388,7 @@ pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
 
         //     } else {
         //         pixel.0[i] = 0;
-                
+
         //     }
         // }
         pixel.0[0] = pixel.0[channel];
@@ -385,11 +427,10 @@ pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
     for pixel in updated_img.pixels_mut() {
         if pixel.0[3] != 0 && pixel.0[3] != 255 {
-                // pixel.0 = [0, 255, 0, 255];
-                // pixel.0[1] += 100;
-                pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
-                pixel.0[3] = pixel.0[1].checked_add(100).unwrap_or(255);
-
+            // pixel.0 = [0, 255, 0, 255];
+            // pixel.0[1] += 100;
+            pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
+            pixel.0[3] = pixel.0[1].checked_add(100).unwrap_or(255);
         }
     }
     updated_img

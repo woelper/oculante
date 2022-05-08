@@ -17,14 +17,14 @@ icon = ["res/logo.png"]
 [dependencies]
 clap ="3.1.8"
 image = "0.24.1"
-nalgebra = "0.30.1"
+nalgebra = "0.31.0"
 dds-rs = "0.7.0"
 rgb = "0.8.32"
 psd = "0.3.0"
 exr = "1.4.1"
 lazy_static = "1.4.0"
-libwebp-sys = "0.5.0"
-self_update = "0.29.0"
+libwebp-sys = "0.6.0"
+self_update = "0.30.0"
 log = "0.4.14"
 # simple-logging = "2.0.2"
 usvg = "0.22.0"
@@ -32,7 +32,7 @@ resvg = "0.22.0"
 tiny-skia = "0.6.1"
 env_logger = "0.9.0"
 anyhow = "1.0.42"
-notan = {version = "0.2.1", features = ["drop_files", "egui"]}
+notan = {version = "0.3.0", features = ["drop_files", "egui"]}
 strum = { version = "0.24", features = ["derive"] }
 strum_macros = "0.24"
 

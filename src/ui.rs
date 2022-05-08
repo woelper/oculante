@@ -34,15 +34,47 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         ));
         ui.label(format!("Pixels: {}", info.num_pixels));
 
-        let hist_vals = info
-            .histogram
-            .iter()
-            .map(|(k, v)| Value::new(*k as f64, *v as f64));
-        let line = Line::new(Values::from_values_iter(hist_vals));
+        let grey_vals = Line::new(Values::from_values_iter(
+            info.grey_histogram
+                .iter()
+                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
+        ))
+        .color(Color32::GRAY);
+
+        let red_vals = Line::new(Values::from_values_iter(
+            info.red_histogram
+                .iter()
+                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
+        ))
+        .fill(0.)
+        .color(Color32::RED);
+
+        let green_vals = Line::new(Values::from_values_iter(
+            info.green_histogram
+                .iter()
+                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
+        ))
+        .fill(0.)
+        .color(Color32::GREEN);
+
+        let blue_vals = Line::new(Values::from_values_iter(
+            info.blue_histogram
+                .iter()
+                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
+        ))
+        .fill(0.)
+        .color(Color32::BLUE);
+
         ui.label("Histogram");
         Plot::new("my_plot")
-            // .data_aspect(2.0)
-            .show(ui, |plot_ui| plot_ui.line(line));
+            .allow_zoom(false)
+            .allow_drag(false)
+            .show(ui, |plot_ui| {
+                plot_ui.line(grey_vals);
+                plot_ui.line(red_vals);
+                plot_ui.line(green_vals);
+                plot_ui.line(blue_vals);
+            });
     }
 }
 
