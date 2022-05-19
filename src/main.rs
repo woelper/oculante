@@ -11,9 +11,9 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use std::ffi::OsStr;
-use strum::IntoEnumIterator;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use strum::IntoEnumIterator;
 
 mod utils;
 use utils::*;
@@ -281,10 +281,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     if let Some(texture) = &state.current_texture {
-        draw.image(texture)
-            .blend_mode(BlendMode::NORMAL)
-            .translate(state.offset.x as f32, state.offset.y as f32)
-            .scale(state.scale, state.scale);
+        if state.tiling < 2 {
+            draw.image(texture)
+                .blend_mode(BlendMode::NORMAL)
+                .translate(state.offset.x as f32, state.offset.y as f32)
+                .scale(state.scale, state.scale);
+        } else {
+            draw.pattern(texture)
+                .translate(state.offset.x as f32, state.offset.y as f32)
+                .scale(state.scale, state.scale)
+                .size(texture.width() * state.tiling as f32, texture.height() * state.tiling as f32)
+                ;
+        }
+
     }
 
     let egui_output = plugins.egui(|ctx| {
@@ -434,146 +443,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             });
         }
 
-        if state.info_enabled {
-            egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-                ui.label(format!(
-                    "Size: {}x{}",
-                    state.image_dimension.0, state.image_dimension.1
-                ));
-
-                if let Some(path) = &state.current_path {
-                    ui.label(format!("Path: {}", path.display()));
-                }
-
-                if let Some(img) = &state.current_image {
-                    if let Some(p) = img.get_pixel_checked(
-                        state.cursor_relative.x as u32,
-                        state.cursor_relative.y as u32,
-                    ) {
-                        state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-                    }
-                }
-
-                if let Some(texture) = &state.current_texture {
-                    ui.horizontal(|ui| {
-                        ui.label("🌗 RGBA");
-                        ui.label(
-                            RichText::new(format!("{}", disp_col(state.sampled_color)))
-                                .monospace()
-                                .background_color(Color32::from_rgba_unmultiplied(
-                                    255, 255, 255, 6,
-                                )),
-                        );
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("🌗 RGBA");
-                        ui.label(
-                            RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
-                                .monospace()
-                                .background_color(Color32::from_rgba_unmultiplied(
-                                    255, 255, 255, 6,
-                                )),
-                        );
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("⊞ Pos");
-                        ui.label(
-                            RichText::new(format!(
-                                "{:.0},{:.0}",
-                                state.cursor_relative.x, state.cursor_relative.y
-                            ))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                        );
-                    });
-
-                    // texture.
-                    let tex_id = gfx.egui_register_texture(&texture);
-
-                    // width of image widget
-                    let desired_width = 200.;
-
-                    let scale = (desired_width / 8.) / texture.size().0;
-                    let img_size = egui::Vec2::new(desired_width, desired_width);
-
-                    let uv_center = (
-                        state.cursor_relative.x / state.image_dimension.0 as f32,
-                        state.cursor_relative.y / state.image_dimension.1 as f32,
-                    );
-
-                    ui.horizontal(|ui| {
-                        ui.label(" UV");
-                        ui.label(
-                            RichText::new(format!("{:.3},{:.3}", uv_center.0, uv_center.1))
-                                .monospace()
-                                .background_color(Color32::from_rgba_unmultiplied(
-                                    255, 255, 255, 6,
-                                )),
-                        );
-                    });
-
-                    // make sure aspect ratio is compensated for the square preview
-                    let ratio = texture.size().0 / texture.size().1;
-                    let uv_size = (scale, scale * ratio);
-                    let x = ui
-                        .add(
-                            egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
-                                uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                                uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                            )), // .bg_fill(egui::Color32::RED),
-                        )
-                        .rect;
-
-                    let stroke_color = Color32::from_white_alpha(240);
-                    let bg_color = Color32::BLACK.linear_multiply(0.5);
-                    ui.painter_at(x).line_segment(
-                        [x.center_bottom(), x.center_top()],
-                        Stroke::new(4., bg_color),
-                    );
-                    ui.painter_at(x).line_segment(
-                        [x.left_center(), x.right_center()],
-                        Stroke::new(4., bg_color),
-                    );
-                    ui.painter_at(x).line_segment(
-                        [x.center_bottom(), x.center_top()],
-                        Stroke::new(1., stroke_color),
-                    );
-                    ui.painter_at(x).line_segment(
-                        [x.left_center(), x.right_center()],
-                        Stroke::new(1., stroke_color),
-                    );
-                    // ui.image(tex_id, img_size);
-
-
-                
-                }
-
-                ui.vertical_centered_justified(|ui| {
-
-                    if let Some(img) = &state.current_image {
-                        if ui.button("Calculate extended info").on_hover_text("Count unique colors in image").clicked() {
-                            state.image_info = Some(ExtendedImageInfo::from_image(img));
-                        }
-                        if ui.button("Show alpha bleed").on_hover_text("Highlight pixels with zero alpha and color information").clicked() {
-                            state.current_texture = highlight_bleed(img).to_texture(gfx);
-                        }
-                        if ui.button("Show semi-transparent pixels").on_hover_text("Highlight pixels that are neither fully opaque not fully transparent").clicked() {
-                            state.current_texture = highlight_semitrans(img).to_texture(gfx);
-                        }
-                        if ui.button("Reset image").clicked() {
-                            state.current_texture = img.to_texture(gfx);
-                        }
-                    }
-                });
-
-       
-                advanced_ui(ui, state);
-
-
-            });
-        }
+        info_ui(ctx, state, gfx);
 
         if !state.is_loaded {
             egui::Window::new("")

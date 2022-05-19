@@ -6,6 +6,6 @@ git add Cargo.toml
 cargo update
 cargo check
 git add Cargo.lock
-git commit -m Lockfile
+git commit -m "Bumped version"
 git push --tags
 git push

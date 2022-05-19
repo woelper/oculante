@@ -259,6 +259,7 @@ pub struct OculanteState {
     pub settings_enabled: bool,
     pub edit_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
+    pub tiling: usize
 }
 
 impl Default for OculanteState {
@@ -288,6 +289,7 @@ impl Default for OculanteState {
             settings_enabled: false,
             edit_enabled: false,
             image_info: None,
+            tiling: 1
         }
     }
 }
