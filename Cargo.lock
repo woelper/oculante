@@ -2173,7 +2173,7 @@ dependencies = [
 
 [[package]]
 name = "oculante"
-version = "0.5.35"
+version = "0.5.36"
 dependencies = [
  "anyhow",
  "clap",
