@@ -1,6 +1,6 @@
 [package]
 name = "oculante"
-version = "0.5.36"
+version = "0.5.37"
 authors = ["Johann Woelper <woelper@gmail.com>"]
 edition = "2018"
 license = "MIT"
