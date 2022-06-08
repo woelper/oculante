@@ -8,7 +8,6 @@ use nalgebra::{clamp, Vector2};
 use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
-use rgb::alt::Gray;
 use std::collections::{HashMap, HashSet};
 // use piston_window::{CharacterCache, Text};
 use std::fs::File;

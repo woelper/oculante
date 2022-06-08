@@ -397,8 +397,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                         tooltip(
                             ui.checkbox(&mut state.info_enabled, "Extended info"),
-                            "Show extended info",
+                            "Show image info",
                             "i",
+                            ui,
+                        );
+                        tooltip(
+                            ui.checkbox(&mut state.edit_enabled, "Image editing"),
+                            "Edit the image",
+                            "e",
                             ui,
                         );
                     }
@@ -469,6 +475,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         settings_ui(ctx, state);
+        edit_ui(ctx, state);
     });
 
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
