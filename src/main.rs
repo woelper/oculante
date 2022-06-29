@@ -209,7 +209,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
 
-    if app.mouse.is_down(MouseButton::Left) {
+    if app.mouse.is_down(MouseButton::Left) && !state.mouse_grab{
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
@@ -247,6 +247,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
+            state.edit_state = Default::default();
             debug!("Done reset");
         }
     }
@@ -290,10 +291,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             draw.pattern(texture)
                 .translate(state.offset.x as f32, state.offset.y as f32)
                 .scale(state.scale, state.scale)
-                .size(texture.width() * state.tiling as f32, texture.height() * state.tiling as f32)
-                ;
+                .size(
+                    texture.width() * state.tiling as f32,
+                    texture.height() * state.tiling as f32,
+                );
         }
-
     }
 
     let egui_output = plugins.egui(|ctx| {
@@ -475,7 +477,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         settings_ui(ctx, state);
-        edit_ui(ctx, state);
+        edit_ui(ctx, state, gfx);
+
+        // if there is interaction on the ui (dragging etc)
+        // we don't want zoom & pan to work, so we "grab" the pointer
+        if ctx.is_using_pointer() {
+            state.mouse_grab = true;
+        } else {
+            state.mouse_grab = false;
+
+        }
     });
 
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));

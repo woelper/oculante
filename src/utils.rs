@@ -232,6 +232,18 @@ impl Channel {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct EditState {
+    pub color: [f32;3],
+    pub result: RgbaImage,
+    pub blur: f32,
+    pub unsharpen: f32,
+    pub unsharpen_threshold: i32,
+    pub contrast: f32,
+    pub brightness: i32,
+}
+
+
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
@@ -258,7 +270,9 @@ pub struct OculanteState {
     pub settings_enabled: bool,
     pub edit_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
-    pub tiling: usize
+    pub tiling: usize,
+    pub mouse_grab: bool,
+    pub edit_state: EditState
 }
 
 impl Default for OculanteState {
@@ -288,7 +302,9 @@ impl Default for OculanteState {
             settings_enabled: false,
             edit_enabled: false,
             image_info: None,
-            tiling: 1
+            tiling: 1,
+            mouse_grab: false,
+            edit_state: Default::default()
         }
     }
 }
@@ -703,7 +719,13 @@ pub trait ImageExt {
     fn to_texture(&self, _: &mut Graphics) -> Option<Texture> {
         unimplemented!()
     }
+
+    fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
+        unimplemented!()
+    }
 }
+
+
 
 impl ImageExt for RgbaImage {
     fn size_vec(&self) -> Vector2<f32> {
@@ -719,6 +741,7 @@ impl ImageExt for RgbaImage {
             .ok()
     }
 }
+
 impl ImageExt for (i32, i32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0 as f32, self.1 as f32)
