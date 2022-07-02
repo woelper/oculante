@@ -403,12 +403,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             "i",
                             ui,
                         );
-                        tooltip(
-                            ui.checkbox(&mut state.edit_enabled, "Image editing"),
-                            "Edit the image",
-                            "e",
-                            ui,
-                        );
+                        // tooltip(
+                        //     ui.checkbox(&mut state.edit_enabled, "Image editing"),
+                        //     "Edit the image",
+                        //     "e",
+                        //     ui,
+                        // );
                     }
 
                     // ui.add(egui::Separator::default().vertical());
