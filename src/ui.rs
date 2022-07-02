@@ -1,6 +1,6 @@
 use egui::plot::{Line, Plot, Value, Values};
 use notan::{
-    egui::{self, *},
+    egui::{self, plot::Points, *},
     prelude::Graphics,
 };
 
@@ -167,15 +167,17 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
             .default_width(400.)
             // .title_bar(false)
             .show(&ctx, |ui| {
-                if ui.button("Check for updates").clicked() {
-                    state.message = Some("Checking for updates...".into());
-                    update::update(Some(state.message_channel.0.clone()));
-                    state.settings_enabled = false;
-                }
+                ui.vertical_centered_justified(|ui| {
+                    if ui.button("Check for updates").clicked() {
+                        state.message = Some("Checking for updates...".into());
+                        update::update(Some(state.message_channel.0.clone()));
+                        state.settings_enabled = false;
+                    }
 
-                if ui.button("Close").clicked() {
-                    state.settings_enabled = false;
-                }
+                    if ui.button("Close").clicked() {
+                        state.settings_enabled = false;
+                    }
+                });
             });
     }
 }
@@ -196,28 +198,31 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         ))
         .color(Color32::GRAY);
 
-        let red_vals = Line::new(Values::from_values_iter(
+        let red_vals = Points::new(Values::from_values_iter(
             info.red_histogram
                 .iter()
                 .map(|(k, v)| Value::new(*k as f64, *v as f64)),
         ))
-        .fill(0.)
+        // .fill(0.)
+        .stems(0.0)
         .color(Color32::RED);
 
-        let green_vals = Line::new(Values::from_values_iter(
+        let green_vals = Points::new(Values::from_values_iter(
             info.green_histogram
                 .iter()
                 .map(|(k, v)| Value::new(*k as f64, *v as f64)),
         ))
-        .fill(0.)
+        // .fill(0.)
+        .stems(0.0)
         .color(Color32::GREEN);
 
-        let blue_vals = Line::new(Values::from_values_iter(
+        let blue_vals = Points::new(Values::from_values_iter(
             info.blue_histogram
                 .iter()
                 .map(|(k, v)| Value::new(*k as f64, *v as f64)),
         ))
-        .fill(0.)
+        // .fill(0.)
+        .stems(0.0)
         .color(Color32::BLUE);
 
         ui.label("Histogram");
@@ -225,10 +230,10 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             .allow_zoom(false)
             .allow_drag(false)
             .show(ui, |plot_ui| {
-                plot_ui.line(grey_vals);
-                plot_ui.line(red_vals);
-                plot_ui.line(green_vals);
-                plot_ui.line(blue_vals);
+                // plot_ui.line(grey_vals);
+                plot_ui.points(red_vals);
+                plot_ui.points(green_vals);
+                plot_ui.points(blue_vals);
             });
     }
 }
@@ -326,21 +331,22 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
             }
 
-                        // Contrast
-                        if let Some(img) = &mut state.current_image {
-                            let response = ui.add(
-                                egui::Slider::new(&mut state.edit_state.brightness, -255..=255)
-                                    .text("☀ Brightness"),
-                            );
-                            if response.changed() {
-                                let img_brightness = image::imageops::brighten(img, state.edit_state.brightness);
-                                state.current_texture = img_brightness.to_texture(gfx);
-                                state.edit_state.result = img_brightness;
-                            }
-                            if response.drag_released() {
-                                *img = state.edit_state.result.clone();
-                            }
-                        }
+            // Contrast
+            if let Some(img) = &mut state.current_image {
+                let response = ui.add(
+                    egui::Slider::new(&mut state.edit_state.brightness, -255..=255)
+                        .text("☀ Brightness"),
+                );
+                if response.changed() {
+                    let img_brightness =
+                        image::imageops::brighten(img, state.edit_state.brightness);
+                    state.current_texture = img_brightness.to_texture(gfx);
+                    state.edit_state.result = img_brightness;
+                }
+                if response.drag_released() {
+                    *img = state.edit_state.result.clone();
+                }
+            }
 
             ui.horizontal(|ui| {
                 ui.label("Mult color");
