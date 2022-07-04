@@ -8,67 +8,28 @@ use crate::{
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, ExtendedImageInfo, ImageExt,
-        OculanteState,
+        OculanteState, send_extended_info,
     },
 };
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if state.info_enabled {
+        if let Some(img) = &state.current_image {
+            if let Some(p) = img.get_pixel_checked(
+                state.cursor_relative.x as u32,
+                state.cursor_relative.y as u32,
+            ) {
+                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+            }
+        }
+
         egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-            ui.label(format!(
-                "Size: {}x{}",
-                state.image_dimension.0, state.image_dimension.1
-            ));
-
-            if let Some(path) = &state.current_path {
-                ui.label(format!("Path: {}", path.display()));
-            }
-
-            if let Some(img) = &state.current_image {
-                if let Some(p) = img.get_pixel_checked(
-                    state.cursor_relative.x as u32,
-                    state.cursor_relative.y as u32,
-                ) {
-                    state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-                }
-            }
-
             if let Some(texture) = &state.current_texture {
-                ui.horizontal(|ui| {
-                    ui.label("🌗 RGBA");
-                    ui.label(
-                        RichText::new(format!("{}", disp_col(state.sampled_color)))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("🌗 RGBA");
-                    ui.label(
-                        RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("⊞ Pos");
-                    ui.label(
-                        RichText::new(format!(
-                            "{:.0},{:.0}",
-                            state.cursor_relative.x, state.cursor_relative.y
-                        ))
-                        .monospace()
-                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                });
-
                 // texture.
                 let tex_id = gfx.egui_register_texture(&texture);
 
                 // width of image widget
-                let desired_width = 200.;
+                let desired_width = ui.available_width();
 
                 let scale = (desired_width / 8.) / texture.size().0;
                 let img_size = egui::Vec2::new(desired_width, desired_width);
@@ -78,13 +39,55 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     state.cursor_relative.y / state.image_dimension.1 as f32,
                 );
 
-                ui.horizontal(|ui| {
+                egui::Grid::new("info").show(ui, |ui| {
+                    ui.label("Size");
+
+                    ui.label(format!(
+                        "{}x{}",
+                        state.image_dimension.0, state.image_dimension.1
+                    ));
+                    ui.end_row();
+
+                    if let Some(path) = &state.current_path {
+                        ui.label("File");
+                        ui.label(format!("{}", path.file_name().unwrap_or_default().to_string_lossy())).on_hover_text(format!("{}", path.display()));
+                        ui.end_row();
+                    }
+
+                    ui.label("🌗 RGBA");
+                    ui.label(
+                        RichText::new(format!("{}", disp_col(state.sampled_color)))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+
+                    ui.label("🌗 RGBA");
+                    ui.label(
+                        RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+
+                    ui.label("⊞ Pos");
+                    ui.label(
+                        RichText::new(format!(
+                            "{:.0},{:.0}",
+                            state.cursor_relative.x, state.cursor_relative.y
+                        ))
+                        .monospace()
+                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+
                     ui.label(" UV");
                     ui.label(
                         RichText::new(format!("{:.3},{:.3}", uv_center.0, uv_center.1))
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
+                    ui.end_row();
                 });
 
                 // make sure aspect ratio is compensated for the square preview
@@ -122,13 +125,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
             ui.vertical_centered_justified(|ui| {
                 if let Some(img) = &state.current_image {
-                    if ui
-                        .button("Calculate extended info")
-                        .on_hover_text("Count unique colors in image")
-                        .clicked()
-                    {
-                        state.image_info = Some(ExtendedImageInfo::from_image(img));
-                    }
+                    // if ui
+                    //     .button("Calculate extended info")
+                    //     .on_hover_text("Count unique colors in image")
+                    //     .clicked()
+                    // {
+                    //     state.image_info = Some(ExtendedImageInfo::from_image(img));
+                    // }
                     if ui
                         .button("Show alpha bleed")
                         .on_hover_text("Highlight pixels with zero alpha and color information")
@@ -184,19 +187,28 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
 pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_info {
-        ui.label(format!("Number of colors: {}", info.num_colors));
-        ui.label(format!(
-            "Fully transparent: {:.2}%",
-            (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
-        ));
-        ui.label(format!("Pixels: {}", info.num_pixels));
 
-        let grey_vals = Line::new(Values::from_values_iter(
-            info.grey_histogram
-                .iter()
-                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
-        ))
-        .color(Color32::GRAY);
+
+        egui::Grid::new("extended").show(ui, |ui| {
+            ui.label(format!("Number of colors"));
+            ui.label(format!("{}", info.num_colors));
+            ui.end_row();
+
+            ui.label("Fully transparent");
+            ui.label(format!(
+                "{:.2}%",
+                (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
+            ));
+            ui.end_row();
+
+            ui.label("Pixels");
+            ui.label(format!("{}", info.num_pixels));
+            ui.end_row();
+
+        });
+
+
+   
 
         let red_vals = Points::new(Values::from_values_iter(
             info.red_histogram
@@ -225,7 +237,6 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .stems(0.0)
         .color(Color32::BLUE);
 
-        ui.label("Histogram");
         Plot::new("my_plot")
             .allow_zoom(false)
             .allow_drag(false)
@@ -245,8 +256,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     }
 
     egui::SidePanel::right("edit_panel")
-        .min_width(300.)
+        .min_width(360.)
         .show(&ctx, |ui| {
+
+            let mut changed = false;
+
             ui.horizontal(|ui| {
                 if let Some(img) = &mut state.current_image {
                     if ui
@@ -256,10 +270,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     {
                         *img = image::imageops::rotate90(img);
                         state.current_texture = img.to_texture(gfx);
+                        changed = true;
                     }
                     if ui.button("⟲").on_hover_text("Rotate 90 deg left").clicked() {
                         *img = image::imageops::rotate270(img);
                         state.current_texture = img.to_texture(gfx);
+                        changed = true;
+
                     }
                 }
             });
@@ -275,6 +292,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
                 if response.drag_released() {
                     *img = state.edit_state.result.clone();
+                    changed = true;
+
                 }
             }
 
@@ -328,6 +347,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
                 if response.drag_released() {
                     *img = state.edit_state.result.clone();
+                    changed = true;
+
                 }
             }
 
@@ -345,6 +366,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
                 if response.drag_released() {
                     *img = state.edit_state.result.clone();
+                    changed = true;
+
                 }
             }
 
@@ -368,6 +391,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if ui.button("Apply").clicked() {
                         // dbg!("rels clr");
                         *img = state.edit_state.result.clone();
+                        changed = true;
+
                     }
                 }
             });
@@ -391,6 +416,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                     if ui.button("Apply").clicked() {
                         *img = state.edit_state.result.clone();
+                        changed = true;
+
                     }
                 }
             });
@@ -399,6 +426,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if ui.button("Invert").clicked() {
                         image::imageops::invert(img);
                         state.current_texture = img.to_texture(gfx);
+                        changed = true;
+
                     }
                 }
             });
@@ -422,6 +451,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let _ = img.save(path);
                     }
                 }
+
+                
+            }
+
+            if changed && state.info_enabled {
+                state.image_info = None;
+                send_extended_info(&state.current_image, &state.extended_info_channel);
             }
         });
 }

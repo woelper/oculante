@@ -13,6 +13,7 @@ use notan::prelude::*;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::thread;
 use strum::IntoEnumIterator;
 
 mod utils;
@@ -237,6 +238,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 
+    // redraw if extended info is missing
+    if state.info_enabled && state.image_info.is_none() {
+        app.window().request_frame();
+    }
+
     if state.reset_image {
         let window_size = app.window().size().size_vec();
         if let Some(current_image) = &state.current_image {
@@ -273,6 +279,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
+        if state.info_enabled {
+            send_extended_info(&state.current_image, &state.extended_info_channel);
+
+        }
+    }
+
+    // check extended info has been sent
+    if let Ok(info) = state.extended_info_channel.1.try_recv() {
+        debug!("Received ext info");
+        state.image_info = Some(info);
     }
 
     // check if a new texture has been sent
@@ -397,18 +413,20 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 }
                             }
                         }
-                        tooltip(
+                        if tooltip(
                             ui.checkbox(&mut state.info_enabled, "Extended info"),
                             "Show image info",
                             "i",
                             ui,
+                        ).changed() || app.keyboard.was_pressed(KeyCode::I) {
+                            send_extended_info(&state.current_image, &state.extended_info_channel);
+                        } 
+                        tooltip(
+                            ui.checkbox(&mut state.edit_enabled, "Image editing"),
+                            "Edit the image",
+                            "e",
+                            ui,
                         );
-                        // tooltip(
-                        //     ui.checkbox(&mut state.edit_enabled, "Image editing"),
-                        //     "Edit the image",
-                        //     "e",
-                        //     ui,
-                        // );
                     }
 
                     // ui.add(egui::Separator::default().vertical());

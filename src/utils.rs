@@ -262,6 +262,8 @@ pub struct OculanteState {
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub message_channel: (Sender<String>, Receiver<String>),
+    pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+    pub extended_info_loading: bool,
     pub player: Player,
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
@@ -294,6 +296,8 @@ impl Default for OculanteState {
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
+            extended_info_channel: mpsc::channel(),
+            extended_info_loading: false,
             mouse_delta: Default::default(),
             current_texture: Default::default(),
             current_image: Default::default(),
@@ -547,6 +551,18 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image:
         Err(e) => error!("Error {:?} from {:?}", e, img_location),
     }
 }
+
+pub fn send_extended_info(current_image: &Option<RgbaImage>, channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>)) {
+    if let Some(img) = current_image {
+        let copied_img = img.clone();
+        let sender = channel.0.clone();
+        thread::spawn(move || {
+            let e_info = ExtendedImageInfo::from_image(&copied_img);
+            let _ = sender.send(e_info);
+        });
+    }
+}
+
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
