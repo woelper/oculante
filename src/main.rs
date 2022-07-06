@@ -184,6 +184,7 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
+        Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
         Event::WindowResize { width, height } => {
             let window_size = (width, height).size_vec();
             if let Some(current_image) = &state.current_image {
@@ -414,19 +415,20 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
                         if tooltip(
-                            ui.checkbox(&mut state.info_enabled, "Extended info"),
+                            ui.checkbox(&mut state.info_enabled, "Image info"),
                             "Show image info",
                             "i",
                             ui,
                         ).changed() || app.keyboard.was_pressed(KeyCode::I) {
                             send_extended_info(&state.current_image, &state.extended_info_channel);
                         } 
+
                         tooltip(
                             ui.checkbox(&mut state.edit_enabled, "Image editing"),
                             "Edit the image",
                             "e",
                             ui,
-                        );
+                        ); 
                     }
 
                     // ui.add(egui::Separator::default().vertical());

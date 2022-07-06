@@ -7,8 +7,8 @@ use notan::{
 use crate::{
     update,
     utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, ExtendedImageInfo, ImageExt,
-        OculanteState, send_extended_info,
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
+        ExtendedImageInfo, ImageExt, OculanteState,
     },
 };
 
@@ -36,21 +36,25 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 let uv_center = (
                     state.cursor_relative.x / state.image_dimension.0 as f32,
-                    state.cursor_relative.y / state.image_dimension.1 as f32,
+                    (state.cursor_relative.y / state.image_dimension.1 as f32),
                 );
 
                 egui::Grid::new("info").show(ui, |ui| {
                     ui.label("Size");
 
-                    ui.label(format!(
+                    ui.label(RichText::new(format!(
                         "{}x{}",
                         state.image_dimension.0, state.image_dimension.1
-                    ));
+                    )).monospace());
                     ui.end_row();
 
                     if let Some(path) = &state.current_path {
                         ui.label("File");
-                        ui.label(format!("{}", path.file_name().unwrap_or_default().to_string_lossy())).on_hover_text(format!("{}", path.display()));
+                        ui.label(RichText::new(format!(
+                            "{}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        )).monospace())
+                        .on_hover_text(format!("{}", path.display()));
                         ui.end_row();
                     }
 
@@ -83,7 +87,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label(" UV");
                     ui.label(
-                        RichText::new(format!("{:.3},{:.3}", uv_center.0, uv_center.1))
+                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
@@ -187,8 +191,6 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
 pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_info {
-
-
         egui::Grid::new("extended").show(ui, |ui| {
             ui.label(format!("Number of colors"));
             ui.label(format!("{}", info.num_colors));
@@ -204,11 +206,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             ui.label("Pixels");
             ui.label(format!("{}", info.num_pixels));
             ui.end_row();
-
         });
-
-
-   
 
         let red_vals = Points::new(Values::from_values_iter(
             info.red_histogram
@@ -237,7 +235,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .stems(0.0)
         .color(Color32::BLUE);
 
-        Plot::new("my_plot")
+        Plot::new("histogram")
             .allow_zoom(false)
             .allow_drag(false)
             .show(ui, |plot_ui| {
@@ -249,6 +247,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     }
 }
 
+/// Everything related to image editing
 pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     //    ui.color_edit_button_rgb(rgb)
     if !state.edit_enabled {
@@ -258,44 +257,197 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("edit_panel")
         .min_width(360.)
         .show(&ctx, |ui| {
-
             let mut changed = false;
 
-            ui.horizontal(|ui| {
+            egui::Grid::new("editing").show(ui, |ui| {
+                ui.label("○ Rotation");
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        if ui
+                            .button("⟳")
+                            .on_hover_text("Rotate 90 deg right")
+                            .clicked()
+                        {
+                            *img = image::imageops::rotate90(img);
+                            state.current_texture = img.to_texture(gfx);
+                            changed = true;
+                        }
+                        if ui.button("⟲").on_hover_text("Rotate 90 deg left").clicked() {
+                            *img = image::imageops::rotate270(img);
+                            state.current_texture = img.to_texture(gfx);
+                            changed = true;
+                        }
+                    }
+                });
+                ui.end_row();
+
+                // Blur
+
+                ui.label("💧 Blur");
+
                 if let Some(img) = &mut state.current_image {
-                    if ui
-                        .button("⟳")
-                        .on_hover_text("Rotate 90 deg right")
-                        .clicked()
-                    {
-                        *img = image::imageops::rotate90(img);
-                        state.current_texture = img.to_texture(gfx);
+                    let response = ui.add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.));
+                    if response.changed() {
+                        if state.edit_state.blur == 0.0 {
+                            state.current_texture = img.to_texture(gfx);
+                            state.edit_state.result = img.clone();
+
+                        } else {
+                            let img_blurred = image::imageops::blur(img, state.edit_state.blur);
+                            state.current_texture = img_blurred.to_texture(gfx);
+                            state.edit_state.result = img_blurred;
+                        }
+                    }
+                    if response.drag_released() {
+                        *img = state.edit_state.result.clone();
                         changed = true;
                     }
-                    if ui.button("⟲").on_hover_text("Rotate 90 deg left").clicked() {
-                        *img = image::imageops::rotate270(img);
-                        state.current_texture = img.to_texture(gfx);
-                        changed = true;
+                }
+                ui.end_row();
 
+                // Contrast
+                ui.label("◑ Contrast");
+
+                if let Some(img) = &mut state.current_image {
+                    let response = ui.add(egui::Slider::new(
+                        &mut state.edit_state.contrast,
+                        -100.0..=100.,
+                    ));
+                    if response.changed() {
+                        let img_contrasted =
+                            image::imageops::contrast(img, state.edit_state.contrast);
+                        state.current_texture = img_contrasted.to_texture(gfx);
+                        state.edit_state.result = img_contrasted;
+                    }
+                    if response.drag_released() {
+                        *img = state.edit_state.result.clone();
+                        changed = true;
+                    }
+                }
+                ui.end_row();
+
+                // Brightness
+                ui.label("☀ Brightness");
+
+                if let Some(img) = &mut state.current_image {
+                    let response = ui.add(egui::Slider::new(
+                        &mut state.edit_state.brightness,
+                        -255..=255,
+                    ));
+                    if response.changed() {
+                        let img_brightness =
+                            image::imageops::brighten(img, state.edit_state.brightness);
+                        state.current_texture = img_brightness.to_texture(gfx);
+                        state.edit_state.result = img_brightness;
+                    }
+                    if response.drag_released() {
+                        *img = state.edit_state.result.clone();
+                        changed = true;
+                    }
+                }
+                ui.end_row();
+
+                ui.label("✖ Mult color");
+
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        let response = ui.color_edit_button_rgb(&mut state.edit_state.color);
+
+                        if response.changed() {
+                            let mut e = img.clone();
+
+                            for p in e.pixels_mut() {
+                                p[0] = (p[0] as f32 * state.edit_state.color[0]) as u8;
+                                p[1] = (p[1] as f32 * state.edit_state.color[1]) as u8;
+                                p[2] = (p[2] as f32 * state.edit_state.color[2]) as u8;
+                            }
+                            state.current_texture = e.to_texture(gfx);
+                            state.edit_state.result = e;
+                        }
+
+                        if ui.button("Apply").clicked() {
+                            // dbg!("rels clr");
+                            *img = state.edit_state.result.clone();
+                            changed = true;
+                        }
+                    }
+                });
+                ui.end_row();
+
+                ui.label("➕ Add  color");
+
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        if ui
+                            .color_edit_button_rgb(&mut state.edit_state.color)
+                            .changed()
+                        {
+                            let mut e = img.clone();
+
+                            for p in e.pixels_mut() {
+                                p[0] = (p[0] as f32 + state.edit_state.color[0] * 255.) as u8;
+                                p[1] = (p[1] as f32 + state.edit_state.color[1] * 255.) as u8;
+                                p[2] = (p[2] as f32 + state.edit_state.color[2] * 255.) as u8;
+                            }
+                            state.current_texture = e.to_texture(gfx);
+                            state.edit_state.result = e;
+                        }
+                        if ui.button("Apply").clicked() {
+                            *img = state.edit_state.result.clone();
+                            changed = true;
+                        }
+                    }
+                });
+                ui.end_row();
+
+                ui.label("！ Invert colors");
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        if ui.button("Invert").clicked() {
+                            image::imageops::invert(img);
+                            state.current_texture = img.to_texture(gfx);
+                            changed = true;
+                        }
+                    }
+                });
+                ui.end_row();
+                ui.label("⬌ Flipping");
+
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        if ui.button("Horizontal").clicked() {
+                            *img = image::imageops::flip_horizontal(img);
+                            state.current_texture = img.to_texture(gfx);
+                        }
+
+                        if ui.button("Vertical").clicked() {
+                            *img = image::imageops::flip_vertical(img);
+                            state.current_texture = img.to_texture(gfx);
+                        }
+                    }
+                });
+                ui.end_row();
+
+                ui.label("💾 Save");
+                if let Some(img) = &mut state.current_image {
+                    let compatible_extensions = ["png", "jpg"];
+                    if let Some(path) = &state.current_path {
+                        if let Some(ext) = path.extension() {
+                            if compatible_extensions
+                                .contains(&ext.to_string_lossy().to_string().as_str())
+                            {
+                                if ui.button("Overwrite").clicked() {
+                                    let _ = img.save(path);
+                                }
+                            } else {
+                                if ui.button("Save as png").clicked() {
+                                    let _ = img.save(path.with_extension("png"));
+                                }
+                            }
+                        }
                     }
                 }
             });
-
-            // Blur
-            if let Some(img) = &mut state.current_image {
-                let response = ui
-                    .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.).text("💧 blur"));
-                if response.changed() {
-                    let img_blurred = image::imageops::blur(img, state.edit_state.blur);
-                    state.current_texture = img_blurred.to_texture(gfx);
-                    state.edit_state.result = img_blurred;
-                }
-                if response.drag_released() {
-                    *img = state.edit_state.result.clone();
-                    changed = true;
-
-                }
-            }
 
             // // Unsharp
             // if let Some(img) = &mut state.current_image {
@@ -333,127 +485,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             //         *img = state.edit_state.result.clone();
             //     }
             // }
-
-            // Contrast
-            if let Some(img) = &mut state.current_image {
-                let response = ui.add(
-                    egui::Slider::new(&mut state.edit_state.contrast, -100.0..=100.)
-                        .text("◑ Contrast"),
-                );
-                if response.changed() {
-                    let img_contrasted = image::imageops::contrast(img, state.edit_state.contrast);
-                    state.current_texture = img_contrasted.to_texture(gfx);
-                    state.edit_state.result = img_contrasted;
-                }
-                if response.drag_released() {
-                    *img = state.edit_state.result.clone();
-                    changed = true;
-
-                }
-            }
-
-            // Contrast
-            if let Some(img) = &mut state.current_image {
-                let response = ui.add(
-                    egui::Slider::new(&mut state.edit_state.brightness, -255..=255)
-                        .text("☀ Brightness"),
-                );
-                if response.changed() {
-                    let img_brightness =
-                        image::imageops::brighten(img, state.edit_state.brightness);
-                    state.current_texture = img_brightness.to_texture(gfx);
-                    state.edit_state.result = img_brightness;
-                }
-                if response.drag_released() {
-                    *img = state.edit_state.result.clone();
-                    changed = true;
-
-                }
-            }
-
-            ui.horizontal(|ui| {
-                ui.label("Mult color");
-                if let Some(img) = &mut state.current_image {
-                    let response = ui.color_edit_button_rgb(&mut state.edit_state.color);
-
-                    if response.changed() {
-                        let mut e = img.clone();
-
-                        for p in e.pixels_mut() {
-                            p[0] = (p[0] as f32 * state.edit_state.color[0]) as u8;
-                            p[1] = (p[1] as f32 * state.edit_state.color[1]) as u8;
-                            p[2] = (p[2] as f32 * state.edit_state.color[2]) as u8;
-                        }
-                        state.current_texture = e.to_texture(gfx);
-                        state.edit_state.result = e;
-                    }
-
-                    if ui.button("Apply").clicked() {
-                        // dbg!("rels clr");
-                        *img = state.edit_state.result.clone();
-                        changed = true;
-
-                    }
-                }
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Add  color");
-                if let Some(img) = &mut state.current_image {
-                    if ui
-                        .color_edit_button_rgb(&mut state.edit_state.color)
-                        .changed()
-                    {
-                        let mut e = img.clone();
-
-                        for p in e.pixels_mut() {
-                            p[0] = (p[0] as f32 + state.edit_state.color[0] * 255.) as u8;
-                            p[1] = (p[1] as f32 + state.edit_state.color[1] * 255.) as u8;
-                            p[2] = (p[2] as f32 + state.edit_state.color[2] * 255.) as u8;
-                        }
-                        state.current_texture = e.to_texture(gfx);
-                        state.edit_state.result = e;
-                    }
-                    if ui.button("Apply").clicked() {
-                        *img = state.edit_state.result.clone();
-                        changed = true;
-
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                if let Some(img) = &mut state.current_image {
-                    if ui.button("Invert").clicked() {
-                        image::imageops::invert(img);
-                        state.current_texture = img.to_texture(gfx);
-                        changed = true;
-
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                if let Some(img) = &mut state.current_image {
-                    if ui.button("↔ Flip horizontally").clicked() {
-                        *img = image::imageops::flip_horizontal(img);
-                        state.current_texture = img.to_texture(gfx);
-                    }
-
-                    if ui.button("↕ Flip vertically").clicked() {
-                        *img = image::imageops::flip_vertical(img);
-                        state.current_texture = img.to_texture(gfx);
-                    }
-                }
-            });
-
-            if let Some(img) = &mut state.current_image {
-                if let Some(path) = &state.current_path {
-                    if ui.button("💾 Save").clicked() {
-                        let _ = img.save(path);
-                    }
-                }
-
-                
-            }
 
             if changed && state.info_enabled {
                 state.image_info = None;
