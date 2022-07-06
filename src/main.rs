@@ -13,6 +13,7 @@ use notan::prelude::*;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::thread;
 use strum::IntoEnumIterator;
 
 mod utils;
@@ -183,6 +184,7 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
+        Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
         Event::WindowResize { width, height } => {
             let window_size = (width, height).size_vec();
             if let Some(current_image) = &state.current_image {
@@ -209,7 +211,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
 
-    if app.mouse.is_down(MouseButton::Left) {
+    if app.mouse.is_down(MouseButton::Left) && !state.mouse_grab{
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
@@ -237,6 +239,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 
+    // redraw if extended info is missing
+    if state.info_enabled && state.image_info.is_none() {
+        app.window().request_frame();
+    }
+
     if state.reset_image {
         let window_size = app.window().size().size_vec();
         if let Some(current_image) = &state.current_image {
@@ -247,6 +254,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
+            state.edit_state = Default::default();
             debug!("Done reset");
         }
     }
@@ -272,6 +280,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.reset_image = true;
         state.is_loaded = true;
         state.current_image = Some(img);
+        if state.info_enabled {
+            send_extended_info(&state.current_image, &state.extended_info_channel);
+
+        }
+    }
+
+    // check extended info has been sent
+    if let Ok(info) = state.extended_info_channel.1.try_recv() {
+        debug!("Received ext info");
+        state.image_info = Some(info);
     }
 
     // check if a new texture has been sent
@@ -290,10 +308,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             draw.pattern(texture)
                 .translate(state.offset.x as f32, state.offset.y as f32)
                 .scale(state.scale, state.scale)
-                .size(texture.width() * state.tiling as f32, texture.height() * state.tiling as f32)
-                ;
+                .size(
+                    texture.width() * state.tiling as f32,
+                    texture.height() * state.tiling as f32,
+                );
         }
-
     }
 
     let egui_output = plugins.egui(|ctx| {
@@ -395,18 +414,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 }
                             }
                         }
-                        tooltip(
-                            ui.checkbox(&mut state.info_enabled, "Extended info"),
+                        if tooltip(
+                            ui.checkbox(&mut state.info_enabled, "Image info"),
                             "Show image info",
                             "i",
                             ui,
-                        );
-                        // tooltip(
-                        //     ui.checkbox(&mut state.edit_enabled, "Image editing"),
-                        //     "Edit the image",
-                        //     "e",
-                        //     ui,
-                        // );
+                        ).changed() || app.keyboard.was_pressed(KeyCode::I) {
+                            send_extended_info(&state.current_image, &state.extended_info_channel);
+                        } 
+
+                        tooltip(
+                            ui.checkbox(&mut state.edit_enabled, "Image editing"),
+                            "Edit the image",
+                            "e",
+                            ui,
+                        ); 
                     }
 
                     // ui.add(egui::Separator::default().vertical());
@@ -475,7 +497,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         settings_ui(ctx, state);
-        edit_ui(ctx, state);
+        edit_ui(ctx, state, gfx);
+
+        // if there is interaction on the ui (dragging etc)
+        // we don't want zoom & pan to work, so we "grab" the pointer
+        if ctx.is_using_pointer() {
+            state.mouse_grab = true;
+        } else {
+            state.mouse_grab = false;
+
+        }
     });
 
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));

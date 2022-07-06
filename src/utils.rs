@@ -232,6 +232,18 @@ impl Channel {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct EditState {
+    pub color: [f32;3],
+    pub result: RgbaImage,
+    pub blur: f32,
+    pub unsharpen: f32,
+    pub unsharpen_threshold: i32,
+    pub contrast: f32,
+    pub brightness: i32,
+}
+
+
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
@@ -250,6 +262,8 @@ pub struct OculanteState {
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
     pub message_channel: (Sender<String>, Receiver<String>),
+    pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+    pub extended_info_loading: bool,
     pub player: Player,
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
@@ -258,7 +272,9 @@ pub struct OculanteState {
     pub settings_enabled: bool,
     pub edit_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
-    pub tiling: usize
+    pub tiling: usize,
+    pub mouse_grab: bool,
+    pub edit_state: EditState
 }
 
 impl Default for OculanteState {
@@ -280,6 +296,8 @@ impl Default for OculanteState {
             player: Player::new(tx_channel.0.clone()),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
+            extended_info_channel: mpsc::channel(),
+            extended_info_loading: false,
             mouse_delta: Default::default(),
             current_texture: Default::default(),
             current_image: Default::default(),
@@ -288,7 +306,9 @@ impl Default for OculanteState {
             settings_enabled: false,
             edit_enabled: false,
             image_info: None,
-            tiling: 1
+            tiling: 1,
+            mouse_grab: false,
+            edit_state: Default::default()
         }
     }
 }
@@ -532,6 +552,18 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image:
     }
 }
 
+pub fn send_extended_info(current_image: &Option<RgbaImage>, channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>)) {
+    if let Some(img) = current_image {
+        let copied_img = img.clone();
+        let sender = channel.0.clone();
+        thread::spawn(move || {
+            let e_info = ExtendedImageInfo::from_image(&copied_img);
+            let _ = sender.send(e_info);
+        });
+    }
+}
+
+
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     let img_location = img_location.clone();
@@ -703,7 +735,13 @@ pub trait ImageExt {
     fn to_texture(&self, _: &mut Graphics) -> Option<Texture> {
         unimplemented!()
     }
+
+    fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
+        unimplemented!()
+    }
 }
+
+
 
 impl ImageExt for RgbaImage {
     fn size_vec(&self) -> Vector2<f32> {
@@ -719,6 +757,7 @@ impl ImageExt for RgbaImage {
             .ok()
     }
 }
+
 impl ImageExt for (i32, i32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0 as f32, self.1 as f32)
