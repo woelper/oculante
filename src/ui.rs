@@ -260,7 +260,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             let mut changed = false;
 
             egui::Grid::new("editing").show(ui, |ui| {
-                ui.label("○ Rotation");
+                ui.label("🔃 Rotation");
                 ui.horizontal(|ui| {
                     if let Some(img) = &mut state.current_image {
                         if ui
