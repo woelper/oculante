@@ -386,36 +386,39 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     // ui.add(egui::Separator::default().vertical());
 
                     if state.current_image.is_some() {
-                        if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
-                            .clicked()
-                            || app.keyboard.was_pressed(KeyCode::Left)
-                        {
-                            if let Some(img_location) = state.current_path.as_mut() {
-                                let next_img = img_shift(&img_location, -1);
-                                // prevent reload if at last or first
-                                if &next_img != img_location {
-                                    state.is_loaded = false;
-                                    *img_location = next_img;
-                                    state.player.load(&img_location);
+                        if state.current_path.is_some() {
+                            if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
+                                .clicked()
+                                || app.keyboard.was_pressed(KeyCode::Left)
+                            {
+                                if let Some(img_location) = state.current_path.as_mut() {
+                                    let next_img = img_shift(&img_location, -1);
+                                    // prevent reload if at last or first
+                                    if &next_img != img_location {
+                                        state.is_loaded = false;
+                                        *img_location = next_img;
+                                        state.player.load(&img_location);
+                                    }
+                                }
+                            }
+                            if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
+                                .clicked()
+                                || app.keyboard.was_pressed(KeyCode::Right)
+                            {
+                                if let Some(img_location) = state.current_path.as_mut() {
+                                    let next_img = img_shift(&img_location, 1);
+                                    // prevent reload if at last or first
+                                    if &next_img != img_location {
+                                        state.is_loaded = false;
+                                        *img_location = next_img;
+                                        state.player.load(&img_location);
+                                    }
                                 }
                             }
                         }
-                        if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
-                            .clicked()
-                            || app.keyboard.was_pressed(KeyCode::Right)
-                        {
-                            if let Some(img_location) = state.current_path.as_mut() {
-                                let next_img = img_shift(&img_location, 1);
-                                // prevent reload if at last or first
-                                if &next_img != img_location {
-                                    state.is_loaded = false;
-                                    *img_location = next_img;
-                                    state.player.load(&img_location);
-                                }
-                            }
-                        }
+
                         if tooltip(
-                            ui.checkbox(&mut state.info_enabled, "Image info"),
+                            ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
                             "i",
                             ui,
@@ -427,7 +430,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
 
                         tooltip(
-                            ui.checkbox(&mut state.edit_enabled, "Image editing"),
+                            ui.checkbox(&mut state.edit_enabled, "✏ Edit"),
                             "Edit the image",
                             "e",
                             ui,
@@ -449,11 +452,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             .clicked()
                         {
                             if let Ok(clipboard) = &mut Clipboard::new() {
-                                let i = img.clone();
                                 let _ = clipboard.set_image(arboard::ImageData {
                                     width: img.width() as usize,
                                     height: img.height() as usize,
-                                    bytes: std::borrow::Cow::Borrowed(i.as_bytes()),
+                                    bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
                                 });
                             }
                         }
@@ -470,8 +472,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     imagedata.height as u32,
                                     (&imagedata.bytes).to_vec(),
                                 ) {
-                                    state.current_texture = image.to_texture(gfx);
-                                    state.current_image = Some(image);
+                                    let _ = state.player.image_sender.send(image);
+                                    // Since pasted data has no path, make sure it's not set
+                                    state.current_path = None;
                                 }
                             }
                         }
