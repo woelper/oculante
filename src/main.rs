@@ -1,7 +1,9 @@
 #![windows_subsystem = "windows"]
 
+use arboard::Clipboard;
 use clap::Arg;
 use clap::Command;
+use image::EncodableLayout;
 use log::debug;
 use log::error;
 use log::info;
@@ -200,7 +202,6 @@ fn event(state: &mut OculanteState, evt: Event) {
                 state.current_path = Some(p);
             }
         }
-
         _ => {}
     }
 }
@@ -211,7 +212,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
 
-    if app.mouse.is_down(MouseButton::Left) && !state.mouse_grab{
+    if app.mouse.is_down(MouseButton::Left) && !state.mouse_grab {
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
@@ -282,7 +283,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_image = Some(img);
         if state.info_enabled {
             send_extended_info(&state.current_image, &state.extended_info_channel);
-
         }
     }
 
@@ -419,16 +419,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             "Show image info",
                             "i",
                             ui,
-                        ).changed() || app.keyboard.was_pressed(KeyCode::I) {
+                        )
+                        .changed()
+                            || app.keyboard.was_pressed(KeyCode::I)
+                        {
                             send_extended_info(&state.current_image, &state.extended_info_channel);
-                        } 
+                        }
 
                         tooltip(
                             ui.checkbox(&mut state.edit_enabled, "Image editing"),
                             "Edit the image",
                             "e",
                             ui,
-                        ); 
+                        );
                     }
 
                     // ui.add(egui::Separator::default().vertical());
@@ -440,13 +443,38 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         app.window().set_fullscreen(!fullscreen);
                     }
 
-                    if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten()
+                    if let Some(img) = &state.current_image {
+                        if unframed_button("🗐 Copy", ui)
+                            .on_hover_text("Copy image to clipboard")
+                            .clicked()
+                        {
+                            if let Ok(clipboard) = &mut Clipboard::new() {
+                                let i = img.clone();
+                                let _ = clipboard.set_image(arboard::ImageData {
+                                    width: img.width() as usize,
+                                    height: img.height() as usize,
+                                    bytes: std::borrow::Cow::Borrowed(i.as_bytes()),
+                                });
+                            }
+                        }
+                    }
+
+                    if unframed_button("📋 Paste", ui)
+                        .on_hover_text("Paste image from clipboard")
+                        .clicked()
                     {
-                        ui.label(format!("{}", file.to_string_lossy()));
-                        ui.label(format!(
-                            "{}x{}",
-                            state.image_dimension.0, state.image_dimension.1
-                        ));
+                        if let Ok(clipboard) = &mut Clipboard::new() {
+                            if let Ok(imagedata) = clipboard.get_image() {
+                                if let Some(image) = image::RgbaImage::from_raw(
+                                    imagedata.width as u32,
+                                    imagedata.height as u32,
+                                    (&imagedata.bytes).to_vec(),
+                                ) {
+                                    state.current_texture = image.to_texture(gfx);
+                                    state.current_image = Some(image);
+                                }
+                            }
+                        }
                     }
 
                     if unframed_button("⛭", ui)
@@ -454,6 +482,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         .clicked()
                     {
                         state.settings_enabled = !state.settings_enabled;
+                    }
+                    if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten()
+                    {
+                        ui.label(format!("{}", file.to_string_lossy()));
+                        ui.label(format!(
+                            "{}x{}",
+                            state.image_dimension.0, state.image_dimension.1
+                        ));
                     }
                 });
             });
@@ -505,7 +541,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
-
         }
     });
 
