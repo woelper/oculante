@@ -1,7 +1,8 @@
+use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::RgbaImage;
+use image::{EncodableLayout, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
@@ -44,14 +45,6 @@ fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     // dbg!(p.0.iter());
     p.0 == [0, 0, 0, 0]
     // p.0[3] == 0 &&
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq)]
-pub enum HistogramData {
-    Red(u8),
-    Green(u8),
-    Blue(u8),
-    Gray(u8),
 }
 
 #[derive(Debug)]
@@ -234,7 +227,7 @@ impl Channel {
 
 #[derive(Debug, Default)]
 pub struct EditState {
-    pub color: [f32;3],
+    pub color: [f32; 3],
     pub result: RgbaImage,
     pub blur: f32,
     pub unsharpen: f32,
@@ -242,7 +235,6 @@ pub struct EditState {
     pub contrast: f32,
     pub brightness: i32,
 }
-
 
 /// The state of the application
 #[derive(Debug, AppState)]
@@ -274,7 +266,7 @@ pub struct OculanteState {
     pub image_info: Option<ExtendedImageInfo>,
     pub tiling: usize,
     pub mouse_grab: bool,
-    pub edit_state: EditState
+    pub edit_state: EditState,
 }
 
 impl Default for OculanteState {
@@ -308,7 +300,7 @@ impl Default for OculanteState {
             image_info: None,
             tiling: 1,
             mouse_grab: false,
-            edit_state: Default::default()
+            edit_state: Default::default(),
         }
     }
 }
@@ -552,7 +544,10 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image:
     }
 }
 
-pub fn send_extended_info(current_image: &Option<RgbaImage>, channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>)) {
+pub fn send_extended_info(
+    current_image: &Option<RgbaImage>,
+    channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+) {
     if let Some(img) = current_image {
         let copied_img = img.clone();
         let sender = channel.0.clone();
@@ -562,7 +557,6 @@ pub fn send_extended_info(current_image: &Option<RgbaImage>, channel: &(Sender<E
         });
     }
 }
-
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
@@ -741,8 +735,6 @@ pub trait ImageExt {
     }
 }
 
-
-
 impl ImageExt for RgbaImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
@@ -773,5 +765,15 @@ impl ImageExt for (f32, f32) {
 impl ImageExt for (u32, u32) {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.0 as f32, self.1 as f32)
+    }
+}
+
+pub fn clipboard_copy(img: &RgbaImage) {
+    if let Ok(clipboard) = &mut Clipboard::new() {
+        let _ = clipboard.set_image(arboard::ImageData {
+            width: img.width() as usize,
+            height: img.height() as usize,
+            bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
+        });
     }
 }

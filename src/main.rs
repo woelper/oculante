@@ -3,7 +3,6 @@
 use arboard::Clipboard;
 use clap::Arg;
 use clap::Command;
-use image::EncodableLayout;
 use log::debug;
 use log::error;
 use log::info;
@@ -15,7 +14,6 @@ use notan::prelude::*;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::thread;
 use strum::IntoEnumIterator;
 
 mod utils;
@@ -187,6 +185,9 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
         Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
+        Event::KeyDown {
+            key: KeyCode::Paste,
+        } => {}
         Event::WindowResize { width, height } => {
             let window_size = (width, height).size_vec();
             if let Some(current_image) = &state.current_image {
@@ -450,20 +451,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if unframed_button("🗐 Copy", ui)
                             .on_hover_text("Copy image to clipboard")
                             .clicked()
+                            || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::C))
                         {
-                            if let Ok(clipboard) = &mut Clipboard::new() {
-                                let _ = clipboard.set_image(arboard::ImageData {
-                                    width: img.width() as usize,
-                                    height: img.height() as usize,
-                                    bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
-                                });
-                            }
+                            clipboard_copy(img);
                         }
                     }
 
                     if unframed_button("📋 Paste", ui)
                         .on_hover_text("Paste image from clipboard")
                         .clicked()
+                        || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::V))
                     {
                         if let Ok(clipboard) = &mut Clipboard::new() {
                             if let Ok(imagedata) = clipboard.get_image() {

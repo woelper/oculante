@@ -42,18 +42,24 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 egui::Grid::new("info").show(ui, |ui| {
                     ui.label("Size");
 
-                    ui.label(RichText::new(format!(
-                        "{}x{}",
-                        state.image_dimension.0, state.image_dimension.1
-                    )).monospace());
+                    ui.label(
+                        RichText::new(format!(
+                            "{}x{}",
+                            state.image_dimension.0, state.image_dimension.1
+                        ))
+                        .monospace(),
+                    );
                     ui.end_row();
 
                     if let Some(path) = &state.current_path {
                         ui.label("File");
-                        ui.label(RichText::new(format!(
-                            "{}",
-                            path.file_name().unwrap_or_default().to_string_lossy()
-                        )).monospace())
+                        ui.label(
+                            RichText::new(format!(
+                                "{}",
+                                path.file_name().unwrap_or_default().to_string_lossy()
+                            ))
+                            .monospace(),
+                        )
                         .on_hover_text(format!("{}", path.display()));
                         ui.end_row();
                     }
@@ -291,7 +297,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if state.edit_state.blur == 0.0 {
                             state.current_texture = img.to_texture(gfx);
                             state.edit_state.result = img.clone();
-
                         } else {
                             let img_blurred = image::imageops::blur(img, state.edit_state.blur);
                             state.current_texture = img_blurred.to_texture(gfx);
