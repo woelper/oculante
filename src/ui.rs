@@ -263,6 +263,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("edit_panel")
         .min_width(360.)
         .show(&ctx, |ui| {
+            // A flag to indicate that the image needs to be rebuilt
             let mut changed = false;
 
             egui::Grid::new("editing").show(ui, |ui| {
@@ -275,12 +276,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .clicked()
                         {
                             *img = image::imageops::rotate90(img);
-                            state.current_texture = img.to_texture(gfx);
                             changed = true;
                         }
                         if ui.button("⟲").on_hover_text("Rotate 90 deg left").clicked() {
                             *img = image::imageops::rotate270(img);
-                            state.current_texture = img.to_texture(gfx);
                             changed = true;
                         }
                     }
@@ -288,119 +287,59 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 // Blur
-
                 ui.label("💧 Blur");
-
-                if let Some(img) = &mut state.current_image {
-                    let response = ui.add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.));
-                    if response.changed() {
-                        if state.edit_state.blur == 0.0 {
-                            state.current_texture = img.to_texture(gfx);
-                            state.edit_state.result = img.clone();
-                        } else {
-                            let img_blurred = image::imageops::blur(img, state.edit_state.blur);
-                            state.current_texture = img_blurred.to_texture(gfx);
-                            state.edit_state.result = img_blurred;
-                        }
-                    }
-                    if response.drag_released() {
-                        *img = state.edit_state.result.clone();
-                        changed = true;
-                    }
+                if ui
+                    .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.))
+                    .changed()
+                {
+                    changed = true;
                 }
                 ui.end_row();
 
                 // Contrast
                 ui.label("◑ Contrast");
-
-                if let Some(img) = &mut state.current_image {
-                    let response = ui.add(egui::Slider::new(
+                if ui
+                    .add(egui::Slider::new(
                         &mut state.edit_state.contrast,
                         -100.0..=100.,
-                    ));
-                    if response.changed() {
-                        let img_contrasted =
-                            image::imageops::contrast(img, state.edit_state.contrast);
-                        state.current_texture = img_contrasted.to_texture(gfx);
-                        state.edit_state.result = img_contrasted;
-                    }
-                    if response.drag_released() {
-                        *img = state.edit_state.result.clone();
-                        changed = true;
-                    }
+                    ))
+                    .changed()
+                {
+                    changed = true;
                 }
                 ui.end_row();
 
                 // Brightness
                 ui.label("☀ Brightness");
-
-                if let Some(img) = &mut state.current_image {
-                    let response = ui.add(egui::Slider::new(
+                if ui
+                    .add(egui::Slider::new(
                         &mut state.edit_state.brightness,
                         -255..=255,
-                    ));
-                    if response.changed() {
-                        let img_brightness =
-                            image::imageops::brighten(img, state.edit_state.brightness);
-                        state.current_texture = img_brightness.to_texture(gfx);
-                        state.edit_state.result = img_brightness;
-                    }
-                    if response.drag_released() {
-                        *img = state.edit_state.result.clone();
-                        changed = true;
-                    }
+                    ))
+                    .changed()
+                {
+                    changed = true;
                 }
                 ui.end_row();
 
                 ui.label("✖ Mult color");
-
                 ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        let response = ui.color_edit_button_rgb(&mut state.edit_state.color);
-
-                        if response.changed() {
-                            let mut e = img.clone();
-
-                            for p in e.pixels_mut() {
-                                p[0] = (p[0] as f32 * state.edit_state.color[0]) as u8;
-                                p[1] = (p[1] as f32 * state.edit_state.color[1]) as u8;
-                                p[2] = (p[2] as f32 * state.edit_state.color[2]) as u8;
-                            }
-                            state.current_texture = e.to_texture(gfx);
-                            state.edit_state.result = e;
-                        }
-
-                        if ui.button("Apply").clicked() {
-                            // dbg!("rels clr");
-                            *img = state.edit_state.result.clone();
-                            changed = true;
-                        }
+                    if ui
+                        .color_edit_button_rgb(&mut state.edit_state.color_mult)
+                        .changed()
+                    {
+                        changed = true;
                     }
                 });
                 ui.end_row();
 
                 ui.label("➕ Add  color");
-
                 ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        if ui
-                            .color_edit_button_rgb(&mut state.edit_state.color)
-                            .changed()
-                        {
-                            let mut e = img.clone();
-
-                            for p in e.pixels_mut() {
-                                p[0] = (p[0] as f32 + state.edit_state.color[0] * 255.) as u8;
-                                p[1] = (p[1] as f32 + state.edit_state.color[1] * 255.) as u8;
-                                p[2] = (p[2] as f32 + state.edit_state.color[2] * 255.) as u8;
-                            }
-                            state.current_texture = e.to_texture(gfx);
-                            state.edit_state.result = e;
-                        }
-                        if ui.button("Apply").clicked() {
-                            *img = state.edit_state.result.clone();
-                            changed = true;
-                        }
+                    if ui
+                        .color_edit_button_rgb(&mut state.edit_state.color_add)
+                        .changed()
+                    {
+                        changed = true;
                     }
                 });
                 ui.end_row();
@@ -410,44 +349,137 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if let Some(img) = &mut state.current_image {
                         if ui.button("Invert").clicked() {
                             image::imageops::invert(img);
-                            state.current_texture = img.to_texture(gfx);
                             changed = true;
                         }
                     }
                 });
                 ui.end_row();
-                ui.label("⬌ Flipping");
 
+                ui.label("⬌ Flipping");
                 ui.horizontal(|ui| {
                     if let Some(img) = &mut state.current_image {
                         if ui.button("Horizontal").clicked() {
                             *img = image::imageops::flip_horizontal(img);
-                            state.current_texture = img.to_texture(gfx);
+                            changed = true;
                         }
-
                         if ui.button("Vertical").clicked() {
                             *img = image::imageops::flip_vertical(img);
-                            state.current_texture = img.to_texture(gfx);
+                            changed = true;
                         }
                     }
                 });
                 ui.end_row();
 
+                ui.label("✂ Crop");
+                ui.horizontal(|ui| {
+                    let r1 = ui.add(
+                        egui::DragValue::new(&mut state.edit_state.crop[0])
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("left "),
+                    );
+                    let r2 = ui.add(
+                        egui::DragValue::new(&mut state.edit_state.crop[2])
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("right "),
+                    );
+                    let r3 = ui.add(
+                        egui::DragValue::new(&mut state.edit_state.crop[1])
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("top "),
+                    );
+                    let r4 = ui.add(
+                        egui::DragValue::new(&mut state.edit_state.crop[3])
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("bottom "),
+                    );
+                    // TODO rewrite with any
+                    if r1.changed() || r2.changed() || r3.changed() || r4.changed() {
+                        changed = true;
+                    }
+                });
+                ui.end_row();
+
+                ui.label("🔁 Reset");
+                if ui.button("Reset all edits").clicked() {
+                    state.edit_state = Default::default();
+                    changed = true
+                }
+                ui.end_row();
+
+                ui.label("❓ Compare");
+                ui.horizontal(|ui| {
+                    if ui.button("Unmodified").clicked() {
+                        if let Some(img) = &state.current_image {
+                            state.current_texture = img.to_texture(gfx);
+                        }
+                    }
+                    if ui.button("Modified").clicked() {
+                        changed = true;
+                    }
+                });
+                ui.end_row();
+
+                // Do the processing
+                if changed {
+                    if let Some(img) = &state.current_image {
+                        let sub_img = image::imageops::crop_imm(
+                            img,
+                            state.edit_state.crop[0].max(0) as u32,
+                            state.edit_state.crop[1].max(0) as u32,
+                            (img.width() as i32 - state.edit_state.crop[2]).max(0) as u32,
+                            (img.height() as i32 - state.edit_state.crop[3]).max(0) as u32,
+                        );
+                        state.edit_state.result = sub_img.to_image();
+
+                        if state.edit_state.blur != 0.0 {
+                            state.edit_state.result = image::imageops::blur(
+                                &state.edit_state.result,
+                                state.edit_state.blur,
+                            );
+                        }
+
+                        for p in state.edit_state.result.pixels_mut() {
+                            // mult
+                            p[0] = (p[0] as f32 * state.edit_state.color_mult[0]) as u8;
+                            p[1] = (p[1] as f32 * state.edit_state.color_mult[1]) as u8;
+                            p[2] = (p[2] as f32 * state.edit_state.color_mult[2]) as u8;
+                            // add
+                            p[0] = (p[0] as f32 + state.edit_state.color_add[0] * 255.) as u8;
+                            p[1] = (p[1] as f32 + state.edit_state.color_add[1] * 255.) as u8;
+                            p[2] = (p[2] as f32 + state.edit_state.color_add[2] * 255.) as u8;
+                        }
+
+                        state.edit_state.result = image::imageops::brighten(
+                            &state.edit_state.result,
+                            state.edit_state.brightness,
+                        );
+
+                        state.edit_state.result = image::imageops::contrast(
+                            &state.edit_state.result,
+                            state.edit_state.contrast,
+                        );
+                    }
+
+                    state.current_texture = state.edit_state.result.to_texture(gfx);
+                }
+
                 ui.label("💾 Save");
-                if let Some(img) = &mut state.current_image {
-                    let compatible_extensions = ["png", "jpg"];
-                    if let Some(path) = &state.current_path {
-                        if let Some(ext) = path.extension() {
-                            if compatible_extensions
-                                .contains(&ext.to_string_lossy().to_string().as_str())
-                            {
-                                if ui.button("Overwrite").clicked() {
-                                    let _ = img.save(path);
-                                }
-                            } else {
-                                if ui.button("Save as png").clicked() {
-                                    let _ = img.save(path.with_extension("png"));
-                                }
+                let compatible_extensions = ["png", "jpg"];
+                if let Some(path) = &state.current_path {
+                    if let Some(ext) = path.extension() {
+                        if compatible_extensions
+                            .contains(&ext.to_string_lossy().to_string().as_str())
+                        {
+                            if ui.button("Overwrite").clicked() {
+                                let _ = state.edit_state.result.save(path);
+                            }
+                        } else {
+                            if ui.button("Save as png").clicked() {
+                                let _ = state.edit_state.result.save(path.with_extension("png"));
                             }
                         }
                     }

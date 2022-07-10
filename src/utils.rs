@@ -225,15 +225,33 @@ impl Channel {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EditState {
-    pub color: [f32; 3],
+    pub color_mult: [f32; 3],
+    pub color_add: [f32; 3],
     pub result: RgbaImage,
     pub blur: f32,
     pub unsharpen: f32,
     pub unsharpen_threshold: i32,
     pub contrast: f32,
     pub brightness: i32,
+    pub crop: [i32; 4],
+}
+
+impl Default for EditState {
+    fn default() -> Self {
+        Self {
+            color_mult: [1., 1., 1.],
+            color_add: [0.,0.,0.],
+            result: RgbaImage::default(),
+            blur: 0.0,
+            unsharpen: 0.0,
+            unsharpen_threshold: 0,
+            contrast: 0.0,
+            brightness: 0,
+            crop: [0,0,0,0],
+        }
+    }
 }
 
 /// The state of the application
