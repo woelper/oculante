@@ -1,4 +1,5 @@
 use egui::plot::{Line, Plot, Value, Values};
+use image::Rgba;
 use notan::{
     egui::{self, plot::Points, *},
     prelude::Graphics,
@@ -423,6 +424,45 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
+                ui.label("🖊 Paint");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut state.edit_state.painting, "Enable painting");
+
+                    ui.color_edit_button_rgba_premultiplied(&mut state.edit_state.color_paint);
+
+                    if ui.button("↩").clicked() {
+                        let _ = state.edit_state.paint_lines.pop();
+                        let _ = state.edit_state.paint_lines.pop();
+                        changed = true;
+                    }
+
+                    if ui.button("⊗").clicked() {
+                        let _ = state.edit_state.paint_lines.clear();
+                        changed = true;
+
+                    }
+
+                    // If we have no lines, create an empty one
+                    if state.edit_state.paint_lines.is_empty() {
+                        state.edit_state.paint_lines.push(vec![]);
+                    }
+
+                    if state.edit_state.painting {
+                        if let Some(current_line) = state.edit_state.paint_lines.last_mut() {
+                            if ctx.input().pointer.primary_down() {
+                                // get pos in image
+                                let p = state.cursor_relative;
+                                // ui.label(format!("{}/{}", p.x, p.y));
+                                current_line.push(Pos2::new(p.x, p.y));
+                                changed = true;
+                            } else if !current_line.is_empty() {
+                                state.edit_state.paint_lines.push(vec![]);
+                            }
+                        }
+                    }
+                });
+                ui.end_row();
+
                 // Do the processing
                 if changed {
                     if let Some(img) = &state.current_image {
@@ -462,6 +502,23 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             &state.edit_state.result,
                             state.edit_state.contrast,
                         );
+
+                        // draw paint lines
+                        for line in &state.edit_state.paint_lines {
+                            for p in egui::Shape::dotted_line(line, Color32::DARK_RED, 1., 1.) {
+                                let pos = p.visual_bounding_rect().center();
+                                state.edit_state.result.put_pixel(
+                                    pos.x as u32,
+                                    pos.y as u32,
+                                    Rgba([
+                                        (state.edit_state.color_paint[0] * 255.) as u8,
+                                        (state.edit_state.color_paint[1] * 255.) as u8,
+                                        (state.edit_state.color_paint[2] * 255.) as u8,
+                                        (state.edit_state.color_paint[3] * 255.) as u8,
+                                    ]),
+                                );
+                            }
+                        }
                     }
 
                     state.current_texture = state.edit_state.result.to_texture(gfx);

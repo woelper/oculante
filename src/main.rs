@@ -218,7 +218,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.offset += state.mouse_delta;
     }
 
-    if state.info_enabled {
+    if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.offset,
             state.cursor,
@@ -537,7 +537,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() {
+        if ctx.is_using_pointer() || state.edit_state.painting {
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
@@ -547,7 +547,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);
-    if egui_output.needs_repaint() {
+    if egui_output.needs_repaint() || state.edit_state.painting {
         app.window().request_frame();
     }
 }

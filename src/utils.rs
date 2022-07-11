@@ -6,6 +6,7 @@ use image::{EncodableLayout, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
+use notan::egui::Pos2;
 use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
@@ -229,6 +230,7 @@ impl Channel {
 pub struct EditState {
     pub color_mult: [f32; 3],
     pub color_add: [f32; 3],
+    pub color_paint: [f32; 4],
     pub result: RgbaImage,
     pub blur: f32,
     pub unsharpen: f32,
@@ -236,20 +238,25 @@ pub struct EditState {
     pub contrast: f32,
     pub brightness: i32,
     pub crop: [i32; 4],
+    pub painting: bool,
+    pub paint_lines: Vec<Vec<Pos2>>,
 }
 
 impl Default for EditState {
     fn default() -> Self {
         Self {
             color_mult: [1., 1., 1.],
-            color_add: [0.,0.,0.],
+            color_add: Default::default(),
+            color_paint: [1., 0., 0., 1.],
             result: RgbaImage::default(),
-            blur: 0.0,
-            unsharpen: 0.0,
-            unsharpen_threshold: 0,
-            contrast: 0.0,
-            brightness: 0,
-            crop: [0,0,0,0],
+            blur: Default::default(),
+            unsharpen: Default::default(),
+            unsharpen_threshold: Default::default(),
+            contrast: Default::default(),
+            brightness: Default::default(),
+            crop: Default::default(),
+            painting: Default::default(),
+            paint_lines: Default::default(),
         }
     }
 }
