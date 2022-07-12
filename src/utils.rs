@@ -2,11 +2,12 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, RgbaImage};
+use image::imageops::FilterType::Lanczos3;
+use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::egui::Pos2;
+use notan::egui::{Color32, Pos2};
 use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
@@ -240,6 +241,7 @@ pub struct EditState {
     pub crop: [i32; 4],
     pub painting: bool,
     pub paint_lines: Vec<Vec<Pos2>>,
+    pub brushes: Vec<RgbaImage>,
 }
 
 impl Default for EditState {
@@ -257,6 +259,14 @@ impl Default for EditState {
             crop: Default::default(),
             painting: Default::default(),
             paint_lines: Default::default(),
+            brushes: vec![
+                image::load_from_memory(include_bytes!("brush1.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush2.png"))
+                    .unwrap()
+                    .into_rgba8(),
+            ],
         }
     }
 }
@@ -801,4 +811,39 @@ pub fn clipboard_copy(img: &RgbaImage) {
             bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
         });
     }
+}
+
+pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
+
+    // To test
+    // img.put_pixel(pos.x as u32, pos.y as u32, color_to_pixel(color));
+    // return;
+
+    let brush_offset = Pos2::new(brush.width() as f32 / 2., brush.height() as f32 / 2.);
+
+    for (b_x, b_y, b_pixel) in brush.enumerate_pixels() {
+        if let Some(p) = img.get_pixel_mut_checked(
+            (*pos - brush_offset).x as u32 + b_x,
+            (*pos - brush_offset).y as u32 + b_y,
+        ) {
+            // multiply brush with user color os it's tinted
+            let colored_pixel = Rgba([
+                (color[0] * b_pixel[0] as f32) as u8,
+                (color[1] * b_pixel[1] as f32) as u8,
+                (color[2] * b_pixel[2] as f32) as u8,
+                (color[3] * b_pixel[3] as f32) as u8,
+            ]);
+            // colored_pixel.blend(&color_to_pixel(color));
+            p.blend(&colored_pixel);
+        }
+    }
+}
+
+pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
+    Rgba([
+        (c[0] * 255.) as u8,
+        (c[1] * 255.) as u8,
+        (c[2] * 255.) as u8,
+        (c[3] * 255.) as u8,
+    ])
 }

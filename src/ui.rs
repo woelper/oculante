@@ -1,5 +1,5 @@
 use egui::plot::{Line, Plot, Value, Values};
-use image::Rgba;
+use image::{Rgba, imageops::FilterType::Gaussian};
 use notan::{
     egui::{self, plot::Points, *},
     prelude::Graphics,
@@ -8,8 +8,8 @@ use notan::{
 use crate::{
     update,
     utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ExtendedImageInfo, ImageExt, OculanteState,
+        color_to_pixel, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, paint_at,
+        send_extended_info, ExtendedImageInfo, ImageExt, OculanteState,
     },
 };
 
@@ -425,56 +425,84 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 ui.label("🖊 Paint");
-                ui.horizontal(|ui| {
-                    ui.checkbox(&mut state.edit_state.painting, "Enable painting");
+                ui.checkbox(&mut state.edit_state.painting, "Enable painting");
+                
+                if state.edit_state.painting {
+                    ui.end_row();
+                    ui.label("Color");
+                    ui.color_edit_button_rgba_unmultiplied(&mut state.edit_state.color_paint);
+                    ui.end_row();
+                
+                    ui.label("Strokes");
+                    ui.horizontal(|ui| {
 
-                    ui.color_edit_button_rgba_premultiplied(&mut state.edit_state.color_paint);
 
-                    if ui.button("↩").clicked() {
-                        let _ = state.edit_state.paint_lines.pop();
-                        let _ = state.edit_state.paint_lines.pop();
-                        changed = true;
-                    }
-
-                    if ui.button("⊗").clicked() {
-                        let _ = state.edit_state.paint_lines.clear();
-                        changed = true;
-
-                    }
-
-                    // If we have no lines, create an empty one
-                    if state.edit_state.paint_lines.is_empty() {
-                        state.edit_state.paint_lines.push(vec![]);
-                    }
-
-                    if state.edit_state.painting {
-                        if let Some(current_line) = state.edit_state.paint_lines.last_mut() {
-                            if ctx.input().pointer.primary_down() {
-                                // get pos in image
-                                let p = state.cursor_relative;
-                                // ui.label(format!("{}/{}", p.x, p.y));
-                                current_line.push(Pos2::new(p.x, p.y));
-                                changed = true;
-                            } else if !current_line.is_empty() {
-                                state.edit_state.paint_lines.push(vec![]);
+                        if ui.button("↩").clicked() {
+                            let _ = state.edit_state.paint_lines.pop();
+                            let _ = state.edit_state.paint_lines.pop();
+                            changed = true;
+                        }
+    
+                        if ui.button("⊗").clicked() {
+                            let _ = state.edit_state.paint_lines.clear();
+                            changed = true;
+                        }
+    
+                        // If we have no lines, create an empty one
+                        if state.edit_state.paint_lines.is_empty() {
+                            state.edit_state.paint_lines.push(vec![]);
+                        }
+    
+                        if state.edit_state.painting {
+                            if let Some(current_line) = state.edit_state.paint_lines.last_mut() {
+                                if ctx.input().pointer.primary_down() {
+                                    // get pos in image
+                                    let p = state.cursor_relative;
+                                    // ui.label(format!("{}/{}", p.x, p.y));
+                                    current_line.push(Pos2::new(p.x, p.y));
+                                    changed = true;
+                                } else if !current_line.is_empty() {
+                                    state.edit_state.paint_lines.push(vec![]);
+                                }
                             }
                         }
+                    });
+                
+                
+                }
+                
+              
+                ui.end_row();
+
+
+                ui.label("Apply edits");
+                if ui.button("Apply").on_hover_text("Apply all edits to the image and reset edit controls").clicked() {
+                    if let Some(img) = &mut state.current_image {
+                        *img = state.edit_state.result.clone();
+                        state.edit_state = Default::default();
+                        changed = true;
                     }
-                });
+                }
                 ui.end_row();
 
                 // Do the processing
                 if changed {
                     if let Some(img) = &state.current_image {
-                        let sub_img = image::imageops::crop_imm(
-                            img,
-                            state.edit_state.crop[0].max(0) as u32,
-                            state.edit_state.crop[1].max(0) as u32,
-                            (img.width() as i32 - state.edit_state.crop[2]).max(0) as u32,
-                            (img.height() as i32 - state.edit_state.crop[3]).max(0) as u32,
-                        );
-                        state.edit_state.result = sub_img.to_image();
+                        // test if there is cropping
+                        if state.edit_state.crop != [0, 0, 0, 0] {
+                            let sub_img = image::imageops::crop_imm(
+                                img,
+                                state.edit_state.crop[0].max(0) as u32,
+                                state.edit_state.crop[1].max(0) as u32,
+                                (img.width() as i32 - state.edit_state.crop[2]).max(0) as u32,
+                                (img.height() as i32 - state.edit_state.crop[3]).max(0) as u32,
+                            );
+                            state.edit_state.result = sub_img.to_image();
+                        } else {
+                            state.edit_state.result = img.clone();
+                        }
 
+                        // test if blur is changed
                         if state.edit_state.blur != 0.0 {
                             state.edit_state.result = image::imageops::blur(
                                 &state.edit_state.result,
@@ -482,40 +510,58 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             );
                         }
 
-                        for p in state.edit_state.result.pixels_mut() {
-                            // mult
-                            p[0] = (p[0] as f32 * state.edit_state.color_mult[0]) as u8;
-                            p[1] = (p[1] as f32 * state.edit_state.color_mult[1]) as u8;
-                            p[2] = (p[2] as f32 * state.edit_state.color_mult[2]) as u8;
-                            // add
-                            p[0] = (p[0] as f32 + state.edit_state.color_add[0] * 255.) as u8;
-                            p[1] = (p[1] as f32 + state.edit_state.color_add[1] * 255.) as u8;
-                            p[2] = (p[2] as f32 + state.edit_state.color_add[2] * 255.) as u8;
+                        // test if mult or add is modified
+                        if state.edit_state.color_mult != [1., 1., 1.]
+                            || state.edit_state.color_add != [0., 0., 0.]
+                        {
+                            for p in state.edit_state.result.pixels_mut() {
+                                // mult
+                                p[0] = (p[0] as f32 * state.edit_state.color_mult[0]) as u8;
+                                p[1] = (p[1] as f32 * state.edit_state.color_mult[1]) as u8;
+                                p[2] = (p[2] as f32 * state.edit_state.color_mult[2]) as u8;
+                                // add
+                                p[0] = (p[0] as f32 + state.edit_state.color_add[0] * 255.) as u8;
+                                p[1] = (p[1] as f32 + state.edit_state.color_add[1] * 255.) as u8;
+                                p[2] = (p[2] as f32 + state.edit_state.color_add[2] * 255.) as u8;
+                            }
                         }
 
-                        state.edit_state.result = image::imageops::brighten(
-                            &state.edit_state.result,
-                            state.edit_state.brightness,
-                        );
-
-                        state.edit_state.result = image::imageops::contrast(
-                            &state.edit_state.result,
-                            state.edit_state.contrast,
-                        );
+                        if state.edit_state.brightness != 0 {
+                            state.edit_state.result = image::imageops::brighten(
+                                &state.edit_state.result,
+                                state.edit_state.brightness,
+                            );
+                        }
+                        if state.edit_state.contrast != 0.0 {
+                            state.edit_state.result = image::imageops::contrast(
+                                &state.edit_state.result,
+                                state.edit_state.contrast,
+                            );
+                        }
 
                         // draw paint lines
+                        let active_brush = &state.edit_state.brushes[0];
+                        let fac = 0.5;
+                        let active_brush = image::imageops::resize(
+                            active_brush,
+                            (active_brush.width() as f32 * fac) as u32,
+                            (active_brush.height() as f32 * fac) as u32,
+                            Gaussian,
+                        );
                         for line in &state.edit_state.paint_lines {
-                            for p in egui::Shape::dotted_line(line, Color32::DARK_RED, 1., 1.) {
-                                let pos = p.visual_bounding_rect().center();
-                                state.edit_state.result.put_pixel(
-                                    pos.x as u32,
-                                    pos.y as u32,
-                                    Rgba([
-                                        (state.edit_state.color_paint[0] * 255.) as u8,
-                                        (state.edit_state.color_paint[1] * 255.) as u8,
-                                        (state.edit_state.color_paint[2] * 255.) as u8,
-                                        (state.edit_state.color_paint[3] * 255.) as u8,
-                                    ]),
+                            for p in egui::Shape::dotted_line(
+                                line,
+                                Color32::DARK_RED,
+                                active_brush.width() as f32 / 4.,
+                                0.,
+                            ) {
+                                let pos_on_line = p.visual_bounding_rect().center();
+
+                                paint_at(
+                                    &mut state.edit_state.result,
+                                    &active_brush,
+                                    &pos_on_line,
+                                    state.edit_state.color_paint,
                                 );
                             }
                         }
@@ -523,6 +569,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     state.current_texture = state.edit_state.result.to_texture(gfx);
                 }
+
+            
 
                 ui.label("💾 Save");
                 let compatible_extensions = ["png", "jpg"];

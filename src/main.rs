@@ -547,7 +547,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);
-    if egui_output.needs_repaint() || state.edit_state.painting {
+    if egui_output.needs_repaint() {
         app.window().request_frame();
     }
 }
