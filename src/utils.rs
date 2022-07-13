@@ -2,7 +2,6 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::imageops::FilterType::Lanczos3;
 use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
 
 use log::{debug, error};
@@ -12,30 +11,26 @@ use notan::graphics::{Texture, TextureFilter};
 use notan::prelude::Graphics;
 use notan::AppState;
 use std::collections::{HashMap, HashSet};
-// use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-// use exr::prelude::rgba_image as rgb_exr;
 
 use exr::prelude as exrs;
 use exr::prelude::*;
 
+use anyhow::{anyhow, Result};
 use image::Rgba;
 use image::{self, AnimationDecoder};
-//use nsvg;
 use lazy_static::lazy_static;
+use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
-// use libwebp_image;
-use anyhow::{anyhow, Result};
-use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use strum::Display;
 use strum_macros::EnumIter;
 
@@ -240,7 +235,8 @@ pub struct EditState {
     pub brightness: i32,
     pub crop: [i32; 4],
     pub painting: bool,
-    pub paint_lines: Vec<Vec<Pos2>>,
+    pub non_destructive_painting: bool,
+    pub paint_lines: Vec<PaintStroke>,
     pub brushes: Vec<RgbaImage>,
 }
 
@@ -258,6 +254,7 @@ impl Default for EditState {
             brightness: Default::default(),
             crop: Default::default(),
             painting: Default::default(),
+            non_destructive_painting: Default::default(),
             paint_lines: Default::default(),
             brushes: vec![
                 image::load_from_memory(include_bytes!("brush1.png"))
@@ -267,6 +264,57 @@ impl Default for EditState {
                     .unwrap()
                     .into_rgba8(),
             ],
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PaintStroke {
+    pub points: Vec<Pos2>,
+    pub fade: bool,
+    pub color: [f32; 4],
+    pub width: f32,
+    pub brush: RgbaImage,
+    pub highlight: bool
+}
+
+impl PaintStroke {
+    pub fn new(brush: RgbaImage) -> Self {
+        Self {
+            points: vec![],
+            fade: false,
+            color: [1., 1., 1., 1.],
+            width: 1.,
+            brush,
+            highlight: false
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
+
+    pub fn color(self, color: [f32;4]) -> Self {
+        Self {
+            color,
+            ..self
+        }
+    }
+
+    pub fn render(&self, img: &mut RgbaImage) {
+        for p in notan::egui::Shape::dotted_line(
+            &self.points,
+            Color32::DARK_RED,
+            self.brush.width() as f32 / 4.,
+            0.,
+        ) {
+            let pos_on_line = p.visual_bounding_rect().center();
+            let col = if self.highlight {
+                [self.color[0]*1.5, self.color[1]*1.5, self.color[2]*1.5, self.color[3]*1.5]
+            } else {
+                self.color
+            };
+            paint_at(img, &self.brush, &pos_on_line,col);
         }
     }
 }
@@ -302,6 +350,7 @@ pub struct OculanteState {
     pub tiling: usize,
     pub mouse_grab: bool,
     pub edit_state: EditState,
+    pub pointer_over_ui: bool,
 }
 
 impl Default for OculanteState {
@@ -336,6 +385,7 @@ impl Default for OculanteState {
             tiling: 1,
             mouse_grab: false,
             edit_state: Default::default(),
+            pointer_over_ui: Default::default(),
         }
     }
 }
@@ -814,7 +864,6 @@ pub fn clipboard_copy(img: &RgbaImage) {
 }
 
 pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
-
     // To test
     // img.put_pixel(pos.x as u32, pos.y as u32, color_to_pixel(color));
     // return;

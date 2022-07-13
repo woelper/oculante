@@ -507,7 +507,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             });
         }
 
-        info_ui(ctx, state, gfx);
+        if state.info_enabled {
+            info_ui(ctx, state, gfx);
+        }
+
+        if state.edit_enabled {
+            edit_ui(ctx, state, gfx);
+        }
 
         if !state.is_loaded {
             egui::Window::new("")
@@ -533,7 +539,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         settings_ui(ctx, state);
-        edit_ui(ctx, state, gfx);
+
+        state.pointer_over_ui = ctx.is_pointer_over_area();
+        // info!("using pointer {}", ctx.is_using_pointer());
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer

@@ -1,5 +1,6 @@
-use egui::plot::{Line, Plot, Value, Values};
-use image::{Rgba, imageops::FilterType::Gaussian};
+use egui::plot::{Plot, Value, Values};
+use image::{imageops::FilterType::Gaussian, Rgba};
+use log::info;
 use notan::{
     egui::{self, plot::Points, *},
     prelude::Graphics,
@@ -9,167 +10,165 @@ use crate::{
     update,
     utils::{
         color_to_pixel, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, paint_at,
-        send_extended_info, ExtendedImageInfo, ImageExt, OculanteState,
+        send_extended_info, ExtendedImageInfo, ImageExt, OculanteState, PaintStroke,
     },
 };
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if state.info_enabled {
-        if let Some(img) = &state.current_image {
-            if let Some(p) = img.get_pixel_checked(
-                state.cursor_relative.x as u32,
-                state.cursor_relative.y as u32,
-            ) {
-                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-            }
+    if let Some(img) = &state.current_image {
+        if let Some(p) = img.get_pixel_checked(
+            state.cursor_relative.x as u32,
+            state.cursor_relative.y as u32,
+        ) {
+            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
         }
+    }
 
-        egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-            if let Some(texture) = &state.current_texture {
-                // texture.
-                let tex_id = gfx.egui_register_texture(&texture);
+    egui::SidePanel::left("side_panel").show(&ctx, |ui| {
+        if let Some(texture) = &state.current_texture {
+            // texture.
+            let tex_id = gfx.egui_register_texture(&texture);
 
-                // width of image widget
-                let desired_width = ui.available_width();
+            // width of image widget
+            let desired_width = ui.available_width();
 
-                let scale = (desired_width / 8.) / texture.size().0;
-                let img_size = egui::Vec2::new(desired_width, desired_width);
+            let scale = (desired_width / 8.) / texture.size().0;
+            let img_size = egui::Vec2::new(desired_width, desired_width);
 
-                let uv_center = (
-                    state.cursor_relative.x / state.image_dimension.0 as f32,
-                    (state.cursor_relative.y / state.image_dimension.1 as f32),
+            let uv_center = (
+                state.cursor_relative.x / state.image_dimension.0 as f32,
+                (state.cursor_relative.y / state.image_dimension.1 as f32),
+            );
+
+            egui::Grid::new("info").show(ui, |ui| {
+                ui.label("Size");
+
+                ui.label(
+                    RichText::new(format!(
+                        "{}x{}",
+                        state.image_dimension.0, state.image_dimension.1
+                    ))
+                    .monospace(),
                 );
+                ui.end_row();
 
-                egui::Grid::new("info").show(ui, |ui| {
-                    ui.label("Size");
-
+                if let Some(path) = &state.current_path {
+                    ui.label("File");
                     ui.label(
                         RichText::new(format!(
-                            "{}x{}",
-                            state.image_dimension.0, state.image_dimension.1
+                            "{}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
                         ))
                         .monospace(),
-                    );
+                    )
+                    .on_hover_text(format!("{}", path.display()));
                     ui.end_row();
+                }
 
-                    if let Some(path) = &state.current_path {
-                        ui.label("File");
-                        ui.label(
-                            RichText::new(format!(
-                                "{}",
-                                path.file_name().unwrap_or_default().to_string_lossy()
-                            ))
-                            .monospace(),
-                        )
-                        .on_hover_text(format!("{}", path.display()));
-                        ui.end_row();
-                    }
-
-                    ui.label("🌗 RGBA");
-                    ui.label(
-                        RichText::new(format!("{}", disp_col(state.sampled_color)))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                    ui.end_row();
-
-                    ui.label("🌗 RGBA");
-                    ui.label(
-                        RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                    ui.end_row();
-
-                    ui.label("⊞ Pos");
-                    ui.label(
-                        RichText::new(format!(
-                            "{:.0},{:.0}",
-                            state.cursor_relative.x, state.cursor_relative.y
-                        ))
+                ui.label("🌗 RGBA");
+                ui.label(
+                    RichText::new(format!("{}", disp_col(state.sampled_color)))
                         .monospace()
                         .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                    ui.end_row();
-
-                    ui.label(" UV");
-                    ui.label(
-                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                    );
-                    ui.end_row();
-                });
-
-                // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 / texture.size().1;
-                let uv_size = (scale, scale * ratio);
-                let x = ui
-                    .add(
-                        egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
-                            uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                            uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                        )), // .bg_fill(egui::Color32::RED),
-                    )
-                    .rect;
-
-                let stroke_color = Color32::from_white_alpha(240);
-                let bg_color = Color32::BLACK.linear_multiply(0.5);
-                ui.painter_at(x).line_segment(
-                    [x.center_bottom(), x.center_top()],
-                    Stroke::new(4., bg_color),
                 );
-                ui.painter_at(x).line_segment(
-                    [x.left_center(), x.right_center()],
-                    Stroke::new(4., bg_color),
-                );
-                ui.painter_at(x).line_segment(
-                    [x.center_bottom(), x.center_top()],
-                    Stroke::new(1., stroke_color),
-                );
-                ui.painter_at(x).line_segment(
-                    [x.left_center(), x.right_center()],
-                    Stroke::new(1., stroke_color),
-                );
-                // ui.image(tex_id, img_size);
-            }
+                ui.end_row();
 
-            ui.vertical_centered_justified(|ui| {
-                if let Some(img) = &state.current_image {
-                    // if ui
-                    //     .button("Calculate extended info")
-                    //     .on_hover_text("Count unique colors in image")
-                    //     .clicked()
-                    // {
-                    //     state.image_info = Some(ExtendedImageInfo::from_image(img));
-                    // }
-                    if ui
-                        .button("Show alpha bleed")
-                        .on_hover_text("Highlight pixels with zero alpha and color information")
-                        .clicked()
-                    {
-                        state.current_texture = highlight_bleed(img).to_texture(gfx);
-                    }
-                    if ui
-                        .button("Show semi-transparent pixels")
-                        .on_hover_text(
-                            "Highlight pixels that are neither fully opaque not fully transparent",
-                        )
-                        .clicked()
-                    {
-                        state.current_texture = highlight_semitrans(img).to_texture(gfx);
-                    }
-                    if ui.button("Reset image").clicked() {
-                        state.current_texture = img.to_texture(gfx);
-                    }
+                ui.label("🌗 RGBA");
+                ui.label(
+                    RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
+                        .monospace()
+                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                );
+                ui.end_row();
 
-                    ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
-                }
+                ui.label("⊞ Pos");
+                ui.label(
+                    RichText::new(format!(
+                        "{:.0},{:.0}",
+                        state.cursor_relative.x, state.cursor_relative.y
+                    ))
+                    .monospace()
+                    .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                );
+                ui.end_row();
+
+                ui.label(" UV");
+                ui.label(
+                    RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
+                        .monospace()
+                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                );
+                ui.end_row();
             });
 
-            advanced_ui(ui, state);
+            // make sure aspect ratio is compensated for the square preview
+            let ratio = texture.size().0 / texture.size().1;
+            let uv_size = (scale, scale * ratio);
+            let x = ui
+                .add(
+                    egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
+                        uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
+                        uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
+                    )), // .bg_fill(egui::Color32::RED),
+                )
+                .rect;
+
+            let stroke_color = Color32::from_white_alpha(240);
+            let bg_color = Color32::BLACK.linear_multiply(0.5);
+            ui.painter_at(x).line_segment(
+                [x.center_bottom(), x.center_top()],
+                Stroke::new(4., bg_color),
+            );
+            ui.painter_at(x).line_segment(
+                [x.left_center(), x.right_center()],
+                Stroke::new(4., bg_color),
+            );
+            ui.painter_at(x).line_segment(
+                [x.center_bottom(), x.center_top()],
+                Stroke::new(1., stroke_color),
+            );
+            ui.painter_at(x).line_segment(
+                [x.left_center(), x.right_center()],
+                Stroke::new(1., stroke_color),
+            );
+            // ui.image(tex_id, img_size);
+        }
+
+        ui.vertical_centered_justified(|ui| {
+            if let Some(img) = &state.current_image {
+                // if ui
+                //     .button("Calculate extended info")
+                //     .on_hover_text("Count unique colors in image")
+                //     .clicked()
+                // {
+                //     state.image_info = Some(ExtendedImageInfo::from_image(img));
+                // }
+                if ui
+                    .button("Show alpha bleed")
+                    .on_hover_text("Highlight pixels with zero alpha and color information")
+                    .clicked()
+                {
+                    state.current_texture = highlight_bleed(img).to_texture(gfx);
+                }
+                if ui
+                    .button("Show semi-transparent pixels")
+                    .on_hover_text(
+                        "Highlight pixels that are neither fully opaque not fully transparent",
+                    )
+                    .clicked()
+                {
+                    state.current_texture = highlight_semitrans(img).to_texture(gfx);
+                }
+                if ui.button("Reset image").clicked() {
+                    state.current_texture = img.to_texture(gfx);
+                }
+
+                ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
+            }
         });
-    }
+
+        advanced_ui(ui, state);
+    });
 }
 
 pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
@@ -256,12 +255,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 
 /// Everything related to image editing
 pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    //    ui.color_edit_button_rgb(rgb)
-    if !state.edit_enabled {
-        return;
-    }
-
-    egui::SidePanel::right("edit_panel")
+    egui::SidePanel::right("editing")
         .min_width(360.)
         .show(&ctx, |ui| {
             // A flag to indicate that the image needs to be rebuilt
@@ -372,36 +366,38 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 ui.label("✂ Crop");
+
                 ui.horizontal(|ui| {
                     let r1 = ui.add(
                         egui::DragValue::new(&mut state.edit_state.crop[0])
                             .speed(4.)
                             .clamp_range(0..=10000)
-                            .prefix("left "),
+                            .prefix("⏴ "),
                     );
                     let r2 = ui.add(
                         egui::DragValue::new(&mut state.edit_state.crop[2])
                             .speed(4.)
                             .clamp_range(0..=10000)
-                            .prefix("right "),
+                            .prefix("⏵ "),
                     );
                     let r3 = ui.add(
                         egui::DragValue::new(&mut state.edit_state.crop[1])
                             .speed(4.)
                             .clamp_range(0..=10000)
-                            .prefix("top "),
+                            .prefix("⏶ "),
                     );
                     let r4 = ui.add(
                         egui::DragValue::new(&mut state.edit_state.crop[3])
                             .speed(4.)
                             .clamp_range(0..=10000)
-                            .prefix("bottom "),
+                            .prefix("⏷ "),
                     );
                     // TODO rewrite with any
                     if r1.changed() || r2.changed() || r3.changed() || r4.changed() {
                         changed = true;
                     }
                 });
+
                 ui.end_row();
 
                 ui.label("🔁 Reset");
@@ -426,57 +422,119 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 ui.label("🖊 Paint");
                 ui.checkbox(&mut state.edit_state.painting, "Enable painting");
-                
+
                 if state.edit_state.painting {
                     ui.end_row();
-                    ui.label("Color");
-                    ui.color_edit_button_rgba_unmultiplied(&mut state.edit_state.color_paint);
+
+                    ui.label("Non-destructive mode");
+                    ui.checkbox(&mut state.edit_state.non_destructive_painting, "");
                     ui.end_row();
-                
+
+                    ui.label("Color");
+                    if ui
+                        .color_edit_button_rgba_unmultiplied(&mut state.edit_state.color_paint)
+                        .changed()
+                    {
+                        changed = true;
+
+                        // update the last empty stroke (it's the template stroke)
+                        if let Some(stroke) = state.edit_state.paint_lines.last_mut() {
+                            if stroke.is_empty() {
+                                stroke.color = state.edit_state.color_paint;
+                            }
+                        }
+                    }
+                    ui.end_row();
+
+                    let mut delete_stroke: Option<usize> = None;
+
                     ui.label("Strokes");
+                    ui.vertical(|ui| {
+                        for (i, stroke) in state.edit_state.paint_lines.iter_mut().enumerate() {
+                            if stroke.is_empty() {
+                                continue;
+                            }
+
+                            ui.horizontal(|ui| {
+                                
+                                let r =  ui
+                                .color_edit_button_rgba_unmultiplied(&mut stroke.color);
+                                if
+                                    r.changed()
+                                {
+                                    changed = true;
+                                }
+
+                                if r.hovered() {
+                                    stroke.highlight = true;
+                                    changed = true;
+
+                                } else {
+                                    stroke.highlight = false;
+                                    changed = true;
+
+                                }
+
+                                if ui.button("⊗").clicked() {
+                                    delete_stroke = Some(i);
+                                }
+
+                            });
+                        }
+                    });
+                    ui.end_row();
+
                     ui.horizontal(|ui| {
-
-
                         if ui.button("↩").clicked() {
                             let _ = state.edit_state.paint_lines.pop();
                             let _ = state.edit_state.paint_lines.pop();
                             changed = true;
                         }
-    
-                        if ui.button("⊗").clicked() {
+
+                        if let Some(stroke_to_delete) = delete_stroke {
+                            state.edit_state.paint_lines.remove(stroke_to_delete);
+                            changed = true;
+
+                        }
+
+                        if ui.button("Clear").clicked() {
                             let _ = state.edit_state.paint_lines.clear();
                             changed = true;
                         }
-    
+
                         // If we have no lines, create an empty one
                         if state.edit_state.paint_lines.is_empty() {
-                            state.edit_state.paint_lines.push(vec![]);
+                            state.edit_state.paint_lines.push(
+                                PaintStroke::new(state.edit_state.brushes[0].clone())
+                                    .color(state.edit_state.color_paint),
+                            );
                         }
-    
-                        if state.edit_state.painting {
-                            if let Some(current_line) = state.edit_state.paint_lines.last_mut() {
-                                if ctx.input().pointer.primary_down() {
-                                    // get pos in image
-                                    let p = state.cursor_relative;
-                                    // ui.label(format!("{}/{}", p.x, p.y));
-                                    current_line.push(Pos2::new(p.x, p.y));
-                                    changed = true;
-                                } else if !current_line.is_empty() {
-                                    state.edit_state.paint_lines.push(vec![]);
-                                }
+
+                        if let Some(current_stroke) = state.edit_state.paint_lines.last_mut() {
+                            // if state.mouse_delta.x > 0.0 {
+                            if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
+                                info!("PAINT");
+                                // get pos in image
+                                let p = state.cursor_relative;
+                                current_stroke.points.push(Pos2::new(p.x, p.y));
+                                changed = true;
+                            } else if !current_stroke.is_empty() {
+                                state.edit_state.paint_lines.push(
+                                    PaintStroke::new(state.edit_state.brushes[0].clone())
+                                        .color(state.edit_state.color_paint),
+                                );
                             }
                         }
                     });
-                
-                
                 }
-                
-              
                 ui.end_row();
 
-
                 ui.label("Apply edits");
-                if ui.button("Apply").on_hover_text("Apply all edits to the image and reset edit controls").clicked() {
+                if ui
+                    .button("Apply")
+                    .on_hover_text("Apply all edits to the image and reset edit controls")
+                    .clicked()
+                {
                     if let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result.clone();
                         state.edit_state = Default::default();
@@ -487,7 +545,49 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 // Do the processing
                 if changed {
-                    if let Some(img) = &state.current_image {
+                    if let Some(img) = &mut state.current_image {
+                        let fac = 0.5;
+                        let active_brush = image::imageops::resize(
+                            &state.edit_state.brushes[0].clone(),
+                            (state.edit_state.brushes[0].width() as f32 * fac) as u32,
+                            (state.edit_state.brushes[0].height() as f32 * fac) as u32,
+                            Gaussian,
+                        );
+
+                        info!("{}", state.edit_state.paint_lines.len());
+
+                        // render previous strokes
+                        if state
+                            .edit_state
+                            .paint_lines
+                            .iter()
+                            .filter(|l| !l.points.is_empty())
+                            .count()
+                            > 1
+                            && !state.edit_state.non_destructive_painting
+                        {
+                            if let Some(first_line) = state.edit_state.paint_lines.first() {
+                                first_line.render(img);
+
+                                // for p in egui::Shape::dotted_line(
+                                //     first_line,
+                                //     Color32::DARK_RED,
+                                //     active_brush.width() as f32 / 4.,
+                                //     0.,
+                                // ) {
+                                //     let pos_on_line = p.visual_bounding_rect().center();
+
+                                //     paint_at(
+                                //         img,
+                                //         &active_brush,
+                                //         &pos_on_line,
+                                //         state.edit_state.color_paint,
+                                //     );
+                                // }
+                                state.edit_state.paint_lines.remove(0);
+                            }
+                        }
+
                         // test if there is cropping
                         if state.edit_state.crop != [0, 0, 0, 0] {
                             let sub_img = image::imageops::crop_imm(
@@ -540,37 +640,31 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
 
                         // draw paint lines
-                        let active_brush = &state.edit_state.brushes[0];
-                        let fac = 0.5;
-                        let active_brush = image::imageops::resize(
-                            active_brush,
-                            (active_brush.width() as f32 * fac) as u32,
-                            (active_brush.height() as f32 * fac) as u32,
-                            Gaussian,
-                        );
-                        for line in &state.edit_state.paint_lines {
-                            for p in egui::Shape::dotted_line(
-                                line,
-                                Color32::DARK_RED,
-                                active_brush.width() as f32 / 4.,
-                                0.,
-                            ) {
-                                let pos_on_line = p.visual_bounding_rect().center();
 
-                                paint_at(
-                                    &mut state.edit_state.result,
-                                    &active_brush,
-                                    &pos_on_line,
-                                    state.edit_state.color_paint,
-                                );
-                            }
+                        for stroke in &state.edit_state.paint_lines {
+                            stroke.render(&mut state.edit_state.result);
+
+                            // for p in egui::Shape::dotted_line(
+                            //     line,
+                            //     Color32::DARK_RED,
+                            //     active_brush.width() as f32 / 4.,
+                            //     0.,
+                            // ) {
+                            //     let pos_on_line = p.visual_bounding_rect().center();
+
+                            //     paint_at(
+                            //         &mut state.edit_state.result,
+                            //         &active_brush,
+                            //         &pos_on_line,
+                            //         state.edit_state.color_paint,
+                            //     );
+                            // }
                         }
                     }
 
+                    // update the current texture with the edit state
                     state.current_texture = state.edit_state.result.to_texture(gfx);
                 }
-
-            
 
                 ui.label("💾 Save");
                 let compatible_extensions = ["png", "jpg"];
@@ -591,46 +685,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
             });
 
-            // // Unsharp
-            // if let Some(img) = &mut state.current_image {
-            //     let response_amt = ui.add(
-            //         egui::Slider::new(&mut state.edit_state.unsharpen, 0.0..=20.)
-            //             .text("💧 unsharpen amt"),
-            //     );
-            //     let response_thresh = ui.add(
-            //         egui::Slider::new(&mut state.edit_state.unsharpen_threshold, 0..=20)
-            //             .text("💧 unsharpen threshold"),
-            //     );
-            //     if response_amt.changed() {
-            //         let img_blurred = image::imageops::unsharpen(
-            //             img,
-            //             state.edit_state.unsharpen,
-            //             state.edit_state.unsharpen_threshold,
-            //         );
-            //         state.current_texture = img_blurred.to_texture(gfx);
-            //         state.edit_state.result = img_blurred;
-            //     }
-            //     if response_amt.drag_released() {
-            //         *img = state.edit_state.result.clone();
-            //     }
-
-            //     if response_thresh.changed() {
-            //         let img_blurred = image::imageops::unsharpen(
-            //             img,
-            //             state.edit_state.unsharpen,
-            //             state.edit_state.unsharpen_threshold,
-            //         );
-            //         state.current_texture = img_blurred.to_texture(gfx);
-            //         state.edit_state.result = img_blurred;
-            //     }
-            //     if response_thresh.drag_released() {
-            //         *img = state.edit_state.result.clone();
-            //     }
-            // }
-
             if changed && state.info_enabled {
                 state.image_info = None;
-                send_extended_info(&state.current_image, &state.extended_info_channel);
+                send_extended_info(
+                    &Some(state.edit_state.result.clone()),
+                    &state.extended_info_channel,
+                );
             }
         });
 }
