@@ -438,7 +438,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         changed = true;
 
                         // update the last empty stroke (it's the template stroke)
-                        if let Some(stroke) = state.edit_state.paint_lines.last_mut() {
+                        if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
                             if stroke.is_empty() {
                                 stroke.color = state.edit_state.color_paint;
                             }
@@ -450,35 +450,28 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label("Strokes");
                     ui.vertical(|ui| {
-                        for (i, stroke) in state.edit_state.paint_lines.iter_mut().enumerate() {
+                        for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
                             if stroke.is_empty() {
                                 continue;
                             }
 
                             ui.horizontal(|ui| {
-                                
-                                let r =  ui
-                                .color_edit_button_rgba_unmultiplied(&mut stroke.color);
-                                if
-                                    r.changed()
-                                {
+                                let r = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
+                                if r.changed() {
                                     changed = true;
                                 }
 
                                 if r.hovered() {
                                     stroke.highlight = true;
                                     changed = true;
-
                                 } else {
                                     stroke.highlight = false;
                                     changed = true;
-
                                 }
 
                                 if ui.button("⊗").clicked() {
                                     delete_stroke = Some(i);
                                 }
-
                             });
                         }
                     });
@@ -486,31 +479,30 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.horizontal(|ui| {
                         if ui.button("↩").clicked() {
-                            let _ = state.edit_state.paint_lines.pop();
-                            let _ = state.edit_state.paint_lines.pop();
+                            let _ = state.edit_state.paint_strokes.pop();
+                            let _ = state.edit_state.paint_strokes.pop();
                             changed = true;
                         }
 
                         if let Some(stroke_to_delete) = delete_stroke {
-                            state.edit_state.paint_lines.remove(stroke_to_delete);
+                            state.edit_state.paint_strokes.remove(stroke_to_delete);
                             changed = true;
-
                         }
 
                         if ui.button("Clear").clicked() {
-                            let _ = state.edit_state.paint_lines.clear();
+                            let _ = state.edit_state.paint_strokes.clear();
                             changed = true;
                         }
 
                         // If we have no lines, create an empty one
-                        if state.edit_state.paint_lines.is_empty() {
-                            state.edit_state.paint_lines.push(
+                        if state.edit_state.paint_strokes.is_empty() {
+                            state.edit_state.paint_strokes.push(
                                 PaintStroke::new(state.edit_state.brushes[0].clone())
                                     .color(state.edit_state.color_paint),
                             );
                         }
 
-                        if let Some(current_stroke) = state.edit_state.paint_lines.last_mut() {
+                        if let Some(current_stroke) = state.edit_state.paint_strokes.last_mut() {
                             // if state.mouse_delta.x > 0.0 {
                             if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
                                 info!("PAINT");
@@ -519,7 +511,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 current_stroke.points.push(Pos2::new(p.x, p.y));
                                 changed = true;
                             } else if !current_stroke.is_empty() {
-                                state.edit_state.paint_lines.push(
+                                state.edit_state.paint_strokes.push(
                                     PaintStroke::new(state.edit_state.brushes[0].clone())
                                         .color(state.edit_state.color_paint),
                                 );
@@ -554,19 +546,19 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             Gaussian,
                         );
 
-                        info!("{}", state.edit_state.paint_lines.len());
+                        info!("{}", state.edit_state.paint_strokes.len());
 
                         // render previous strokes
                         if state
                             .edit_state
-                            .paint_lines
+                            .paint_strokes
                             .iter()
                             .filter(|l| !l.points.is_empty())
                             .count()
                             > 1
                             && !state.edit_state.non_destructive_painting
                         {
-                            if let Some(first_line) = state.edit_state.paint_lines.first() {
+                            if let Some(first_line) = state.edit_state.paint_strokes.first() {
                                 first_line.render(img);
 
                                 // for p in egui::Shape::dotted_line(
@@ -584,7 +576,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 //         state.edit_state.color_paint,
                                 //     );
                                 // }
-                                state.edit_state.paint_lines.remove(0);
+                                state.edit_state.paint_strokes.remove(0);
                             }
                         }
 
@@ -641,7 +633,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                         // draw paint lines
 
-                        for stroke in &state.edit_state.paint_lines {
+                        for stroke in &state.edit_state.paint_strokes {
                             stroke.render(&mut state.edit_state.result);
 
                             // for p in egui::Shape::dotted_line(

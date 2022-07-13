@@ -236,7 +236,7 @@ pub struct EditState {
     pub crop: [i32; 4],
     pub painting: bool,
     pub non_destructive_painting: bool,
-    pub paint_lines: Vec<PaintStroke>,
+    pub paint_strokes: Vec<PaintStroke>,
     pub brushes: Vec<RgbaImage>,
 }
 
@@ -255,7 +255,7 @@ impl Default for EditState {
             crop: Default::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
-            paint_lines: Default::default(),
+            paint_strokes: Default::default(),
             brushes: vec![
                 image::load_from_memory(include_bytes!("brush1.png"))
                     .unwrap()
@@ -275,7 +275,7 @@ pub struct PaintStroke {
     pub color: [f32; 4],
     pub width: f32,
     pub brush: RgbaImage,
-    pub highlight: bool
+    pub highlight: bool,
 }
 
 impl PaintStroke {
@@ -286,7 +286,7 @@ impl PaintStroke {
             color: [1., 1., 1., 1.],
             width: 1.,
             brush,
-            highlight: false
+            highlight: false,
         }
     }
 
@@ -294,11 +294,8 @@ impl PaintStroke {
         self.points.is_empty()
     }
 
-    pub fn color(self, color: [f32;4]) -> Self {
-        Self {
-            color,
-            ..self
-        }
+    pub fn color(self, color: [f32; 4]) -> Self {
+        Self { color, ..self }
     }
 
     pub fn render(&self, img: &mut RgbaImage) {
@@ -310,11 +307,16 @@ impl PaintStroke {
         ) {
             let pos_on_line = p.visual_bounding_rect().center();
             let col = if self.highlight {
-                [self.color[0]*1.5, self.color[1]*1.5, self.color[2]*1.5, self.color[3]*1.5]
+                [
+                    self.color[0] * 1.5,
+                    self.color[1] * 1.5,
+                    self.color[2] * 1.5,
+                    self.color[3] * 1.5,
+                ]
             } else {
                 self.color
             };
-            paint_at(img, &self.brush, &pos_on_line,col);
+            paint_at(img, &self.brush, &pos_on_line, col);
         }
     }
 }
