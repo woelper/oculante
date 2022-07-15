@@ -173,12 +173,15 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 fn event(state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_y, .. } => {
-            let delta = zoomratio(delta_y, state.scale);
-            let new_scale = state.scale + delta;
-            // limit scale
-            if new_scale > 0.05 && new_scale < 40. {
-                state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                state.scale += delta;
+            if !state.pointer_over_ui {
+
+                let delta = zoomratio(delta_y, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+                    state.scale += delta;
+                }
             }
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,

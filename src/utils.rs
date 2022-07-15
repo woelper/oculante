@@ -237,6 +237,7 @@ pub struct EditState {
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
+    pub paint_fade: bool,
     pub brushes: Vec<RgbaImage>,
 }
 
@@ -256,6 +257,7 @@ impl Default for EditState {
             painting: Default::default(),
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
+            paint_fade: false,
             brushes: vec![
                 image::load_from_memory(include_bytes!("brush1.png"))
                     .unwrap()
@@ -268,23 +270,31 @@ impl Default for EditState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PaintStroke {
     pub points: Vec<Pos2>,
     pub fade: bool,
     pub color: [f32; 4],
-    pub width: f32,
+    pub width: u32,
     pub brush: RgbaImage,
     pub highlight: bool,
 }
 
 impl PaintStroke {
+
+    pub fn without_points(&self) -> Self {
+        Self {
+            points: vec![],
+            ..self.clone()
+        }
+    }
+
     pub fn new(brush: RgbaImage) -> Self {
         Self {
             points: vec![],
             fade: false,
             color: [1., 1., 1., 1.],
-            width: 1.,
+            width: 16,
             brush,
             highlight: false,
         }
@@ -299,24 +309,31 @@ impl PaintStroke {
     }
 
     pub fn render(&self, img: &mut RgbaImage) {
-        for p in notan::egui::Shape::dotted_line(
+        let brush  = image::imageops::resize(&self.brush, self.width, self.width, image::imageops::Gaussian);
+        let points = notan::egui::Shape::dotted_line(
             &self.points,
             Color32::DARK_RED,
-            self.brush.width() as f32 / 4.,
+            (brush.width() as f32 / 4.).max(1.0),
             0.,
-        ) {
+        );
+
+
+        for (i, p) in points.iter().enumerate() {
             let pos_on_line = p.visual_bounding_rect().center();
-            let col = if self.highlight {
-                [
-                    self.color[0] * 1.5,
-                    self.color[1] * 1.5,
-                    self.color[2] * 1.5,
-                    self.color[3] * 1.5,
-                ]
-            } else {
-                self.color
-            };
-            paint_at(img, &self.brush, &pos_on_line, col);
+
+            let mut stroke_color = self.color;
+
+            if self.fade {
+                let fraction = i as f32 / points.len() as f32;
+                stroke_color[3] = stroke_color[3] * fraction;
+            }
+            if self.highlight {
+                stroke_color[0] *= 2.5;
+                stroke_color[1] *= 2.5;
+                stroke_color[2] *= 2.5;
+                stroke_color[3] *= 2.5;
+            }
+            paint_at(img, &brush, &pos_on_line, stroke_color);
         }
     }
 }
