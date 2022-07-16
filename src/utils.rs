@@ -265,6 +265,12 @@ impl Default for EditState {
                 image::load_from_memory(include_bytes!("brush2.png"))
                     .unwrap()
                     .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush3.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush4.png"))
+                    .unwrap()
+                    .into_rgba8(),
             ],
         }
     }
@@ -276,12 +282,11 @@ pub struct PaintStroke {
     pub fade: bool,
     pub color: [f32; 4],
     pub width: u32,
-    pub brush: RgbaImage,
+    pub brush_index: usize,
     pub highlight: bool,
 }
 
 impl PaintStroke {
-
     pub fn without_points(&self) -> Self {
         Self {
             points: vec![],
@@ -289,13 +294,13 @@ impl PaintStroke {
         }
     }
 
-    pub fn new(brush: RgbaImage) -> Self {
+    pub fn new() -> Self {
         Self {
             points: vec![],
             fade: false,
             color: [1., 1., 1., 1.],
             width: 16,
-            brush,
+            brush_index: 0,
             highlight: false,
         }
     }
@@ -308,15 +313,19 @@ impl PaintStroke {
         Self { color, ..self }
     }
 
-    pub fn render(&self, img: &mut RgbaImage) {
-        let brush  = image::imageops::resize(&self.brush, self.width, self.width, image::imageops::Gaussian);
+    pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
+        let brush = image::imageops::resize(
+            &brushes[self.brush_index],
+            self.width,
+            self.width,
+            image::imageops::Gaussian,
+        );
         let points = notan::egui::Shape::dotted_line(
             &self.points,
             Color32::DARK_RED,
             (brush.width() as f32 / 4.).max(1.0),
             0.,
         );
-
 
         for (i, p) in points.iter().enumerate() {
             let pos_on_line = p.visual_bounding_rect().center();

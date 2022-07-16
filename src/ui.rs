@@ -1,7 +1,7 @@
 use std::fmt::format;
 
 use egui::plot::{Plot, Value, Values};
-use image::{imageops::FilterType::Gaussian, Rgba};
+use image::{imageops::FilterType::Gaussian, Rgba, RgbaImage};
 use log::{debug, info};
 use notan::{
     egui::{self, plot::Points, *},
@@ -451,31 +451,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
                         if stroke.is_empty() {
-                            ui.label("◎ Brush color");
-                            if ui
-                                .color_edit_button_rgba_unmultiplied(&mut stroke.color)
-                                .changed()
-                            {
-                                changed = true;
-                            }
+                            ui.label("Color");
+                            ui.label("Fade");
+                            ui.label("Width");
+                            ui.label("idx");
                             ui.end_row();
 
-                            ui.label("⏺ Brush width");
-
-                            if ui
-                                .add(egui::Slider::new(&mut stroke.width, 1..=64))
-                                .changed()
-                            {
-                                changed = true;
-                            }
-
-                            ui.end_row();
-
-                            ui.label("〰 Brush fade");
-                            if ui.checkbox(&mut stroke.fade, "").changed() {
-                                changed = true;
-                            }
-                            ui.end_row();
+                            stroke_ui(stroke, &state.edit_state.brushes, ui);
                         }
                     }
                 });
@@ -507,53 +489,59 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     egui::ScrollArea::vertical()
                         .min_scrolled_height(64.)
                         .show(ui, |ui| {
-                            ui.vertical(|ui| {
-                                egui::Grid::new("stroke").show(ui, |ui| {
-                                    ui.label("Color");
-                                    ui.label("Fade");
-                                    ui.label("Width");
-                                    ui.label("Del");
-                                    ui.end_row();
-
-                                    for (i, stroke) in
-                                        state.edit_state.paint_strokes.iter_mut().enumerate()
-                                    {
-                                        if stroke.is_empty() {
-                                            continue;
-                                        }
-
-                                        let mut hovered = false;
-
-                                        if ui
-                                            .color_edit_button_rgba_unmultiplied(&mut stroke.color)
-                                            .hovered()
-                                        {
-                                            hovered = true;
-                                        }
-
-                                        if ui.checkbox(&mut stroke.fade, "").hovered() {
-                                            hovered = true;
-                                        }
-
-                                        if ui.add(egui::DragValue::new(&mut stroke.width)).hovered()
-                                        {
-                                            hovered = true;
-                                        }
-
-                                        if ui.button("⊗").clicked() {
-                                            delete_stroke = Some(i);
-                                        }
-                                        if hovered {
-                                            stroke.highlight = true;
-                                            changed = true;
-                                        } else {
-                                            stroke.highlight = false;
-                                            changed = true;
-                                        }
+                            let mut stroke_lost_highlight = false;
+                            if ui
+                                .vertical(|ui| {
+                                    egui::Grid::new("stroke").show(ui, |ui| {
+                                        ui.label("Color");
+                                        ui.label("Fade");
+                                        ui.label("Width");
+                                        ui.label("Brush");
+                                        ui.label("Del");
                                         ui.end_row();
-                                    }
-                                });
-                            });
+
+                                        for (i, stroke) in
+                                            state.edit_state.paint_strokes.iter_mut().enumerate()
+                                        {
+                                            if stroke.is_empty() {
+                                                continue;
+                                            }
+
+                                            let r =
+                                                stroke_ui(stroke, &state.edit_state.brushes, ui);
+                                            if r.changed() {
+                                                changed = true;
+                                            }
+
+                                            if r.hovered() {
+                                                changed = true;
+                                                stroke.highlight = true;
+                                            } else {
+                                                stroke.highlight = false;
+                                                stroke_lost_highlight = true;
+                                            }
+
+                                            // safety catch to update brush highlights
+                                            if r.clicked_elsewhere() {
+                                                changed = true;
+                                            }
+
+                                            if ui.button("⊗").clicked() {
+                                                delete_stroke = Some(i);
+                                            }
+                                            ui.end_row();
+                                        }
+                                    });
+                                })
+                                .response
+                                .hovered()
+                            {
+                                // only update if this outer response is triggered, so we don't trigger it all the time
+                                if stroke_lost_highlight {
+                                    info!("stroke highlight off");
+                                    changed = true;
+                                }
+                            }
                         });
                     if let Some(stroke_to_delete) = delete_stroke {
                         state.edit_state.paint_strokes.remove(stroke_to_delete);
@@ -566,10 +554,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.horizontal(|ui| {
                     // If we have no lines, create an empty one
                     if state.edit_state.paint_strokes.is_empty() {
-                        state.edit_state.paint_strokes.push(
-                            PaintStroke::new(state.edit_state.brushes[0].clone())
-                                .color(state.edit_state.color_paint),
-                        );
+                        state
+                            .edit_state
+                            .paint_strokes
+                            .push(PaintStroke::new().color(state.edit_state.color_paint));
                     }
 
                     if let Some(current_stroke) = state.edit_state.paint_strokes.last_mut() {
@@ -632,25 +620,16 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             > 1
                             && !state.edit_state.non_destructive_painting
                         {
-                            info!("initial strokes: {}", state.edit_state.paint_strokes.len());
+                            // info!("initial strokes: {}", state.edit_state.paint_strokes.len());
 
                             // commit first line
                             if let Some(first_line) = state.edit_state.paint_strokes.first() {
-                                first_line.render(img);
+                                first_line.render(img, &state.edit_state.brushes);
                                 state.edit_state.paint_strokes.remove(0);
                             }
 
-                            info!("strokes left: {}", state.edit_state.paint_strokes.len());
+                            // info!("strokes left: {}", state.edit_state.paint_strokes.len());
                         }
-
-                        // if let Some(last_line) = state.edit_state.paint_strokes.get_mut(0) {
-                        //     info!("got last line {:?}", last_line.points);
-                        //     last_line.render(img);
-
-                        //     if let Some(last_point) = last_line.points.last() {
-                        //         last_line.points = vec![*last_point];
-                        //     }
-                        // }
                     }
 
                     // test if there is cropping
@@ -705,23 +684,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     // draw paint lines
 
                     for stroke in &state.edit_state.paint_strokes {
-                        stroke.render(&mut state.edit_state.result);
-
-                        // for p in egui::Shape::dotted_line(
-                        //     line,
-                        //     Color32::DARK_RED,
-                        //     active_brush.width() as f32 / 4.,
-                        //     0.,
-                        // ) {
-                        //     let pos_on_line = p.visual_bounding_rect().center();
-
-                        //     paint_at(
-                        //         &mut state.edit_state.result,
-                        //         &active_brush,
-                        //         &pos_on_line,
-                        //         state.edit_state.color_paint,
-                        //     );
-                        // }
+                        stroke.render(&mut state.edit_state.result, &state.edit_state.brushes);
                     }
                 }
 
@@ -771,4 +734,48 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, ui: &mut Ui) -> Respons
 
 pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
     ui.add(egui::Button::new(text).frame(false))
+}
+
+pub fn stroke_ui(stroke: &mut PaintStroke, brushes: &Vec<RgbaImage>, ui: &mut Ui) -> Response {
+    let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
+
+    let r = ui.checkbox(&mut stroke.fade, "");
+    if r.changed() {
+        combined_response.changed = true;
+    }
+    if r.hovered() {
+        combined_response.hovered = true;
+    }
+    let r = ui.add(egui::DragValue::new(&mut stroke.width));
+    if r.changed() {
+        combined_response.changed = true;
+    }
+    if r.hovered() {
+        combined_response.hovered = true;
+    }
+    let r = egui::ComboBox::from_id_source(format!("s {:?}", stroke.points))
+        .selected_text(format!("Brush {}", stroke.brush_index))
+        .show_ui(ui, |ui| {
+            for (b_i, b) in brushes.iter().enumerate() {
+                if ui
+                    .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {}", b_i))
+                    .clicked()
+                {
+                    combined_response.changed = true
+                }
+            }
+        })
+        .response;
+    if r.hovered() {
+        combined_response.hovered = true;
+    }
+    if combined_response.hovered() {
+        stroke.highlight = true;
+    } else {
+        stroke.highlight = false;
+    }
+    if combined_response.changed() {
+        stroke.highlight = false;
+    }
+    combined_response
 }
