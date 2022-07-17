@@ -7,7 +7,7 @@ use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::egui::{Color32, Pos2};
-use notan::graphics::{Texture, TextureFilter};
+use notan::graphics::{Texture, TextureFilter, TextureWrap};
 use notan::prelude::Graphics;
 use notan::AppState;
 use std::collections::{HashMap, HashSet};
@@ -271,6 +271,9 @@ impl Default for EditState {
                 image::load_from_memory(include_bytes!("brush4.png"))
                     .unwrap()
                     .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush5.png"))
+                    .unwrap()
+                    .into_rgba8(),
             ],
         }
     }
@@ -323,7 +326,7 @@ impl PaintStroke {
         let points = notan::egui::Shape::dotted_line(
             &self.points,
             Color32::DARK_RED,
-            (brush.width() as f32 / 4.).max(1.0),
+            (brush.width() as f32 / 4.0).max(1.5), // .min(60.)
             0.,
         );
 
@@ -843,6 +846,10 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
+        unimplemented!()
+    }
+
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
     }
@@ -857,9 +864,17 @@ impl ImageExt for RgbaImage {
         gfx.create_texture()
             .from_bytes(&self, self.width() as i32, self.height() as i32)
             // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
             .build()
             .ok()
+    }
+
+    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
+        gfx.update_texture(texture)
+            .with_data(&self)
+            .update()
+            .unwrap();
     }
 }
 

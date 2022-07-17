@@ -478,7 +478,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             let _ = state.edit_state.paint_strokes.pop();
                             changed = true;
                         }
-                        if ui.button("Clear").clicked() {
+                        if ui.button("Clear all").clicked() {
                             let _ = state.edit_state.paint_strokes.clear();
                             changed = true;
                         }
@@ -538,7 +538,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             {
                                 // only update if this outer response is triggered, so we don't trigger it all the time
                                 if stroke_lost_highlight {
-                                    info!("stroke highlight off");
                                     changed = true;
                                 }
                             }
@@ -583,18 +582,19 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.end_row();
 
-            ui.label("Apply edits");
-            if ui
-                .button("Apply")
-                .on_hover_text("Apply all edits to the image and reset edit controls")
-                .clicked()
-            {
-                if let Some(img) = &mut state.current_image {
-                    *img = state.edit_state.result.clone();
-                    state.edit_state = Default::default();
-                    changed = true;
+            ui.vertical_centered_justified(|ui| {
+                if ui
+                    .button("Apply all edits")
+                    .on_hover_text("Apply all edits to the image and reset edit controls")
+                    .clicked()
+                {
+                    if let Some(img) = &mut state.current_image {
+                        *img = state.edit_state.result.clone();
+                        state.edit_state = Default::default();
+                        changed = true;
+                    }
                 }
-            }
+            });
 
             // Do the processing
             if changed {
@@ -625,6 +625,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             // commit first line
                             if let Some(first_line) = state.edit_state.paint_strokes.first() {
                                 first_line.render(img, &state.edit_state.brushes);
+                                info!("Committed stroke");
                                 state.edit_state.paint_strokes.remove(0);
                             }
 
@@ -682,31 +683,50 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
 
                     // draw paint lines
-
+                    let stamp = std::time::Instant::now();
                     for stroke in &state.edit_state.paint_strokes {
                         stroke.render(&mut state.edit_state.result, &state.edit_state.brushes);
                     }
+                    debug!("Stroke rendering took {}s", stamp.elapsed().as_secs_f64());
                 }
 
                 // update the current texture with the edit state
-                state.current_texture = state.edit_state.result.to_texture(gfx);
-            }
+                // let stamp = std::time::Instant::now();
+                // state.current_texture = state.edit_state.result.to_texture(gfx);
+                // info!("New tex took {}s", stamp.elapsed().as_secs_f64());
 
-            ui.label("💾 Save");
-            let compatible_extensions = ["png", "jpg"];
-            if let Some(path) = &state.current_path {
-                if let Some(ext) = path.extension() {
-                    if compatible_extensions.contains(&ext.to_string_lossy().to_string().as_str()) {
-                        if ui.button("Overwrite").clicked() {
-                            let _ = state.edit_state.result.save(path);
-                        }
-                    } else {
-                        if ui.button("Save as png").clicked() {
-                            let _ = state.edit_state.result.save(path.with_extension("png"));
+                let stamp = std::time::Instant::now();
+                if let Some(tex) = &mut state.current_texture {
+                    if let Some(img) = &state.current_image {
+                        if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
+                            info!("uPD");
+                            state.edit_state.result.update_texture(gfx, tex);
+                        } else {
+                            state.current_texture = state.edit_state.result.to_texture(gfx);
                         }
                     }
                 }
+                info!("Upd tex took {}s", stamp.elapsed().as_secs_f64());
             }
+
+            ui.vertical_centered_justified(|ui| {
+                let compatible_extensions = ["png", "jpg"];
+                if let Some(path) = &state.current_path {
+                    if let Some(ext) = path.extension() {
+                        if compatible_extensions
+                            .contains(&ext.to_string_lossy().to_string().as_str())
+                        {
+                            if ui.button("💾 Overwrite").clicked() {
+                                let _ = state.edit_state.result.save(path);
+                            }
+                        } else {
+                            if ui.button("💾 Save as png").clicked() {
+                                let _ = state.edit_state.result.save(path.with_extension("png"));
+                            }
+                        }
+                    }
+                }
+            });
 
             if changed && state.info_enabled {
                 state.image_info = None;
