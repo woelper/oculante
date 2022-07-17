@@ -2,38 +2,35 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, RgbaImage};
+use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::graphics::{Texture, TextureFilter};
+use notan::egui::{Color32, Pos2};
+use notan::graphics::{Texture, TextureFilter, TextureWrap};
 use notan::prelude::Graphics;
 use notan::AppState;
 use std::collections::{HashMap, HashSet};
-// use piston_window::{CharacterCache, Text};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-// use exr::prelude::rgba_image as rgb_exr;
 
 use exr::prelude as exrs;
 use exr::prelude::*;
 
+use anyhow::{anyhow, Result};
 use image::Rgba;
 use image::{self, AnimationDecoder};
-//use nsvg;
 use lazy_static::lazy_static;
+use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
-// use libwebp_image;
-use anyhow::{anyhow, Result};
-use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use strum::Display;
 use strum_macros::EnumIter;
 
@@ -229,6 +226,7 @@ impl Channel {
 pub struct EditState {
     pub color_mult: [f32; 3],
     pub color_add: [f32; 3],
+    pub color_paint: [f32; 4],
     pub result: RgbaImage,
     pub blur: f32,
     pub unsharpen: f32,
@@ -236,20 +234,118 @@ pub struct EditState {
     pub contrast: f32,
     pub brightness: i32,
     pub crop: [i32; 4],
+    pub painting: bool,
+    pub non_destructive_painting: bool,
+    pub paint_strokes: Vec<PaintStroke>,
+    pub paint_fade: bool,
+    pub brushes: Vec<RgbaImage>,
 }
 
 impl Default for EditState {
     fn default() -> Self {
         Self {
             color_mult: [1., 1., 1.],
-            color_add: [0.,0.,0.],
+            color_add: Default::default(),
+            color_paint: [1., 0., 0., 1.],
             result: RgbaImage::default(),
-            blur: 0.0,
-            unsharpen: 0.0,
-            unsharpen_threshold: 0,
-            contrast: 0.0,
-            brightness: 0,
-            crop: [0,0,0,0],
+            blur: Default::default(),
+            unsharpen: Default::default(),
+            unsharpen_threshold: Default::default(),
+            contrast: Default::default(),
+            brightness: Default::default(),
+            crop: Default::default(),
+            painting: Default::default(),
+            non_destructive_painting: Default::default(),
+            paint_strokes: Default::default(),
+            paint_fade: false,
+            brushes: vec![
+                image::load_from_memory(include_bytes!("brush1.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush2.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush3.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush4.png"))
+                    .unwrap()
+                    .into_rgba8(),
+                image::load_from_memory(include_bytes!("brush5.png"))
+                    .unwrap()
+                    .into_rgba8(),
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PaintStroke {
+    pub points: Vec<Pos2>,
+    pub fade: bool,
+    pub color: [f32; 4],
+    pub width: u32,
+    pub brush_index: usize,
+    pub highlight: bool,
+}
+
+impl PaintStroke {
+    pub fn without_points(&self) -> Self {
+        Self {
+            points: vec![],
+            ..self.clone()
+        }
+    }
+
+    pub fn new() -> Self {
+        Self {
+            points: vec![],
+            fade: false,
+            color: [1., 1., 1., 1.],
+            width: 16,
+            brush_index: 0,
+            highlight: false,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
+
+    pub fn color(self, color: [f32; 4]) -> Self {
+        Self { color, ..self }
+    }
+
+    pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
+        let brush = image::imageops::resize(
+            &brushes[self.brush_index],
+            self.width,
+            self.width,
+            image::imageops::Gaussian,
+        );
+        let points = notan::egui::Shape::dotted_line(
+            &self.points,
+            Color32::DARK_RED,
+            (brush.width() as f32 / 4.0).max(1.5), // .min(60.)
+            0.,
+        );
+
+        for (i, p) in points.iter().enumerate() {
+            let pos_on_line = p.visual_bounding_rect().center();
+
+            let mut stroke_color = self.color;
+
+            if self.fade {
+                let fraction = i as f32 / points.len() as f32;
+                stroke_color[3] = stroke_color[3] * fraction;
+            }
+            if self.highlight {
+                stroke_color[0] *= 2.5;
+                stroke_color[1] *= 2.5;
+                stroke_color[2] *= 2.5;
+                stroke_color[3] *= 2.5;
+            }
+            paint_at(img, &brush, &pos_on_line, stroke_color);
         }
     }
 }
@@ -285,6 +381,7 @@ pub struct OculanteState {
     pub tiling: usize,
     pub mouse_grab: bool,
     pub edit_state: EditState,
+    pub pointer_over_ui: bool,
 }
 
 impl Default for OculanteState {
@@ -319,6 +416,7 @@ impl Default for OculanteState {
             tiling: 1,
             mouse_grab: false,
             edit_state: Default::default(),
+            pointer_over_ui: Default::default(),
         }
     }
 }
@@ -748,6 +846,14 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    fn to_texture_premult(&self, _: &mut Graphics) -> Option<Texture> {
+        unimplemented!()
+    }
+
+    fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
+        unimplemented!()
+    }
+
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
     }
@@ -762,9 +868,27 @@ impl ImageExt for RgbaImage {
         gfx.create_texture()
             .from_bytes(&self, self.width() as i32, self.height() as i32)
             // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
             .build()
             .ok()
+    }
+
+    fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.create_texture()
+            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .with_premultiplied_alpha()
+            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
+            .build()
+            .ok()
+    }
+
+    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
+        gfx.update_texture(texture)
+            .with_data(&self)
+            .update()
+            .unwrap();
     }
 }
 
@@ -794,4 +918,38 @@ pub fn clipboard_copy(img: &RgbaImage) {
             bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
         });
     }
+}
+
+pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
+    // To test
+    // img.put_pixel(pos.x as u32, pos.y as u32, color_to_pixel(color));
+    // return;
+
+    let brush_offset = Pos2::new(brush.width() as f32 / 2., brush.height() as f32 / 2.);
+
+    for (b_x, b_y, b_pixel) in brush.enumerate_pixels() {
+        if let Some(p) = img.get_pixel_mut_checked(
+            (*pos - brush_offset).x as u32 + b_x,
+            (*pos - brush_offset).y as u32 + b_y,
+        ) {
+            // multiply brush with user color os it's tinted
+            let colored_pixel = Rgba([
+                (color[0] * b_pixel[0] as f32) as u8,
+                (color[1] * b_pixel[1] as f32) as u8,
+                (color[2] * b_pixel[2] as f32) as u8,
+                (color[3] * b_pixel[3] as f32) as u8,
+            ]);
+            // colored_pixel.blend(&color_to_pixel(color));
+            p.blend(&colored_pixel);
+        }
+    }
+}
+
+pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
+    Rgba([
+        (c[0] * 255.) as u8,
+        (c[1] * 255.) as u8,
+        (c[2] * 255.) as u8,
+        (c[3] * 255.) as u8,
+    ])
 }

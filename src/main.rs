@@ -173,12 +173,15 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 fn event(state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_y, .. } => {
-            let delta = zoomratio(delta_y, state.scale);
-            let new_scale = state.scale + delta;
-            // limit scale
-            if new_scale > 0.05 && new_scale < 40. {
-                state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                state.scale += delta;
+            if !state.pointer_over_ui {
+
+                let delta = zoomratio(delta_y, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+                    state.scale += delta;
+                }
             }
         }
         Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
@@ -218,7 +221,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.offset += state.mouse_delta;
     }
 
-    if state.info_enabled {
+    if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.offset,
             state.cursor,
@@ -321,6 +324,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(25.)
             .show(&ctx, |ui| {
                 ui.horizontal(|ui| {
+
                     ui.heading("Channels");
 
                     let mut changed_channels = false;
@@ -507,7 +511,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             });
         }
 
-        info_ui(ctx, state, gfx);
+        if state.info_enabled {
+            info_ui(ctx, state, gfx);
+        }
+
+        if state.edit_enabled {
+            edit_ui(ctx, state, gfx);
+        }
 
         if !state.is_loaded {
             egui::Window::new("")
@@ -533,11 +543,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         settings_ui(ctx, state);
-        edit_ui(ctx, state, gfx);
+
+        state.pointer_over_ui = ctx.is_pointer_over_area();
+        // info!("using pointer {}", ctx.is_using_pointer());
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() {
+        if ctx.is_using_pointer() || state.edit_state.painting {
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
