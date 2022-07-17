@@ -6,7 +6,7 @@ use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::egui::{Color32, Pos2};
+use notan::egui::{Color32, Pos2, self};
 use notan::graphics::{Texture, TextureFilter, TextureWrap};
 use notan::prelude::Graphics;
 use notan::AppState;
@@ -233,6 +233,7 @@ pub struct EditState {
     pub unsharpen_threshold: i32,
     pub contrast: f32,
     pub brightness: i32,
+    pub desaturate: f32,
     pub crop: [i32; 4],
     pub painting: bool,
     pub non_destructive_painting: bool,
@@ -253,6 +254,7 @@ impl Default for EditState {
             unsharpen_threshold: Default::default(),
             contrast: Default::default(),
             brightness: Default::default(),
+            desaturate: Default::default(),
             crop: Default::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
@@ -952,4 +954,12 @@ pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
         (c[2] * 255.) as u8,
         (c[3] * 255.) as u8,
     ])
+}
+
+pub fn desaturate(p: &mut Rgba<u8>, factor: f32) {
+    // G*.59+R*.3+B*.11
+    let val = p[0] as f32 * 0.59 + p[1] as f32 * 0.3 + p[2] as f32 * 0.11; 
+    p[0] = egui::lerp(p[0] as f32..=val, factor) as u8;
+    p[1] = egui::lerp(p[1] as f32..=val, factor) as u8;
+    p[2] = egui::lerp(p[2] as f32..=val, factor) as u8;
 }

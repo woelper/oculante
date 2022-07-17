@@ -1,5 +1,5 @@
 use egui::plot::{Plot, Value, Values};
-use image::{RgbaImage};
+use image::RgbaImage;
 use log::{debug, info};
 use notan::{
     egui::{self, plot::Points, *},
@@ -9,7 +9,7 @@ use notan::{
 use crate::{
     update,
     utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
+        desaturate, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
         send_extended_info, ImageExt, OculanteState, PaintStroke,
     },
 };
@@ -297,14 +297,19 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                // Blur
-                ui.label_i("💧 Blur");
-                if ui
-                    .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.))
-                    .changed()
-                {
-                    changed = true;
-                }
+                ui.label_i("⬌ Flipping");
+                ui.horizontal(|ui| {
+                    if let Some(img) = &mut state.current_image {
+                        if ui.button("Horizontal").clicked() {
+                            *img = image::imageops::flip_horizontal(img);
+                            changed = true;
+                        }
+                        if ui.button("Vertical").clicked() {
+                            *img = image::imageops::flip_vertical(img);
+                            changed = true;
+                        }
+                    }
+                });
                 ui.end_row();
 
                 // Contrast
@@ -326,6 +331,19 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     .add(egui::Slider::new(
                         &mut state.edit_state.brightness,
                         -255..=255,
+                    ))
+                    .changed()
+                {
+                    changed = true;
+                }
+                ui.end_row();
+
+                // Brightness
+                ui.label_i("🌁 Desaturate");
+                if ui
+                    .add(egui::Slider::new(
+                        &mut state.edit_state.desaturate,
+                        0.0..=1.0,
                     ))
                     .changed()
                 {
@@ -366,22 +384,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                ui.label_i("⬌ Flipping");
-
-                ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        if ui.button("Horizontal").clicked() {
-                            *img = image::imageops::flip_horizontal(img);
-                            changed = true;
-                        }
-                        if ui.button("Vertical").clicked() {
-                            *img = image::imageops::flip_vertical(img);
-                            changed = true;
-                        }
-                    }
-                });
-                ui.end_row();
-
                 ui.label_i("✂ Crop");
 
                 ui.horizontal(|ui| {
@@ -415,6 +417,16 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                 });
 
+                ui.end_row();
+
+                // Blur
+                ui.label_i("💧 Blur");
+                if ui
+                    .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.))
+                    .changed()
+                {
+                    changed = true;
+                }
                 ui.end_row();
 
                 ui.label_i("🔁 Reset");
@@ -611,14 +623,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
                     }
                 });
-
             }
 
             // Do the processing
             if changed {
                 if let Some(img) = &mut state.current_image {
                     if state.edit_state.painting {
-
                         debug!("Num strokes {}", state.edit_state.paint_strokes.len());
 
                         // render previous strokes
@@ -667,8 +677,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     // test if mult or add is modified
                     if state.edit_state.color_mult != [1., 1., 1.]
                         || state.edit_state.color_add != [0., 0., 0.]
+                        || state.edit_state.desaturate != 0.0
                     {
                         for p in state.edit_state.result.pixels_mut() {
+                            desaturate(p, state.edit_state.desaturate);
                             // mult
                             p[0] = (p[0] as f32 * state.edit_state.color_mult[0]) as u8;
                             p[1] = (p[1] as f32 * state.edit_state.color_mult[1]) as u8;
@@ -677,6 +689,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             p[0] = (p[0] as f32 + state.edit_state.color_add[0] * 255.) as u8;
                             p[1] = (p[1] as f32 + state.edit_state.color_add[1] * 255.) as u8;
                             p[2] = (p[2] as f32 + state.edit_state.color_add[2] * 255.) as u8;
+
                         }
                     }
 
@@ -709,7 +722,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // let stamp = std::time::Instant::now();
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
-                        if tex.width() as u32 == state.edit_state.result.width() && state.edit_state.result.height() as u32 == img.height()
+                        if tex.width() as u32 == state.edit_state.result.width()
+                            && state.edit_state.result.height() as u32 == img.height()
                         {
                             state.edit_state.result.update_texture(gfx, tex);
                         } else {
