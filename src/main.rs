@@ -324,6 +324,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(25.)
             .show(&ctx, |ui| {
                 ui.horizontal(|ui| {
+
                     ui.heading("Channels");
 
                     let mut changed_channels = false;

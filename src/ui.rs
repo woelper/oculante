@@ -1,7 +1,5 @@
-use std::fmt::format;
-
 use egui::plot::{Plot, Value, Values};
-use image::{imageops::FilterType::Gaussian, Rgba, RgbaImage};
+use image::{RgbaImage};
 use log::{debug, info};
 use notan::{
     egui::{self, plot::Points, *},
@@ -11,10 +9,33 @@ use notan::{
 use crate::{
     update,
     utils::{
-        color_to_pixel, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, paint_at,
-        send_extended_info, ExtendedImageInfo, ImageExt, OculanteState, PaintStroke,
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
+        send_extended_info, ImageExt, OculanteState, PaintStroke,
     },
 };
+pub trait EguiExt {
+    fn label_i(&mut self, _text: &str) -> Response {
+        unimplemented!()
+    }
+}
+
+impl EguiExt for Ui {
+    /// Draw a justified icon from a string starting with an emoji
+    fn label_i(&mut self, text: &str) -> Response {
+        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        self.horizontal(|ui| {
+            ui.add_sized(
+                egui::Vec2::new(28., ui.available_height()),
+                egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
+            );
+            ui.label(
+                RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
+            );
+        })
+        .response
+    }
+}
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
@@ -43,7 +64,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             );
 
             egui::Grid::new("info").show(ui, |ui| {
-                ui.label("Size");
+                ui.label_i("⬜ Size");
 
                 ui.label(
                     RichText::new(format!(
@@ -55,7 +76,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 if let Some(path) = &state.current_path {
-                    ui.label("File");
+                    ui.label_i("🖻 File");
                     ui.label(
                         RichText::new(format!(
                             "{}",
@@ -67,7 +88,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ui.end_row();
                 }
 
-                ui.label("🌗 RGBA");
+                ui.label_i("🌗 RGBA");
                 ui.label(
                     RichText::new(format!("{}", disp_col(state.sampled_color)))
                         .monospace()
@@ -75,7 +96,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
                 ui.end_row();
 
-                ui.label("🌗 RGBA");
+                ui.label_i("🌗 RGBA");
                 ui.label(
                     RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
                         .monospace()
@@ -83,7 +104,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
                 ui.end_row();
 
-                ui.label("⊞ Pos");
+                ui.label_i("⊞ Pos");
                 ui.label(
                     RichText::new(format!(
                         "{:.0},{:.0}",
@@ -94,7 +115,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
                 ui.end_row();
 
-                ui.label(" UV");
+                ui.label_i(" UV");
                 ui.label(
                     RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
                         .monospace()
@@ -257,7 +278,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             let mut changed = false;
 
             egui::Grid::new("editing").show(ui, |ui| {
-                ui.label("🔃 Rotation");
+                ui.label_i("🔃 Rotation");
                 ui.horizontal(|ui| {
                     if let Some(img) = &mut state.current_image {
                         if ui
@@ -277,7 +298,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 // Blur
-                ui.label("💧 Blur");
+                ui.label_i("💧 Blur");
                 if ui
                     .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.))
                     .changed()
@@ -287,7 +308,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 // Contrast
-                ui.label("◑ Contrast");
+                ui.label_i("◑ Contrast");
                 if ui
                     .add(egui::Slider::new(
                         &mut state.edit_state.contrast,
@@ -300,7 +321,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.end_row();
 
                 // Brightness
-                ui.label("☀ Brightness");
+                ui.label_i("☀ Brightness");
                 if ui
                     .add(egui::Slider::new(
                         &mut state.edit_state.brightness,
@@ -312,7 +333,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
                 ui.end_row();
 
-                ui.label("✖ Mult color");
+                ui.label_i("✖ Mult color");
                 ui.horizontal(|ui| {
                     if ui
                         .color_edit_button_rgb(&mut state.edit_state.color_mult)
@@ -323,7 +344,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                ui.label("➕ Add  color");
+                ui.label_i("➕ Add  color");
                 ui.horizontal(|ui| {
                     if ui
                         .color_edit_button_rgb(&mut state.edit_state.color_add)
@@ -334,7 +355,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                ui.label("！ Invert");
+                ui.label_i("！ Invert");
                 ui.horizontal(|ui| {
                     if let Some(img) = &mut state.current_image {
                         if ui.button("Invert colors").clicked() {
@@ -345,7 +366,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                ui.label("⬌ Flipping");
+                ui.label_i("⬌ Flipping");
 
                 ui.horizontal(|ui| {
                     if let Some(img) = &mut state.current_image {
@@ -361,7 +382,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                ui.label("✂ Crop");
+                ui.label_i("✂ Crop");
 
                 ui.horizontal(|ui| {
                     let r1 = ui.add(
@@ -396,14 +417,14 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 ui.end_row();
 
-                ui.label("🔁 Reset");
+                ui.label_i("🔁 Reset");
                 if ui.button("Reset all edits").clicked() {
                     state.edit_state = Default::default();
                     changed = true
                 }
                 ui.end_row();
 
-                ui.label("❓ Compare");
+                ui.label_i("❓ Compare");
                 ui.horizontal(|ui| {
                     if ui.button("Unmodified").clicked() {
                         if let Some(img) = &state.current_image {
@@ -547,41 +568,38 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 ui.end_row();
 
-                ui.horizontal(|ui| {
-                    // If we have no lines, create an empty one
-                    if state.edit_state.paint_strokes.is_empty() {
-                        state
-                            .edit_state
-                            .paint_strokes
-                            .push(PaintStroke::new().color(state.edit_state.color_paint));
-                    }
+                // If we have no lines, create an empty one
+                if state.edit_state.paint_strokes.is_empty() {
+                    state
+                        .edit_state
+                        .paint_strokes
+                        .push(PaintStroke::new().color(state.edit_state.color_paint));
+                }
 
-                    if let Some(current_stroke) = state.edit_state.paint_strokes.last_mut() {
-                        // if state.mouse_delta.x > 0.0 {
-                        if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
-                            debug!("PAINT");
-                            // get pos in image
-                            let p = state.cursor_relative;
-                            current_stroke.points.push(Pos2::new(p.x, p.y));
-                            changed = true;
-                        } else if !current_stroke.is_empty() {
-                            // clone last stroke to inherit settings
-                            if let Some(last_stroke) = state.edit_state.paint_strokes.clone().last()
-                            {
-                                state
-                                    .edit_state
-                                    .paint_strokes
-                                    .push(last_stroke.without_points());
-                            }
+                if let Some(current_stroke) = state.edit_state.paint_strokes.last_mut() {
+                    // if state.mouse_delta.x > 0.0 {
+                    if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
+                        debug!("PAINT");
+                        // get pos in image
+                        let p = state.cursor_relative;
+                        current_stroke.points.push(Pos2::new(p.x, p.y));
+                        changed = true;
+                    } else if !current_stroke.is_empty() {
+                        // clone last stroke to inherit settings
+                        if let Some(last_stroke) = state.edit_state.paint_strokes.clone().last() {
+                            state
+                                .edit_state
+                                .paint_strokes
+                                .push(last_stroke.without_points());
                         }
                     }
-                });
+                }
             }
             ui.end_row();
 
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button("Apply all edits")
+                    .button("⤵ Apply all edits")
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                 {
@@ -597,13 +615,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if changed {
                 if let Some(img) = &mut state.current_image {
                     if state.edit_state.painting {
-                        let fac = 0.5;
-                        let active_brush = image::imageops::resize(
-                            &state.edit_state.brushes[0].clone(),
-                            (state.edit_state.brushes[0].width() as f32 * fac) as u32,
-                            (state.edit_state.brushes[0].height() as f32 * fac) as u32,
-                            Gaussian,
-                        );
 
                         debug!("Num strokes {}", state.edit_state.paint_strokes.len());
 
@@ -722,6 +733,15 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             }
                         }
                     }
+
+                    if ui
+                        .button("⟳ Reload image")
+                        .on_hover_text("Completely reload image, destroying all edits.")
+                        .clicked()
+                    {
+                        state.is_loaded = false;
+                        state.player.load(&path);
+                    }
                 }
             });
 
@@ -735,7 +755,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         });
 }
 
-pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, ui: &mut Ui) -> Response {
+pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
         ui.horizontal(|ui| {
             ui.label(tooltip);
