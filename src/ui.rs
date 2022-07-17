@@ -597,19 +597,22 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.end_row();
 
-            ui.vertical_centered_justified(|ui| {
-                if ui
-                    .button("⤵ Apply all edits")
-                    .on_hover_text("Apply all edits to the image and reset edit controls")
-                    .clicked()
-                {
-                    if let Some(img) = &mut state.current_image {
-                        *img = state.edit_state.result.clone();
-                        state.edit_state = Default::default();
-                        changed = true;
+            if state.edit_state.result != RgbaImage::default() {
+                ui.vertical_centered_justified(|ui| {
+                    if ui
+                        .button("⤵ Apply all edits")
+                        .on_hover_text("Apply all edits to the image and reset edit controls")
+                        .clicked()
+                    {
+                        if let Some(img) = &mut state.current_image {
+                            *img = state.edit_state.result.clone();
+                            state.edit_state = Default::default();
+                            changed = true;
+                        }
                     }
-                }
-            });
+                });
+
+            }
 
             // Do the processing
             if changed {
@@ -641,7 +644,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
                     }
 
-                    // test if there is cropping
+                    // test if there is cropping, or copy original
                     if state.edit_state.crop != [0, 0, 0, 0] {
                         let sub_img = image::imageops::crop_imm(
                             img,
@@ -691,11 +694,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
 
                     // draw paint lines
-                    let stamp = std::time::Instant::now();
+                    // let stamp = std::time::Instant::now();
                     for stroke in &state.edit_state.paint_strokes {
                         stroke.render(&mut state.edit_state.result, &state.edit_state.brushes);
                     }
-                    debug!("Stroke rendering took {}s", stamp.elapsed().as_secs_f64());
+                    // debug!("Stroke rendering took {}s", stamp.elapsed().as_secs_f64());
                 }
 
                 // update the current texture with the edit state
@@ -706,7 +709,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // let stamp = std::time::Instant::now();
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
-                        if tex.width() as u32 == img.width() && tex.height() as u32 == img.height()
+                        if tex.width() as u32 == state.edit_state.result.width() && state.edit_state.result.height() as u32 == img.height()
                         {
                             state.edit_state.result.update_texture(gfx, tex);
                         } else {
