@@ -138,13 +138,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
         ui.vertical_centered_justified(|ui| {
             if let Some(img) = &state.current_image {
-                // if ui
-                //     .button("Calculate extended info")
-                //     .on_hover_text("Count unique colors in image")
-                //     .clicked()
-                // {
-                //     state.image_info = Some(ExtendedImageInfo::from_image(img));
-                // }
                 if ui
                     .button("Show alpha bleed")
                     .on_hover_text("Highlight pixels with zero alpha and color information")
@@ -457,7 +450,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             ui.label("idx");
                             ui.end_row();
 
-                            stroke_ui(stroke, &state.edit_state.brushes, ui);
+                            stroke_ui(stroke, &state.edit_state.brushes, ui, gfx);
                         }
                     }
                 });
@@ -507,8 +500,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                                 continue;
                                             }
 
-                                            let r =
-                                                stroke_ui(stroke, &state.edit_state.brushes, ui);
+                                            let r = stroke_ui(
+                                                stroke,
+                                                &state.edit_state.brushes,
+                                                ui,
+                                                gfx,
+                                            );
                                             if r.changed() {
                                                 changed = true;
                                             }
@@ -695,18 +692,18 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // state.current_texture = state.edit_state.result.to_texture(gfx);
                 // info!("New tex took {}s", stamp.elapsed().as_secs_f64());
 
-                let stamp = std::time::Instant::now();
+                // let stamp = std::time::Instant::now();
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
-                        if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                            info!("uPD");
+                        if tex.width() as u32 == img.width() && tex.height() as u32 == img.height()
+                        {
                             state.edit_state.result.update_texture(gfx, tex);
                         } else {
                             state.current_texture = state.edit_state.result.to_texture(gfx);
                         }
                     }
                 }
-                info!("Upd tex took {}s", stamp.elapsed().as_secs_f64());
+                // info!("Upd tex took {}s", stamp.elapsed().as_secs_f64());
             }
 
             ui.vertical_centered_justified(|ui| {
@@ -756,7 +753,12 @@ pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
     ui.add(egui::Button::new(text).frame(false))
 }
 
-pub fn stroke_ui(stroke: &mut PaintStroke, brushes: &Vec<RgbaImage>, ui: &mut Ui) -> Response {
+pub fn stroke_ui(
+    stroke: &mut PaintStroke,
+    brushes: &Vec<RgbaImage>,
+    ui: &mut Ui,
+    gfx: &mut Graphics,
+) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
     let r = ui.checkbox(&mut stroke.fade, "");
@@ -773,22 +775,43 @@ pub fn stroke_ui(stroke: &mut PaintStroke, brushes: &Vec<RgbaImage>, ui: &mut Ui
     if r.hovered() {
         combined_response.hovered = true;
     }
-    let r = egui::ComboBox::from_id_source(format!("s {:?}", stroke.points))
-        .selected_text(format!("Brush {}", stroke.brush_index))
-        .show_ui(ui, |ui| {
-            for (b_i, b) in brushes.iter().enumerate() {
-                if ui
-                    .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {}", b_i))
-                    .clicked()
-                {
-                    combined_response.changed = true
+
+    ui.horizontal(|ui| {
+        if let Some(notan_texture) = brushes[stroke.brush_index].to_texture_premult(gfx) {
+            let texture_id = gfx.egui_register_texture(&notan_texture);
+            ui.image(texture_id, egui::Vec2::splat(ui.available_height()));
+        }
+
+        let r = egui::ComboBox::from_id_source(format!("s {:?}", stroke.points))
+            .selected_text(format!("Brush {}", stroke.brush_index))
+            .show_ui(ui, |ui| {
+                for (b_i, b) in brushes.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        if let Some(notan_texture) = b.to_texture_premult(gfx) {
+                            let texture_id = gfx.egui_register_texture(&notan_texture);
+                            ui.image(texture_id, egui::Vec2::splat(32.));
+                        }
+
+                        if ui
+                            .selectable_value(
+                                &mut stroke.brush_index,
+                                b_i,
+                                format!("Brush {}", b_i),
+                            )
+                            .clicked()
+                        {
+                            combined_response.changed = true
+                        }
+                    });
                 }
-            }
-        })
-        .response;
-    if r.hovered() {
-        combined_response.hovered = true;
-    }
+            })
+            .response;
+
+        if r.hovered() {
+            combined_response.hovered = true;
+        }
+    });
+
     if combined_response.hovered() {
         stroke.highlight = true;
     } else {

@@ -846,6 +846,10 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    fn to_texture_premult(&self, _: &mut Graphics) -> Option<Texture> {
+        unimplemented!()
+    }
+
     fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
         unimplemented!()
     }
@@ -864,6 +868,16 @@ impl ImageExt for RgbaImage {
         gfx.create_texture()
             .from_bytes(&self, self.width() as i32, self.height() as i32)
             // .with_premultiplied_alpha()
+            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
+            .build()
+            .ok()
+    }
+
+    fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.create_texture()
+            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .with_premultiplied_alpha()
             // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
             .build()
