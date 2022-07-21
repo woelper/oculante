@@ -313,8 +313,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-    
-
                 ui.label_i("✂ Crop");
 
                 ui.horizontal(|ui| {
@@ -350,40 +348,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 ui.end_row();
 
-                // Blur
-                ui.label_i("💧 Blur");
-                if ui
-                    .add(egui::Slider::new(&mut state.edit_state.blur, 0.0..=10.))
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
-
-                ui.label_i("🔁 Reset");
-                if ui.button("Reset all edits").clicked() {
-                    state.edit_state = Default::default();
-                    changed = true
-                }
-                ui.end_row();
-
-                ui.label_i("❓ Compare");
-                ui.horizontal(|ui| {
-                    if ui.button("Unmodified").clicked() {
-                        if let Some(img) = &state.current_image {
-                            state.current_texture = img.to_texture(gfx);
-                        }
-                    }
-                    if ui.button("Modified").clicked() {
-                        changed = true;
-                    }
-                });
-                ui.end_row();
-
                 let mut ops = [
                     ImageOperation::Brightness(0),
                     ImageOperation::Contrast(0),
                     ImageOperation::Desaturate(0),
+                    ImageOperation::Blur(0),
                     ImageOperation::Invert,
                     ImageOperation::Mult([255, 255, 255]),
                     ImageOperation::Add([0, 0, 0]),
@@ -440,6 +409,28 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         state.edit_state.edit_stack.swap(swap.0, swap.1);
                     }
                 }
+
+                ui.label_i("🔁 Reset");
+                if ui.button("Reset all edits").clicked() {
+                    state.edit_state = Default::default();
+                    changed = true
+                }
+                ui.end_row();
+
+                ui.label_i("❓ Compare");
+                ui.horizontal(|ui| {
+                    if ui.button("Unmodified").clicked() {
+                        if let Some(img) = &state.current_image {
+                            state.current_texture = img.to_texture(gfx);
+                        }
+                    }
+                    if ui.button("Modified").clicked() {
+                        changed = true;
+                    }
+                });
+                ui.end_row();
+
+                
             });
 
             ui.vertical_centered_justified(|ui| {
@@ -602,7 +593,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.end_row();
 
-            if state.edit_state.result != RgbaImage::default() {
+            if state.edit_state.result != Default::default() {
                 ui.vertical_centered_justified(|ui| {
                     if ui
                         .button("⤵ Apply all edits")
@@ -669,18 +660,29 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     if !state.edit_state.edit_stack.is_empty() {
                         for p in state.edit_state.result.pixels_mut() {
+                            let mut float_pixel = image::Rgba([
+                                p[0] as f32 / 255.,
+                                p[1] as f32 / 255.,
+                                p[2] as f32 / 255.,
+                                p[3] as f32 / 255.,
+                            ]);
                             for operation in &mut state.edit_state.edit_stack {
-                                operation.process_pixel(p);
+                                operation.process_pixel(&mut float_pixel);
                             }
+
+                            p[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
+                            p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
+                            p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+
                         }
+
+                        for operation in &mut state.edit_state.edit_stack {
+                            operation.process_image( &mut state.edit_state.result);
+                        }
+
                     }
 
-                    if state.edit_state.contrast != 0.0 {
-                        state.edit_state.result = image::imageops::contrast(
-                            &state.edit_state.result,
-                            state.edit_state.contrast,
-                        );
-                    }
+                 
 
                     // draw paint lines
                     // let stamp = std::time::Instant::now();
