@@ -16,6 +16,8 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -281,14 +283,17 @@ impl Default for EditState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PaintStroke {
     pub points: Vec<Pos2>,
     pub fade: bool,
     pub color: [f32; 4],
+    /// brush width in px
     pub width: u32,
     pub brush_index: usize,
+    /// For ui preview: if highlit, paint brush stroke differently
     pub highlight: bool,
+    pub flip_random: bool
 }
 
 impl PaintStroke {
@@ -301,12 +306,9 @@ impl PaintStroke {
 
     pub fn new() -> Self {
         Self {
-            points: vec![],
-            fade: false,
             color: [1., 1., 1., 1.],
-            width: 16,
-            brush_index: 0,
-            highlight: false,
+            width: 32,
+            ..Default::default()
         }
     }
 
@@ -319,12 +321,13 @@ impl PaintStroke {
     }
 
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
-        let brush = image::imageops::resize(
+        let mut brush = image::imageops::resize(
             &brushes[self.brush_index],
             self.width,
             self.width,
             image::imageops::Gaussian,
         );
+
         let points = notan::egui::Shape::dotted_line(
             &self.points,
             Color32::DARK_RED,
@@ -333,7 +336,24 @@ impl PaintStroke {
         );
 
         for (i, p) in points.iter().enumerate() {
+
             let pos_on_line = p.visual_bounding_rect().center();
+
+            if self.flip_random {
+
+                // seed by brush position so randomness only changes per brush instance
+                let mut rng = ChaCha8Rng::seed_from_u64(pos_on_line.x as u64 + pos_on_line.y as u64);
+    
+                let flip_x: bool = rng.gen();
+                let flip_y: bool = rng.gen();
+        
+                if flip_x {
+                    image::imageops::flip_horizontal_in_place(&mut brush);
+                }
+                if flip_y {
+                    image::imageops::flip_vertical_in_place(&mut brush);
+                }
+            }
 
             let mut stroke_color = self.color;
 
@@ -341,6 +361,8 @@ impl PaintStroke {
                 let fraction = i as f32 / points.len() as f32;
                 stroke_color[3] = stroke_color[3] * fraction;
             }
+
+
             if self.highlight {
                 stroke_color[0] *= 2.5;
                 stroke_color[1] *= 2.5;
@@ -428,7 +450,7 @@ fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
     let mut width = 0;
     let mut height = 0;
     let len = buf.len();
-    let mut webp_buffer: Vec<u8> = vec![];
+    let webp_buffer: Vec<u8>;
     unsafe {
         WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
         let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);

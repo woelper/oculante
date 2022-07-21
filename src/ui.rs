@@ -479,8 +479,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if stroke.is_empty() {
                             ui.label("Color");
                             ui.label("Fade");
+                            ui.label("Rnd flip");
                             ui.label("Width");
-                            ui.label("idx");
+                            ui.label("Brush");
                             ui.end_row();
 
                             stroke_ui(stroke, &state.edit_state.brushes, ui, gfx);
@@ -798,13 +799,22 @@ pub fn stroke_ui(
 ) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
-    let r = ui.checkbox(&mut stroke.fade, "");
+    let r = ui.checkbox(&mut stroke.fade, "").on_hover_text("Fade out the stroke over it's path");
     if r.changed() {
         combined_response.changed = true;
     }
     if r.hovered() {
         combined_response.hovered = true;
     }
+
+    let r = ui.checkbox(&mut stroke.flip_random, "").on_hover_text("Flip brush in X any Y randomly to make stroke less uniform");
+    if r.changed() {
+        combined_response.changed = true;
+    }
+    if r.hovered() {
+        combined_response.hovered = true;
+    }
+
     let r = ui.add(egui::DragValue::new(&mut stroke.width));
     if r.changed() {
         combined_response.changed = true;
