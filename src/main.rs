@@ -28,6 +28,7 @@ mod tests;
 mod ui;
 mod update;
 use ui::*;
+mod image_editing;
 
 #[notan_main]
 fn main() -> Result<(), String> {

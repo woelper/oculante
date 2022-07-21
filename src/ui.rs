@@ -7,10 +7,11 @@ use notan::{
 };
 
 use crate::{
+    image_editing::ImageOperation,
     update,
     utils::{
-        desaturate, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
-        send_extended_info, ImageExt, OculanteState, PaintStroke,
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
+        ImageExt, OculanteState, PaintStroke,
     },
 };
 pub trait EguiExt {
@@ -312,77 +313,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
                 ui.end_row();
 
-                // Contrast
-                ui.label_i("◑ Contrast");
-                if ui
-                    .add(egui::Slider::new(
-                        &mut state.edit_state.contrast,
-                        -100.0..=100.,
-                    ))
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
-
-                // Brightness
-                ui.label_i("☀ Brightness");
-                if ui
-                    .add(egui::Slider::new(
-                        &mut state.edit_state.brightness,
-                        -255..=255,
-                    ))
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
-
-                // Brightness
-                ui.label_i("🌁 Desaturate");
-                if ui
-                    .add(egui::Slider::new(
-                        &mut state.edit_state.desaturate,
-                        0.0..=1.0,
-                    ))
-                    .changed()
-                {
-                    changed = true;
-                }
-                ui.end_row();
-
-                ui.label_i("✖ Mult color");
-                ui.horizontal(|ui| {
-                    if ui
-                        .color_edit_button_rgb(&mut state.edit_state.color_mult)
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                });
-                ui.end_row();
-
-                ui.label_i("➕ Add  color");
-                ui.horizontal(|ui| {
-                    if ui
-                        .color_edit_button_rgb(&mut state.edit_state.color_add)
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                });
-                ui.end_row();
-
-                ui.label_i("！ Invert");
-                ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        if ui.button("Invert colors").clicked() {
-                            image::imageops::invert(img);
-                            changed = true;
-                        }
-                    }
-                });
-                ui.end_row();
+    
 
                 ui.label_i("✂ Crop");
 
@@ -448,6 +379,67 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                 });
                 ui.end_row();
+
+                let mut ops = [
+                    ImageOperation::Brightness(0),
+                    ImageOperation::Contrast(0),
+                    ImageOperation::Desaturate(0),
+                    ImageOperation::Invert,
+                    ImageOperation::Mult([255, 255, 255]),
+                    ImageOperation::Add([0, 0, 0]),
+                    ImageOperation::SwapRG,
+                    ImageOperation::SwapBG,
+                    ImageOperation::SwapRB,
+                ];
+
+                ui.label_i("➕ Filter");
+
+                egui::ComboBox::from_id_source("Imageops")
+                    .selected_text("Select a filter to add...")
+                    .show_ui(ui, |ui| {
+                        for op in &mut ops {
+                            if ui.selectable_label(false, format!("{}", op)).clicked() {
+                                state.edit_state.edit_stack.push(*op);
+                                changed = true;
+                            }
+                        }
+                    });
+                ui.end_row();
+
+                let mut delete: Option<usize> = None;
+                let mut swap: Option<(usize, usize)> = None;
+
+                for (i, operation) in state.edit_state.edit_stack.iter_mut().enumerate() {
+                    ui.label_i(&format!("{}", operation));
+                    // let op draw itself and check for response
+                    if operation.ui(ui).changed() {
+                        changed = true;
+                    }
+                    ui.horizontal(|ui| {
+                        if ui.button("⏶").clicked() {
+                            swap = Some(((i as i32 - 1).max(0) as usize, i));
+                            changed = true;
+                        }
+                        if ui.button("⏷").clicked() {
+                            swap = Some((i, i + 1));
+                            changed = true;
+                        }
+                        if ui.button("⊗").clicked() {
+                            delete = Some(i);
+                            changed = true;
+                        }
+                    });
+                    ui.end_row();
+                }
+                if let Some(delete) = delete {
+                    state.edit_state.edit_stack.remove(delete);
+                }
+
+                if let Some(swap) = swap {
+                    if swap.1 < state.edit_state.edit_stack.len() {
+                        state.edit_state.edit_stack.swap(swap.0, swap.1);
+                    }
+                }
             });
 
             ui.vertical_centered_justified(|ui| {
@@ -675,31 +667,14 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             image::imageops::blur(&state.edit_state.result, state.edit_state.blur);
                     }
 
-                    // test if mult or add is modified
-                    if state.edit_state.color_mult != [1., 1., 1.]
-                        || state.edit_state.color_add != [0., 0., 0.]
-                        || state.edit_state.desaturate != 0.0
-                    {
+                    if !state.edit_state.edit_stack.is_empty() {
                         for p in state.edit_state.result.pixels_mut() {
-                            desaturate(p, state.edit_state.desaturate);
-                            // mult
-                            p[0] = (p[0] as f32 * state.edit_state.color_mult[0]) as u8;
-                            p[1] = (p[1] as f32 * state.edit_state.color_mult[1]) as u8;
-                            p[2] = (p[2] as f32 * state.edit_state.color_mult[2]) as u8;
-                            // add
-                            p[0] = (p[0] as f32 + state.edit_state.color_add[0] * 255.) as u8;
-                            p[1] = (p[1] as f32 + state.edit_state.color_add[1] * 255.) as u8;
-                            p[2] = (p[2] as f32 + state.edit_state.color_add[2] * 255.) as u8;
-
+                            for operation in &mut state.edit_state.edit_stack {
+                                operation.process_pixel(p);
+                            }
                         }
                     }
 
-                    if state.edit_state.brightness != 0 {
-                        state.edit_state.result = image::imageops::brighten(
-                            &state.edit_state.result,
-                            state.edit_state.brightness,
-                        );
-                    }
                     if state.edit_state.contrast != 0.0 {
                         state.edit_state.result = image::imageops::contrast(
                             &state.edit_state.result,
@@ -799,7 +774,9 @@ pub fn stroke_ui(
 ) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
-    let r = ui.checkbox(&mut stroke.fade, "").on_hover_text("Fade out the stroke over it's path");
+    let r = ui
+        .checkbox(&mut stroke.fade, "")
+        .on_hover_text("Fade out the stroke over it's path");
     if r.changed() {
         combined_response.changed = true;
     }
@@ -807,7 +784,9 @@ pub fn stroke_ui(
         combined_response.hovered = true;
     }
 
-    let r = ui.checkbox(&mut stroke.flip_random, "").on_hover_text("Flip brush in X any Y randomly to make stroke less uniform");
+    let r = ui
+        .checkbox(&mut stroke.flip_random, "")
+        .on_hover_text("Flip brush in X any Y randomly to make stroke less uniform");
     if r.changed() {
         combined_response.changed = true;
     }

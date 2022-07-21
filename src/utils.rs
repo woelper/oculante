@@ -2,12 +2,12 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
+use image::{EncodableLayout, Pixel, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::egui::{Color32, Pos2, self};
-use notan::graphics::{Texture, TextureFilter, TextureWrap};
+use notan::egui::{Color32, Pos2};
+use notan::graphics::{Texture};
 use notan::prelude::Graphics;
 use notan::AppState;
 use std::collections::{HashMap, HashSet};
@@ -35,6 +35,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use strum::Display;
 use strum_macros::EnumIter;
+
+use crate::image_editing::ImageOperation;
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -242,6 +244,7 @@ pub struct EditState {
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
     pub brushes: Vec<RgbaImage>,
+    pub edit_stack: Vec<ImageOperation>
 }
 
 impl Default for EditState {
@@ -279,6 +282,7 @@ impl Default for EditState {
                     .unwrap()
                     .into_rgba8(),
             ],
+            edit_stack: vec![]
         }
     }
 }
@@ -978,10 +982,3 @@ pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
     ])
 }
 
-pub fn desaturate(p: &mut Rgba<u8>, factor: f32) {
-    // G*.59+R*.3+B*.11
-    let val = p[0] as f32 * 0.59 + p[1] as f32 * 0.3 + p[2] as f32 * 0.11; 
-    p[0] = egui::lerp(p[0] as f32..=val, factor) as u8;
-    p[1] = egui::lerp(p[1] as f32..=val, factor) as u8;
-    p[2] = egui::lerp(p[2] as f32..=val, factor) as u8;
-}
