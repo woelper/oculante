@@ -395,6 +395,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Contrast(0),
                     ImageOperation::Desaturate(0),
                     ImageOperation::Blur(0),
+                    ImageOperation::Crop((0, 0, 0, 0)),
                     ImageOperation::Invert,
                     ImageOperation::Mult([255, 255, 255]),
                     ImageOperation::Add([0, 0, 0]),

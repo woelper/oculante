@@ -33,6 +33,7 @@ impl fmt::Display for ImageOperation {
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
             Self::Blur(_) => write!(f, "💧 Blur"),
+            Self::Crop(_) => write!(f, "✂ Crop"),
             Self::Invert => write!(f, "！ Invert"),
             Self::SwapRG => write!(f, "⬌ Swap R / G"),
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
@@ -60,6 +61,46 @@ impl ImageOperation {
             Self::Blur(val) => ui.add(Slider::new(val, 0..=20)),
             Self::Desaturate(val) => ui.add(Slider::new(val, 0..=100)),
             Self::Contrast(val) => ui.add(Slider::new(val, -128..=128)),
+            Self::Crop(bounds) => {
+                let available_w_single_spacing =
+                    ui.available_width() - ui.style().spacing.item_spacing.x * 3.;
+                ui.horizontal(|ui| {
+                    let mut r1 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.0)
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("⏴ "),
+                    );
+                    let r2 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.2)
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("⏵ "),
+                    );
+                    let r3 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.1)
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("⏶ "),
+                    );
+                    let r4 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.3)
+                            .speed(4.)
+                            .clamp_range(0..=10000)
+                            .prefix("⏷ "),
+                    );
+                    // TODO rewrite with any
+                    if r2.changed() || r3.changed() || r4.changed() {
+                        r1.changed = true;
+                    }
+                    r1
+                })
+                .inner
+            }
             Self::Mult(val) => {
                 let mut color: [f32; 3] = [
                     val[0] as f32 / 255.,
@@ -92,7 +133,6 @@ impl ImageOperation {
             }
             Self::Resize { dimensions, aspect } => {
                 let ratio = dimensions.1 as f32 / dimensions.0 as f32;
-
 
                 ui.horizontal(|ui| {
                     let mut r0 = ui.add(
@@ -129,13 +169,11 @@ impl ImageOperation {
                         if *aspect {
                             dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
-
                     }
 
-
-
                     r0
-                }).inner
+                })
+                .inner
             }
             _ => ui.label("Filter has no options."),
         }
@@ -146,6 +184,18 @@ impl ImageOperation {
             Self::Blur(amt) => {
                 if *amt != 0 {
                     *img = imageops::blur(img, *amt as f32);
+                }
+            }
+            Self::Crop(amt) => {
+                if *amt != (0, 0, 0, 0) {
+                    let sub_img = image::imageops::crop_imm(
+                        img,
+                        amt.0.max(0),
+                        amt.1.max(0),
+                        (img.width() as i32 - amt.2 as i32).max(0) as u32,
+                        (img.height() as i32 - amt.3 as i32).max(0) as u32,
+                    );
+                    *img = sub_img.to_image();
                 }
             }
             Self::Resize { dimensions, .. } => {
