@@ -14,7 +14,6 @@ use std::{
 pub fn launch() -> Result<(), Box<dyn Error>> {
     info!("Starting MacOS integration");
 
-
     // It's not good design that the MacOS workaround does it's own argument parsing again,
     // However, the notan (and possibly other engines/libraries) structure prefer argument parsing
     // in an init funcion, from which fruitbasked panics internally. For this reason this extra
@@ -46,7 +45,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     if !matches.is_present("chainload") && maybe_img_location.is_none() {
         info!("Chainload not specified, and no input file present. Invoking mac hack.");
     } else {
-        return Ok(())
+        return Ok(());
     }
 
     let file_arg: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));

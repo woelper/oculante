@@ -7,17 +7,17 @@ use image::{EncodableLayout, Pixel, RgbaImage};
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::egui::{Color32, Pos2};
-use notan::graphics::{Texture};
+use notan::graphics::Texture;
 use notan::prelude::Graphics;
 use notan::AppState;
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use rand::prelude::*;
-use rand_chacha::ChaCha8Rng;
 
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -228,39 +228,23 @@ impl Channel {
 
 #[derive(Debug)]
 pub struct EditState {
-    pub color_mult: [f32; 3],
-    pub color_add: [f32; 3],
-    pub color_paint: [f32; 4],
     pub result: RgbaImage,
-    pub blur: f32,
-    pub unsharpen: f32,
-    pub unsharpen_threshold: i32,
-    pub contrast: f32,
-    pub brightness: i32,
-    pub desaturate: f32,
     pub crop: [i32; 4],
+    pub resize: (u32, u32),
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
     pub brushes: Vec<RgbaImage>,
-    pub edit_stack: Vec<ImageOperation>
+    pub edit_stack: Vec<ImageOperation>,
 }
 
 impl Default for EditState {
     fn default() -> Self {
         Self {
-            color_mult: [1., 1., 1.],
-            color_add: Default::default(),
-            color_paint: [1., 0., 0., 1.],
             result: RgbaImage::default(),
-            blur: Default::default(),
-            unsharpen: Default::default(),
-            unsharpen_threshold: Default::default(),
-            contrast: Default::default(),
-            brightness: Default::default(),
-            desaturate: Default::default(),
             crop: Default::default(),
+            resize: Default::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
@@ -282,7 +266,7 @@ impl Default for EditState {
                     .unwrap()
                     .into_rgba8(),
             ],
-            edit_stack: vec![]
+            edit_stack: vec![],
         }
     }
 }
@@ -297,7 +281,7 @@ pub struct PaintStroke {
     pub brush_index: usize,
     /// For ui preview: if highlit, paint brush stroke differently
     pub highlight: bool,
-    pub flip_random: bool
+    pub flip_random: bool,
 }
 
 impl PaintStroke {
@@ -340,17 +324,16 @@ impl PaintStroke {
         );
 
         for (i, p) in points.iter().enumerate() {
-
             let pos_on_line = p.visual_bounding_rect().center();
 
             if self.flip_random {
-
                 // seed by brush position so randomness only changes per brush instance
-                let mut rng = ChaCha8Rng::seed_from_u64(pos_on_line.x as u64 + pos_on_line.y as u64);
-    
+                let mut rng =
+                    ChaCha8Rng::seed_from_u64(pos_on_line.x as u64 + pos_on_line.y as u64);
+
                 let flip_x: bool = rng.gen();
                 let flip_y: bool = rng.gen();
-        
+
                 if flip_x {
                     image::imageops::flip_horizontal_in_place(&mut brush);
                 }
@@ -365,7 +348,6 @@ impl PaintStroke {
                 let fraction = i as f32 / points.len() as f32;
                 stroke_color[3] = stroke_color[3] * fraction;
             }
-
 
             if self.highlight {
                 stroke_color[0] *= 2.5;
@@ -981,4 +963,3 @@ pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
         (c[3] * 255.) as u8,
     ])
 }
-

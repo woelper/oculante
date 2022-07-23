@@ -1,9 +1,9 @@
 use std::fmt;
 
-use image::{Rgba, Rgba32FImage, RgbaImage, imageops};
+use image::{imageops, Rgba, Rgba32FImage, RgbaImage};
+use imageops::FilterType::Gaussian;
 use notan::egui;
 use notan::egui::{Response, Slider, Ui};
-
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ImageOperation {
@@ -16,7 +16,12 @@ pub enum ImageOperation {
     SwapRB,
     SwapBG,
     Invert,
-    Blur(u8)
+    Blur(u8),
+    Resize {
+        dimensions: (u32, u32),
+        aspect: bool,
+    },
+    Crop((u32, u32, u32, u32)),
 }
 
 impl fmt::Display for ImageOperation {
@@ -32,12 +37,22 @@ impl fmt::Display for ImageOperation {
             Self::SwapRG => write!(f, "⬌ Swap R / G"),
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
             Self::SwapBG => write!(f, "⬌ Swap B / G"),
+            Self::Resize { .. } => write!(f, "⬜ Resize"),
             _ => write!(f, "Not implemented Display"),
         }
     }
 }
 
 impl ImageOperation {
+    pub fn is_per_pixel(&self) -> bool {
+        match self {
+            Self::Blur(_) => false,
+            Self::Resize { .. } => false,
+            Self::Crop(_) => false,
+            _ => true,
+        }
+    }
+
     pub fn ui(&mut self, ui: &mut Ui) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
@@ -75,6 +90,53 @@ impl ImageOperation {
                 }
                 r
             }
+            Self::Resize { dimensions, aspect } => {
+                let ratio = dimensions.1 as f32 / dimensions.0 as f32;
+
+
+                ui.horizontal(|ui| {
+                    let mut r0 = ui.add(
+                        egui::DragValue::new(&mut dimensions.0)
+                            .speed(4.)
+                            .clamp_range(1..=10000)
+                            .prefix("X "),
+                    );
+                    let r1 = ui.add(
+                        egui::DragValue::new(&mut dimensions.1)
+                            .speed(4.)
+                            .clamp_range(1..=10000)
+                            .prefix("Y "),
+                    );
+
+                    if r0.changed() {
+                        if *aspect {
+                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32
+                        }
+                    }
+
+                    if r1.changed() {
+                        r0.changed = true;
+                        if *aspect {
+                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
+                        }
+                    }
+
+                    let r2 = ui.checkbox(aspect, "Locked");
+
+                    if r2.changed() {
+                        r0.changed = true;
+
+                        if *aspect {
+                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
+                        }
+
+                    }
+
+
+
+                    r0
+                }).inner
+            }
             _ => ui.label("Filter has no options."),
         }
     }
@@ -85,17 +147,22 @@ impl ImageOperation {
                 if *amt != 0 {
                     *img = imageops::blur(img, *amt as f32);
                 }
-            },
-            _ => ()
+            }
+            Self::Resize { dimensions, .. } => {
+                if *dimensions != Default::default() {
+                    *img = image::imageops::resize(img, dimensions.0, dimensions.1, Gaussian);
+                }
+            }
+            _ => (),
         }
     }
 
     pub fn process_pixel(&self, p: &mut Rgba<f32>) {
         match self {
             Self::Brightness(amt) => {
-                p[0] = p[0]  + *amt as f32 / 255.;
-                p[1] = p[1]  + *amt as f32 / 255.;
-                p[2] = p[2]  + *amt as f32 / 255.;
+                p[0] = p[0] + *amt as f32 / 255.;
+                p[1] = p[1] + *amt as f32 / 255.;
+                p[2] = p[2] + *amt as f32 / 255.;
             }
             Self::Desaturate(amt) => {
                 desaturate(p, *amt as f32 / 100.);
@@ -131,7 +198,8 @@ impl ImageOperation {
                 p[2] = r;
             }
             Self::Contrast(val) => {
-                let factor: f32 = (1.015686275 * (*val as f32/255. + 1.0)) / (1.0 * (1.015686275 - *val as f32/255.)) as f32;
+                let factor: f32 = (1.015686275 * (*val as f32 / 255. + 1.0))
+                    / (1.0 * (1.015686275 - *val as f32 / 255.)) as f32;
                 p[0] = ((factor * p[0] - 0.5) + 0.5).clamp(0.0, 1.0);
                 p[1] = ((factor * p[1] - 0.5) + 0.5).clamp(0.0, 1.0);
                 p[2] = ((factor * p[2] - 0.5) + 0.5).clamp(0.0, 1.0);
@@ -145,7 +213,7 @@ impl ImageOperation {
 
 pub fn desaturate(p: &mut Rgba<f32>, factor: f32) {
     // G*.59+R*.3+B*.11
-    let val = p[0]  * 0.59 + p[1]  * 0.3 + p[2]  * 0.11;
+    let val = p[0] * 0.59 + p[1] * 0.3 + p[2] * 0.11;
     p[0] = egui::lerp(p[0] as f32..=val, factor);
     p[1] = egui::lerp(p[1] as f32..=val, factor);
     p[2] = egui::lerp(p[2] as f32..=val, factor);
