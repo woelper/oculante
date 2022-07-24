@@ -186,14 +186,14 @@ impl ImageOperation {
                     *img = imageops::blur(img, *amt as f32);
                 }
             }
-            Self::Crop(amt) => {
-                if *amt != (0, 0, 0, 0) {
+            Self::Crop(dim) => {
+                if *dim != (0, 0, 0, 0) {
                     let sub_img = image::imageops::crop_imm(
                         img,
-                        amt.0.max(0),
-                        amt.1.max(0),
-                        (img.width() as i32 - amt.2 as i32).max(0) as u32,
-                        (img.height() as i32 - amt.3 as i32).max(0) as u32,
+                        dim.0.max(0),
+                        dim.1.max(0),
+                        (img.width() as i32 - dim.2 as i32 - dim.0 as i32).max(0) as u32,
+                        (img.height() as i32 - dim.3 as i32 - dim.1 as i32).max(0) as u32,
                     );
                     *img = sub_img.to_image();
                 }
