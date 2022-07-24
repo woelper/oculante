@@ -228,23 +228,22 @@ impl Channel {
 
 #[derive(Debug)]
 pub struct EditState {
-    pub result: RgbaImage,
-    pub crop: [i32; 4],
-    pub resize: (u32, u32),
+    pub result_pixel_op: RgbaImage,
+    pub result_image_op: RgbaImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
     pub brushes: Vec<RgbaImage>,
-    pub edit_stack: Vec<ImageOperation>,
+    pub pixel_op_stack: Vec<ImageOperation>,
+    pub image_op_stack: Vec<ImageOperation>,
 }
 
 impl Default for EditState {
     fn default() -> Self {
         Self {
-            result: RgbaImage::default(),
-            crop: Default::default(),
-            resize: Default::default(),
+            result_pixel_op: RgbaImage::default(),
+            result_image_op: RgbaImage::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
@@ -266,7 +265,8 @@ impl Default for EditState {
                     .unwrap()
                     .into_rgba8(),
             ],
-            edit_stack: vec![],
+            pixel_op_stack: vec![],
+            image_op_stack: vec![],
         }
     }
 }

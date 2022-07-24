@@ -1,6 +1,6 @@
 use std::fmt;
 
-use image::{imageops, Rgba, Rgba32FImage, RgbaImage};
+use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::Gaussian;
 use notan::egui;
 use notan::egui::{Response, Slider, Ui};

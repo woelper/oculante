@@ -285,6 +285,20 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             let mut image_changed = false;
             let mut pixels_changed = false;
 
+            if let Some(img) = &state.current_image {
+                // Ensure that edit result image is always filled
+                if state.edit_state.result_pixel_op.width() == 0 {
+                    info!("Pxl result is default");
+                    state.edit_state.result_pixel_op = img.clone();
+                    pixels_changed = true;
+                }
+                if state.edit_state.result_image_op.width() == 0 {
+                    info!("Img result is default");
+                    state.edit_state.result_image_op = img.clone();
+                    image_changed = true;
+                }
+            }
+
             egui::Grid::new("editing").num_columns(2).show(ui, |ui| {
                 ui.label_i("🔃 Rotation");
                 ui.horizontal(|ui| {
@@ -299,8 +313,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .on_hover_text("Rotate 90 deg right")
                             .clicked()
                         {
-                            *img = image::imageops::rotate90(img);
-                            state.edit_state.resize = Default::default();
+                            state.edit_state.result_pixel_op =
+                                image::imageops::rotate90(&state.edit_state.result_pixel_op);
 
                             pixels_changed = true;
                         }
@@ -312,8 +326,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .on_hover_text("Rotate 90 deg left")
                             .clicked()
                         {
-                            *img = image::imageops::rotate270(img);
-                            state.edit_state.resize = Default::default();
+                            state.edit_state.result_pixel_op =
+                                image::imageops::rotate270(&state.edit_state.result_pixel_op);
                             pixels_changed = true;
                         }
                     }
@@ -334,7 +348,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             )
                             .clicked()
                         {
-                            *img = image::imageops::flip_horizontal(img);
+                            state.edit_state.result_pixel_op =
+                                image::imageops::flip_horizontal(&state.edit_state.result_pixel_op);
                             pixels_changed = true;
                         }
                         if ui
@@ -344,48 +359,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             )
                             .clicked()
                         {
-                            *img = image::imageops::flip_vertical(img);
+                            state.edit_state.result_pixel_op =
+                                image::imageops::flip_vertical(&state.edit_state.result_pixel_op);
                             pixels_changed = true;
                         }
-                    }
-                });
-                ui.end_row();
-
-                ui.label_i("✂ Crop");
-                let available_w_single_spacing =
-                    ui.available_width() - ui.style().spacing.item_spacing.x * 3.;
-                ui.horizontal(|ui| {
-                    let r1 = ui.add_sized(
-                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut state.edit_state.crop[0])
-                            .speed(4.)
-                            .clamp_range(0..=10000)
-                            .prefix("⏴ "),
-                    );
-                    let r2 = ui.add_sized(
-                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut state.edit_state.crop[2])
-                            .speed(4.)
-                            .clamp_range(0..=10000)
-                            .prefix("⏵ "),
-                    );
-                    let r3 = ui.add_sized(
-                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut state.edit_state.crop[1])
-                            .speed(4.)
-                            .clamp_range(0..=10000)
-                            .prefix("⏶ "),
-                    );
-                    let r4 = ui.add_sized(
-                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut state.edit_state.crop[3])
-                            .speed(4.)
-                            .clamp_range(0..=10000)
-                            .prefix("⏷ "),
-                    );
-                    // TODO rewrite with any
-                    if r1.changed() || r2.changed() || r3.changed() || r4.changed() {
-                        pixels_changed = true;
                     }
                 });
                 ui.end_row();
@@ -418,8 +395,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     .show_ui(ui, |ui| {
                         for op in &mut ops {
                             if ui.selectable_label(false, format!("{}", op)).clicked() {
-                                state.edit_state.edit_stack.push(*op);
-                                pixels_changed = true;
+                                if op.is_per_pixel() {
+                                    state.edit_state.pixel_op_stack.push(*op);
+                                    pixels_changed = true;
+                                } else {
+                                    image_changed = true;
+                                    state.edit_state.image_op_stack.push(*op);
+                                }
                             }
                         }
                     });
@@ -428,35 +410,114 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let mut delete: Option<usize> = None;
                 let mut swap: Option<(usize, usize)> = None;
 
-                for (i, operation) in state.edit_state.edit_stack.iter_mut().enumerate() {
+                for (i, operation) in state.edit_state.image_op_stack.iter_mut().enumerate() {
                     ui.label_i(&format!("{}", operation));
-                    // let op draw itself and check for response
-                    if operation.ui(ui).changed() {
-                        pixels_changed = true;
-                    }
-                    // ui.horizontal(|ui| {
-                    //     if ui.button("⏶").clicked() {
-                    //         swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    //         pixels_changed = true;
-                    //     }
-                    //     if ui.button("⏷").clicked() {
-                    //         swap = Some((i, i + 1));
-                    //         pixels_changed = true;
-                    //     }
-                    //     if ui.button("⊗").clicked() {
-                    //         delete = Some(i);
-                    //         pixels_changed = true;
-                    //     }
-                    // });
+
+                    ui.horizontal(|ui| {
+                        // let op draw itself and check for response
+
+                        ui.horizontal(|ui| {
+                            if egui::Button::new("⏶")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("Move up in order")
+                                .clicked()
+                            {
+                                swap = Some(((i as i32 - 1).max(0) as usize, i));
+                                image_changed = true;
+                            }
+                            if egui::Button::new("⏷")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("move down in order")
+                                .clicked()
+                            {
+                                swap = Some((i, i + 1));
+                                image_changed = true;
+                            }
+                            if egui::Button::new("⊗")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("Remove operator")
+                                .clicked()
+                            {
+                                delete = Some(i);
+                                image_changed = true;
+                            }
+                        });
+
+                        if operation.ui(ui).changed() {
+                            image_changed = true;
+                        }
+                    });
+
                     ui.end_row();
                 }
+
                 if let Some(delete) = delete {
-                    state.edit_state.edit_stack.remove(delete);
+                    state.edit_state.image_op_stack.remove(delete);
                 }
 
                 if let Some(swap) = swap {
-                    if swap.1 < state.edit_state.edit_stack.len() {
-                        state.edit_state.edit_stack.swap(swap.0, swap.1);
+                    if swap.1 < state.edit_state.image_op_stack.len() {
+                        state.edit_state.image_op_stack.swap(swap.0, swap.1);
+                    }
+                }
+
+                let mut delete: Option<usize> = None;
+                let mut swap: Option<(usize, usize)> = None;
+
+                for (i, operation) in state.edit_state.pixel_op_stack.iter_mut().enumerate() {
+                    ui.label_i(&format!("{}", operation));
+
+                    ui.horizontal(|ui| {
+                        // let op draw itself and check for response
+
+                        ui.horizontal(|ui| {
+                            if egui::Button::new("⏶")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("Move up in order")
+                                .clicked()
+                            {
+                                swap = Some(((i as i32 - 1).max(0) as usize, i));
+                                pixels_changed = true;
+                            }
+                            if egui::Button::new("⏷")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("move down in order")
+                                .clicked()
+                            {
+                                swap = Some((i, i + 1));
+                                pixels_changed = true;
+                            }
+                            if egui::Button::new("⊗")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("Remove operator")
+                                .clicked()
+                            {
+                                delete = Some(i);
+                                pixels_changed = true;
+                            }
+                        });
+
+                        if operation.ui(ui).changed() {
+                            pixels_changed = true;
+                        }
+                    });
+
+                    ui.end_row();
+                }
+
+                if let Some(delete) = delete {
+                    state.edit_state.pixel_op_stack.remove(delete);
+                }
+
+                if let Some(swap) = swap {
+                    if swap.1 < state.edit_state.pixel_op_stack.len() {
+                        state.edit_state.pixel_op_stack.swap(swap.0, swap.1);
                     }
                 }
 
@@ -656,7 +717,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.end_row();
 
-            if state.edit_state.result != Default::default() {
+            if state.edit_state.result_pixel_op != Default::default() {
                 ui.vertical_centered_justified(|ui| {
                     if ui
                         .button("⤵ Apply all edits")
@@ -664,7 +725,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .clicked()
                     {
                         if let Some(img) = &mut state.current_image {
-                            *img = state.edit_state.result.clone();
+                            *img = state.edit_state.result_pixel_op.clone();
                             state.edit_state = Default::default();
                             // state.image_dimension = img.dimensions();
                             pixels_changed = true;
@@ -674,7 +735,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
 
             // Do the processing
-            if pixels_changed {
+            if pixels_changed || image_changed {
                 if let Some(img) = &mut state.current_image {
                     if state.edit_state.painting {
                         debug!("Num strokes {}", state.edit_state.paint_strokes.len());
@@ -702,34 +763,22 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
                     }
 
-                    if state.edit_state.resize != img.dimensions()
-                        && state.edit_state.resize != (0, 0)
-                    {
-                        state.edit_state.result = image::imageops::resize(
-                            img,
-                            state.edit_state.resize.0,
-                            state.edit_state.resize.1,
-                            Gaussian,
-                        );
-                    } else {
-                        state.edit_state.result = img.clone();
-                    }
-
-                    // test if there is cropping, or copy original
-                    if state.edit_state.crop != [0, 0, 0, 0] {
-                        let sub_img = image::imageops::crop_imm(
-                            &state.edit_state.result,
-                            state.edit_state.crop[0].max(0) as u32,
-                            state.edit_state.crop[1].max(0) as u32,
-                            (img.width() as i32 - state.edit_state.crop[2]).max(0) as u32,
-                            (img.height() as i32 - state.edit_state.crop[3]).max(0) as u32,
-                        );
-                        state.edit_state.result = sub_img.to_image();
-                    }
-
-                    if !state.edit_state.edit_stack.is_empty() {
+                    if image_changed {
                         let stamp = Instant::now();
-                        for p in state.edit_state.result.pixels_mut() {
+                        state.edit_state.result_image_op = img.clone();
+                        for operation in &mut state.edit_state.image_op_stack {
+                            operation.process_image(&mut state.edit_state.result_image_op);
+                        }
+                        info!("img ops elapsed {}", stamp.elapsed().as_secs_f32());
+                    }
+                    
+                    // init result as a clean copy of image
+                    state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
+                    
+
+                    if !state.edit_state.pixel_op_stack.is_empty() {
+                        let stamp = Instant::now();
+                        for p in state.edit_state.result_pixel_op.pixels_mut() {
                             // convert pixel to f32 for processing, so we don't clamp
                             let mut float_pixel = image::Rgba([
                                 p[0] as f32 / 255.,
@@ -738,7 +787,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 p[3] as f32 / 255.,
                             ]);
 
-                            for operation in &mut state.edit_state.edit_stack {
+                            for operation in &mut state.edit_state.pixel_op_stack {
                                 operation.process_pixel(&mut float_pixel);
                             }
 
@@ -747,17 +796,16 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
                             p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
                         }
-                        info!("px elapsed{}", stamp.elapsed().as_secs_f32());
-
-                        for operation in &mut state.edit_state.edit_stack {
-                            operation.process_image(&mut state.edit_state.result);
-                        }
+                        info!("pxl ops elapsed {}", stamp.elapsed().as_secs_f32());
                     }
 
                     // draw paint lines
                     // let stamp = std::time::Instant::now();
                     for stroke in &state.edit_state.paint_strokes {
-                        stroke.render(&mut state.edit_state.result, &state.edit_state.brushes);
+                        stroke.render(
+                            &mut state.edit_state.result_pixel_op,
+                            &state.edit_state.brushes,
+                        );
                     }
                     // debug!("Stroke rendering took {}s", stamp.elapsed().as_secs_f64());
                 }
@@ -770,61 +818,63 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // let stamp = std::time::Instant::now();
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
-                        if tex.width() as u32 == state.edit_state.result.width()
-                            && state.edit_state.result.height() as u32 == img.height()
+                        if tex.width() as u32 == state.edit_state.result_pixel_op.width()
+                            && state.edit_state.result_pixel_op.height() as u32 == img.height()
                         {
-                            state.edit_state.result.update_texture(gfx, tex);
+                            state.edit_state.result_pixel_op.update_texture(gfx, tex);
                         } else {
-                            state.current_texture = state.edit_state.result.to_texture(gfx);
+                            state.current_texture =
+                                state.edit_state.result_pixel_op.to_texture(gfx);
                         }
                     }
                 }
                 // info!("Upd tex took {}s", stamp.elapsed().as_secs_f64());
             }
 
-            if state.edit_state.result != Default::default() {
-                state.image_dimension = state.edit_state.result.dimensions();
+            state.image_dimension = state.edit_state.result_pixel_op.dimensions();
 
-                ui.vertical_centered_justified(|ui| {
-                    let compatible_extensions = ["png", "jpg"];
-                    if let Some(path) = &state.current_path {
-                        if let Some(ext) = path.extension() {
-                            if compatible_extensions
-                                .contains(&ext.to_string_lossy().to_string().as_str())
-                            {
-                                if ui.button("💾 Overwrite").clicked() {
-                                    let _ = state.edit_state.result.save(path);
-                                }
-                            } else {
-                                if ui.button("💾 Save as png").clicked() {
-                                    let _ =
-                                        state.edit_state.result.save(path.with_extension("png"));
-                                }
+            ui.vertical_centered_justified(|ui| {
+                let compatible_extensions = ["png", "jpg"];
+                if let Some(path) = &state.current_path {
+                    if let Some(ext) = path.extension() {
+                        if compatible_extensions
+                            .contains(&ext.to_string_lossy().to_string().as_str())
+                        {
+                            if ui.button("💾 Overwrite").clicked() {
+                                let _ = state.edit_state.result_pixel_op.save(path);
+                            }
+                        } else {
+                            if ui.button("💾 Save as png").clicked() {
+                                let _ = state
+                                    .edit_state
+                                    .result_pixel_op
+                                    .save(path.with_extension("png"));
                             }
                         }
-
-                        if ui
-                            .button("⟳ Reload image")
-                            .on_hover_text("Completely reload image, destroying all edits.")
-                            .clicked()
-                        {
-                            state.is_loaded = false;
-                            state.player.load(&path);
-                        }
                     }
-                });
-            }
+
+                    if ui
+                        .button("⟳ Reload image")
+                        .on_hover_text("Completely reload image, destroying all edits.")
+                        .clicked()
+                    {
+                        state.is_loaded = false;
+                        state.player.load(&path);
+                    }
+                }
+            });
 
             if pixels_changed && state.info_enabled {
                 state.image_info = None;
                 send_extended_info(
-                    &Some(state.edit_state.result.clone()),
+                    &Some(state.edit_state.result_pixel_op.clone()),
                     &state.extended_info_channel,
                 );
             }
         });
 }
 
+// TODO redo as impl UI
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
         ui.horizontal(|ui| {
@@ -839,6 +889,7 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
     })
 }
 
+// TODO redo as impl UI
 pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
     ui.add(egui::Button::new(text).frame(false))
 }
