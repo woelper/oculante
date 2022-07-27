@@ -3,7 +3,7 @@ use std::time::Instant;
 use egui::plot::{Plot, Value, Values};
 use image::{
     imageops::FilterType::{Gaussian, Lanczos3},
-    Pixels, RgbaImage,
+    RgbaImage,
 };
 use log::{debug, info};
 use notan::{
@@ -300,72 +300,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
 
             egui::Grid::new("editing").num_columns(2).show(ui, |ui| {
-                ui.label_i("🔃 Rotation");
-                ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        let available_w_single_spacing =
-                            ui.available_width() - ui.style().spacing.item_spacing.x;
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("⟳"),
-                            )
-                            .on_hover_text("Rotate 90 deg right")
-                            .clicked()
-                        {
-                            state.edit_state.result_pixel_op =
-                                image::imageops::rotate90(&state.edit_state.result_pixel_op);
-
-                            pixels_changed = true;
-                        }
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("⟲"),
-                            )
-                            .on_hover_text("Rotate 90 deg left")
-                            .clicked()
-                        {
-                            state.edit_state.result_pixel_op =
-                                image::imageops::rotate270(&state.edit_state.result_pixel_op);
-                            pixels_changed = true;
-                        }
-                    }
-                });
-                ui.end_row();
-
-                ui.label_i("⬌ Flipping");
-                // ui.vertical_centered_justified(|ui| {
-                ui.horizontal(|ui| {
-                    if let Some(img) = &mut state.current_image {
-                        let available_w_single_spacing =
-                            ui.available_width() - ui.style().spacing.item_spacing.x;
-
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Horizontal"),
-                            )
-                            .clicked()
-                        {
-                            state.edit_state.result_pixel_op =
-                                image::imageops::flip_horizontal(&state.edit_state.result_pixel_op);
-                            pixels_changed = true;
-                        }
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Vertical"),
-                            )
-                            .clicked()
-                        {
-                            state.edit_state.result_pixel_op =
-                                image::imageops::flip_vertical(&state.edit_state.result_pixel_op);
-                            pixels_changed = true;
-                        }
-                    }
-                });
-                ui.end_row();
+                
 
                 let mut ops = [
                     ImageOperation::Brightness(0),
@@ -380,6 +315,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         dimensions: state.image_dimension,
                         aspect: true,
                     },
+                    ImageOperation::Flip(true),
+                    ImageOperation::Rotate(true),
                     ImageOperation::SwapRG,
                     ImageOperation::SwapBG,
                     ImageOperation::SwapRB,
@@ -399,8 +336,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     state.edit_state.pixel_op_stack.push(*op);
                                     pixels_changed = true;
                                 } else {
-                                    image_changed = true;
                                     state.edit_state.image_op_stack.push(*op);
+                                    image_changed = true;
                                 }
                             }
                         }
@@ -640,7 +577,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                         for (i, stroke) in
                                             state.edit_state.paint_strokes.iter_mut().enumerate()
                                         {
-                                            if stroke.is_empty() {
+                                            if stroke.is_empty() || stroke.committed {
                                                 continue;
                                             }
 
@@ -701,8 +638,14 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
                         debug!("PAINT");
                         // get pos in image
-                        let p = state.cursor_relative;
-                        current_stroke.points.push(Pos2::new(p.x, p.y));
+                        // let p = state.cursor_relative;
+                        let uv = (
+                            state.cursor_relative.x / state.image_dimension.0 as f32,
+                            (state.cursor_relative.y / state.image_dimension.1 as f32),
+                        );
+                        // info!("pnt @ {:?}", uv);
+                        // current_stroke.points.push(Pos2::new(p.x, p.y));
+                        current_stroke.points.push(Pos2::new(uv.0, uv.1));
                         pixels_changed = true;
                     } else if !current_stroke.is_empty() {
                         // clone last stroke to inherit settings
@@ -717,105 +660,87 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.end_row();
 
-            if state.edit_state.result_pixel_op != Default::default() {
-                ui.vertical_centered_justified(|ui| {
-                    if ui
-                        .button("⤵ Apply all edits")
-                        .on_hover_text("Apply all edits to the image and reset edit controls")
-                        .clicked()
-                    {
-                        if let Some(img) = &mut state.current_image {
-                            *img = state.edit_state.result_pixel_op.clone();
-                            state.edit_state = Default::default();
-                            // state.image_dimension = img.dimensions();
-                            pixels_changed = true;
-                        }
+            ui.vertical_centered_justified(|ui| {
+                if ui
+                    .button("⤵ Apply all edits")
+                    .on_hover_text("Apply all edits to the image and reset edit controls")
+                    .clicked()
+                {
+                    if let Some(img) = &mut state.current_image {
+                        *img = state.edit_state.result_pixel_op.clone();
+                        state.edit_state = Default::default();
+                        // state.image_dimension = img.dimensions();
+                        pixels_changed = true;
+                        image_changed = true;
                     }
-                });
-            }
+                }
+            });
 
             // Do the processing
-            if pixels_changed || image_changed {
+
+            // If expensive operations happened (modifying image geometry), process them here
+            if image_changed {
                 if let Some(img) = &mut state.current_image {
-                    if state.edit_state.painting {
-                        debug!("Num strokes {}", state.edit_state.paint_strokes.len());
-
-                        // render previous strokes
-                        if state
-                            .edit_state
-                            .paint_strokes
-                            .iter()
-                            .filter(|l| !l.points.is_empty())
-                            .count()
-                            > 1
-                            && !state.edit_state.non_destructive_painting
-                        {
-                            // info!("initial strokes: {}", state.edit_state.paint_strokes.len());
-
-                            // commit first line
-                            if let Some(first_line) = state.edit_state.paint_strokes.first() {
-                                first_line.render(img, &state.edit_state.brushes);
-                                info!("Committed stroke");
-                                state.edit_state.paint_strokes.remove(0);
-                            }
-
-                            // info!("strokes left: {}", state.edit_state.paint_strokes.len());
-                        }
+                    let stamp = Instant::now();
+                    // start with a fresh copy of the unmodified image
+                    state.edit_state.result_image_op = img.clone();
+                    for operation in &mut state.edit_state.image_op_stack {
+                        operation.process_image(&mut state.edit_state.result_image_op);
                     }
+                    info!(
+                        "Image changed. Finished evaluating in {}s",
+                        stamp.elapsed().as_secs_f32()
+                    );
 
-                    if image_changed {
-                        let stamp = Instant::now();
-                        state.edit_state.result_image_op = img.clone();
-                        for operation in &mut state.edit_state.image_op_stack {
-                            operation.process_image(&mut state.edit_state.result_image_op);
-                        }
-                        info!("img ops elapsed {}", stamp.elapsed().as_secs_f32());
+                    // tag strokes as uncommitted as they need to be rendered again
+                    for stroke in &mut state.edit_state.paint_strokes {
+                        stroke.committed = false;
                     }
-                    
-                    // init result as a clean copy of image
-                    state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
-                    
+                }
+                pixels_changed = true;
+            }
 
-                    if !state.edit_state.pixel_op_stack.is_empty() {
-                        let stamp = Instant::now();
-                        for p in state.edit_state.result_pixel_op.pixels_mut() {
-                            // convert pixel to f32 for processing, so we don't clamp
-                            let mut float_pixel = image::Rgba([
-                                p[0] as f32 / 255.,
-                                p[1] as f32 / 255.,
-                                p[2] as f32 / 255.,
-                                p[3] as f32 / 255.,
-                            ]);
+            if pixels_changed {
+                // init result as a clean copy of image operation result
+                let stamp = Instant::now();
 
-                            for operation in &mut state.edit_state.pixel_op_stack {
-                                operation.process_pixel(&mut float_pixel);
-                            }
+                // start from the result of the image operations
+                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
 
-                            // convert back
-                            p[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
-                            p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
-                            p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+                // only process pixel stack if it is empty so we don't run through pixels without need
+                if !state.edit_state.pixel_op_stack.is_empty() {
+                    for p in state.edit_state.result_pixel_op.pixels_mut() {
+                        // convert pixel to f32 for processing, so we don't clamp
+                        let mut float_pixel = image::Rgba([
+                            p[0] as f32 / 255.,
+                            p[1] as f32 / 255.,
+                            p[2] as f32 / 255.,
+                            p[3] as f32 / 255.,
+                        ]);
+
+                        // run pixel operations
+                        for operation in &mut state.edit_state.pixel_op_stack {
+                            operation.process_pixel(&mut float_pixel);
                         }
-                        info!("pxl ops elapsed {}", stamp.elapsed().as_secs_f32());
-                    }
 
-                    // draw paint lines
-                    // let stamp = std::time::Instant::now();
-                    for stroke in &state.edit_state.paint_strokes {
+                        // convert back to u8
+                        p[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
+                        p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
+                        p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+                    }
+                }
+
+                // draw paint lines
+                for stroke in &state.edit_state.paint_strokes {
+                    if !stroke.committed {
                         stroke.render(
                             &mut state.edit_state.result_pixel_op,
                             &state.edit_state.brushes,
                         );
                     }
-                    // debug!("Stroke rendering took {}s", stamp.elapsed().as_secs_f64());
                 }
 
-                // update the current texture with the edit state
-                // let stamp = std::time::Instant::now();
-                // state.current_texture = state.edit_state.result.to_texture(gfx);
-                // info!("New tex took {}s", stamp.elapsed().as_secs_f64());
-
-                // let stamp = std::time::Instant::now();
+                // Update the texture
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
@@ -828,7 +753,39 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
                     }
                 }
-                // info!("Upd tex took {}s", stamp.elapsed().as_secs_f64());
+                info!(
+                    "Pixels changed. Finished evaluating in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
+            }
+
+            // render uncommitted strokes if destructive to speed up painting
+            if state.edit_state.painting {
+                // render previous strokes
+                if state
+                    .edit_state
+                    .paint_strokes
+                    .iter()
+                    .filter(|l| !l.points.is_empty())
+                    .count()
+                    > 1
+                    && !state.edit_state.non_destructive_painting
+                {
+                    let stroke_count = state.edit_state.paint_strokes.len();
+
+                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
+                        if i < stroke_count - 1 {
+                            if !stroke.committed && !stroke.is_empty() {
+                                stroke.render(
+                                    &mut state.edit_state.result_image_op,
+                                    &state.edit_state.brushes,
+                                );
+                                stroke.committed = true;
+                                info!("Committed stroke {}", i);
+                            }
+                        }
+                    }
+                }
             }
 
             state.image_dimension = state.edit_state.result_pixel_op.dimensions();
@@ -922,7 +879,11 @@ pub fn stroke_ui(
         combined_response.hovered = true;
     }
 
-    let r = ui.add(egui::DragValue::new(&mut stroke.width));
+    let r = ui.add(
+        egui::DragValue::new(&mut stroke.width)
+            .clamp_range(0.0..=0.3)
+            .speed(0.001),
+    );
     if r.changed() {
         combined_response.changed = true;
     }

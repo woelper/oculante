@@ -12,6 +12,8 @@ pub enum ImageOperation {
     Mult([u8; 3]),
     Add([u8; 3]),
     Contrast(i32),
+    Flip(bool),
+    Rotate(bool),
     SwapRG,
     SwapRB,
     SwapBG,
@@ -34,6 +36,8 @@ impl fmt::Display for ImageOperation {
             Self::Add(_) => write!(f, "➕ Add color"),
             Self::Blur(_) => write!(f, "💧 Blur"),
             Self::Crop(_) => write!(f, "✂ Crop"),
+            Self::Flip(_) => write!(f, "⬌ Flip"),
+            Self::Rotate(_) => write!(f, "⟳ Rotate"),
             Self::Invert => write!(f, "！ Invert"),
             Self::SwapRG => write!(f, "⬌ Swap R / G"),
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
@@ -50,6 +54,8 @@ impl ImageOperation {
             Self::Blur(_) => false,
             Self::Resize { .. } => false,
             Self::Crop(_) => false,
+            Self::Rotate(_) => false,
+            Self::Flip(_) => false,
             _ => true,
         }
     }
@@ -59,6 +65,20 @@ impl ImageOperation {
         match self {
             Self::Brightness(val) => ui.add(Slider::new(val, -255..=255)),
             Self::Blur(val) => ui.add(Slider::new(val, 0..=20)),
+            Self::Flip(horizontal) => {
+                let mut r = ui.radio_value(horizontal, true, "V");
+                if ui.radio_value(horizontal, false, "H").changed() {
+                    r.changed = true
+                }
+                r
+            }
+            Self::Rotate(ccw) => {
+                let mut r = ui.radio_value(ccw, true, "CCW");
+                if ui.radio_value(ccw, false, "CW").changed() {
+                    r.changed = true
+                }
+                r
+            }
             Self::Desaturate(val) => ui.add(Slider::new(val, 0..=100)),
             Self::Contrast(val) => ui.add(Slider::new(val, -128..=128)),
             Self::Crop(bounds) => {
@@ -171,6 +191,12 @@ impl ImageOperation {
                         }
                     }
 
+                    // For this operator, we want to update on release, not on change.
+                    // Since all operators are processed the same, we use the hack to emit `changed` just on release.
+                    // Users dragging the resize values will now only trigger a resize on release, which feels
+                    // more snappy.
+                    r0.changed = r0.drag_released();
+
                     r0
                 })
                 .inner
@@ -179,6 +205,7 @@ impl ImageOperation {
         }
     }
 
+    /// Process all image operators (All things that modify the image and are not "per pixel")
     pub fn process_image(&self, img: &mut RgbaImage) {
         match self {
             Self::Blur(amt) => {
@@ -203,10 +230,26 @@ impl ImageOperation {
                     *img = image::imageops::resize(img, dimensions.0, dimensions.1, Gaussian);
                 }
             }
+            Self::Rotate(ccw) => {
+                if *ccw {
+                    *img = image::imageops::rotate270(img);
+                } else {
+                    *img = image::imageops::rotate90(img);
+                }
+            }
+
+            Self::Flip(vert) => {
+                if *vert {
+                    *img = image::imageops::flip_vertical(img);
+                }
+                *img = image::imageops::flip_horizontal(img);
+            }
+
             _ => (),
         }
     }
 
+    /// Process a single pixel.
     pub fn process_pixel(&self, p: &mut Rgba<f32>) {
         match self {
             Self::Brightness(amt) => {

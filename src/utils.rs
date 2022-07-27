@@ -276,11 +276,12 @@ pub struct PaintStroke {
     pub points: Vec<Pos2>,
     pub fade: bool,
     pub color: [f32; 4],
-    /// brush width in px
-    pub width: u32,
+    /// brush width from 0-1. 1 is equal to 1/10th of the smallest image dimension.
+    pub width: f32,
     pub brush_index: usize,
     /// For ui preview: if highlit, paint brush stroke differently
     pub highlight: bool,
+    pub committed: bool,
     pub flip_random: bool,
 }
 
@@ -295,7 +296,7 @@ impl PaintStroke {
     pub fn new() -> Self {
         Self {
             color: [1., 1., 1., 1.],
-            width: 32,
+            width: 0.05,
             ..Default::default()
         }
     }
@@ -309,15 +310,29 @@ impl PaintStroke {
     }
 
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
+        // Calculate the brush: use a fraction of the smallest image size
+        let max_brush_size = img.width().min(img.height());
+        
+        
+        
         let mut brush = image::imageops::resize(
             &brushes[self.brush_index],
-            self.width,
-            self.width,
+            (self.width * max_brush_size as f32) as u32,
+            (self.width * max_brush_size as f32) as u32,
             image::imageops::Gaussian,
         );
 
+
+
+        // transform points from UV into image space
+        let abs_points = self
+            .points
+            .iter()
+            .map(|p| Pos2::new(img.width() as f32 * p.x, img.height() as f32 * p.y))
+            .collect::<Vec<_>>();
+
         let points = notan::egui::Shape::dotted_line(
-            &self.points,
+            &abs_points,
             Color32::DARK_RED,
             (brush.width() as f32 / 4.0).max(1.5), // .min(60.)
             0.,
