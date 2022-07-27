@@ -310,6 +310,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Crop((0, 0, 0, 0)),
                     ImageOperation::Invert,
                     ImageOperation::Mult([255, 255, 255]),
+                    ImageOperation::Fill([255, 255, 255]),
                     ImageOperation::Add([0, 0, 0]),
                     ImageOperation::Resize {
                         dimensions: state.image_dimension,

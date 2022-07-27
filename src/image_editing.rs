@@ -11,6 +11,7 @@ pub enum ImageOperation {
     Desaturate(u8),
     Mult([u8; 3]),
     Add([u8; 3]),
+    Fill([u8; 3]),
     Contrast(i32),
     Flip(bool),
     Rotate(bool),
@@ -34,6 +35,7 @@ impl fmt::Display for ImageOperation {
             Self::Contrast(_) => write!(f, "◑ Contrast"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
+            Self::Fill(_) => write!(f, "💧 Fill color"),
             Self::Blur(_) => write!(f, "💧 Blur"),
             Self::Crop(_) => write!(f, "✂ Crop"),
             Self::Flip(_) => write!(f, "⬌ Flip"),
@@ -56,6 +58,7 @@ impl ImageOperation {
             Self::Crop(_) => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
+            Self::Fill(_) => false,
             _ => true,
         }
     }
@@ -122,6 +125,21 @@ impl ImageOperation {
                 .inner
             }
             Self::Mult(val) => {
+                let mut color: [f32; 3] = [
+                    val[0] as f32 / 255.,
+                    val[1] as f32 / 255.,
+                    val[2] as f32 / 255.,
+                ];
+
+                let r = ui.color_edit_button_rgb(&mut color);
+                if r.changed() {
+                    val[0] = (color[0] * 255.) as u8;
+                    val[1] = (color[1] * 255.) as u8;
+                    val[2] = (color[2] * 255.) as u8;
+                }
+                r
+            }
+            Self::Fill(val) => {
                 let mut color: [f32; 3] = [
                     val[0] as f32 / 255.,
                     val[1] as f32 / 255.,
@@ -244,6 +262,13 @@ impl ImageOperation {
                 }
                 *img = image::imageops::flip_horizontal(img);
             }
+            Self::Fill(color) => {
+                *img = RgbaImage::from_pixel(
+                    img.width(),
+                    img.height(),
+                    image::Rgba([color[0], color[1], color[2], 255]),
+                )
+            }
 
             _ => (),
         }
@@ -270,6 +295,7 @@ impl ImageOperation {
                 p[1] = p[1] + amt[1] as f32 / 255.;
                 p[2] = p[2] + amt[2] as f32 / 255.;
             }
+
             Self::Invert => {
                 p[0] = 1. - p[0];
                 p[1] = 1. - p[1];
