@@ -35,7 +35,7 @@ impl fmt::Display for ImageOperation {
             Self::Contrast(_) => write!(f, "◑ Contrast"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
-            Self::Fill(_) => write!(f, "💧 Fill color"),
+            Self::Fill(_) => write!(f, "🍺 Fill color"),
             Self::Blur(_) => write!(f, "💧 Blur"),
             Self::Crop(_) => write!(f, "✂ Crop"),
             Self::Flip(_) => write!(f, "⬌ Flip"),
