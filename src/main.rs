@@ -28,6 +28,7 @@ mod tests;
 mod ui;
 mod update;
 use ui::*;
+mod image_editing;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -174,7 +175,6 @@ fn event(state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
-
                 let delta = zoomratio(delta_y, state.scale);
                 let new_scale = state.scale + delta;
                 // limit scale
@@ -276,7 +276,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(img) = state.texture_channel.1.try_recv() {
         debug!("Received image buffer");
-        state.image_dimension = (img.width(), img.height());
+        state.image_dimension = img.dimensions();
         state.current_texture = img.to_texture(gfx);
         state.image_info = None;
 
@@ -324,7 +324,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(25.)
             .show(&ctx, |ui| {
                 ui.horizontal(|ui| {
-
                     ui.heading("Channels");
 
                     let mut changed_channels = false;

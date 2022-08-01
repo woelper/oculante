@@ -36,6 +36,8 @@ notan = {version = "0.5.1", features = ["drop_files", "egui"]}
 strum = { version = "0.24", features = ["derive"] }
 strum_macros = "0.24"
 arboard = "2.1.1"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"

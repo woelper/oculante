@@ -2289,6 +2289,8 @@ dependencies = [
  "nalgebra",
  "notan",
  "psd",
+ "rand",
+ "rand_chacha",
  "resvg",
  "rgb",
  "self_update",

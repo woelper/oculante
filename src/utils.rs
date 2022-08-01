@@ -2,14 +2,16 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, GenericImage, Pixel, RgbaImage};
+use image::{EncodableLayout, Pixel, RgbaImage};
 
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::egui::{Color32, Pos2, self};
-use notan::graphics::{Texture, TextureFilter, TextureWrap};
+use notan::egui::{Color32, Pos2};
+use notan::graphics::Texture;
 use notan::prelude::Graphics;
 use notan::AppState;
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
@@ -33,6 +35,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use strum::Display;
 use strum_macros::EnumIter;
+
+use crate::image_editing::ImageOperation;
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -224,38 +228,22 @@ impl Channel {
 
 #[derive(Debug)]
 pub struct EditState {
-    pub color_mult: [f32; 3],
-    pub color_add: [f32; 3],
-    pub color_paint: [f32; 4],
-    pub result: RgbaImage,
-    pub blur: f32,
-    pub unsharpen: f32,
-    pub unsharpen_threshold: i32,
-    pub contrast: f32,
-    pub brightness: i32,
-    pub desaturate: f32,
-    pub crop: [i32; 4],
+    pub result_pixel_op: RgbaImage,
+    pub result_image_op: RgbaImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
     pub brushes: Vec<RgbaImage>,
+    pub pixel_op_stack: Vec<ImageOperation>,
+    pub image_op_stack: Vec<ImageOperation>,
 }
 
 impl Default for EditState {
     fn default() -> Self {
         Self {
-            color_mult: [1., 1., 1.],
-            color_add: Default::default(),
-            color_paint: [1., 0., 0., 1.],
-            result: RgbaImage::default(),
-            blur: Default::default(),
-            unsharpen: Default::default(),
-            unsharpen_threshold: Default::default(),
-            contrast: Default::default(),
-            brightness: Default::default(),
-            desaturate: Default::default(),
-            crop: Default::default(),
+            result_pixel_op: RgbaImage::default(),
+            result_image_op: RgbaImage::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
@@ -277,18 +265,24 @@ impl Default for EditState {
                     .unwrap()
                     .into_rgba8(),
             ],
+            pixel_op_stack: vec![],
+            image_op_stack: vec![],
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PaintStroke {
     pub points: Vec<Pos2>,
     pub fade: bool,
     pub color: [f32; 4],
-    pub width: u32,
+    /// brush width from 0-1. 1 is equal to 1/10th of the smallest image dimension.
+    pub width: f32,
     pub brush_index: usize,
+    /// For ui preview: if highlit, paint brush stroke differently
     pub highlight: bool,
+    pub committed: bool,
+    pub flip_random: bool,
 }
 
 impl PaintStroke {
@@ -301,12 +295,9 @@ impl PaintStroke {
 
     pub fn new() -> Self {
         Self {
-            points: vec![],
-            fade: false,
             color: [1., 1., 1., 1.],
-            width: 16,
-            brush_index: 0,
-            highlight: false,
+            width: 0.05,
+            ..Default::default()
         }
     }
 
@@ -319,14 +310,29 @@ impl PaintStroke {
     }
 
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
-        let brush = image::imageops::resize(
+        // Calculate the brush: use a fraction of the smallest image size
+        let max_brush_size = img.width().min(img.height());
+        
+        
+        
+        let mut brush = image::imageops::resize(
             &brushes[self.brush_index],
-            self.width,
-            self.width,
+            (self.width * max_brush_size as f32) as u32,
+            (self.width * max_brush_size as f32) as u32,
             image::imageops::Gaussian,
         );
+
+
+
+        // transform points from UV into image space
+        let abs_points = self
+            .points
+            .iter()
+            .map(|p| Pos2::new(img.width() as f32 * p.x, img.height() as f32 * p.y))
+            .collect::<Vec<_>>();
+
         let points = notan::egui::Shape::dotted_line(
-            &self.points,
+            &abs_points,
             Color32::DARK_RED,
             (brush.width() as f32 / 4.0).max(1.5), // .min(60.)
             0.,
@@ -335,12 +341,29 @@ impl PaintStroke {
         for (i, p) in points.iter().enumerate() {
             let pos_on_line = p.visual_bounding_rect().center();
 
+            if self.flip_random {
+                // seed by brush position so randomness only changes per brush instance
+                let mut rng =
+                    ChaCha8Rng::seed_from_u64(pos_on_line.x as u64 + pos_on_line.y as u64);
+
+                let flip_x: bool = rng.gen();
+                let flip_y: bool = rng.gen();
+
+                if flip_x {
+                    image::imageops::flip_horizontal_in_place(&mut brush);
+                }
+                if flip_y {
+                    image::imageops::flip_vertical_in_place(&mut brush);
+                }
+            }
+
             let mut stroke_color = self.color;
 
             if self.fade {
                 let fraction = i as f32 / points.len() as f32;
                 stroke_color[3] = stroke_color[3] * fraction;
             }
+
             if self.highlight {
                 stroke_color[0] *= 2.5;
                 stroke_color[1] *= 2.5;
@@ -428,7 +451,7 @@ fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
     let mut width = 0;
     let mut height = 0;
     let len = buf.len();
-    let mut webp_buffer: Vec<u8> = vec![];
+    let webp_buffer: Vec<u8>;
     unsafe {
         WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
         let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);
@@ -954,12 +977,4 @@ pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
         (c[2] * 255.) as u8,
         (c[3] * 255.) as u8,
     ])
-}
-
-pub fn desaturate(p: &mut Rgba<u8>, factor: f32) {
-    // G*.59+R*.3+B*.11
-    let val = p[0] as f32 * 0.59 + p[1] as f32 * 0.3 + p[2] as f32 * 0.11; 
-    p[0] = egui::lerp(p[0] as f32..=val, factor) as u8;
-    p[1] = egui::lerp(p[1] as f32..=val, factor) as u8;
-    p[2] = egui::lerp(p[2] as f32..=val, factor) as u8;
 }
