@@ -300,8 +300,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
 
             egui::Grid::new("editing").num_columns(2).show(ui, |ui| {
-                
-
                 let mut ops = [
                     ImageOperation::Brightness(0),
                     ImageOperation::Contrast(0),
@@ -499,6 +497,24 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
+                    if ctx.input().pointer.secondary_down() {
+                        if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
+                            if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
+                                state.cursor_relative.x as u32,
+                                state.cursor_relative.y as u32,
+                            ) {
+                                info!("{:?}", p);
+                                stroke.color = [
+                                    p[0] as f32 / 255.,
+                                    p[1] as f32 / 255.,
+                                    p[2] as f32 / 255.,
+                                    p[3] as f32 / 255.,
+                                ];
+                                // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+                            }
+                        }
+                    }
+
                     if ui
                         .add(
                             egui::Button::new("Stop painting")

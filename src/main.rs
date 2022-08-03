@@ -220,6 +220,15 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
+    
+    if app.mouse.is_down(MouseButton::Middle) {
+        state.drag_enabled = true;
+        state.offset += state.mouse_delta;
+    }
+
+    if app.mouse.is_down(MouseButton::Right) {
+
+    }
 
     if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
@@ -236,6 +245,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.was_released(MouseButton::Left) {
         state.drag_enabled = false;
     }
+    if app.mouse.was_released(MouseButton::Middle) {
+        state.drag_enabled = false;
+    }
+
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
