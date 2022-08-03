@@ -14,7 +14,7 @@ use std::{
 pub fn launch() -> Result<(), Box<dyn Error>> {
     info!("Starting MacOS integration");
 
-    // It's not good design that the MacOS workaround does it's own argument parsing again,
+    // It's not good design that the MacOS workaround does its own argument parsing again,
     // However, the notan (and possibly other engines/libraries) structure prefer argument parsing
     // in an init funcion, from which fruitbasked panics internally. For this reason this extra
     // module keeps everything self-contained and barebones so it can be called independently
@@ -62,7 +62,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         }),
     );
 
-    // clone file_arg to muve it into closure
+    // clone file_arg to move it into closure
     let farg = file_arg.clone();
     let stopper = app.stopper();
     app.register_callback(
