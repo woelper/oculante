@@ -10,6 +10,7 @@ use notan::{
     egui::{self, plot::Points, *},
     prelude::Graphics,
 };
+use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
 use crate::{
     image_editing::ImageOperation,
@@ -304,11 +305,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Brightness(0),
                     ImageOperation::Contrast(0),
                     ImageOperation::Desaturate(0),
-                    ImageOperation::Blur(0),
+                    ImageOperation::HSV((0, 100, 100)),
                     ImageOperation::Crop((0, 0, 0, 0)),
                     ImageOperation::Invert,
                     ImageOperation::Mult([255, 255, 255]),
                     ImageOperation::Fill([255, 255, 255]),
+                    ImageOperation::Blur(0),
                     ImageOperation::Add([0, 0, 0]),
                     ImageOperation::Resize {
                         dimensions: state.image_dimension,
@@ -353,6 +355,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         // let op draw itself and check for response
 
                         ui.horizontal(|ui| {
+                            // ui.vertical(|ui| {
+
                             if egui::Button::new("⏶")
                                 .small()
                                 .ui(ui)
@@ -371,6 +375,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 swap = Some((i, i + 1));
                                 image_changed = true;
                             }
+                            // });
                             if egui::Button::new("⊗")
                                 .small()
                                 .ui(ui)
@@ -410,6 +415,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         // let op draw itself and check for response
 
                         ui.horizontal(|ui| {
+                            // ui.vertical(|ui| {
+
                             if egui::Button::new("⏶")
                                 .small()
                                 .ui(ui)
@@ -428,6 +435,17 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 swap = Some((i, i + 1));
                                 pixels_changed = true;
                             }
+                            // });
+                            if egui::Button::new("⊗")
+                                .small()
+                                .ui(ui)
+                                .on_hover_text("Remove operator")
+                                .clicked()
+                            {
+                                delete = Some(i);
+                                pixels_changed = true;
+                            }
+
                             if egui::Button::new("⊗")
                                 .small()
                                 .ui(ui)
@@ -726,27 +744,58 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
-                    for p in state.edit_state.result_pixel_op.pixels_mut() {
-                        // convert pixel to f32 for processing, so we don't clamp
+                    // for p in state.edit_state.result_pixel_op.pixels_mut() {
+                    //     // convert pixel to f32 for processing, so we don't clamp
+                    //     let mut float_pixel = image::Rgba([
+                    //         p[0] as f32 / 255.,
+                    //         p[1] as f32 / 255.,
+                    //         p[2] as f32 / 255.,
+                    //         p[3] as f32 / 255.,
+                    //     ]);
+
+                    //     // run pixel operations
+                    //     for operation in &mut state.edit_state.pixel_op_stack {
+                    //         operation.process_pixel(&mut float_pixel);
+                    //     }
+
+                    //     // convert back to u8
+                    //     p[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
+                    //     p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
+                    //     p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+                    // }
+                }
+
+                let rstamp = Instant::now();
+
+                // let x = state.edit_state.result_pixel_op.chunks(4).par_bridge().map(|x| x).collect::<&Chunks<u8>>();
+                let ops = &state.edit_state.pixel_op_stack;
+
+                state
+                    .edit_state
+                    .result_pixel_op
+                    .par_chunks_mut(4)
+                    .for_each(|px| {
                         let mut float_pixel = image::Rgba([
-                            p[0] as f32 / 255.,
-                            p[1] as f32 / 255.,
-                            p[2] as f32 / 255.,
-                            p[3] as f32 / 255.,
+                            px[0] as f32 / 255.,
+                            px[1] as f32 / 255.,
+                            px[2] as f32 / 255.,
+                            px[3] as f32 / 255.,
                         ]);
 
                         // run pixel operations
-                        for operation in &mut state.edit_state.pixel_op_stack {
+                        for operation in ops {
                             operation.process_pixel(&mut float_pixel);
                         }
 
                         // convert back to u8
-                        p[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
-                        p[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
-                        p[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
-                    }
-                }
-
+                        px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
+                        px[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
+                        px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+                    });
+                info!(
+                    "Rayon Pixels changed. Finished evaluating in {} s",
+                    rstamp.elapsed().as_secs_f32()
+                );
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
                     if !stroke.committed {
@@ -755,6 +804,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             &state.edit_state.brushes,
                         );
                     }
+                }
+
+                if let Some(tex) = &mut state.current_texture {
+                    let p = gfx.read_pixels(tex);
+                    // p.
                 }
 
                 // Update the texture

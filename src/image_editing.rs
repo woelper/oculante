@@ -2,8 +2,9 @@ use std::fmt;
 
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::Gaussian;
-use notan::egui;
+use notan::egui::{self, DragValue};
 use notan::egui::{Response, Slider, Ui};
+use palette::Pixel;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ImageOperation {
@@ -15,6 +16,8 @@ pub enum ImageOperation {
     Contrast(i32),
     Flip(bool),
     Rotate(bool),
+    HSV((u16, u8, u8)),
+    ChromaticAberration(u8),
     SwapRG,
     SwapRB,
     SwapBG,
@@ -44,6 +47,8 @@ impl fmt::Display for ImageOperation {
             Self::SwapRG => write!(f, "⬌ Swap R / G"),
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
             Self::SwapBG => write!(f, "⬌ Swap B / G"),
+            Self::HSV(_) => write!(f, "◔ HSV"),
+            Self::ChromaticAberration(_) => write!(f, "○ Chrmatic Aberration"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
             _ => write!(f, "Not implemented Display"),
         }
@@ -67,6 +72,23 @@ impl ImageOperation {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.add(Slider::new(val, -255..=255)),
+            Self::ChromaticAberration(val) => ui.add(Slider::new(val, 0..=255)),
+            Self::HSV(val) => {
+                let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
+                if ui
+                    .add(DragValue::new(&mut val.1).clamp_range(0..=100))
+                    .changed()
+                {
+                    r.changed = true;
+                }
+                if ui
+                    .add(DragValue::new(&mut val.2).clamp_range(0..=100))
+                    .changed()
+                {
+                    r.changed = true;
+                }
+                r
+            }
             Self::Blur(val) => ui.add(Slider::new(val, 0..=20)),
             Self::Flip(horizontal) => {
                 let mut r = ui.radio_value(horizontal, true, "V");
@@ -255,7 +277,6 @@ impl ImageOperation {
                     *img = image::imageops::rotate90(img);
                 }
             }
-
             Self::Flip(vert) => {
                 if *vert {
                     *img = image::imageops::flip_vertical(img);
@@ -268,6 +289,13 @@ impl ImageOperation {
                     img.height(),
                     image::Rgba([color[0], color[1], color[2], 255]),
                 )
+            }
+            Self::ChromaticAberration(amt) => {
+                let center = (img.width() / 2, img.height() / 2);
+
+                for (x, y, p) in img.enumerate_pixels_mut() {
+
+                }
             }
 
             _ => (),
@@ -295,7 +323,23 @@ impl ImageOperation {
                 p[1] = p[1] + amt[1] as f32 / 255.;
                 p[2] = p[2] + amt[2] as f32 / 255.;
             }
+            Self::HSV(amt) => {
+                // rgb_to_hsv(p);
+                use palette::{rgb::Rgb, Hsl, IntoColor};
+                // let rgb: Rgb = Rgb::new(p[0], p[1], p[2]);
+                let rgb: Rgb = *Rgb::from_raw(&p.0);
 
+                let mut hsv: Hsl = rgb.into_color();
+                hsv.hue += amt.0 as f32;
+                hsv.saturation *= amt.1 as f32 / 100.;
+                hsv.lightness *= amt.2 as f32 / 100.;
+                let rgb: Rgb = hsv.into_color();
+
+                *p = image::Rgba([rgb.red, rgb.green, rgb.blue, p[3]]);
+                p[0] = rgb.red;
+                p[1] = rgb.green;
+                p[2] = rgb.blue;
+            }
             Self::Invert => {
                 p[0] = 1. - p[0];
                 p[1] = 1. - p[1];
@@ -336,4 +380,42 @@ pub fn desaturate(p: &mut Rgba<f32>, factor: f32) {
     p[0] = egui::lerp(p[0] as f32..=val, factor);
     p[1] = egui::lerp(p[1] as f32..=val, factor);
     p[2] = egui::lerp(p[2] as f32..=val, factor);
+}
+
+fn rgb_to_hsv(p: &mut Rgba<f32>) {
+    let cmax = p[0].max(p[1]).max(p[2]);
+    let cmin = p[0].min(p[1]).min(p[2]);
+    let delta = cmax - cmin;
+    let mut h = 0.;
+    let mut s = 0.;
+    let mut v = 0.;
+
+    if delta == 0. {
+        h = 0.;
+    } else if cmax == p[0] {
+        h = ((p[1] - p[2]) / delta) % 6.;
+    } else if cmax == p[1] {
+        h = ((p[2] - p[0]) / delta) % 2.;
+    } else {
+        h = ((p[0] - p[1]) / delta) % 4.;
+    }
+    h = (h * 60.).round();
+
+    if h < 0. {
+        h += 360.;
+    }
+
+    // Calculate lightness
+    v = (cmax + cmin) / 2.;
+
+    // Calculate saturation
+    s = if delta == 0. {
+        0.
+    } else {
+        delta / (1. - (2. * v - 1.).abs())
+    };
+
+    // Multiply l and s by 100
+    //   s = +(s * 100.);
+    //   v = +(l * 100.);
 }

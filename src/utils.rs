@@ -891,7 +891,7 @@ impl ImageExt for RgbaImage {
 
     fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.create_texture()
-            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .from_bytes(self, self.width() as i32, self.height() as i32)
             // .with_premultiplied_alpha()
             // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
@@ -901,7 +901,7 @@ impl ImageExt for RgbaImage {
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.create_texture()
-            .from_bytes(&self, self.width() as i32, self.height() as i32)
+            .from_bytes(self, self.width() as i32, self.height() as i32)
             .with_premultiplied_alpha()
             // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
@@ -911,7 +911,7 @@ impl ImageExt for RgbaImage {
 
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
         gfx.update_texture(texture)
-            .with_data(&self)
+            .with_data(self)
             .update()
             .unwrap();
     }
