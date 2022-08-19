@@ -307,9 +307,7 @@ impl PaintStroke {
         self.points.is_empty()
     }
 
-    pub fn color(self, color: [f32; 4]) -> Self {
-        Self { color, ..self }
-    }
+
 
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
         // Calculate the brush: use a fraction of the smallest image size
@@ -319,7 +317,7 @@ impl PaintStroke {
             &brushes[self.brush_index],
             (self.width * max_brush_size as f32) as u32,
             (self.width * max_brush_size as f32) as u32,
-            image::imageops::Gaussian,
+            image::imageops::Triangle,
         );
 
         // transform points from UV into image space

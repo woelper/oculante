@@ -13,7 +13,7 @@ use notan::{
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
 use crate::{
-    image_editing::ImageOperation,
+    image_editing::{ImageOperation, ScaleFilter},
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
@@ -315,6 +315,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Resize {
                         dimensions: state.image_dimension,
                         aspect: true,
+                        filter: ScaleFilter::Triangle
                     },
                     ImageOperation::Flip(true),
                     ImageOperation::Rotate(true),

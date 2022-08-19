@@ -1,11 +1,20 @@
 use std::fmt;
 
 use image::{imageops, Rgba, RgbaImage};
-use imageops::FilterType::Gaussian;
-use log::info;
+use imageops::FilterType::*;
 use notan::egui::{self, DragValue};
 use notan::egui::{Response, Slider, Ui};
 use palette::Pixel;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+
+pub enum ScaleFilter {
+    Lanzcos3,
+    Gaussian,
+    Nearest,
+    Triangle,
+    CatmullRom,
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ImageOperation {
@@ -27,6 +36,7 @@ pub enum ImageOperation {
     Resize {
         dimensions: (u32, u32),
         aspect: bool,
+        filter: ScaleFilter,
     },
     Crop((u32, u32, u32, u32)),
 }
@@ -193,7 +203,11 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Resize { dimensions, aspect } => {
+            Self::Resize {
+                dimensions,
+                aspect,
+                filter,
+            } => {
                 let ratio = dimensions.1 as f32 / dimensions.0 as f32;
 
                 ui.horizontal(|ui| {
@@ -233,11 +247,31 @@ impl ImageOperation {
                         }
                     }
 
+             
+
                     // For this operator, we want to update on release, not on change.
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
                     r0.changed = r0.drag_released();
+
+
+                    egui::ComboBox::from_id_source("filter")
+                    .selected_text(format!("{:?}", filter))
+                    .show_ui(ui, |ui| {
+                        for f in [
+                            ScaleFilter::Triangle,
+                            ScaleFilter::Gaussian,
+                            ScaleFilter::CatmullRom,
+                            ScaleFilter::Nearest,
+                            ScaleFilter::Lanzcos3,
+                        ] {
+                            if ui.selectable_value(filter, f, format!("{:?}", f)).clicked() {
+                                r0.changed = true;
+                            }
+                        }
+
+                    });
 
                     r0
                 })
@@ -267,9 +301,19 @@ impl ImageOperation {
                     *img = sub_img.to_image();
                 }
             }
-            Self::Resize { dimensions, .. } => {
+            Self::Resize {
+                dimensions, filter, ..
+            } => {
                 if *dimensions != Default::default() {
-                    *img = image::imageops::resize(img, dimensions.0, dimensions.1, Gaussian);
+                    let filter = match filter {
+                        ScaleFilter::Lanzcos3 => Lanczos3,
+                        ScaleFilter::Gaussian => Gaussian,
+                        ScaleFilter::Nearest => Nearest,
+                        ScaleFilter::Triangle => Triangle,
+                        ScaleFilter::CatmullRom => CatmullRom,
+                    };
+
+                    *img = image::imageops::resize(img, dimensions.0, dimensions.1, filter);
                 }
             }
             Self::Rotate(ccw) => {
@@ -301,12 +345,16 @@ impl ImageOperation {
                     //     + (center.1 as f32 - y as f32).powi(2))
                     // .sqrt()/ center.0.max(center.1) as f32) * *amt as f32 / 10.;
                     let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
-                    let dist_to_center = ((dist_to_center.0 as f32 / center.0 as f32) * *amt as f32, (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32);
+                    let dist_to_center = (
+                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32,
+                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32,
+                    );
                     // info!("{:?}", dist_to_center);
                     // info!("D {}", dist_to_center);
-                    if let Some(l) = img_c
-                        .get_pixel_checked((x as i32 + dist_to_center.0 as i32).max(0) as u32, (y as i32 + dist_to_center.1 as i32).max(0) as u32)
-                    {
+                    if let Some(l) = img_c.get_pixel_checked(
+                        (x as i32 + dist_to_center.0 as i32).max(0) as u32,
+                        (y as i32 + dist_to_center.1 as i32).max(0) as u32,
+                    ) {
                         p[0] = l[0];
                     }
                 }
@@ -394,42 +442,4 @@ pub fn desaturate(p: &mut Rgba<f32>, factor: f32) {
     p[0] = egui::lerp(p[0] as f32..=val, factor);
     p[1] = egui::lerp(p[1] as f32..=val, factor);
     p[2] = egui::lerp(p[2] as f32..=val, factor);
-}
-
-fn rgb_to_hsv(p: &mut Rgba<f32>) {
-    let cmax = p[0].max(p[1]).max(p[2]);
-    let cmin = p[0].min(p[1]).min(p[2]);
-    let delta = cmax - cmin;
-    let mut h = 0.;
-    let mut s = 0.;
-    let mut v = 0.;
-
-    if delta == 0. {
-        h = 0.;
-    } else if cmax == p[0] {
-        h = ((p[1] - p[2]) / delta) % 6.;
-    } else if cmax == p[1] {
-        h = ((p[2] - p[0]) / delta) % 2.;
-    } else {
-        h = ((p[0] - p[1]) / delta) % 4.;
-    }
-    h = (h * 60.).round();
-
-    if h < 0. {
-        h += 360.;
-    }
-
-    // Calculate lightness
-    v = (cmax + cmin) / 2.;
-
-    // Calculate saturation
-    s = if delta == 0. {
-        0.
-    } else {
-        delta / (1. - (2. * v - 1.).abs())
-    };
-
-    // Multiply l and s by 100
-    //   s = +(s * 100.);
-    //   v = +(l * 100.);
 }
