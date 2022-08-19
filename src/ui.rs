@@ -318,6 +318,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     },
                     ImageOperation::Flip(true),
                     ImageOperation::Rotate(true),
+                    ImageOperation::ChromaticAberration(0),
                     ImageOperation::SwapRG,
                     ImageOperation::SwapBG,
                     ImageOperation::SwapRB,

@@ -2,6 +2,7 @@ use std::fmt;
 
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::Gaussian;
+use log::info;
 use notan::egui::{self, DragValue};
 use notan::egui::{Response, Slider, Ui};
 use palette::Pixel;
@@ -48,7 +49,7 @@ impl fmt::Display for ImageOperation {
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
             Self::SwapBG => write!(f, "⬌ Swap B / G"),
             Self::HSV(_) => write!(f, "◔ HSV"),
-            Self::ChromaticAberration(_) => write!(f, "○ Chrmatic Aberration"),
+            Self::ChromaticAberration(_) => write!(f, "○ Chromatic Aberration"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
             _ => write!(f, "Not implemented Display"),
         }
@@ -64,6 +65,7 @@ impl ImageOperation {
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
             Self::Fill(_) => false,
+            Self::ChromaticAberration(_) => false,
             _ => true,
         }
     }
@@ -291,10 +293,22 @@ impl ImageOperation {
                 )
             }
             Self::ChromaticAberration(amt) => {
-                let center = (img.width() / 2, img.height() / 2);
+                let center = (img.width() as i32 / 2, img.height() as i32 / 2);
+                let img_c = img.clone();
 
                 for (x, y, p) in img.enumerate_pixels_mut() {
-
+                    // let dist_to_center = (((center.0 as f32 - x as f32).powi(2)
+                    //     + (center.1 as f32 - y as f32).powi(2))
+                    // .sqrt()/ center.0.max(center.1) as f32) * *amt as f32 / 10.;
+                    let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
+                    let dist_to_center = ((dist_to_center.0 as f32 / center.0 as f32) * *amt as f32, (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32);
+                    // info!("{:?}", dist_to_center);
+                    // info!("D {}", dist_to_center);
+                    if let Some(l) = img_c
+                        .get_pixel_checked((x as i32 + dist_to_center.0 as i32).max(0) as u32, (y as i32 + dist_to_center.1 as i32).max(0) as u32)
+                    {
+                        p[0] = l[0];
+                    }
                 }
             }
 

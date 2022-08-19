@@ -12,6 +12,8 @@ use notan::prelude::Graphics;
 use notan::AppState;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
+use rayon::prelude::ParallelIterator;
+use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
@@ -312,17 +314,13 @@ impl PaintStroke {
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
         // Calculate the brush: use a fraction of the smallest image size
         let max_brush_size = img.width().min(img.height());
-        
-        
-        
+
         let mut brush = image::imageops::resize(
             &brushes[self.brush_index],
             (self.width * max_brush_size as f32) as u32,
             (self.width * max_brush_size as f32) as u32,
             image::imageops::Gaussian,
         );
-
-
 
         // transform points from UV into image space
         let abs_points = self
@@ -535,58 +533,47 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
 pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
     // TODO make this FP
     let mut updated_img = img.clone();
-    for pixel in updated_img.pixels_mut() {
-        // for i in 0..=2 {
-        //     if i == channel {
-        //         pixel.0[i] = pixel.0[channel];
-
-        //     } else {
-        //         pixel.0[i] = 0;
-
-        //     }
-        // }
-        pixel.0[0] = pixel.0[channel];
-        pixel.0[1] = pixel.0[channel];
-        pixel.0[2] = pixel.0[channel];
-        pixel.0[3] = 255;
-    }
+    updated_img.par_chunks_mut(4).for_each(|pixel| {
+        pixel[0] = pixel[channel];
+        pixel[1] = pixel[channel];
+        pixel[2] = pixel[channel];
+        pixel[3] = 255;
+    });
     updated_img
 }
 
 pub fn unpremult(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
-    for pixel in updated_img.pixels_mut() {
-        pixel.0[3] = 255;
-    }
+    updated_img.par_chunks_mut(4).for_each(|pixel| {
+        pixel[3] = 255;
+
+    });
     updated_img
 }
 
 /// Mark pixels with no alpha but color info
 pub fn highlight_bleed(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
-    for pixel in updated_img.pixels_mut() {
-        if pixel.0[3] == 0 {
-            if pixel.0[0] != 0 || pixel.0[1] != 0 || pixel.0[2] != 0 {
-                // pixel.0 = [0, 255, 0, 255];
-                pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
-                pixel.0[3] = 255;
+    updated_img.par_chunks_mut(4).for_each(|pixel| {
+        if pixel[3] == 0 {
+            if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 {
+                pixel[1] = pixel[1].checked_add(100).unwrap_or(255);
+                pixel[3] = 255;
             }
         }
-    }
+    });
     updated_img
 }
 
 /// Mark pixels with transparency
 pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
-    for pixel in updated_img.pixels_mut() {
-        if pixel.0[3] != 0 && pixel.0[3] != 255 {
-            // pixel.0 = [0, 255, 0, 255];
-            // pixel.0[1] += 100;
-            pixel.0[1] = pixel.0[1].checked_add(100).unwrap_or(255);
-            pixel.0[3] = pixel.0[1].checked_add(100).unwrap_or(255);
+    updated_img.par_chunks_mut(4).for_each(|pixel| {
+        if pixel[3] != 0 && pixel[3] != 255 {
+            pixel[1] = pixel[1].checked_add(100).unwrap_or(255);
+            pixel[3] = pixel[1].checked_add(100).unwrap_or(255);
         }
-    }
+    });
     updated_img
 }
 
@@ -968,13 +955,4 @@ pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32;
             p.blend(&colored_pixel);
         }
     }
-}
-
-pub fn color_to_pixel(c: [f32; 4]) -> Rgba<u8> {
-    Rgba([
-        (c[0] * 255.) as u8,
-        (c[1] * 255.) as u8,
-        (c[2] * 255.) as u8,
-        (c[3] * 255.) as u8,
-    ])
 }
