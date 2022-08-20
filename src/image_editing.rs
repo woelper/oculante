@@ -21,6 +21,7 @@ pub enum ScaleFilter {
 pub enum ImageOperation {
     Brightness(i32),
     Desaturate(u8),
+    Exposure(u8),
     Mult([u8; 3]),
     Add([u8; 3]),
     Fill([u8; 3]),
@@ -53,6 +54,7 @@ impl fmt::Display for ImageOperation {
             Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
             Self::Contrast(_) => write!(f, "◑ Contrast"),
+            Self::Exposure(_) => write!(f, "✴ Exposure"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
             Self::Fill(_) => write!(f, "🍺 Fill color"),
@@ -90,6 +92,7 @@ impl ImageOperation {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.add(Slider::new(val, -255..=255)),
+            Self::Exposure(val) => ui.add(Slider::new(val, 0..=100)),
             Self::ChromaticAberration(val) => ui.add(Slider::new(val, 0..=255)),
             Self::HSV(val) => {
                 let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
@@ -380,6 +383,13 @@ impl ImageOperation {
                 p[1] = p[1] + amt;
                 p[2] = p[2] + amt;
             }
+            Self::Exposure(amt) => {
+                let amt = *amt as f32 / 100.;
+                // newValue = oldValue * (2 ^ exposureCompensation);
+                p[0] = p[0] * (2 as f32).powf(amt);
+                p[1] = p[1] * (2 as f32).powf(amt);
+                p[2] = p[2] * (2 as f32).powf(amt);
+            }
             Self::Noise {amt, mono} => {
                 let amt = *amt as f32 / 100.;
 
@@ -406,9 +416,7 @@ impl ImageOperation {
                 p[2] = p[2] + amt[2] as f32 / 255.;
             }
             Self::HSV(amt) => {
-                // rgb_to_hsv(p);
                 use palette::{rgb::Rgb, Hsl, IntoColor};
-                // let rgb: Rgb = Rgb::new(p[0], p[1], p[2]);
                 let rgb: Rgb = *Rgb::from_raw(&p.0);
 
                 let mut hsv: Hsl = rgb.into_color();
@@ -448,8 +456,6 @@ impl ImageOperation {
                 p[0] = ((factor * p[0] - 0.5) + 0.5).clamp(0.0, 1.0);
                 p[1] = ((factor * p[1] - 0.5) + 0.5).clamp(0.0, 1.0);
                 p[2] = ((factor * p[2] - 0.5) + 0.5).clamp(0.0, 1.0);
-                // p[1] = ((factor * p[1] as f32 - 128.) + 128.).clamp(0.0, 255.0) as u8;
-                // p[2] = ((factor * p[2] as f32 - 128.) + 128.).clamp(0.0, 255.0) as u8;
             }
             _ => (),
         }

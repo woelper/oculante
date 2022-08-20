@@ -304,6 +304,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let mut ops = [
                     ImageOperation::Brightness(0),
                     ImageOperation::Contrast(0),
+                    ImageOperation::Exposure(20),
                     ImageOperation::Desaturate(0),
                     ImageOperation::Rotate(true),
                     ImageOperation::HSV((0, 100, 100)),
@@ -358,7 +359,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         // let op draw itself and check for response
 
                         ui.horizontal(|ui| {
-                            // ui.vertical(|ui| {
 
                             if egui::Button::new("⏶")
                                 .small()
@@ -378,7 +378,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 swap = Some((i, i + 1));
                                 image_changed = true;
                             }
-                            // });
                             if egui::Button::new("⊗")
                                 .small()
                                 .ui(ui)
@@ -449,15 +448,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 pixels_changed = true;
                             }
 
-                            if egui::Button::new("⊗")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("Remove operator")
-                                .clicked()
-                            {
-                                delete = Some(i);
-                                pixels_changed = true;
-                            }
+                     
                         });
 
                         if operation.ui(ui).changed() {
