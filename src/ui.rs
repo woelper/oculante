@@ -919,7 +919,7 @@ pub fn stroke_ui(
 
     let r = ui
         .checkbox(&mut stroke.fade, "")
-        .on_hover_text("Fade out the stroke over it's path");
+        .on_hover_text("Fade out the stroke over its path");
     if r.changed() {
         combined_response.changed = true;
     }
