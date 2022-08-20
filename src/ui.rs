@@ -312,7 +312,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Mult([255, 255, 255]),
                     ImageOperation::Fill([255, 255, 255]),
                     ImageOperation::Blur(0),
-                    ImageOperation::Noise{amt: 50, mono: false},
+                    ImageOperation::Noise {
+                        amt: 50,
+                        mono: false,
+                    },
                     ImageOperation::Add([0, 0, 0]),
                     ImageOperation::Resize {
                         dimensions: state.image_dimension,
@@ -359,7 +362,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         // let op draw itself and check for response
 
                         ui.horizontal(|ui| {
-
                             if egui::Button::new("⏶")
                                 .small()
                                 .ui(ui)
@@ -447,8 +449,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 delete = Some(i);
                                 pixels_changed = true;
                             }
-
-                     
                         });
 
                         if operation.ui(ui).changed() {
@@ -485,7 +485,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if ui
                         .add_sized(
                             egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                            egui::Button::new("Unmodified"),
+                            egui::Button::new("Original"),
                         )
                         .clicked()
                     {
@@ -838,11 +838,28 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if compatible_extensions
                             .contains(&ext.to_string_lossy().to_string().as_str())
                         {
-                            if ui.button("💾 Overwrite").clicked() {
+                            if ui
+                                .button(format!(
+                                    "💾 Overwrite {}",
+                                    path.file_name()
+                                        .map(|f| f.to_string_lossy())
+                                        .unwrap_or_default()
+                                ))
+                                .clicked()
+                            {
                                 let _ = state.edit_state.result_pixel_op.save(path);
                             }
                         } else {
-                            if ui.button("💾 Save as png").clicked() {
+                            if ui
+                                .button(format!(
+                                    "💾 Save as {}",
+                                    path.with_extension("png")
+                                        .file_name()
+                                        .map(|f| f.to_string_lossy())
+                                        .unwrap_or_default()
+                                ))
+                                .clicked()
+                            {
                                 let _ = state
                                     .edit_state
                                     .result_pixel_op
