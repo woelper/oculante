@@ -5,6 +5,7 @@ use imageops::FilterType::*;
 use notan::egui::{self, DragValue};
 use notan::egui::{Response, Slider, Ui};
 use palette::Pixel;
+use rand::{thread_rng, Rng};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 
@@ -25,6 +26,10 @@ pub enum ImageOperation {
     Fill([u8; 3]),
     Contrast(i32),
     Flip(bool),
+    Noise {
+        amt: u8,
+        mono: bool,
+    },
     Rotate(bool),
     HSV((u16, u8, u8)),
     ChromaticAberration(u8),
@@ -45,6 +50,7 @@ impl fmt::Display for ImageOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Self::Brightness(_) => write!(f, "☀ Brightness"),
+            Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
             Self::Contrast(_) => write!(f, "◑ Contrast"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
@@ -59,7 +65,7 @@ impl fmt::Display for ImageOperation {
             Self::SwapRB => write!(f, "⬌ Swap R / B"),
             Self::SwapBG => write!(f, "⬌ Swap B / G"),
             Self::HSV(_) => write!(f, "◔ HSV"),
-            Self::ChromaticAberration(_) => write!(f, "○ Chromatic Aberration"),
+            Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
             _ => write!(f, "Not implemented Display"),
         }
@@ -102,6 +108,13 @@ impl ImageOperation {
                 r
             }
             Self::Blur(val) => ui.add(Slider::new(val, 0..=20)),
+            Self::Noise { amt, mono } => {
+                let mut r = ui.add(Slider::new(amt, 0..=100));
+                if ui.checkbox(mono, "Grey").changed() {
+                    r.changed = true
+                }
+                r
+            }
             Self::Flip(horizontal) => {
                 let mut r = ui.radio_value(horizontal, true, "V");
                 if ui.radio_value(horizontal, false, "H").changed() {
@@ -247,31 +260,27 @@ impl ImageOperation {
                         }
                     }
 
-             
-
                     // For this operator, we want to update on release, not on change.
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
                     r0.changed = r0.drag_released();
 
-
                     egui::ComboBox::from_id_source("filter")
-                    .selected_text(format!("{:?}", filter))
-                    .show_ui(ui, |ui| {
-                        for f in [
-                            ScaleFilter::Triangle,
-                            ScaleFilter::Gaussian,
-                            ScaleFilter::CatmullRom,
-                            ScaleFilter::Nearest,
-                            ScaleFilter::Lanzcos3,
-                        ] {
-                            if ui.selectable_value(filter, f, format!("{:?}", f)).clicked() {
-                                r0.changed = true;
+                        .selected_text(format!("{:?}", filter))
+                        .show_ui(ui, |ui| {
+                            for f in [
+                                ScaleFilter::Triangle,
+                                ScaleFilter::Gaussian,
+                                ScaleFilter::CatmullRom,
+                                ScaleFilter::Nearest,
+                                ScaleFilter::Lanzcos3,
+                            ] {
+                                if ui.selectable_value(filter, f, format!("{:?}", f)).clicked() {
+                                    r0.changed = true;
+                                }
                             }
-                        }
-
-                    });
+                        });
 
                     r0
                 })
@@ -341,13 +350,11 @@ impl ImageOperation {
                 let img_c = img.clone();
 
                 for (x, y, p) in img.enumerate_pixels_mut() {
-                    // let dist_to_center = (((center.0 as f32 - x as f32).powi(2)
-                    //     + (center.1 as f32 - y as f32).powi(2))
-                    // .sqrt()/ center.0.max(center.1) as f32) * *amt as f32 / 10.;
+              
                     let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
                     let dist_to_center = (
-                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32,
-                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32,
+                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32/10.,
+                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32/10.,
                     );
                     // info!("{:?}", dist_to_center);
                     // info!("D {}", dist_to_center);
@@ -368,9 +375,22 @@ impl ImageOperation {
     pub fn process_pixel(&self, p: &mut Rgba<f32>) {
         match self {
             Self::Brightness(amt) => {
-                p[0] = p[0] + *amt as f32 / 255.;
-                p[1] = p[1] + *amt as f32 / 255.;
-                p[2] = p[2] + *amt as f32 / 255.;
+                let amt = *amt as f32 / 255.;
+                p[0] = p[0] + amt;
+                p[1] = p[1] + amt;
+                p[2] = p[2] + amt;
+            }
+            Self::Noise {amt, mono} => {
+                let amt = *amt as f32 / 100.;
+
+                let mut rng = thread_rng();
+                let n_r: f32 = rng.gen();
+                let n_g: f32 = if *mono { n_r } else {rng.gen()};
+                let n_b: f32 = if *mono { n_r } else {rng.gen()};
+
+                p[0] = egui::lerp(p[0]..=n_r, amt);
+                p[1] = egui::lerp(p[1]..=n_g, amt);
+                p[2] = egui::lerp(p[2]..=n_b, amt);
             }
             Self::Desaturate(amt) => {
                 desaturate(p, *amt as f32 / 100.);
