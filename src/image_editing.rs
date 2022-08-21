@@ -69,7 +69,7 @@ impl fmt::Display for ImageOperation {
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
-            _ => write!(f, "Not implemented Display"),
+            // _ => write!(f, "Not implemented Display"),
         }
     }
 }

@@ -1,10 +1,7 @@
 use std::time::Instant;
 
 use egui::plot::{Plot, Value, Values};
-use image::{
-    imageops::FilterType::{Gaussian, Lanczos3},
-    RgbaImage,
-};
+use image::RgbaImage;
 use log::{debug, info};
 use notan::{
     egui::{self, plot::Points, *},
@@ -352,122 +349,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     });
                 ui.end_row();
 
-                let mut delete: Option<usize> = None;
-                let mut swap: Option<(usize, usize)> = None;
-
-                for (i, operation) in state.edit_state.image_op_stack.iter_mut().enumerate() {
-                    ui.label_i(&format!("{}", operation));
-
-                    ui.horizontal(|ui| {
-                        // let op draw itself and check for response
-
-                        ui.horizontal(|ui| {
-                            if egui::Button::new("⏶")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("Move up in order")
-                                .clicked()
-                            {
-                                swap = Some(((i as i32 - 1).max(0) as usize, i));
-                                image_changed = true;
-                            }
-                            if egui::Button::new("⏷")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("move down in order")
-                                .clicked()
-                            {
-                                swap = Some((i, i + 1));
-                                image_changed = true;
-                            }
-                            if egui::Button::new("⊗")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("Remove operator")
-                                .clicked()
-                            {
-                                delete = Some(i);
-                                image_changed = true;
-                            }
-                        });
-
-                        if operation.ui(ui).changed() {
-                            image_changed = true;
-                        }
-                    });
-
-                    ui.end_row();
-                }
-
-                if let Some(delete) = delete {
-                    state.edit_state.image_op_stack.remove(delete);
-                }
-
-                if let Some(swap) = swap {
-                    if swap.1 < state.edit_state.image_op_stack.len() {
-                        state.edit_state.image_op_stack.swap(swap.0, swap.1);
-                    }
-                }
-
-                let mut delete: Option<usize> = None;
-                let mut swap: Option<(usize, usize)> = None;
-
-                for (i, operation) in state.edit_state.pixel_op_stack.iter_mut().enumerate() {
-                    ui.label_i(&format!("{}", operation));
-
-                    ui.horizontal(|ui| {
-                        // let op draw itself and check for response
-
-                        ui.horizontal(|ui| {
-                            // ui.vertical(|ui| {
-
-                            if egui::Button::new("⏶")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("Move up in order")
-                                .clicked()
-                            {
-                                swap = Some(((i as i32 - 1).max(0) as usize, i));
-                                pixels_changed = true;
-                            }
-                            if egui::Button::new("⏷")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("move down in order")
-                                .clicked()
-                            {
-                                swap = Some((i, i + 1));
-                                pixels_changed = true;
-                            }
-                            // });
-                            if egui::Button::new("⊗")
-                                .small()
-                                .ui(ui)
-                                .on_hover_text("Remove operator")
-                                .clicked()
-                            {
-                                delete = Some(i);
-                                pixels_changed = true;
-                            }
-                        });
-
-                        if operation.ui(ui).changed() {
-                            pixels_changed = true;
-                        }
-                    });
-
-                    ui.end_row();
-                }
-
-                if let Some(delete) = delete {
-                    state.edit_state.pixel_op_stack.remove(delete);
-                }
-
-                if let Some(swap) = swap {
-                    if swap.1 < state.edit_state.pixel_op_stack.len() {
-                        state.edit_state.pixel_op_stack.swap(swap.0, swap.1);
-                    }
-                }
+                modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui);
+                modifier_stack_ui(
+                    &mut state.edit_state.pixel_op_stack,
+                    &mut pixels_changed,
+                    ui,
+                );
 
                 ui.label_i("🔁 Reset");
                 ui.centered_and_justified(|ui| {
@@ -994,4 +881,62 @@ pub fn stroke_ui(
         stroke.highlight = false;
     }
     combined_response
+}
+
+fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, ui: &mut Ui) {
+    let mut delete: Option<usize> = None;
+    let mut swap: Option<(usize, usize)> = None;
+
+    for (i, operation) in stack.iter_mut().enumerate() {
+        ui.label_i(&format!("{}", operation));
+
+        ui.horizontal(|ui| {
+            // let op draw itself and check for response
+
+            ui.horizontal(|ui| {
+                if egui::Button::new("⏶")
+                    .small()
+                    .ui(ui)
+                    .on_hover_text("Move up in order")
+                    .clicked()
+                {
+                    swap = Some(((i as i32 - 1).max(0) as usize, i));
+                    *image_changed = true;
+                }
+                if egui::Button::new("⏷")
+                    .small()
+                    .ui(ui)
+                    .on_hover_text("move down in order")
+                    .clicked()
+                {
+                    swap = Some((i, i + 1));
+                    *image_changed = true;
+                }
+                if egui::Button::new("⊗")
+                    .small()
+                    .ui(ui)
+                    .on_hover_text("Remove operator")
+                    .clicked()
+                {
+                    delete = Some(i);
+                    *image_changed = true;
+                }
+            });
+
+            if operation.ui(ui).changed() {
+                *image_changed = true;
+            }
+        });
+
+        ui.end_row();
+    }
+    if let Some(delete) = delete {
+        stack.remove(delete);
+    }
+
+    if let Some(swap) = swap {
+        if swap.1 < stack.len() {
+            stack.swap(swap.0, swap.1);
+        }
+    }
 }

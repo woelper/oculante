@@ -2,6 +2,7 @@ use self_update::cargo_crate_version;
 use std::{sync::mpsc::Sender, thread};
 
 fn gh_update() -> Result<String, Box<dyn std::error::Error>> {
+    #[cfg(not(target_os = "linux"))]
     let target = "";
     #[cfg(target_os = "linux")]
     let target = "_linux";

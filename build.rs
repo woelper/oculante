@@ -14,7 +14,7 @@ fn main() {
     info!("Build script");
     // #[cfg(windows)]
     match std::process::Command::new("convert")
-        .args(vec!["res/logo.png", "icon.ico"])
+        .args(vec!["res/oculante.png", "icon.ico"])
         .spawn()
     {
         Ok(_b) => info!("Converted icon"),
