@@ -1,6 +1,6 @@
 # oculante
 
-![Logo](res/logo.png "Logo")
+![Logo](res/oculante.png "Logo")
 
 _A no-nonsense hardware-accelerated image viewer_
 
