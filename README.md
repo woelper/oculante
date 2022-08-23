@@ -15,7 +15,6 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 
 [![Build Status](https://travis-ci.org/woelper/oculante.svg?branch=master)](https://travis-ci.org/woelper/oculante)
 
-## Window with active info box
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
 
