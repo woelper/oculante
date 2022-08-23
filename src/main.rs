@@ -60,6 +60,11 @@ fn main() -> Result<(), String> {
         window_config = window_config.lazy_loop();
     }
 
+    #[cfg(target_os = "netbsd")]
+    {
+        window_config = window_config.lazy_loop();
+    }
+
     #[cfg(target_os = "macos")]
     {
         window_config = window_config.lazy_loop().vsync();
