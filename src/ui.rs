@@ -303,7 +303,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Contrast(0),
                     ImageOperation::Exposure(20),
                     ImageOperation::Desaturate(0),
-                    ImageOperation::Rotate(true),
+                    ImageOperation::Rotate(false),
                     ImageOperation::HSV((0, 100, 100)),
                     ImageOperation::Crop((0, 0, 0, 0)),
                     ImageOperation::Mult([255, 255, 255]),
@@ -320,7 +320,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         filter: ScaleFilter::Triangle,
                     },
                     ImageOperation::Invert,
-                    ImageOperation::Flip(true),
+                    ImageOperation::Flip(false),
                     ImageOperation::ChromaticAberration(15),
                     ImageOperation::SwapRG,
                     ImageOperation::SwapBG,
@@ -641,11 +641,21 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 px[2] as f32 / 255.,
                                 px[3] as f32 / 255.,
                             ]);
-
+                            
+                            // degamma to linear
+                            float_pixel[0] = float_pixel[0].powf(2.2);
+                            float_pixel[1] = float_pixel[1].powf(2.2);
+                            float_pixel[2] = float_pixel[2].powf(2.2);
+                            
                             // run pixel operations
                             for operation in ops {
                                 operation.process_pixel(&mut float_pixel);
                             }
+                            
+                            // apply gamma again
+                            float_pixel[0] = float_pixel[0].powf(1.0/2.2);
+                            float_pixel[1] = float_pixel[1].powf(1.0/2.2);
+                            float_pixel[2] = float_pixel[2].powf(1.0/2.2);
 
                             // convert back to u8
                             px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;

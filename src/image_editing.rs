@@ -21,7 +21,7 @@ pub enum ScaleFilter {
 pub enum ImageOperation {
     Brightness(i32),
     Desaturate(u8),
-    Exposure(u8),
+    Exposure(i32),
     Mult([u8; 3]),
     Add([u8; 3]),
     Fill([u8; 3]),
@@ -32,7 +32,7 @@ pub enum ImageOperation {
         mono: bool,
     },
     Rotate(bool),
-    HSV((u16, u8, u8)),
+    HSV((u16, i32, i32)),
     ChromaticAberration(u8),
     SwapRG,
     SwapRB,
@@ -88,22 +88,23 @@ impl ImageOperation {
         }
     }
 
+    // Add functionality about how to draw UI here
     pub fn ui(&mut self, ui: &mut Ui) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.add(Slider::new(val, -255..=255)),
-            Self::Exposure(val) => ui.add(Slider::new(val, 0..=100)),
+            Self::Exposure(val) => ui.add(Slider::new(val, -100..=100)),
             Self::ChromaticAberration(val) => ui.add(Slider::new(val, 0..=255)),
             Self::HSV(val) => {
                 let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
                 if ui
-                    .add(DragValue::new(&mut val.1).clamp_range(0..=100))
+                    .add(DragValue::new(&mut val.1).clamp_range(0..=200))
                     .changed()
                 {
                     r.changed = true;
                 }
                 if ui
-                    .add(DragValue::new(&mut val.2).clamp_range(0..=100))
+                    .add(DragValue::new(&mut val.2).clamp_range(0..=200))
                     .changed()
                 {
                     r.changed = true;
@@ -353,11 +354,10 @@ impl ImageOperation {
                 let img_c = img.clone();
 
                 for (x, y, p) in img.enumerate_pixels_mut() {
-              
                     let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
                     let dist_to_center = (
-                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32/10.,
-                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32/10.,
+                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
+                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
                     );
                     // info!("{:?}", dist_to_center);
                     // info!("D {}", dist_to_center);
@@ -384,19 +384,18 @@ impl ImageOperation {
                 p[2] = p[2] + amt;
             }
             Self::Exposure(amt) => {
-                let amt = *amt as f32 / 100.;
-                // newValue = oldValue * (2 ^ exposureCompensation);
+                let amt = (*amt as f32 / 100.) * 4.;
                 p[0] = p[0] * (2 as f32).powf(amt);
                 p[1] = p[1] * (2 as f32).powf(amt);
                 p[2] = p[2] * (2 as f32).powf(amt);
             }
-            Self::Noise {amt, mono} => {
+            Self::Noise { amt, mono } => {
                 let amt = *amt as f32 / 100.;
 
                 let mut rng = thread_rng();
                 let n_r: f32 = rng.gen();
-                let n_g: f32 = if *mono { n_r } else {rng.gen()};
-                let n_b: f32 = if *mono { n_r } else {rng.gen()};
+                let n_g: f32 = if *mono { n_r } else { rng.gen() };
+                let n_b: f32 = if *mono { n_r } else { rng.gen() };
 
                 p[0] = egui::lerp(p[0]..=n_r, amt);
                 p[1] = egui::lerp(p[1]..=n_g, amt);
