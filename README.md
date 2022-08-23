@@ -5,11 +5,11 @@
 _A no-nonsense hardware-accelerated image viewer_
 
 
-I started this as a toy project to make a simple image viewer. The vision is to create something with a broad support of industry-standard files and gradually add more image analysis and editing tools. Here are some reasons why this might be helpful to you:
+Oculante's vision is to be a fast, unobtrusive, portable image viewer with good image forma support, offering image analysis and basic editing tools.
 - Completely bloat-free
 - Available for Win, Mac, Linux and NetBSD
 - Supports a wide range of images and SVG
-- Can display unassociated channels correctly (For example if your image uses alpha and color channels to encode data in a special way)
+- Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
 - Lets you pick pixels, displays location and color values
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 
