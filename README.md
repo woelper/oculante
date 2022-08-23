@@ -5,7 +5,7 @@
 _A no-nonsense hardware-accelerated image viewer_
 
 
-Oculante's vision is to be a fast, unobtrusive, portable image viewer with good image forma support, offering image analysis and basic editing tools.
+Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
 - Completely bloat-free
 - Available for Win, Mac, Linux and NetBSD
 - Supports a wide range of images and SVG
