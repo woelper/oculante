@@ -308,7 +308,7 @@ impl PaintStroke {
     }
 
 
-
+    // render brush stroke
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
         // Calculate the brush: use a fraction of the smallest image size
         let max_brush_size = img.width().min(img.height());
@@ -356,7 +356,7 @@ impl PaintStroke {
             let mut stroke_color = self.color;
 
             if self.fade {
-                let fraction = i as f32 / points.len() as f32;
+                let fraction = 1.0 - i as f32 / points.len() as f32;
                 stroke_color[3] = stroke_color[3] * fraction;
             }
 

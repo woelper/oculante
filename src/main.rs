@@ -45,8 +45,6 @@ fn main() -> Result<(), String> {
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
-        // .vsync() // enable vsync
-        // .lazy_loop()
         .resizable() // window can be resized
         .min_size(600, 400); // Set a minimum window size
 
