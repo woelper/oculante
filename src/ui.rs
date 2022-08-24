@@ -53,142 +53,154 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     }
 
     egui::SidePanel::left("side_panel").show(&ctx, |ui| {
-        if let Some(texture) = &state.current_texture {
-            // texture.
-            let tex_id = gfx.egui_register_texture(&texture);
 
-            // width of image widget
-            let desired_width = ui.available_width();
 
-            let scale = (desired_width / 8.) / texture.size().0;
-            let img_size = egui::Vec2::new(desired_width, desired_width);
-
-            let uv_center = (
-                state.cursor_relative.x / state.image_dimension.0 as f32,
-                (state.cursor_relative.y / state.image_dimension.1 as f32),
-            );
-
-            egui::Grid::new("info").show(ui, |ui| {
-                ui.label_i("⬜ Size");
-
-                ui.label(
-                    RichText::new(format!(
-                        "{}x{}",
-                        state.image_dimension.0, state.image_dimension.1
-                    ))
-                    .monospace(),
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            if let Some(texture) = &state.current_texture {
+                // texture.
+                let tex_id = gfx.egui_register_texture(&texture);
+    
+                // width of image widget
+                let desired_width = ui.available_width();
+    
+                let scale = (desired_width / 8.) / texture.size().0;
+                let img_size = egui::Vec2::new(desired_width, desired_width);
+    
+                let uv_center = (
+                    state.cursor_relative.x / state.image_dimension.0 as f32,
+                    (state.cursor_relative.y / state.image_dimension.1 as f32),
                 );
-                ui.end_row();
-
-                if let Some(path) = &state.current_path {
-                    ui.label_i("🖻 File");
+    
+                egui::Grid::new("info").show(ui, |ui| {
+                    ui.label_i("⬜ Size");
+    
                     ui.label(
                         RichText::new(format!(
-                            "{}",
-                            path.file_name().unwrap_or_default().to_string_lossy()
+                            "{}x{}",
+                            state.image_dimension.0, state.image_dimension.1
                         ))
                         .monospace(),
-                    )
-                    .on_hover_text(format!("{}", path.display()));
+                    );
                     ui.end_row();
-                }
-
-                ui.label_i("🌗 RGBA");
-                ui.label(
-                    RichText::new(format!("{}", disp_col(state.sampled_color)))
+    
+                    if let Some(path) = &state.current_path {
+                        ui.label_i("🖻 File");
+                        ui.label(
+                            RichText::new(format!(
+                                "{}",
+                                path.file_name().unwrap_or_default().to_string_lossy()
+                            ))
+                            .monospace(),
+                        )
+                        .on_hover_text(format!("{}", path.display()));
+                        ui.end_row();
+                    }
+    
+                    ui.label_i("🌗 RGBA");
+                    ui.label(
+                        RichText::new(format!("{}", disp_col(state.sampled_color)))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+    
+                    ui.label_i("🌗 RGBA");
+                    ui.label(
+                        RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+    
+                    ui.label_i("⊞ Pos");
+                    ui.label(
+                        RichText::new(format!(
+                            "{:.0},{:.0}",
+                            state.cursor_relative.x, state.cursor_relative.y
+                        ))
                         .monospace()
                         .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                );
-                ui.end_row();
-
-                ui.label_i("🌗 RGBA");
-                ui.label(
-                    RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
-                        .monospace()
-                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                );
-                ui.end_row();
-
-                ui.label_i("⊞ Pos");
-                ui.label(
-                    RichText::new(format!(
-                        "{:.0},{:.0}",
-                        state.cursor_relative.x, state.cursor_relative.y
-                    ))
-                    .monospace()
-                    .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                );
-                ui.end_row();
-
-                ui.label_i(" UV");
-                ui.label(
-                    RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                        .monospace()
-                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
-                );
-                ui.end_row();
-            });
-
-            // make sure aspect ratio is compensated for the square preview
-            let ratio = texture.size().0 / texture.size().1;
-            let uv_size = (scale, scale * ratio);
-            let x = ui
-                .add(
-                    egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
-                        uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                        uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                    )), // .bg_fill(egui::Color32::RED),
-                )
-                .rect;
-
-            let stroke_color = Color32::from_white_alpha(240);
-            let bg_color = Color32::BLACK.linear_multiply(0.5);
-            ui.painter_at(x).line_segment(
-                [x.center_bottom(), x.center_top()],
-                Stroke::new(4., bg_color),
-            );
-            ui.painter_at(x).line_segment(
-                [x.left_center(), x.right_center()],
-                Stroke::new(4., bg_color),
-            );
-            ui.painter_at(x).line_segment(
-                [x.center_bottom(), x.center_top()],
-                Stroke::new(1., stroke_color),
-            );
-            ui.painter_at(x).line_segment(
-                [x.left_center(), x.right_center()],
-                Stroke::new(1., stroke_color),
-            );
-            // ui.image(tex_id, img_size);
-        }
-
-        ui.vertical_centered_justified(|ui| {
-            if let Some(img) = &state.current_image {
-                if ui
-                    .button("Show alpha bleed")
-                    .on_hover_text("Highlight pixels with zero alpha and color information")
-                    .clicked()
-                {
-                    state.current_texture = highlight_bleed(img).to_texture(gfx);
-                }
-                if ui
-                    .button("Show semi-transparent pixels")
-                    .on_hover_text(
-                        "Highlight pixels that are neither fully opaque nor fully transparent",
+                    );
+                    ui.end_row();
+    
+                    ui.label_i(" UV");
+                    ui.label(
+                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
+                            .monospace()
+                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
+                    );
+                    ui.end_row();
+                });
+    
+                // make sure aspect ratio is compensated for the square preview
+                let ratio = texture.size().0 / texture.size().1;
+                let uv_size = (scale, scale * ratio);
+                let x = ui
+                    .add(
+                        egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
+                            uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
+                            uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
+                        )), // .bg_fill(egui::Color32::RED),
                     )
-                    .clicked()
-                {
-                    state.current_texture = highlight_semitrans(img).to_texture(gfx);
-                }
-                if ui.button("Reset image").clicked() {
-                    state.current_texture = img.to_texture(gfx);
-                }
-
-                ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
+                    .rect;
+    
+                let stroke_color = Color32::from_white_alpha(240);
+                let bg_color = Color32::BLACK.linear_multiply(0.5);
+                ui.painter_at(x).line_segment(
+                    [x.center_bottom(), x.center_top()],
+                    Stroke::new(4., bg_color),
+                );
+                ui.painter_at(x).line_segment(
+                    [x.left_center(), x.right_center()],
+                    Stroke::new(4., bg_color),
+                );
+                ui.painter_at(x).line_segment(
+                    [x.center_bottom(), x.center_top()],
+                    Stroke::new(1., stroke_color),
+                );
+                ui.painter_at(x).line_segment(
+                    [x.left_center(), x.right_center()],
+                    Stroke::new(1., stroke_color),
+                );
+                // ui.image(tex_id, img_size);
             }
+
+            ui.collapsing("Alpha tools", |ui| {
+                ui.vertical_centered_justified(|ui| {
+                    if let Some(img) = &state.current_image {
+                        if ui
+                            .button("Show alpha bleed")
+                            .on_hover_text("Highlight pixels with zero alpha and color information")
+                            .clicked()
+                        {
+                            state.current_texture = highlight_bleed(img).to_texture(gfx);
+                        }
+                        if ui
+                            .button("Show semi-transparent pixels")
+                            .on_hover_text(
+                                "Highlight pixels that are neither fully opaque nor fully transparent",
+                            )
+                            .clicked()
+                        {
+                            state.current_texture = highlight_semitrans(img).to_texture(gfx);
+                        }
+                        if ui.button("Reset image").clicked() {
+                            state.current_texture = img.to_texture(gfx);
+                        }
+        
+                    }
+                });
+            });
+            ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
+    
+            advanced_ui(ui, state);
+            
         });
 
-        advanced_ui(ui, state);
+
+
+
+        
     });
 }
 
