@@ -57,12 +57,12 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.lazy_loop();
+        window_config = window_config.lazy_loop().vsync();
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.lazy_loop();
+        window_config = window_config.lazy_loop().vsync();
     }
 
     #[cfg(target_os = "macos")]
