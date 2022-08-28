@@ -2,9 +2,9 @@
 cargo install cargo-bump
 cargo install cargo-get
 cargo bump patch --git-tag
+cargo check
 git add Cargo.toml
 git add Cargo.lock
-cargo check
 git commit -m "Release version `cargo get version`"
 git push --tags
 git push
