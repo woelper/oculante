@@ -50,7 +50,7 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        window_config = window_config.vsync();
+        window_config = window_config.vsync(true);
     }
 
     #[cfg(target_os = "linux")]
@@ -191,6 +191,15 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
         Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
+        Event::KeyDown { key: KeyCode::Plus } => {
+            // let new_scale = state.scale + delta;
+            // // limit scale
+            // if new_scale > 0.05 && new_scale < 40. {
+            //     state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+            //     state.scale += delta;
+            // }
+
+        }
         Event::KeyDown {
             key: KeyCode::Paste,
         } => {}
