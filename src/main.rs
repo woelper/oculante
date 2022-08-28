@@ -229,7 +229,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.offset += state.mouse_delta;
     }
 
-    if app.mouse.is_down(MouseButton::Right) {}
 
     if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
@@ -257,7 +256,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 
-    // redraw if extended info is missing
+    // redraw if extended info is missing so we make sure it's promply displayed
     if state.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
     }
@@ -273,7 +272,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
             state.edit_state = Default::default();
-            debug!("Done reset");
+            debug!("Image has been reset.");
         }
     }
 
@@ -305,7 +304,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
-        debug!("Received ext info");
+        debug!("Finished calculating extended image info");
         state.image_info = Some(info);
     }
 
