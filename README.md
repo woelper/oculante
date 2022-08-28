@@ -1,4 +1,4 @@
-# oculante
+# oculante 
 
 ![Logo](res/oculante.png "Logo")
 
@@ -67,11 +67,11 @@ Misc features
 - Low cpu usage
 - Pretty fast startup/loading time
 - Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
-- Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
+- Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
 
 
-Cheatsheet:
+Shortcuts:
 > <kbd>Esc</kbd>/<kbd>q</kbd> = quit
 >
 > <kbd>i</kbd> = display extended info
@@ -80,7 +80,7 @@ Cheatsheet:
 >
 > <kbd>v</kbd> = reset view
 >
-> <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display red/green/blue/alpha channel
+> <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display `r`ed/`g`reen/`b`lue/`a`lpha channel
 >
 > <kbd>c</kbd> = display color channel
 >
@@ -88,9 +88,13 @@ Cheatsheet:
 >
 > <kbd>f</kbd> = toggle fullscreen
 >
-> `mouse wheel` = zoom
+> `mouse wheel`,  <kbd>+</kbd> <kbd>-</kbd> = zoom
 >
-> <kbd>left</kbd>/<kbd>right</kbd> = prev/next image in folder
+> `left mouse`,`middle mouse`,  <kbd>Left</kbd> <kbd>Right</kbd> <kbd>Up</kbd> <kbd>Down</kbd> = pan
+>
+> <kbd>Left</kbd>/<kbd>Right</kbd> = prev/next image in folder
+>
+> `Right mouse` pick color from image (in paint mode)
 
 Please submit bugs and feature requests on this github repo!
 

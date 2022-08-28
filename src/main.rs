@@ -191,15 +191,6 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
         Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
         Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
-        Event::KeyDown { key: KeyCode::Plus } => {
-            // let new_scale = state.scale + delta;
-            // // limit scale
-            // if new_scale > 0.05 && new_scale < 40. {
-            //     state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-            //     state.scale += delta;
-            // }
-
-        }
         Event::KeyDown {
             key: KeyCode::Paste,
         } => {}
@@ -238,7 +229,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.offset += state.mouse_delta;
     }
 
-
     if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.offset,
@@ -257,6 +247,54 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.was_released(MouseButton::Middle) {
         state.drag_enabled = false;
     }
+    // Zoom in
+    if app.keyboard.is_down(KeyCode::Plus) {
+        let delta = zoomratio(0.5, state.scale);
+        let new_scale = state.scale + delta;
+        // limit scale
+        if new_scale > 0.05 && new_scale < 40. {
+            // We want to zoom towards the center
+            let center: Vector2<f32> = nalgebra::Vector2::new(
+                app.window().width() as f32 / 2.,
+                app.window().height() as f32 / 2.,
+            );
+            state.offset -= scale_pt(state.offset, center, state.scale, delta);
+            state.scale += delta;
+        }
+    }
+    // Zoom out
+    if app.keyboard.is_down(KeyCode::Minus) {
+        let delta = zoomratio(-0.5, state.scale);
+        let new_scale = state.scale + delta;
+        // limit scale
+        if new_scale > 0.05 && new_scale < 40. {
+            // We want to zoom towards the center
+            let center: Vector2<f32> = nalgebra::Vector2::new(
+                app.window().width() as f32 / 2.,
+                app.window().height() as f32 / 2.,
+            );
+            state.offset -= scale_pt(state.offset, center, state.scale, delta);
+            state.scale += delta;
+        }
+    }
+
+    // Keyboard panning
+    if app.keyboard.shift() {
+        if app.keyboard.is_down(KeyCode::Right) {
+            state.offset.x += 10.;
+        }
+        if app.keyboard.is_down(KeyCode::Left) {
+            state.offset.x -= 10.;
+        }
+
+        if app.keyboard.is_down(KeyCode::Up) {
+            state.offset.y -= 10.;
+        }
+        if app.keyboard.is_down(KeyCode::Down) {
+            state.offset.y += 10.;
+        }
+    }
+
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -351,7 +389,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     .scale(state.scale, state.scale)
                     .scale(stroke.width * dim, stroke.width * dim);
 
-
                 // For later: Maybe paint the actual brush? Maybe overkill.
 
                 // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
@@ -444,7 +481,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if state.current_path.is_some() {
                             if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
                                 .clicked()
-                                || app.keyboard.was_pressed(KeyCode::Left)
+                                || (!app.keyboard.shift()
+                                    && app.keyboard.was_pressed(KeyCode::Left))
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, -1);
@@ -458,7 +496,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                             if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
                                 .clicked()
-                                || app.keyboard.was_pressed(KeyCode::Right)
+                                || (!app.keyboard.shift()
+                                    && app.keyboard.was_pressed(KeyCode::Right))
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, 1);
