@@ -7,8 +7,8 @@ use std::path::PathBuf;
 #[test]
 fn load() {
     open_image(&PathBuf::from(
-        "tests/isabella-juskova-bECrTveml_w-unsplash.jpg",
-    ));
+        "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg",
+    )).unwrap();
 }
 
 // #[bench]
