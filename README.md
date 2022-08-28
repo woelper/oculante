@@ -76,6 +76,8 @@ Cheatsheet:
 >
 > <kbd>i</kbd> = display extended info
 >
+> <kbd>e</kbd> = display edit toolbox
+>
 > <kbd>v</kbd> = reset view
 >
 > <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display red/green/blue/alpha channel
