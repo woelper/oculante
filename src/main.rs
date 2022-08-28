@@ -223,15 +223,13 @@ fn update(app: &mut App, state: &mut OculanteState) {
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
-    
+
     if app.mouse.is_down(MouseButton::Middle) {
         state.drag_enabled = true;
         state.offset += state.mouse_delta;
     }
 
-    if app.mouse.is_down(MouseButton::Right) {
-
-    }
+    if app.mouse.is_down(MouseButton::Right) {}
 
     if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
@@ -251,7 +249,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.was_released(MouseButton::Middle) {
         state.drag_enabled = false;
     }
-
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -332,6 +329,36 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
                 );
+        }
+
+        // Draw a brush preview when paint mode is on
+        if state.edit_state.painting {
+            if let Some(stroke) = state.edit_state.paint_strokes.last() {
+                let dim = texture.width().min(texture.height()) / 50.;
+                draw.circle(20.)
+                    // .translate(state.cursor_relative.x, state.cursor_relative.y)
+                    .translate(state.cursor.x, state.cursor.y)
+                    .alpha(0.5)
+                    .stroke(1.5)
+                    .scale(state.scale, state.scale)
+                    .scale(stroke.width * dim, stroke.width * dim);
+
+
+                // For later: Maybe paint the actual brush? Maybe overkill.
+
+                // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
+                //     if let Some(brush_tex) = brush.to_texture(gfx) {
+                //         draw.image(&brush_tex)
+                //             .blend_mode(BlendMode::NORMAL)
+                //             .translate(state.cursor.x, state.cursor.y)
+                //             .scale(state.scale, state.scale)
+                //             .scale(stroke.width*dim, stroke.width*dim)
+                //             // .translate(state.offset.x as f32, state.offset.y as f32)
+                //             // .transform(state.cursor_relative)
+                //             ;
+                //     }
+                // }
+            }
         }
     }
 
