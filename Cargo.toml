@@ -1,68 +1,66 @@
 [package]
-name = "oculante"
-version = "0.6.1"
 authors = ["Johann Woelper <woelper@gmail.com>"]
-edition = "2018"
-license = "MIT"
-repository = "https://github.com/woelper/oculante/"
 description = "A minimalistic image viewer with analysis and editing tools"
-readme = "README.md"
+edition = "2018"
 keywords = ["graphics", "image", "viewer"]
+license = "MIT"
+name = "oculante"
+readme = "README.md"
+repository = "https://github.com/woelper/oculante/"
+version = "0.6.1"
 
 [package.metadata.bundle]
-name = "oculante"
-identifier = "com.github.woelper.oculante"
 icon = ["res/oculante.png"]
+identifier = "com.github.woelper.oculante"
+name = "oculante"
 
 [dependencies]
-clap ="3.2.16"
-image = "0.24.3"
-nalgebra = "0.31"
+clap = "3.2.16"
 dds-rs = "0.7.0"
-rgb = "0.8.33"
-psd = "0.3.3"
 exr = "1.4.2"
+image = "0.24.3"
 lazy_static = "1.4.0"
 libwebp-sys = "0.6.0"
-self_update = "0.30.0"
 log = "0.4.17"
+nalgebra = "0.31"
+psd = "0.3.3"
+rgb = "0.8.33"
+self_update = "0.30.0"
 # simple-logging = "2.0.2"
-usvg = "0.23.0"
-resvg = "0.23.0"
-tiny-skia = "0.6.4"
-env_logger = "0.9.0"
 anyhow = "1.0.57"
-notan = {version = "0.5.1", features = ["drop_files", "egui"]}
-strum = { version = "0.24", features = ["derive"] }
-strum_macros = "0.24"
 arboard = "2.1.1"
+env_logger = "0.9.0"
+notan = {version = "0.6", features = ["drop_files", "egui"]}
+palette = "0.6"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-palette = "0.6"
 rayon = "1.5.3"
+resvg = "0.23.0"
+strum = {version = "0.24", features = ["derive"]}
+strum_macros = "0.24"
+tiny-skia = "0.6.4"
+usvg = "0.23.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
-
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
 windres = "0.2.1"
 
 [build-dependencies]
-log = "0.4.14"
 env_logger = "0.9.0"
-
+log = "0.4.14"
 
 [profile.release]
+codegen-units = 1
 incremental = true
 lto = "thin"
-codegen-units = 1
 strip = true
 # opt-level = "z"
 panic = "abort"
 
 [profile.dev]
-incremental = true
 debug = false
+incremental = true
 opt-level = 1

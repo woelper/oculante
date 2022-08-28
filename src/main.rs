@@ -45,7 +45,7 @@ fn main() -> Result<(), String> {
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
-        .resizable() // window can be resized
+        .resizable(true) // window can be resized
         .min_size(600, 400); // Set a minimum window size
 
     #[cfg(target_os = "windows")]
@@ -55,17 +55,17 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.lazy_loop().vsync();
+        window_config = window_config.lazy_loop(true).vsync(true);
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.lazy_loop().vsync();
+        window_config = window_config.lazy_loop(true).vsync(true);
     }
 
     #[cfg(target_os = "macos")]
     {
-        window_config = window_config.lazy_loop().vsync();
+        window_config = window_config.lazy_loop(true).vsync(true);
     }
 
     #[cfg(target_os = "macos")]
