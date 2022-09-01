@@ -1,10 +1,11 @@
 # This is a script to be locally run in order to release.
 cargo install cargo-bump
 cargo install cargo-get
-cargo bump patch --git-tag
+cargo bump patch
 cargo check
 git add Cargo.toml
 git add Cargo.lock
+git tag `cargo get version`
 git commit -m "Release version `cargo get version`"
 git push --tags
 git push
