@@ -3,9 +3,11 @@ use std::fmt;
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
 use notan::egui::{self, DragValue};
-use notan::egui::{Response, Slider, Ui};
+use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
+
+use crate::ui::EguiExt;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 
@@ -92,9 +94,9 @@ impl ImageOperation {
     pub fn ui(&mut self, ui: &mut Ui) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
-            Self::Brightness(val) => ui.add(Slider::new(val, -255..=255)),
-            Self::Exposure(val) => ui.add(Slider::new(val, -100..=100)),
-            Self::ChromaticAberration(val) => ui.add(Slider::new(val, 0..=255)),
+            Self::Brightness(val) => ui.slider_styled(val, -255..=255),
+            Self::Exposure(val) => ui.slider_styled(val, -100..=100),
+            Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
             Self::HSV(val) => {
                 let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
                 if ui
@@ -111,9 +113,9 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Blur(val) => ui.add(Slider::new(val, 0..=20)),
+            Self::Blur(val) => ui.slider_styled(val, 0..=20),
             Self::Noise { amt, mono } => {
-                let mut r = ui.add(Slider::new(amt, 0..=100));
+                let mut r = ui.slider_styled(amt, 0..=100);
                 if ui.checkbox(mono, "Grey").changed() {
                     r.changed = true
                 }
@@ -133,8 +135,8 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Desaturate(val) => ui.add(Slider::new(val, 0..=100)),
-            Self::Contrast(val) => ui.add(Slider::new(val, -128..=128)),
+            Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
+            Self::Contrast(val) => ui.slider_styled(val, -128..=128),
             Self::Crop(bounds) => {
                 let available_w_single_spacing =
                     ui.available_width() - ui.style().spacing.item_spacing.x * 3.;

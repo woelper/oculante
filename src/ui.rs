@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{time::Instant, ops::RangeInclusive};
 
 use egui::plot::{Plot, Value, Values};
 use image::RgbaImage;
@@ -21,6 +21,10 @@ pub trait EguiExt {
     fn label_i(&mut self, _text: &str) -> Response {
         unimplemented!()
     }
+
+    fn slider_styled<Num: emath::Numeric>(&mut self, _value: & mut Num, _range: RangeInclusive<Num>) -> Response {
+        unimplemented!()
+    }
 }
 
 impl EguiExt for Ui {
@@ -39,6 +43,39 @@ impl EguiExt for Ui {
             );
         })
         .response
+    }
+
+    fn slider_styled<Num: emath::Numeric>(&mut self, value: & mut Num, range: RangeInclusive<Num>) -> Response {
+        self.scope(|ui| {
+            let color = ui.style().visuals.selection.bg_fill;
+            // let color = Color32::RED;
+            let mut style = ui.style_mut();
+            style.visuals.widgets.hovered.bg_fill = color;
+            style.visuals.widgets.hovered.fg_stroke.width = 0.;
+
+            style.visuals.widgets.active.bg_fill = color;
+            style.visuals.widgets.active.fg_stroke.width = 0.;
+
+            style.visuals.widgets.inactive.fg_stroke.width = 5.0;
+            style.visuals.widgets.inactive.fg_stroke.color = color;
+            style.visuals.widgets.inactive.rounding = style.visuals.widgets.inactive.rounding.at_least(20.);
+            style.visuals.widgets.inactive.expansion = -5.0;
+            
+            ui.horizontal(|ui| {
+                let r = ui.add(
+                    Slider::new(value, range)
+                    .show_value(false)
+                    .integer()
+                );
+                ui.monospace(format!("{:.0}",value.to_f64()));
+                r
+
+            }).inner
+
+        }).inner
+        
+        
+
     }
 }
 
@@ -191,8 +228,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                 });
             });
-            ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
+            // ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
     
+            ui.horizontal(|ui| {
+                ui.slider_styled(&mut state.tiling, 1..=10);
+                ui.label("Image tiling");
+            });
             advanced_ui(ui, state);
             
         });

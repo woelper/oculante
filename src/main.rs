@@ -167,6 +167,8 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22.;
+        style.visuals.selection.bg_fill = Color32::from_rgb(168, 45, 91);
+        // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
     });
@@ -294,7 +296,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.offset.y += 10.;
         }
     }
-
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -412,7 +413,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(25.)
             .show(&ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.heading("Channels");
+                    ui.label("Channels");
 
                     let mut changed_channels = false;
 
@@ -511,6 +512,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
 
+       
+
+
                         if tooltip(
                             ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
@@ -539,6 +543,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
                     }
+
+                    // TODO: enable if this is on crates.io
+                //     if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
+                //     || app.keyboard.was_pressed(KeyCode::T)
+                // {
+                //     let on_top = app.window().is_always_on_top();
+                //     app.window().set_always_on_top(!on_top);
+                // }
 
                     if let Some(img) = &state.current_image {
                         if unframed_button("🗐 Copy", ui)
