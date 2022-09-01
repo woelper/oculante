@@ -987,9 +987,14 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                 }
             });
 
-            if operation.ui(ui).changed() {
-                *image_changed = true;
-            }
+            ui.push_id(i, |ui| {
+
+                if operation.ui(ui).changed() {
+                    *image_changed = true;
+                }
+            
+            });
+
         });
 
         ui.end_row();

@@ -70,7 +70,7 @@ impl fmt::Display for ImageOperation {
             Self::Flip(_) => write!(f, "⬌ Flip"),
             Self::Rotate(_) => write!(f, "⟳ Rotate"),
             Self::Invert => write!(f, "！ Invert"),
-            Self::ChannelSwap(_) => write!(f, "🔀 Channel Copy"),
+            Self::ChannelSwap(_) => write!(f, "⬌ Channel Copy"),
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
@@ -102,8 +102,9 @@ impl ImageOperation {
             Self::ChannelSwap(val) => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
                 let combo_width = 50.;
+                
                 ui.horizontal(|ui| {
-                    egui::ComboBox::from_id_source(0)
+                    egui::ComboBox::from_id_source(format!("ccopy 0 {}", val.0 as usize))
                         .selected_text(format!("{:?}", val.0))
                         .width(combo_width)
                         .show_ui(ui, |ui| {
@@ -119,7 +120,7 @@ impl ImageOperation {
 
                         ui.label("=");
 
-                    egui::ComboBox::from_id_source(1)
+                    egui::ComboBox::from_id_source(format!("ccopy 1 {}", val.1 as usize))
                         .selected_text(format!("{:?}", val.1))
                         .width(combo_width)
                         .show_ui(ui, |ui| {
