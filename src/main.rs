@@ -512,9 +512,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
 
-       
-
-
                         if tooltip(
                             ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
@@ -545,12 +542,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     // TODO: enable if this is on crates.io
-                //     if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
-                //     || app.keyboard.was_pressed(KeyCode::T)
-                // {
-                //     let on_top = app.window().is_always_on_top();
-                //     app.window().set_always_on_top(!on_top);
-                // }
+                    //     if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
+                    //     || app.keyboard.was_pressed(KeyCode::T)
+                    // {
+                    //     let on_top = app.window().is_always_on_top();
+                    //     app.window().set_always_on_top(!on_top);
+                    // }
 
                     if let Some(img) = &state.current_image {
                         if unframed_button("🗐 Copy", ui)

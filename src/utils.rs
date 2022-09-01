@@ -307,7 +307,6 @@ impl PaintStroke {
         self.points.is_empty()
     }
 
-
     // render brush stroke
     pub fn render(&self, img: &mut RgbaImage, brushes: &Vec<RgbaImage>) {
         // Calculate the brush: use a fraction of the smallest image size
@@ -544,7 +543,6 @@ pub fn unpremult(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         pixel[3] = 255;
-
     });
     updated_img
 }

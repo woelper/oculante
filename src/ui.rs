@@ -1,4 +1,4 @@
-use std::{time::Instant, ops::RangeInclusive};
+use std::{ops::RangeInclusive, time::Instant};
 
 use egui::plot::{Plot, Value, Values};
 use image::RgbaImage;
@@ -10,7 +10,7 @@ use notan::{
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
 use crate::{
-    image_editing::{ImageOperation, ScaleFilter},
+    image_editing::{Channel, ImageOperation, ScaleFilter},
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
@@ -22,7 +22,11 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn slider_styled<Num: emath::Numeric>(&mut self, _value: & mut Num, _range: RangeInclusive<Num>) -> Response {
+    fn slider_styled<Num: emath::Numeric>(
+        &mut self,
+        _value: &mut Num,
+        _range: RangeInclusive<Num>,
+    ) -> Response {
         unimplemented!()
     }
 }
@@ -45,7 +49,11 @@ impl EguiExt for Ui {
         .response
     }
 
-    fn slider_styled<Num: emath::Numeric>(&mut self, value: & mut Num, range: RangeInclusive<Num>) -> Response {
+    fn slider_styled<Num: emath::Numeric>(
+        &mut self,
+        value: &mut Num,
+        range: RangeInclusive<Num>,
+    ) -> Response {
         self.scope(|ui| {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
@@ -58,24 +66,18 @@ impl EguiExt for Ui {
 
             style.visuals.widgets.inactive.fg_stroke.width = 5.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.rounding = style.visuals.widgets.inactive.rounding.at_least(20.);
+            style.visuals.widgets.inactive.rounding =
+                style.visuals.widgets.inactive.rounding.at_least(20.);
             style.visuals.widgets.inactive.expansion = -5.0;
-            
+
             ui.horizontal(|ui| {
-                let r = ui.add(
-                    Slider::new(value, range)
-                    .show_value(false)
-                    .integer()
-                );
-                ui.monospace(format!("{:.0}",value.to_f64()));
+                let r = ui.add(Slider::new(value, range).show_value(false).integer());
+                ui.monospace(format!("{:.0}", value.to_f64()));
                 r
-
-            }).inner
-
-        }).inner
-        
-        
-
+            })
+            .inner
+        })
+        .inner
     }
 }
 
@@ -96,21 +98,21 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if let Some(texture) = &state.current_texture {
                 // texture.
                 let tex_id = gfx.egui_register_texture(&texture);
-    
+
                 // width of image widget
                 let desired_width = ui.available_width();
-    
+
                 let scale = (desired_width / 8.) / texture.size().0;
                 let img_size = egui::Vec2::new(desired_width, desired_width);
-    
+
                 let uv_center = (
                     state.cursor_relative.x / state.image_dimension.0 as f32,
                     (state.cursor_relative.y / state.image_dimension.1 as f32),
                 );
-    
+
                 egui::Grid::new("info").show(ui, |ui| {
                     ui.label_i("⬜ Size");
-    
+
                     ui.label(
                         RichText::new(format!(
                             "{}x{}",
@@ -119,7 +121,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .monospace(),
                     );
                     ui.end_row();
-    
+
                     if let Some(path) = &state.current_path {
                         ui.label_i("🖻 File");
                         ui.label(
@@ -132,7 +134,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .on_hover_text(format!("{}", path.display()));
                         ui.end_row();
                     }
-    
+
                     ui.label_i("🌗 RGBA");
                     ui.label(
                         RichText::new(format!("{}", disp_col(state.sampled_color)))
@@ -140,7 +142,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
-    
+
                     ui.label_i("🌗 RGBA");
                     ui.label(
                         RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
@@ -148,7 +150,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
-    
+
                     ui.label_i("⊞ Pos");
                     ui.label(
                         RichText::new(format!(
@@ -159,7 +161,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
-    
+
                     ui.label_i(" UV");
                     ui.label(
                         RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
@@ -168,7 +170,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
                 });
-    
+
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio);
@@ -180,7 +182,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         )), // .bg_fill(egui::Color32::RED),
                     )
                     .rect;
-    
+
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
                 ui.painter_at(x).line_segment(
@@ -224,24 +226,24 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if ui.button("Reset image").clicked() {
                             state.current_texture = img.to_texture(gfx);
                         }
-        
+
                     }
                 });
             });
             // ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
-    
+
             ui.horizontal(|ui| {
                 ui.slider_styled(&mut state.tiling, 1..=10);
                 ui.label("Image tiling");
             });
             advanced_ui(ui, state);
-            
+
         });
 
 
 
 
-        
+
     });
 }
 
@@ -356,11 +358,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Contrast(0),
                     ImageOperation::Exposure(20),
                     ImageOperation::Desaturate(0),
+                    ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
                     ImageOperation::Rotate(false),
                     ImageOperation::HSV((0, 100, 100)),
                     ImageOperation::Crop((0, 0, 0, 0)),
                     ImageOperation::Mult([255, 255, 255]),
-                    ImageOperation::Fill([255, 255, 255]),
+                    ImageOperation::Fill([255, 255, 255, 255]),
                     ImageOperation::Blur(0),
                     ImageOperation::Noise {
                         amt: 50,
@@ -375,9 +378,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Invert,
                     ImageOperation::Flip(false),
                     ImageOperation::ChromaticAberration(15),
-                    ImageOperation::SwapRG,
-                    ImageOperation::SwapBG,
-                    ImageOperation::SwapRB,
                 ];
 
                 ui.label_i("➕ Filter");
@@ -694,26 +694,27 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 px[2] as f32 / 255.,
                                 px[3] as f32 / 255.,
                             ]);
-                            
+
                             // degamma to linear
                             float_pixel[0] = float_pixel[0].powf(2.2);
                             float_pixel[1] = float_pixel[1].powf(2.2);
                             float_pixel[2] = float_pixel[2].powf(2.2);
-                            
+
                             // run pixel operations
                             for operation in ops {
                                 operation.process_pixel(&mut float_pixel);
                             }
-                            
+
                             // apply gamma again
-                            float_pixel[0] = float_pixel[0].powf(1.0/2.2);
-                            float_pixel[1] = float_pixel[1].powf(1.0/2.2);
-                            float_pixel[2] = float_pixel[2].powf(1.0/2.2);
+                            float_pixel[0] = float_pixel[0].powf(1.0 / 2.2);
+                            float_pixel[1] = float_pixel[1].powf(1.0 / 2.2);
+                            float_pixel[2] = float_pixel[2].powf(1.0 / 2.2);
 
                             // convert back to u8
                             px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
                             px[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
                             px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+                            px[3] = (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8;
                         });
                     info!(
                         "Rayon Pixels changed. Finished evaluating in {} s",

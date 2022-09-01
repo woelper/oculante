@@ -2,7 +2,7 @@ use std::fmt;
 
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
-use notan::egui::{self, DragValue};
+use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
@@ -10,7 +10,14 @@ use rand::{thread_rng, Rng};
 use crate::ui::EguiExt;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum Channel {
+    Red,
+    Green,
+    Blue,
+    Alpha,
+}
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ScaleFilter {
     Lanzcos3,
     Gaussian,
@@ -26,7 +33,7 @@ pub enum ImageOperation {
     Exposure(i32),
     Mult([u8; 3]),
     Add([u8; 3]),
-    Fill([u8; 3]),
+    Fill([u8; 4]),
     Contrast(i32),
     Flip(bool),
     Noise {
@@ -36,9 +43,7 @@ pub enum ImageOperation {
     Rotate(bool),
     HSV((u16, i32, i32)),
     ChromaticAberration(u8),
-    SwapRG,
-    SwapRB,
-    SwapBG,
+    ChannelSwap((Channel, Channel)),
     Invert,
     Blur(u8),
     Resize {
@@ -65,9 +70,7 @@ impl fmt::Display for ImageOperation {
             Self::Flip(_) => write!(f, "⬌ Flip"),
             Self::Rotate(_) => write!(f, "⟳ Rotate"),
             Self::Invert => write!(f, "！ Invert"),
-            Self::SwapRG => write!(f, "⬌ Swap R / G"),
-            Self::SwapRB => write!(f, "⬌ Swap R / B"),
-            Self::SwapBG => write!(f, "⬌ Swap B / G"),
+            Self::ChannelSwap(_) => write!(f, "🔀 Channel Copy"),
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
@@ -84,7 +87,6 @@ impl ImageOperation {
             Self::Crop(_) => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
-            Self::Fill(_) => false,
             Self::ChromaticAberration(_) => false,
             _ => true,
         }
@@ -97,6 +99,43 @@ impl ImageOperation {
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::ChannelSwap(val) => {
+                let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
+                let combo_width = 50.;
+                ui.horizontal(|ui| {
+                    egui::ComboBox::from_id_source(0)
+                        .selected_text(format!("{:?}", val.0))
+                        .width(combo_width)
+                        .show_ui(ui, |ui| {
+                            for f in [Channel::Red, Channel::Green, Channel::Blue, Channel::Alpha] {
+                                if ui
+                                    .selectable_value(&mut val.0, f, format!("{:?}", f))
+                                    .clicked()
+                                {
+                                    r.changed = true;
+                                }
+                            }
+                        });
+
+                        ui.label("=");
+
+                    egui::ComboBox::from_id_source(1)
+                        .selected_text(format!("{:?}", val.1))
+                        .width(combo_width)
+                        .show_ui(ui, |ui| {
+                            for f in [Channel::Red, Channel::Green, Channel::Blue, Channel::Alpha] {
+                                if ui
+                                    .selectable_value(&mut val.1, f, format!("{:?}", f))
+                                    .clicked()
+                                {
+                                    r.changed = true;
+                                }
+                            }
+                        });
+                });
+
+                r
+            }
             Self::HSV(val) => {
                 let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
                 if ui
@@ -193,17 +232,19 @@ impl ImageOperation {
                 r
             }
             Self::Fill(val) => {
-                let mut color: [f32; 3] = [
+                let mut color: [f32; 4] = [
                     val[0] as f32 / 255.,
                     val[1] as f32 / 255.,
                     val[2] as f32 / 255.,
+                    val[3] as f32 / 255.,
                 ];
 
-                let r = ui.color_edit_button_rgb(&mut color);
+                let r = ui.color_edit_button_rgba_premultiplied(&mut color);
                 if r.changed() {
                     val[0] = (color[0] * 255.) as u8;
                     val[1] = (color[1] * 255.) as u8;
                     val[2] = (color[2] * 255.) as u8;
+                    val[3] = (color[3] * 255.) as u8;
                 }
                 r
             }
@@ -344,13 +385,6 @@ impl ImageOperation {
                 }
                 *img = image::imageops::flip_horizontal(img);
             }
-            Self::Fill(color) => {
-                *img = RgbaImage::from_pixel(
-                    img.width(),
-                    img.height(),
-                    image::Rgba([color[0], color[1], color[2], 255]),
-                )
-            }
             Self::ChromaticAberration(amt) => {
                 let center = (img.width() as i32 / 2, img.height() as i32 / 2);
                 let img_c = img.clone();
@@ -403,8 +437,16 @@ impl ImageOperation {
                 p[1] = egui::lerp(p[1]..=n_g, amt);
                 p[2] = egui::lerp(p[2]..=n_b, amt);
             }
+            Self::Fill(col) => {
+                p[0] = egui::lerp(p[0]..=col[0] as f32 / 255., col[3] as f32 / 255.);
+                p[1] = egui::lerp(p[1]..=col[1] as f32 / 255., col[3] as f32 / 255.);
+                p[2] = egui::lerp(p[2]..=col[2] as f32 / 255., col[3] as f32 / 255.);
+            }
             Self::Desaturate(amt) => {
                 desaturate(p, *amt as f32 / 100.);
+            }
+            Self::ChannelSwap(channels) => {
+                p[channels.0 as usize] = p[channels.1 as usize];
             }
             Self::Mult(amt) => {
                 p[0] = p[0] * amt[0] as f32 / 255.;
@@ -435,21 +477,6 @@ impl ImageOperation {
                 p[0] = 1. - p[0];
                 p[1] = 1. - p[1];
                 p[2] = 1. - p[2];
-            }
-            Self::SwapRG => {
-                let r = p[0];
-                p[0] = p[1];
-                p[1] = r;
-            }
-            Self::SwapBG => {
-                let b = p[1];
-                p[2] = p[1];
-                p[1] = b;
-            }
-            Self::SwapRB => {
-                let r = p[0];
-                p[0] = p[2];
-                p[2] = r;
             }
             Self::Contrast(val) => {
                 let factor: f32 = (1.015686275 * (*val as f32 / 255. + 1.0))
