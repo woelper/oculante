@@ -167,7 +167,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22.;
-        style.visuals.selection.bg_fill = Color32::from_rgb(168, 45, 91);
+        style.visuals.selection.bg_fill = Color32::from_rgb(255, 0, 75);
         // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
