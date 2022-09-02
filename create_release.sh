@@ -6,6 +6,8 @@ cargo check
 git add Cargo.toml
 git add Cargo.lock
 git tag `cargo get version`
+kokai release --ref `cargo get version` >> CHANGELOG.md
+git add CHANGELOG.md
 git commit -m "Release version `cargo get version`"
 git push --tags
 git push
