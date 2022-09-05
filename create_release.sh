@@ -2,13 +2,16 @@
 cargo install cargo-bump
 cargo install cargo-get
 cargo bump patch
-cargo check
+cargo build
 git add Cargo.toml
 git add Cargo.lock
+git commit -m "Release version `cargo get version`"
+# tag the commit with current version
 git tag `cargo get version`
+# create changelog
 kokai release --ref `cargo get version` >> CHANGELOG.md
 git add CHANGELOG.md
-git commit -m "Release version `cargo get version`"
+git commit -m "Update changelog for `cargo get version`"
 git push --tags
 git push
 # this needs no-verify as we modify the plist during the build, and cargo does not accept that.
