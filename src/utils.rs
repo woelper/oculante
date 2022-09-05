@@ -239,6 +239,7 @@ pub struct EditState {
     pub brushes: Vec<RgbaImage>,
     pub pixel_op_stack: Vec<ImageOperation>,
     pub image_op_stack: Vec<ImageOperation>,
+    pub export_extension: String,
 }
 
 impl Default for EditState {
@@ -269,6 +270,7 @@ impl Default for EditState {
             ],
             pixel_op_stack: vec![],
             image_op_stack: vec![],
+            export_extension: "png".into(),
         }
     }
 }

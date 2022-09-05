@@ -783,42 +783,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             state.image_dimension = state.edit_state.result_pixel_op.dimensions();
 
             ui.vertical_centered_justified(|ui| {
-                let compatible_extensions = ["png", "jpg"];
                 if let Some(path) = &state.current_path {
-                    if let Some(ext) = path.extension() {
-                        if compatible_extensions
-                            .contains(&ext.to_string_lossy().to_string().as_str())
-                        {
-                            if ui
-                                .button(format!(
-                                    "💾 Overwrite {}",
-                                    path.file_name()
-                                        .map(|f| f.to_string_lossy())
-                                        .unwrap_or_default()
-                                ))
-                                .clicked()
-                            {
-                                let _ = state.edit_state.result_pixel_op.save(path);
-                            }
-                        } else {
-                            if ui
-                                .button(format!(
-                                    "💾 Save as {}",
-                                    path.with_extension("png")
-                                        .file_name()
-                                        .map(|f| f.to_string_lossy())
-                                        .unwrap_or_default()
-                                ))
-                                .clicked()
-                            {
-                                let _ = state
-                                    .edit_state
-                                    .result_pixel_op
-                                    .save(path.with_extension("png"));
-                            }
-                        }
-                    }
-
                     if ui
                         .button("⟳ Reload image")
                         .on_hover_text("Completely reload image, destroying all edits.")
@@ -826,6 +791,55 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     {
                         state.is_loaded = false;
                         state.player.load(&path);
+                    }
+                }
+
+                ui.horizontal(|ui| {
+
+                    ui.label("File:");
+                    
+                    //TODO: This needs more time, as hotkeys prevent typing text 
+                    if let Some(p) = &mut state.current_path {
+                        if let Some(pstem) = p.file_stem() {
+                            // if let Some(b) = p.file_prefix()
+                            ui.label(pstem.to_string_lossy().to_string());
+                            // let mut stem = pstem.to_string_lossy().to_string();
+                            // if ui.text_edit_singleline(&mut stem).changed() {
+                            //     if let Some(parent) = p.parent() {
+                            //         *p = parent.join(stem).with_extension(&state.edit_state.export_extension);
+                            //     }
+                            // }
+                        }
+                    }
+                    egui::ComboBox::from_id_source("ext")
+                        .selected_text(&state.edit_state.export_extension)
+                        .width(ui.available_width() - ui.style().spacing.item_spacing.x)
+                        .show_ui(ui, |ui| {
+                            for f in ["png", "jpg", "bmp", "webp", "tif", "tga"] {
+                                ui.selectable_value(
+                                    &mut state.edit_state.export_extension,
+                                    f.to_string(),
+                                    f,
+                                );
+                            }
+                        });
+                });
+
+                if let Some(p) = &state.current_path {
+                    let text = if p
+                        .with_extension(&state.edit_state.export_extension)
+                        .exists()
+                    {
+                        "💾 Overwrite"
+                    } else {
+                        "💾 Save"
+                    };
+
+                    if ui.button(text).clicked() {
+                        _ = state
+                            .edit_state
+                            .result_pixel_op
+                            .save(p.with_extension(&state.edit_state.export_extension));
                     }
                 }
             });
@@ -988,13 +1002,10 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
             });
 
             ui.push_id(i, |ui| {
-
                 if operation.ui(ui).changed() {
                     *image_changed = true;
                 }
-            
             });
-
         });
 
         ui.end_row();
