@@ -30,6 +30,7 @@ pub enum ScaleFilter {
 pub enum ImageOperation {
     Brightness(i32),
     Desaturate(u8),
+    Posterize(u8),
     Exposure(i32),
     Equalize((i32, i32)),
     Mult([u8; 3]),
@@ -61,9 +62,10 @@ impl fmt::Display for ImageOperation {
             Self::Brightness(_) => write!(f, "☀ Brightness"),
             Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
+            Self::Posterize(_) => write!(f, "🖼 Posterize"),
             Self::Contrast(_) => write!(f, "◑ Contrast"),
             Self::Exposure(_) => write!(f, "✴ Exposure"),
-            Self::Equalize(_) => write!(f, "✴ Equalize"),
+            Self::Equalize(_) => write!(f, "☯ Equalize"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
             Self::Fill(_) => write!(f, "🍺 Fill color"),
@@ -101,6 +103,7 @@ impl ImageOperation {
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::Posterize(val) => ui.slider_styled(val, 1..=255),
             Self::ChannelSwap(val) => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
                 let combo_width = 50.;
@@ -234,7 +237,7 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut bounds.1)
                             .speed(2.)
-                            .clamp_range(64..=370)
+                            .clamp_range(64..=2000)
                             .prefix("bright "),
                     );
 
@@ -456,12 +459,17 @@ impl ImageOperation {
                 p[2] = p[2] * (2 as f32).powf(amt);
             }
             Self::Equalize(bounds) => {
-                let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 /255.);
+                let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
 
                 p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
                 p[2] = egui::lerp(bounds.0..=bounds.1, p[2] as f32);
-                
+            }
+            Self::Posterize(levels) => {
+                p[0] = (p[0] * *levels as f32).round() / *levels as f32;
+                p[1] = (p[1] * *levels as f32).round() / *levels as f32;
+                p[2] = (p[2] * *levels as f32).round() / *levels as f32;
+                // 0.65 * 10.0 = 6.5 / 10
             }
             Self::Noise { amt, mono } => {
                 let amt = *amt as f32 / 100.;

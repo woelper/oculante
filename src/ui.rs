@@ -358,7 +358,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ImageOperation::Contrast(0),
                     ImageOperation::Exposure(20),
                     ImageOperation::Desaturate(0),
-                    ImageOperation::Equalize((0,255)),
+                    ImageOperation::Equalize((0, 255)),
+                    ImageOperation::Posterize(8),
                     ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
                     ImageOperation::Rotate(false),
                     ImageOperation::HSV((0, 100, 100)),
@@ -796,10 +797,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
 
                 ui.horizontal(|ui| {
-
                     ui.label("File:");
-                    
-                    //TODO: This needs more time, as hotkeys prevent typing text 
+
+                    //TODO: This needs more time, as hotkeys prevent typing text
                     if let Some(p) = &mut state.current_path {
                         if let Some(pstem) = p.file_stem() {
                             // if let Some(b) = p.file_prefix()
