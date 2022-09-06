@@ -197,11 +197,12 @@ fn event(state: &mut OculanteState, evt: Event) {
             key: KeyCode::Paste,
         } => {}
         Event::WindowResize { width, height } => {
-            let window_size = (width, height).size_vec();
-            if let Some(current_image) = &state.current_image {
-                let img_size = current_image.size_vec();
-                state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
-            }
+            // TODO: For now, disable image center
+            // let window_size = (width, height).size_vec();
+            // if let Some(current_image) = &state.current_image {
+                // let img_size = current_image.size_vec();
+                // state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
+            // }
         }
         Event::Drop(file) => {
             if let Some(p) = file.path {
