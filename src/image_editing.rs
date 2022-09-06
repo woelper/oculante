@@ -31,6 +31,7 @@ pub enum ImageOperation {
     Brightness(i32),
     Desaturate(u8),
     Exposure(i32),
+    Equalize((i32, i32)),
     Mult([u8; 3]),
     Add([u8; 3]),
     Fill([u8; 4]),
@@ -62,6 +63,7 @@ impl fmt::Display for ImageOperation {
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
             Self::Contrast(_) => write!(f, "◑ Contrast"),
             Self::Exposure(_) => write!(f, "✴ Exposure"),
+            Self::Equalize(_) => write!(f, "✴ Equalize"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
             Self::Fill(_) => write!(f, "🍺 Fill color"),
@@ -102,7 +104,7 @@ impl ImageOperation {
             Self::ChannelSwap(val) => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
                 let combo_width = 50.;
-                
+
                 ui.horizontal(|ui| {
                     egui::ComboBox::from_id_source(format!("ccopy 0 {}", val.0 as usize))
                         .selected_text(format!("{:?}", val.0))
@@ -118,7 +120,7 @@ impl ImageOperation {
                             }
                         });
 
-                        ui.label("=");
+                    ui.label("=");
 
                     egui::ComboBox::from_id_source(format!("ccopy 1 {}", val.1 as usize))
                         .selected_text(format!("{:?}", val.1))
@@ -211,6 +213,33 @@ impl ImageOperation {
                     );
                     // TODO rewrite with any
                     if r2.changed() || r3.changed() || r4.changed() {
+                        r1.changed = true;
+                    }
+                    r1
+                })
+                .inner
+            }
+            Self::Equalize(bounds) => {
+                let available_w_single_spacing =
+                    ui.available_width() - ui.style().spacing.item_spacing.x * 1.;
+                ui.horizontal(|ui| {
+                    let mut r1 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.0)
+                            // .speed(2.)
+                            .clamp_range(-128..=128)
+                            .prefix("dark "),
+                    );
+                    let r2 = ui.add_sized(
+                        egui::vec2(available_w_single_spacing / 4., ui.available_height()),
+                        egui::DragValue::new(&mut bounds.1)
+                            .speed(2.)
+                            .clamp_range(64..=370)
+                            .prefix("bright "),
+                    );
+
+                    // TODO rewrite with any
+                    if r2.changed() {
                         r1.changed = true;
                     }
                     r1
@@ -425,6 +454,14 @@ impl ImageOperation {
                 p[0] = p[0] * (2 as f32).powf(amt);
                 p[1] = p[1] * (2 as f32).powf(amt);
                 p[2] = p[2] * (2 as f32).powf(amt);
+            }
+            Self::Equalize(bounds) => {
+                let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 /255.);
+
+                p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
+                p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
+                p[2] = egui::lerp(bounds.0..=bounds.1, p[2] as f32);
+                
             }
             Self::Noise { amt, mono } => {
                 let amt = *amt as f32 / 100.;
