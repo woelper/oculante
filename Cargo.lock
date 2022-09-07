@@ -611,6 +611,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs-sys"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -959,7 +968,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "898289b8e0528c84fb9b88f15ac9d5109bcaf23e0e49bb6f64deee0d86b6a351"
 dependencies = [
- "dirs",
+ "dirs 2.0.2",
  "objc",
  "objc-foundation",
  "objc_id",
@@ -2366,6 +2375,7 @@ dependencies = [
  "arboard",
  "clap",
  "dds-rs",
+ "dirs 4.0.0",
  "env_logger",
  "exr",
  "fruitbasket",
@@ -2383,6 +2393,8 @@ dependencies = [
  "resvg",
  "rgb",
  "self_update",
+ "serde",
+ "serde_json",
  "strum",
  "strum_macros",
  "tiny-skia 0.6.6",

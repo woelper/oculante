@@ -74,6 +74,11 @@ fn main() -> Result<(), String> {
         let _ = mac::launch();
     }
 
+    if let Ok(settings) = PersistentSettings::load() {
+        window_config.vsync = settings.vsync;
+        info!("Loaded vsync.");
+    }
+
     info!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
@@ -122,6 +127,10 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ..Default::default()
     };
 
+    if let Ok(settings) = PersistentSettings::load() {
+        state.persistent_settings = settings;
+    }
+
     state.player = Player::new(state.texture_channel.0.clone());
 
     info!("Image is: {:?}", maybe_img_location);
@@ -167,7 +176,11 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22.;
-        style.visuals.selection.bg_fill = Color32::from_rgb(255, 0, 75);
+        style.visuals.selection.bg_fill = Color32::from_rgb(
+            state.persistent_settings.accent_color[0],
+            state.persistent_settings.accent_color[1],
+            state.persistent_settings.accent_color[2],
+        );
         // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
@@ -196,7 +209,7 @@ fn event(state: &mut OculanteState, evt: Event) {
         Event::KeyDown {
             key: KeyCode::Paste,
         } => {}
-        Event::WindowResize { width, height } => {
+        Event::WindowResize { .. } => {
             // TODO: For now, disable image center
             // let window_size = (width, height).size_vec();
             // if let Some(current_image) = &state.current_image {

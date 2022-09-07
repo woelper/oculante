@@ -3,7 +3,6 @@ use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
 use image::{EncodableLayout, Pixel, RgbaImage};
-
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::egui::{Color32, Pos2};
@@ -14,6 +13,7 @@ use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
@@ -45,9 +45,36 @@ lazy_static! {
 }
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
-    // dbg!(p.0.iter());
     p.0 == [0, 0, 0, 0]
-    // p.0[3] == 0 &&
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistentSettings {
+    pub accent_color: [u8; 3],
+    pub vsync: bool,
+}
+
+impl Default for PersistentSettings {
+    fn default() -> Self {
+        PersistentSettings {
+            accent_color: [255, 0, 75],
+            vsync: true,
+        }
+    }
+}
+
+impl PersistentSettings {
+    pub fn load() -> Result<Self> {
+        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
+        let f = File::open(local_dir.join(".oculante"))?;
+        Ok(serde_json::from_reader::<_, PersistentSettings>(f)?)
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
+        let f = File::create(local_dir.join(".oculante"))?;
+        Ok(serde_json::to_writer_pretty(f, self)?)
+    }
 }
 
 #[derive(Debug)]
@@ -404,6 +431,7 @@ pub struct OculanteState {
     pub mouse_grab: bool,
     pub edit_state: EditState,
     pub pointer_over_ui: bool,
+    pub persistent_settings: PersistentSettings,
 }
 
 impl Default for OculanteState {
@@ -439,6 +467,7 @@ impl Default for OculanteState {
             mouse_grab: false,
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
+            persistent_settings: Default::default(),
         }
     }
 }

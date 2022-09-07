@@ -263,6 +263,33 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                         state.settings_enabled = false;
                     }
 
+                    if ui
+                        .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
+                        .on_hover_text(
+                            "Vsync reduces tearing and saves CPU. Toggling it off reduces latency.",
+                        )
+                        .changed()
+                    {
+                        _ = state.persistent_settings.save()
+                    }
+
+                    ui.label("Accent color");
+                    if ui
+                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                        .changed()
+                    {
+                        let mut style: egui::Style = (*ctx.style()).clone();
+
+                        style.visuals.selection.bg_fill = Color32::from_rgb(
+                            state.persistent_settings.accent_color[0],
+                            state.persistent_settings.accent_color[1],
+                            state.persistent_settings.accent_color[2],
+                        );
+                        ctx.set_style(style);
+
+                        _ = state.persistent_settings.save()
+                    }
+
                     if ui.button("Close").clicked() {
                         state.settings_enabled = false;
                     }
