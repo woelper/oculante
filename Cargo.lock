@@ -2385,7 +2385,7 @@ dependencies = [
  "self_update",
  "strum",
  "strum_macros",
- "tiny-skia 0.6.6",
+ "tiny-skia 0.7.0",
  "usvg",
  "windres",
 ]
