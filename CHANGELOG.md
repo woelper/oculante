@@ -17,3 +17,17 @@
 * Equalize image operator added (748bf15e)
 * Allow editing the export image extension to save as a different image format (23519eee)
 
+# 0.6.8 (2022-09-07)
+
+### :beetle: Bug Fixes
+
+* Remove offset when initially clicking into OSX window (81544cc4)
+
+### :sparkles: Features
+
+* Persistent settings support. Vsync and color theme are now customizable. (21ed3954)
+
+### :green_apple: Chore
+
+* Update psd, ext, dds-rs (ad2f531b)
+
