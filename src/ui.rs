@@ -379,102 +379,105 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
             }
 
-            egui::Grid::new("editing").num_columns(2).show(ui, |ui| {
-                let mut ops = [
-                    ImageOperation::Brightness(0),
-                    ImageOperation::Contrast(0),
-                    ImageOperation::Exposure(20),
-                    ImageOperation::Desaturate(0),
-                    ImageOperation::Equalize((0, 255)),
-                    ImageOperation::Posterize(8),
-                    ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-                    ImageOperation::Rotate(false),
-                    ImageOperation::HSV((0, 100, 100)),
-                    ImageOperation::Crop((0, 0, 0, 0)),
-                    ImageOperation::Mult([255, 255, 255]),
-                    ImageOperation::Fill([255, 255, 255, 255]),
-                    ImageOperation::Blur(0),
-                    ImageOperation::Noise {
-                        amt: 50,
-                        mono: false,
-                    },
-                    ImageOperation::Add([0, 0, 0]),
-                    ImageOperation::Resize {
-                        dimensions: state.image_dimension,
-                        aspect: true,
-                        filter: ScaleFilter::Triangle,
-                    },
-                    ImageOperation::Invert,
-                    ImageOperation::Flip(false),
-                    ImageOperation::ChromaticAberration(15),
-                ];
+            egui::Grid::new("editing")
+                .num_columns(2)
+                .striped(true)
+                .show(ui, |ui| {
+                    let mut ops = [
+                        ImageOperation::Brightness(0),
+                        ImageOperation::Contrast(0),
+                        ImageOperation::Exposure(20),
+                        ImageOperation::Desaturate(0),
+                        ImageOperation::Equalize((0, 255)),
+                        ImageOperation::Posterize(8),
+                        ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
+                        ImageOperation::Rotate(false),
+                        ImageOperation::HSV((0, 100, 100)),
+                        ImageOperation::Crop((0, 0, 0, 0)),
+                        ImageOperation::Mult([255, 255, 255]),
+                        ImageOperation::Fill([255, 255, 255, 255]),
+                        ImageOperation::Blur(0),
+                        ImageOperation::Noise {
+                            amt: 50,
+                            mono: false,
+                        },
+                        ImageOperation::Add([0, 0, 0]),
+                        ImageOperation::Resize {
+                            dimensions: state.image_dimension,
+                            aspect: true,
+                            filter: ScaleFilter::Triangle,
+                        },
+                        ImageOperation::Invert,
+                        ImageOperation::Flip(false),
+                        ImageOperation::ChromaticAberration(15),
+                    ];
 
-                ui.label_i("➕ Filter");
-                let available_w_single_spacing =
-                    ui.available_width() - ui.style().spacing.item_spacing.x;
+                    ui.label_i("➕ Filter");
+                    let available_w_single_spacing =
+                        ui.available_width() - ui.style().spacing.item_spacing.x;
 
-                egui::ComboBox::from_id_source("Imageops")
-                    .selected_text("Select a filter to add...")
-                    .width(available_w_single_spacing)
-                    .show_ui(ui, |ui| {
-                        for op in &mut ops {
-                            if ui.selectable_label(false, format!("{}", op)).clicked() {
-                                if op.is_per_pixel() {
-                                    state.edit_state.pixel_op_stack.push(*op);
-                                    pixels_changed = true;
-                                } else {
-                                    state.edit_state.image_op_stack.push(*op);
-                                    image_changed = true;
+                    egui::ComboBox::from_id_source("Imageops")
+                        .selected_text("Select a filter to add...")
+                        .width(available_w_single_spacing)
+                        .show_ui(ui, |ui| {
+                            for op in &mut ops {
+                                if ui.selectable_label(false, format!("{}", op)).clicked() {
+                                    if op.is_per_pixel() {
+                                        state.edit_state.pixel_op_stack.push(*op);
+                                        pixels_changed = true;
+                                    } else {
+                                        state.edit_state.image_op_stack.push(*op);
+                                        image_changed = true;
+                                    }
                                 }
                             }
+                        });
+                    ui.end_row();
+
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui);
+                    modifier_stack_ui(
+                        &mut state.edit_state.pixel_op_stack,
+                        &mut pixels_changed,
+                        ui,
+                    );
+
+                    ui.label_i("🔁 Reset");
+                    ui.centered_and_justified(|ui| {
+                        if ui.button("Reset all edits").clicked() {
+                            state.edit_state = Default::default();
+                            pixels_changed = true
                         }
                     });
-                ui.end_row();
+                    ui.end_row();
 
-                modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui);
-                modifier_stack_ui(
-                    &mut state.edit_state.pixel_op_stack,
-                    &mut pixels_changed,
-                    ui,
-                );
-
-                ui.label_i("🔁 Reset");
-                ui.centered_and_justified(|ui| {
-                    if ui.button("Reset all edits").clicked() {
-                        state.edit_state = Default::default();
-                        pixels_changed = true
-                    }
-                });
-                ui.end_row();
-
-                ui.label_i("❓ Compare");
-                let available_w_single_spacing =
-                    ui.available_width() - ui.style().spacing.item_spacing.x;
-                ui.horizontal(|ui| {
-                    if ui
-                        .add_sized(
-                            egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                            egui::Button::new("Original"),
-                        )
-                        .clicked()
-                    {
-                        if let Some(img) = &state.current_image {
-                            state.image_dimension = img.dimensions();
-                            state.current_texture = img.to_texture(gfx);
+                    ui.label_i("❓ Compare");
+                    let available_w_single_spacing =
+                        ui.available_width() - ui.style().spacing.item_spacing.x;
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_sized(
+                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
+                                egui::Button::new("Original"),
+                            )
+                            .clicked()
+                        {
+                            if let Some(img) = &state.current_image {
+                                state.image_dimension = img.dimensions();
+                                state.current_texture = img.to_texture(gfx);
+                            }
                         }
-                    }
-                    if ui
-                        .add_sized(
-                            egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                            egui::Button::new("Modified"),
-                        )
-                        .clicked()
-                    {
-                        pixels_changed = true;
-                    }
+                        if ui
+                            .add_sized(
+                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
+                                egui::Button::new("Modified"),
+                            )
+                            .clicked()
+                        {
+                            pixels_changed = true;
+                        }
+                    });
+                    ui.end_row();
                 });
-                ui.end_row();
-            });
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
@@ -996,43 +999,48 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{}", operation));
 
-        ui.horizontal(|ui| {
-            // let op draw itself and check for response
+        // let op draw itself and check for response
 
-            ui.horizontal(|ui| {
-                if egui::Button::new("⏶")
-                    .small()
-                    .ui(ui)
-                    .on_hover_text("Move up in order")
-                    .clicked()
-                {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
-                if egui::Button::new("⏷")
-                    .small()
-                    .ui(ui)
-                    .on_hover_text("move down in order")
-                    .clicked()
-                {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
-                if egui::Button::new("⊗")
-                    .small()
-                    .ui(ui)
-                    .on_hover_text("Remove operator")
-                    .clicked()
-                {
-                    delete = Some(i);
-                    *image_changed = true;
-                }
-            });
-
-            ui.push_id(i, |ui| {
+        ui.push_id(i, |ui| {
+            egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
+                // ui.end_row();
                 if operation.ui(ui).changed() {
                     *image_changed = true;
                 }
+
+                ui.label("foo");
+
+                // ui.horizontal(|ui| {
+                //     if egui::Button::new("⏶")
+                //         .small()
+                //         .ui(ui)
+                //         .on_hover_text("Move up in order")
+                //         .clicked()
+                //     {
+                //         swap = Some(((i as i32 - 1).max(0) as usize, i));
+                //         *image_changed = true;
+                //     }
+                //     if egui::Button::new("⏷")
+                //         .small()
+                //         .ui(ui)
+                //         .on_hover_text("move down in order")
+                //         .clicked()
+                //     {
+                //         swap = Some((i, i + 1));
+                //         *image_changed = true;
+                //     }
+                //     if egui::Button::new("⊗")
+                //         .small()
+                //         .ui(ui)
+                //         .on_hover_text("Remove operator")
+                //         .clicked()
+                //     {
+                //         delete = Some(i);
+                //         *image_changed = true;
+                //     }
+                // });
+
+                ui.end_row();
             });
         });
 
