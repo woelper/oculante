@@ -57,6 +57,7 @@ impl EguiExt for Ui {
         self.scope(|ui| {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
+            let available_width = ui.available_width() * 0.8;
             let mut style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
@@ -69,6 +70,8 @@ impl EguiExt for Ui {
             style.visuals.widgets.inactive.rounding =
                 style.visuals.widgets.inactive.rounding.at_least(20.);
             style.visuals.widgets.inactive.expansion = -5.0;
+
+            // style.spacing.slider_width = available_width;
 
             ui.horizontal(|ui| {
                 let r = ui.add(Slider::new(value, range).show_value(false).integer());
@@ -996,56 +999,116 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
+    // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{}", operation));
 
         // let op draw itself and check for response
 
         ui.push_id(i, |ui| {
-            egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
-                // ui.end_row();
-                if operation.ui(ui).changed() {
+            // ui.end_row();
+            if operation.ui(ui).changed() {
+                *image_changed = true;
+            }
+
+            // ui.add_space(30.);
+
+            ui.with_layout(egui::Layout::right_to_left(), |ui| {
+                if egui::Button::new("❌")
+                    .small()
+                    .frame(false)
+                    .ui(ui)
+                    .on_hover_text("Remove operator")
+                    .clicked()
+                {
+                    delete = Some(i);
                     *image_changed = true;
                 }
+                let size = 10.;
 
-                ui.label("foo");
 
-                // ui.horizontal(|ui| {
-                //     if egui::Button::new("⏶")
-                //         .small()
-                //         .ui(ui)
-                //         .on_hover_text("Move up in order")
-                //         .clicked()
-                //     {
-                //         swap = Some(((i as i32 - 1).max(0) as usize, i));
-                //         *image_changed = true;
-                //     }
-                //     if egui::Button::new("⏷")
-                //         .small()
-                //         .ui(ui)
-                //         .on_hover_text("move down in order")
-                //         .clicked()
-                //     {
-                //         swap = Some((i, i + 1));
-                //         *image_changed = true;
-                //     }
-                //     if egui::Button::new("⊗")
-                //         .small()
-                //         .ui(ui)
-                //         .on_hover_text("Remove operator")
-                //         .clicked()
-                //     {
-                //         delete = Some(i);
-                //         *image_changed = true;
-                //     }
+                // ui.add_space(size);
+
+                // ui.vertical(|ui| {
+                    ui.style_mut().spacing.icon_spacing = 0.;
+                    ui.style_mut().spacing.button_padding = Vec2::ZERO;
+                    ui.style_mut().spacing.interact_size = Vec2::ZERO;
+                    ui.style_mut().spacing.indent = 0.0;
+                    ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+                    
+                    
+                    let (rect, response) =
+                        ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
+                    ui.painter_at(rect).text(
+                        rect.center(),
+                        Align2::CENTER_CENTER,
+                        "⏶",
+                        FontId::monospace(20.),
+                        Color32::RED,
+                    );
+
+                    if response.clicked() {
+                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        *image_changed = true;
+                    }
+
+                    let (rect, response) =
+                        ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
+                    ui.painter_at(rect).text(
+                        rect.center(),
+                        Align2::CENTER_CENTER,
+                        "⏷",
+                        FontId::monospace(20.),
+                        Color32::RED,
+                    );
+
+                    if response.clicked() {
+                        swap = Some((i, i + 1));
+                        *image_changed = true;
+                    }
+
+                    // if egui::Label::new(RichText::new("⏶").size(size)).ui(ui).clicked() {
+
+                    // }
+                    // if egui::Label::new(RichText::new("⏷").size(size)).ui(ui).clicked() {
+
+                    // }
+
+                    // if egui::Button::new("⏶")
+                    //     .small()
+                    //     .frame(false)
+
+                    //     .ui(ui)
+                    //     .on_hover_text("Move up in order")
+                    //     .clicked()
+                    // {
+                    //     swap = Some(((i as i32 - 1).max(0) as usize, i));
+                    //     *image_changed = true;
+                    // }
+                    // if egui::Button::new("⏷")
+                    //     .small()
+                    //     .frame(false)
+
+                    //     .ui(ui)
+                    //     .on_hover_text("move down in order")
+                    //     .clicked()
+                    // {
+                    //     swap = Some((i, i + 1));
+                    //     *image_changed = true;
+                    // }
                 // });
-
-                ui.end_row();
+                
+                ui.add_space(10.);
             });
+
+
+            ui.end_row();
         });
 
         ui.end_row();
     }
+    // });
+
     if let Some(delete) = delete {
         stack.remove(delete);
     }
