@@ -259,38 +259,38 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
             .default_width(400.)
             // .title_bar(false)
             .show(&ctx, |ui| {
+                ui.label("Accent color");
+                if ui
+                    .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                    .changed()
+                {
+                    let mut style: egui::Style = (*ctx.style()).clone();
+
+                    style.visuals.selection.bg_fill = Color32::from_rgb(
+                        state.persistent_settings.accent_color[0],
+                        state.persistent_settings.accent_color[1],
+                        state.persistent_settings.accent_color[2],
+                    );
+                    ctx.set_style(style);
+
+                    _ = state.persistent_settings.save()
+                }
+
+                if ui
+                    .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
+                    .on_hover_text(
+                        "Vsync reduces tearing and saves CPU. Toggling it off reduces latency.",
+                    )
+                    .changed()
+                {
+                    _ = state.persistent_settings.save()
+                }
+
                 ui.vertical_centered_justified(|ui| {
                     if ui.button("Check for updates").clicked() {
                         state.message = Some("Checking for updates...".into());
                         update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
-                    }
-
-                    if ui
-                        .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
-                        .on_hover_text(
-                            "Vsync reduces tearing and saves CPU. Toggling it off reduces latency.",
-                        )
-                        .changed()
-                    {
-                        _ = state.persistent_settings.save()
-                    }
-
-                    ui.label("Accent color");
-                    if ui
-                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                        .changed()
-                    {
-                        let mut style: egui::Style = (*ctx.style()).clone();
-
-                        style.visuals.selection.bg_fill = Color32::from_rgb(
-                            state.persistent_settings.accent_color[0],
-                            state.persistent_settings.accent_color[1],
-                            state.persistent_settings.accent_color[2],
-                        );
-                        ctx.set_style(style);
-
-                        _ = state.persistent_settings.save()
                     }
 
                     if ui.button("Close").clicked() {
@@ -1016,7 +1016,6 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
             // now draw the ordering/delete ui
             ui.add_space(45.);
 
-
             ui.with_layout(egui::Layout::right_to_left(), |ui| {
                 // ui.add_space(size);
 
@@ -1139,7 +1138,6 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                 //     *image_changed = true;
                 // }
                 // });
-
             });
 
             ui.end_row();
