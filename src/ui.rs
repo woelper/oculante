@@ -891,12 +891,16 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 // TODO redo as impl UI
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
+        let avg = (ui.style().visuals.selection.bg_fill.r() as i32
+            + ui.style().visuals.selection.bg_fill.g() as i32
+            + ui.style().visuals.selection.bg_fill.b() as i32) / 3;
+        let contrast_color: u8 = if avg > 128 { 0 } else {255};
         ui.horizontal(|ui| {
             ui.label(tooltip);
             ui.label(
                 RichText::new(hotkey)
                     .monospace()
-                    .color(Color32::WHITE)
+                    .color(Color32::from_gray(contrast_color))
                     .background_color(ui.style().visuals.selection.bg_fill),
             );
         });
