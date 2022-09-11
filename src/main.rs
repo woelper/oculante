@@ -161,7 +161,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
         fonts.font_data.insert(
             "customfont".to_owned(),
-            FontData::from_static(include_bytes!("NotoSans-Regular.ttf")),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")),
         );
 
         fonts

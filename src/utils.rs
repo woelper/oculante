@@ -279,19 +279,19 @@ impl Default for EditState {
             paint_strokes: Default::default(),
             paint_fade: false,
             brushes: vec![
-                image::load_from_memory(include_bytes!("brush1.png"))
+                image::load_from_memory(include_bytes!("../res/brushes/brush1.png"))
                     .unwrap()
                     .into_rgba8(),
-                image::load_from_memory(include_bytes!("brush2.png"))
+                image::load_from_memory(include_bytes!("../res/brushes/brush2.png"))
                     .unwrap()
                     .into_rgba8(),
-                image::load_from_memory(include_bytes!("brush3.png"))
+                image::load_from_memory(include_bytes!("../res/brushes/brush3.png"))
                     .unwrap()
                     .into_rgba8(),
-                image::load_from_memory(include_bytes!("brush4.png"))
+                image::load_from_memory(include_bytes!("../res/brushes/brush4.png"))
                     .unwrap()
                     .into_rgba8(),
-                image::load_from_memory(include_bytes!("brush5.png"))
+                image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
                     .unwrap()
                     .into_rgba8(),
             ],
