@@ -57,7 +57,7 @@ impl EguiExt for Ui {
         self.scope(|ui| {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
-            let available_width = ui.available_width() * 0.8;
+            let available_width = ui.available_width() * 0.6;
             let mut style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
@@ -71,7 +71,7 @@ impl EguiExt for Ui {
                 style.visuals.widgets.inactive.rounding.at_least(20.);
             style.visuals.widgets.inactive.expansion = -5.0;
 
-            // style.spacing.slider_width = available_width;
+            style.spacing.slider_width = available_width;
 
             ui.horizontal(|ui| {
                 let r = ui.add(Slider::new(value, range).show_value(false).integer());
@@ -1007,13 +1007,26 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
 
         ui.push_id(i, |ui| {
             // ui.end_row();
+
+            // draw the image operator
             if operation.ui(ui).changed() {
                 *image_changed = true;
             }
 
-            // ui.add_space(30.);
+            // now draw the ordering/delete ui
+            ui.add_space(45.);
+
 
             ui.with_layout(egui::Layout::right_to_left(), |ui| {
+                // ui.add_space(size);
+
+                // ui.vertical(|ui| {
+                ui.style_mut().spacing.icon_spacing = 0.;
+                ui.style_mut().spacing.button_padding = Vec2::ZERO;
+                ui.style_mut().spacing.interact_size = Vec2::ZERO;
+                ui.style_mut().spacing.indent = 0.0;
+                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+
                 if egui::Button::new("❌")
                     .small()
                     .frame(false)
@@ -1024,83 +1037,110 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                     delete = Some(i);
                     *image_changed = true;
                 }
-                let size = 10.;
+                // let size = 20.;
 
+                // let (rect, response) =
+                //     ui.allocate_exact_size(Vec2::new(size, size), egui::Sense::click());
+                // ui.painter_at(rect).text(
+                //     rect.center(),
+                //     Align2::CENTER_CENTER,
+                //     "⏶",
+                //     FontId::monospace(size*2.),
+                //     Color32::WHITE,
+                // );
 
-                // ui.add_space(size);
+                // if response.clicked() {
+                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
+                //     *image_changed = true;
+                // }
+
+                // let (rect, response) =
+                //     ui.allocate_exact_size(Vec2::new(size, size), egui::Sense::click());
+                // ui.painter_at(rect).text(
+                //     rect.center(),
+                //     Align2::CENTER_CENTER,
+                //     "⏷",
+                //     FontId::monospace(size*2.),
+                //     Color32::WHITE,
+                // );
+
+                // if response.clicked() {
+                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
+                //     *image_changed = true;
+                // }
+
+                if egui::Button::new("⏶")
+                    .small()
+                    .frame(false)
+                    .ui(ui)
+                    .on_hover_text("Move up")
+                    .clicked()
+                {
+                    swap = Some(((i as i32 - 1).max(0) as usize, i));
+                    *image_changed = true;
+                }
+
+                if egui::Button::new("⏷")
+                    .small()
+                    .frame(false)
+                    .ui(ui)
+                    .on_hover_text("Move down")
+                    .clicked()
+                {
+                    swap = Some((i, i + 1));
+                    *image_changed = true;
+                }
 
                 // ui.vertical(|ui| {
-                    ui.style_mut().spacing.icon_spacing = 0.;
-                    ui.style_mut().spacing.button_padding = Vec2::ZERO;
-                    ui.style_mut().spacing.interact_size = Vec2::ZERO;
-                    ui.style_mut().spacing.indent = 0.0;
-                    ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                    
-                    
-                    let (rect, response) =
-                        ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
-                    ui.painter_at(rect).text(
-                        rect.center(),
-                        Align2::CENTER_CENTER,
-                        "⏶",
-                        FontId::monospace(20.),
-                        Color32::RED,
-                    );
 
-                    if response.clicked() {
-                        swap = Some(((i as i32 - 1).max(0) as usize, i));
-                        *image_changed = true;
-                    }
+                //     let (rect, response) =
+                //         ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
+                //     ui.painter_at(rect).text(
+                //         rect.center(),
+                //         Align2::CENTER_CENTER,
+                //         "⏷",
+                //         FontId::monospace(20.),
+                //         Color32::RED,
+                //     );
 
-                    let (rect, response) =
-                        ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
-                    ui.painter_at(rect).text(
-                        rect.center(),
-                        Align2::CENTER_CENTER,
-                        "⏷",
-                        FontId::monospace(20.),
-                        Color32::RED,
-                    );
-
-                    if response.clicked() {
-                        swap = Some((i, i + 1));
-                        *image_changed = true;
-                    }
-
-                    // if egui::Label::new(RichText::new("⏶").size(size)).ui(ui).clicked() {
-
-                    // }
-                    // if egui::Label::new(RichText::new("⏷").size(size)).ui(ui).clicked() {
-
-                    // }
-
-                    // if egui::Button::new("⏶")
-                    //     .small()
-                    //     .frame(false)
-
-                    //     .ui(ui)
-                    //     .on_hover_text("Move up in order")
-                    //     .clicked()
-                    // {
-                    //     swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    //     *image_changed = true;
-                    // }
-                    // if egui::Button::new("⏷")
-                    //     .small()
-                    //     .frame(false)
-
-                    //     .ui(ui)
-                    //     .on_hover_text("move down in order")
-                    //     .clicked()
-                    // {
-                    //     swap = Some((i, i + 1));
-                    //     *image_changed = true;
-                    // }
+                //     if response.clicked() {
+                //         swap = Some((i, i + 1));
+                //         *image_changed = true;
+                //     }
                 // });
-                
-                ui.add_space(10.);
-            });
 
+                // if egui::Label::new(RichText::new("⏶").size(size)).ui(ui).clicked() {
+
+                // }
+                // if egui::Label::new(RichText::new("⏷").size(size)).ui(ui).clicked() {
+
+                // }
+
+                // if egui::Button::new("⏶")
+                //     .small()
+                //     .frame(false)
+
+                //     .ui(ui)
+                //     .on_hover_text("Move up in order")
+                //     .clicked()
+                // {
+                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
+                //     *image_changed = true;
+                // }
+                // if egui::Button::new("⏷")
+                //     .small()
+                //     .frame(false)
+
+                //     .ui(ui)
+                //     .on_hover_text("move down in order")
+                //     .clicked()
+                // {
+                //     swap = Some((i, i + 1));
+                //     *image_changed = true;
+                // }
+                // });
+
+            });
 
             ui.end_row();
         });

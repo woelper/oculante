@@ -184,7 +184,7 @@ impl ImageOperation {
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
             Self::Crop(bounds) => {
                 let available_w_single_spacing =
-                    ui.available_width() - ui.style().spacing.item_spacing.x * 3.;
+                    ui.available_width() - 60. - ui.style().spacing.item_spacing.x * 3.;
                 ui.horizontal(|ui| {
                     let mut r1 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
@@ -330,7 +330,7 @@ impl ImageOperation {
                         }
                     }
 
-                    let r2 = ui.checkbox(aspect, "Locked");
+                    let r2 = ui.checkbox(aspect, "🔗").on_hover_text("Lock aspect ratio");
 
                     if r2.changed() {
                         r0.changed = true;
