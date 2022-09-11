@@ -31,3 +31,13 @@
 
 * Update psd, ext, dds-rs (ad2f531b)
 
+# 0.6.9 (2022-09-11)
+
+### :beetle: Bug Fixes
+
+* Enable correct accent color selection by changing layout (fixes #48) (a63cc859)
+
+### :sparkles: Features
+
+* Better operator layout, fixes quirky color picking in operator menu (627ace1c)
+
