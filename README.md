@@ -98,6 +98,11 @@ Shortcuts:
 
 Please submit bugs and feature requests on this github repo!
 
+Misc examples:
+
+Extract a signature:
+![signature example](res/ex-signature.gif "Extracting a signature")
+
 Roadmap:
 - Image loading time is still worse than feh or xv
 - Tests and benchmarks
