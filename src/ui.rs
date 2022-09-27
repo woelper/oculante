@@ -22,6 +22,10 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn label_i_selected(&mut self, _selected: bool, _text: &str) -> Response {
+        unimplemented!()
+    }
+
     fn slider_styled<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
@@ -47,6 +51,32 @@ impl EguiExt for Ui {
             );
         })
         .response
+    }
+
+    /// Draw a justified icon from a string starting with an emoji
+    fn label_i_selected(&mut self, selected: bool, text: &str) -> Response {
+        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        self.horizontal(|ui| {
+            let mut r = ui.add_sized(
+                egui::Vec2::new(30., ui.available_height()),
+                egui::SelectableLabel::new(
+                    selected,
+                    RichText::new(icon),
+                ),
+            );
+           if ui.add_sized(
+                egui::Vec2::new(ui.available_width(), ui.available_height()),
+                egui::SelectableLabel::new(
+                    selected,
+                    RichText::new(description), 
+                ),
+            ).clicked() {
+                r.clicked = [true, true, true];
+            }
+            r
+        })
+        .inner
     }
 
     fn slider_styled<Num: emath::Numeric>(
@@ -424,7 +454,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .width(available_w_single_spacing)
                         .show_ui(ui, |ui| {
                             for op in &mut ops {
-                                if ui.selectable_label(false, format!("{}", op)).clicked() {
+                                if ui.label_i_selected(false, &format!("{}", op)).clicked() {
                                     if op.is_per_pixel() {
                                         state.edit_state.pixel_op_stack.push(*op);
                                         pixels_changed = true;
@@ -893,8 +923,9 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
     r.on_hover_ui(|ui| {
         let avg = (ui.style().visuals.selection.bg_fill.r() as i32
             + ui.style().visuals.selection.bg_fill.g() as i32
-            + ui.style().visuals.selection.bg_fill.b() as i32) / 3;
-        let contrast_color: u8 = if avg > 128 { 0 } else {255};
+            + ui.style().visuals.selection.bg_fill.b() as i32)
+            / 3;
+        let contrast_color: u8 = if avg > 128 { 0 } else { 255 };
         ui.horizontal(|ui| {
             ui.label(tooltip);
             ui.label(
