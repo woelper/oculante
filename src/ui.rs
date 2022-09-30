@@ -428,8 +428,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::HSV((0, 100, 100)),
                         ImageOperation::Crop((0, 0, 0, 0)),
                         ImageOperation::Mult([255, 255, 255]),
-                        ImageOperation::Fill([255, 255, 255, 255]),
-                        ImageOperation::Blur(0),
+                        // TODO: Enable if help test added
+                        // ImageOperation::Fill([255, 255, 255, 255]),
+                        // ImageOperation::Blur(0),
+                        ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
                             amt: 50,
                             mono: false,
@@ -456,10 +458,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             for op in &mut ops {
                                 if ui.label_i_selected(false, &format!("{}", op)).clicked() {
                                     if op.is_per_pixel() {
-                                        state.edit_state.pixel_op_stack.push(*op);
+                                        state.edit_state.pixel_op_stack.push(op.clone());
                                         pixels_changed = true;
                                     } else {
-                                        state.edit_state.image_op_stack.push(*op);
+                                        state.edit_state.image_op_stack.push(op.clone());
                                         image_changed = true;
                                     }
                                 }
@@ -1071,37 +1073,7 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                     delete = Some(i);
                     *image_changed = true;
                 }
-                // let size = 20.;
-
-                // let (rect, response) =
-                //     ui.allocate_exact_size(Vec2::new(size, size), egui::Sense::click());
-                // ui.painter_at(rect).text(
-                //     rect.center(),
-                //     Align2::CENTER_CENTER,
-                //     "⏶",
-                //     FontId::monospace(size*2.),
-                //     Color32::WHITE,
-                // );
-
-                // if response.clicked() {
-                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
-                //     *image_changed = true;
-                // }
-
-                // let (rect, response) =
-                //     ui.allocate_exact_size(Vec2::new(size, size), egui::Sense::click());
-                // ui.painter_at(rect).text(
-                //     rect.center(),
-                //     Align2::CENTER_CENTER,
-                //     "⏷",
-                //     FontId::monospace(size*2.),
-                //     Color32::WHITE,
-                // );
-
-                // if response.clicked() {
-                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
-                //     *image_changed = true;
-                // }
+               
 
                 if egui::Button::new("⏶")
                     .small()
@@ -1125,54 +1097,7 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                     *image_changed = true;
                 }
 
-                // ui.vertical(|ui| {
-
-                //     let (rect, response) =
-                //         ui.allocate_exact_size(Vec2::new(20., size), egui::Sense::click());
-                //     ui.painter_at(rect).text(
-                //         rect.center(),
-                //         Align2::CENTER_CENTER,
-                //         "⏷",
-                //         FontId::monospace(20.),
-                //         Color32::RED,
-                //     );
-
-                //     if response.clicked() {
-                //         swap = Some((i, i + 1));
-                //         *image_changed = true;
-                //     }
-                // });
-
-                // if egui::Label::new(RichText::new("⏶").size(size)).ui(ui).clicked() {
-
-                // }
-                // if egui::Label::new(RichText::new("⏷").size(size)).ui(ui).clicked() {
-
-                // }
-
-                // if egui::Button::new("⏶")
-                //     .small()
-                //     .frame(false)
-
-                //     .ui(ui)
-                //     .on_hover_text("Move up in order")
-                //     .clicked()
-                // {
-                //     swap = Some(((i as i32 - 1).max(0) as usize, i));
-                //     *image_changed = true;
-                // }
-                // if egui::Button::new("⏷")
-                //     .small()
-                //     .frame(false)
-
-                //     .ui(ui)
-                //     .on_hover_text("move down in order")
-                //     .clicked()
-                // {
-                //     swap = Some((i, i + 1));
-                //     *image_changed = true;
-                // }
-                // });
+                
             });
 
             ui.end_row();

@@ -754,6 +754,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "evalexpr"
+version = "8.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacfb566035f8cd02f6ec9247c242f3f9904a0b288ea383abcf4e95df6436a34"
+
+[[package]]
 name = "expat-sys"
 version = "2.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2375,6 +2381,7 @@ dependencies = [
  "dds-rs",
  "dirs 4.0.0",
  "env_logger",
+ "evalexpr",
  "exr",
  "fruitbasket",
  "image 0.24.3",

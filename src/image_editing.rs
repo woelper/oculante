@@ -6,6 +6,7 @@ use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
+use evalexpr::*;
 
 use crate::ui::EguiExt;
 
@@ -26,9 +27,10 @@ pub enum ScaleFilter {
     CatmullRom,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum ImageOperation {
     Brightness(i32),
+    Expression(String),
     Desaturate(u8),
     Posterize(u8),
     Exposure(i32),
@@ -78,6 +80,7 @@ impl fmt::Display for ImageOperation {
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
+            Self::Expression(_) => write!(f, "📄 Expression"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -104,6 +107,7 @@ impl ImageOperation {
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
             Self::Posterize(val) => ui.slider_styled(val, 1..=255),
+            Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::ChannelSwap(val) => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
                 let combo_width = 50.;
@@ -464,6 +468,40 @@ impl ImageOperation {
                 p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
                 p[2] = egui::lerp(bounds.0..=bounds.1, p[2] as f32);
+            }
+            Self::Expression(expr) => {
+
+                let mut context = context_map! {
+                    "r" => p[0] as f64,
+                    "g" => p[1] as f64,
+                    "b" => p[2] as f64,
+                    "a" => p[3] as f64,
+
+                 
+                }.unwrap(); // Do proper error handling here
+
+                if let Ok(_) = eval_empty_with_context_mut(expr, &mut context)  {
+                    if let Some(r) = context.get_value("r") {
+                        if let Ok(r) = r.as_float() {
+                            p[0] = r as f32
+                        }
+                    }
+                    if let Some(g) = context.get_value("g") {
+                        if let Ok(g) = g.as_float() {
+                            p[1] = g as f32
+                        }
+                    }
+                    if let Some(b) = context.get_value("b") {
+                        if let Ok(b) = b.as_float() {
+                            p[2] = b as f32
+                        }
+                    }
+                    if let Some(a) = context.get_value("a") {
+                        if let Ok(a) = a.as_float() {
+                            p[3] = a as f32
+                        }
+                    }
+                }
             }
             Self::Posterize(levels) => {
                 p[0] = (p[0] * *levels as f32).round() / *levels as f32;

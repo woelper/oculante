@@ -498,7 +498,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
                                 .clicked()
                                 || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Left))
+                                    && app.keyboard.was_pressed(KeyCode::Left) && !state.mouse_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, -1);
@@ -513,7 +513,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
                                 .clicked()
                                 || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Right))
+                                    && app.keyboard.was_pressed(KeyCode::Right) && !state.mouse_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, 1);
