@@ -66,8 +66,10 @@ Misc features
 - Image info (<kbd>i</kbd>) (pixel position, color info)
 - Threaded image loading
 - Fit image to view
+- Window can be configured to be always on top - helpful to keep image as reference
 - Low cpu usage
-- Pretty fast startup/loading time
+- Non-destructive painting and operator stack - edit very large images interactively by scaling them down first, then deleting the downscale operator once you want to export.
+- Pretty fast startup / loading time
 - Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
@@ -89,6 +91,8 @@ Shortcuts:
 > <kbd>u</kbd> = display colors unpremultiplied
 >
 > <kbd>f</kbd> = toggle fullscreen
+
+> <kbd>t</kbd> = toggle always on top
 >
 > `mouse wheel`,  <kbd>+</kbd> <kbd>-</kbd> = zoom
 >

@@ -432,6 +432,7 @@ pub struct OculanteState {
     pub edit_state: EditState,
     pub pointer_over_ui: bool,
     pub persistent_settings: PersistentSettings,
+    pub always_on_top: bool,
 }
 
 impl Default for OculanteState {
@@ -468,6 +469,7 @@ impl Default for OculanteState {
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: Default::default(),
+            always_on_top: false,
         }
     }
 }

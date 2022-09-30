@@ -60,18 +60,15 @@ impl EguiExt for Ui {
         self.horizontal(|ui| {
             let mut r = ui.add_sized(
                 egui::Vec2::new(30., ui.available_height()),
-                egui::SelectableLabel::new(
-                    selected,
-                    RichText::new(icon),
-                ),
+                egui::SelectableLabel::new(selected, RichText::new(icon)),
             );
-           if ui.add_sized(
-                egui::Vec2::new(ui.available_width(), ui.available_height()),
-                egui::SelectableLabel::new(
-                    selected,
-                    RichText::new(description), 
-                ),
-            ).clicked() {
+            if ui
+                .add_sized(
+                    egui::Vec2::new(ui.available_width(), ui.available_height()),
+                    egui::SelectableLabel::new(selected, RichText::new(description)),
+                )
+                .clicked()
+            {
                 r.clicked = [true, true, true];
             }
             r
@@ -429,7 +426,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::Crop((0, 0, 0, 0)),
                         ImageOperation::Mult([255, 255, 255]),
                         // TODO: Enable if help test added
-                        // ImageOperation::Fill([255, 255, 255, 255]),
+                        ImageOperation::Fill([255, 255, 255, 255]),
                         // ImageOperation::Blur(0),
                         ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
@@ -945,6 +942,13 @@ pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
     ui.add(egui::Button::new(text).frame(false))
 }
 
+pub fn unframed_button_colored(text: impl Into<String>, ui: &mut Ui) -> Response {
+    ui.add(
+        egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill))
+            .frame(false),
+    )
+}
+
 pub fn stroke_ui(
     stroke: &mut PaintStroke,
     brushes: &Vec<RgbaImage>,
@@ -1073,7 +1077,6 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                     delete = Some(i);
                     *image_changed = true;
                 }
-               
 
                 if egui::Button::new("⏶")
                     .small()
@@ -1096,8 +1099,6 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
                     swap = Some((i, i + 1));
                     *image_changed = true;
                 }
-
-                
             });
 
             ui.end_row();

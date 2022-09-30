@@ -202,10 +202,26 @@ fn event(state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::KeyDown { key: KeyCode::V } => state.reset_image = true,
-        Event::KeyDown { key: KeyCode::Q } => std::process::exit(0),
-        Event::KeyDown { key: KeyCode::I } => state.info_enabled = !state.info_enabled,
-        Event::KeyDown { key: KeyCode::E } => state.edit_enabled = !state.edit_enabled,
+        Event::KeyDown { key: KeyCode::V } => {
+            if !state.mouse_grab {
+                state.reset_image = true
+            }
+        }
+        Event::KeyDown { key: KeyCode::Q } => {
+            if !state.mouse_grab {
+                std::process::exit(0)
+            }
+        }
+        Event::KeyDown { key: KeyCode::I } => {
+            if !state.mouse_grab {
+                state.info_enabled = !state.info_enabled
+            }
+        }
+        Event::KeyDown { key: KeyCode::E } => {
+            if !state.mouse_grab {
+                state.edit_enabled = !state.edit_enabled
+            }
+        }
         Event::KeyDown {
             key: KeyCode::Paste,
         } => {}
@@ -296,19 +312,21 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
 
     // Keyboard panning
-    if app.keyboard.shift() {
-        if app.keyboard.is_down(KeyCode::Right) {
-            state.offset.x += 10.;
-        }
-        if app.keyboard.is_down(KeyCode::Left) {
-            state.offset.x -= 10.;
-        }
+    if !state.mouse_grab {
+        if app.keyboard.shift() {
+            if app.keyboard.is_down(KeyCode::Right) {
+                state.offset.x += 10.;
+            }
+            if app.keyboard.is_down(KeyCode::Left) {
+                state.offset.x -= 10.;
+            }
 
-        if app.keyboard.is_down(KeyCode::Up) {
-            state.offset.y -= 10.;
-        }
-        if app.keyboard.is_down(KeyCode::Down) {
-            state.offset.y += 10.;
+            if app.keyboard.is_down(KeyCode::Up) {
+                state.offset.y -= 10.;
+            }
+            if app.keyboard.is_down(KeyCode::Down) {
+                state.offset.y += 10.;
+            }
         }
     }
 }
@@ -432,28 +450,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     let mut changed_channels = false;
 
-                    if app.keyboard.was_pressed(KeyCode::R) {
+                    if app.keyboard.was_pressed(KeyCode::R) && !state.mouse_grab {
                         state.current_channel = Channel::Red;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::G) {
+                    if app.keyboard.was_pressed(KeyCode::G) && !state.mouse_grab {
                         state.current_channel = Channel::Green;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::B) {
+                    if app.keyboard.was_pressed(KeyCode::B) && !state.mouse_grab {
                         state.current_channel = Channel::Blue;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::A) {
+                    if app.keyboard.was_pressed(KeyCode::A) && !state.mouse_grab {
                         state.current_channel = Channel::Alpha;
                         changed_channels = true;
                     }
 
-                    if app.keyboard.was_pressed(KeyCode::U) {
+                    if app.keyboard.was_pressed(KeyCode::U) && !state.mouse_grab {
                         state.current_channel = Channel::RGB;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::C) {
+                    if app.keyboard.was_pressed(KeyCode::C) && !state.mouse_grab {
                         state.current_channel = Channel::RGBA;
                         changed_channels = true;
                     }
@@ -498,7 +516,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
                                 .clicked()
                                 || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Left) && !state.mouse_grab)
+                                    && app.keyboard.was_pressed(KeyCode::Left)
+                                    && !state.mouse_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, -1);
@@ -513,7 +532,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
                                 .clicked()
                                 || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Right) && !state.mouse_grab)
+                                    && app.keyboard.was_pressed(KeyCode::Right)
+                                    && !state.mouse_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, 1);
@@ -547,8 +567,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         );
                     }
 
-                    // ui.add(egui::Separator::default().vertical());
-
                     if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
                         || app.keyboard.was_pressed(KeyCode::F)
                     {
@@ -556,13 +574,23 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         app.window().set_fullscreen(!fullscreen);
                     }
 
-                    // TODO: enable if this is on crates.io
-                    //     if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
-                    //     || app.keyboard.was_pressed(KeyCode::T)
-                    // {
-                    //     let on_top = app.window().is_always_on_top();
-                    //     app.window().set_always_on_top(!on_top);
-                    // }
+                    if state.always_on_top {
+                        if tooltip(unframed_button_colored("📌", ui), "Always on top", "t", ui)
+                            .clicked()
+                            || app.keyboard.was_pressed(KeyCode::T)
+                        {
+                            // let always_on_top = app.window().is_always_on_top();
+                            app.window().set_always_on_top(false);
+                            state.always_on_top = false;
+                        }
+                    } else {
+                        if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
+                            || app.keyboard.was_pressed(KeyCode::T)
+                        {
+                            app.window().set_always_on_top(true);
+                            state.always_on_top = true;
+                        }
+                    }
 
                     if let Some(img) = &state.current_image {
                         if unframed_button("🗐 Copy", ui)
