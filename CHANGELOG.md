@@ -41,3 +41,18 @@
 
 * Better operator layout, fixes quirky color picking in operator menu (627ace1c)
 
+# 0.6.10 (2022-09-30)
+
+### :beetle: Bug Fixes
+
+* Tooltip colors automatically contrast theme color (51eee15e)
+
+### :sparkles: Features
+
+* Add always on top mode (a8fdc891)
+* Filter with custom expressrion per pixel (afa438fe)
+
+### :green_apple: Chore
+
+* update dependencies (72ac0dce)
+
