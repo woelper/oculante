@@ -941,11 +941,13 @@ pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
     ui.add(egui::Button::new(text).frame(false))
 }
 
-pub fn unframed_button_colored(text: impl Into<String>, ui: &mut Ui) -> Response {
-    ui.add(
-        egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill))
-            .frame(false),
-    )
+pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
+    if is_colored {
+        ui.add(egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill)).frame(false))
+    } else {
+        ui.add(egui::Button::new(RichText::new(text)).frame(false))
+
+    }
 }
 
 pub fn stroke_ui(

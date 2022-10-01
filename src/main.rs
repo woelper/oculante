@@ -574,22 +574,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         app.window().set_fullscreen(!fullscreen);
                     }
 
-                    if state.always_on_top {
-                        if tooltip(unframed_button_colored("📌", ui), "Always on top", "t", ui)
-                            .clicked()
-                            || app.keyboard.was_pressed(KeyCode::T)
-                        {
-                            // let always_on_top = app.window().is_always_on_top();
-                            app.window().set_always_on_top(false);
-                            state.always_on_top = false;
-                        }
-                    } else {
-                        if tooltip(unframed_button("📌", ui), "Always on top", "t", ui).clicked()
-                            || app.keyboard.was_pressed(KeyCode::T)
-                        {
-                            app.window().set_always_on_top(true);
-                            state.always_on_top = true;
-                        }
+                    if tooltip(
+                        unframed_button_colored("📌", state.always_on_top, ui),
+                        "Always on top",
+                        "t",
+                        ui,
+                    )
+                    .clicked()
+                        || app.keyboard.was_pressed(KeyCode::T)
+                    {
+                        state.always_on_top = !state.always_on_top;
+                        app.window().set_always_on_top(state.always_on_top);
                     }
 
                     if let Some(img) = &state.current_image {
@@ -622,7 +617,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
 
-                    if unframed_button("⛭", ui)
+                    if unframed_button_colored("⛭", state.settings_enabled, ui)
                         .on_hover_text("Open settings")
                         .clicked()
                     {
