@@ -425,9 +425,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::HSV((0, 100, 100)),
                         ImageOperation::Crop((0, 0, 0, 0)),
                         ImageOperation::Mult([255, 255, 255]),
-                        // TODO: Enable if help test added
                         ImageOperation::Fill([255, 255, 255, 255]),
-                        // ImageOperation::Blur(0),
+                        ImageOperation::Blur(0),
                         ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
                             amt: 50,
