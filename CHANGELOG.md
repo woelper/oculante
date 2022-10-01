@@ -56,3 +56,9 @@
 
 * update dependencies (72ac0dce)
 
+# 0.6.11 (2022-10-01)
+
+### :beetle: Bug Fixes
+
+* Re-enable blur (fixes #52) (e33d27db)
+
