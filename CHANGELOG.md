@@ -62,3 +62,9 @@
 
 * Re-enable blur (fixes #52) (e33d27db)
 
+# 0.6.12 (2022-10-03)
+
+### :beetle: Bug Fixes
+
+* Change windows release to use windows server 2019 (bb740e12)
+
