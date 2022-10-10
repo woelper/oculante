@@ -68,3 +68,9 @@
 
 * Change windows release to use windows server 2019 (bb740e12)
 
+# 0.6.13 (2022-10-10)
+
+### :green_apple: Chore
+
+* update arboard and notan (4cb66206)
+
