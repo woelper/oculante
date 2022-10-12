@@ -32,6 +32,7 @@ mod update;
 use ui::*;
 
 mod image_editing;
+pub mod paint;
 
 #[notan_main]
 fn main() -> Result<(), String> {

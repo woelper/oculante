@@ -14,8 +14,8 @@ use crate::{
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ImageExt, OculanteState, PaintStroke,
-    },
+        ImageExt, OculanteState,
+    }, paint::PaintStroke,
 };
 pub trait EguiExt {
     fn label_i(&mut self, _text: &str) -> Response {
@@ -943,10 +943,12 @@ pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
 
 pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
     if is_colored {
-        ui.add(egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill)).frame(false))
+        ui.add(
+            egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill))
+                .frame(false),
+        )
     } else {
         ui.add(egui::Button::new(RichText::new(text)).frame(false))
-
     }
 }
 
