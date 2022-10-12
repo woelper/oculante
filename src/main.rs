@@ -16,6 +16,8 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use strum::IntoEnumIterator;
 
+pub mod settings;
+
 mod utils;
 use utils::*;
 // mod events;
@@ -28,6 +30,7 @@ mod tests;
 mod ui;
 mod update;
 use ui::*;
+
 mod image_editing;
 
 #[notan_main]
@@ -74,7 +77,7 @@ fn main() -> Result<(), String> {
         let _ = mac::launch();
     }
 
-    if let Ok(settings) = PersistentSettings::load() {
+    if let Ok(settings) = settings::PersistentSettings::load() {
         window_config.vsync = settings.vsync;
         info!("Loaded vsync.");
     }
@@ -127,7 +130,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ..Default::default()
     };
 
-    if let Ok(settings) = PersistentSettings::load() {
+    if let Ok(settings) = settings::PersistentSettings::load() {
         state.persistent_settings = settings;
     }
 

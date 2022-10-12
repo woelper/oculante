@@ -13,7 +13,6 @@ use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
@@ -39,6 +38,7 @@ use strum::Display;
 use strum_macros::EnumIter;
 
 use crate::image_editing::ImageOperation;
+use crate::settings::PersistentSettings;
 
 lazy_static! {
     pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
@@ -48,34 +48,6 @@ fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PersistentSettings {
-    pub accent_color: [u8; 3],
-    pub vsync: bool,
-}
-
-impl Default for PersistentSettings {
-    fn default() -> Self {
-        PersistentSettings {
-            accent_color: [255, 0, 75],
-            vsync: true,
-        }
-    }
-}
-
-impl PersistentSettings {
-    pub fn load() -> Result<Self> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
-        let f = File::open(local_dir.join(".oculante"))?;
-        Ok(serde_json::from_reader::<_, PersistentSettings>(f)?)
-    }
-
-    pub fn save(&self) -> Result<()> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
-        let f = File::create(local_dir.join(".oculante"))?;
-        Ok(serde_json::to_writer_pretty(f, self)?)
-    }
-}
 
 #[derive(Debug)]
 pub struct ExtendedImageInfo {
