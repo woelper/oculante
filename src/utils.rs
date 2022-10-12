@@ -127,11 +127,11 @@ impl ExtendedImageInfo {
 #[derive(Debug)]
 pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
-    pub image_sender: Sender<image::RgbaImage>,
+    pub image_sender: Sender<RgbaImage>,
 }
 
 impl Player {
-    pub fn new(image_sender: Sender<image::RgbaImage>) -> Player {
+    pub fn new(image_sender: Sender<RgbaImage>) -> Player {
         let (frame_sender, frame_receiver): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
         let move_image_sender = image_sender.clone();
@@ -177,11 +177,16 @@ impl Player {
 /// A single frame
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pub buffer: image::RgbaImage,
+    pub buffer: RgbaImage,
     /// How long to paunse until the next frame
     pub delay: u16,
 }
 
+impl Frame {
+    fn new(buffer: RgbaImage, delay: u16) -> Frame {
+        Frame { buffer, delay }
+    }
+}
 /// A collection of frames that can loop/repeat
 #[derive(Debug, Default, Clone)]
 pub struct FrameCollection {
@@ -190,19 +195,15 @@ pub struct FrameCollection {
 }
 
 impl FrameCollection {
-    fn add(&mut self, buffer: image::RgbaImage, delay: u16) {
+    fn add(&mut self, buffer: RgbaImage, delay: u16) {
         self.frames.push(Frame::new(buffer, delay))
     }
-    fn add_default(&mut self, buffer: image::RgbaImage) {
+    fn add_default(&mut self, buffer: RgbaImage) {
         self.frames.push(Frame::new(buffer, 0))
     }
 }
 
-impl Frame {
-    fn new(buffer: image::RgbaImage, delay: u16) -> Frame {
-        Frame { buffer, delay }
-    }
-}
+
 
 #[derive(Debug, PartialEq, EnumIter, Display, Clone, Copy)]
 pub enum Channel {
@@ -447,7 +448,7 @@ impl Default for OculanteState {
 }
 
 // Unsafe webp decoding using webp-sys
-fn decode_webp(buf: &[u8]) -> Option<image::RgbaImage> {
+fn decode_webp(buf: &[u8]) -> Option<RgbaImage> {
     let mut width = 0;
     let mut height = 0;
     let len = buf.len();
@@ -614,7 +615,7 @@ pub fn pos_from_coord(
     size
 }
 
-pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
+pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
     let loc = img_location.clone();
 
     thread::spawn(move || {
@@ -653,7 +654,7 @@ pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<image:
     });
 }
 
-pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<image::RgbaImage>) {
+pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
     match open_image(&img_location) {
         Ok(col) => {
             for frame in col.frames {
@@ -746,7 +747,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 .no_deep_data()
                 .largest_resolution_level()
                 .rgba_channels(
-                    |resolution, _channels: &RgbaChannels| -> image::RgbaImage {
+                    |resolution, _channels: &RgbaChannels| -> RgbaImage {
                         image::ImageBuffer::new(
                             resolution.width() as u32,
                             resolution.height() as u32,
@@ -768,7 +769,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
 
             // an image that contains a single layer containing an png rgba buffer
             let maybe_image: Result<
-                Image<Layer<SpecificChannels<image::RgbaImage, RgbaChannels>>>,
+                Image<Layer<SpecificChannels<RgbaImage, RgbaChannels>>>,
                 exrs::Error,
             > = reader.from_file(&img_location);
 
@@ -800,7 +801,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 s.append(&mut x);
             }
 
-            let tonemapped_buffer = image::RgbaImage::from_raw(meta.width, meta.height, s)
+            let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
                 .ok_or(anyhow!("Failed to create RgbaImage with given dimensions"))?;
             col.add_default(tonemapped_buffer);
         }
