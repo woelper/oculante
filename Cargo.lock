@@ -2357,7 +2357,6 @@ dependencies = [
  "exr",
  "fruitbasket",
  "image",
- "lazy_static",
  "libwebp-sys",
  "log",
  "nalgebra",

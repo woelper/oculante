@@ -3,7 +3,7 @@ use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
 use image::{EncodableLayout, RgbaImage};
-use log::{debug, error};
+use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
@@ -24,14 +24,12 @@ use exr::prelude::*;
 use anyhow::{anyhow, Result};
 use image::Rgba;
 use image::{self, AnimationDecoder};
-use lazy_static::lazy_static;
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Mutex;
 use strum::Display;
 use strum_macros::EnumIter;
 
@@ -39,9 +37,7 @@ use crate::image_editing::ImageOperation;
 use crate::paint::PaintStroke;
 use crate::settings::PersistentSettings;
 
-lazy_static! {
-    pub static ref PLAYER_STOP: Mutex<bool> = Mutex::new(false);
-}
+
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
@@ -126,49 +122,108 @@ impl ExtendedImageInfo {
 pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<RgbaImage>,
+    pub stop_sender: Sender<()>,
 }
 
 impl Player {
     pub fn new(image_sender: Sender<RgbaImage>) -> Player {
-        let (frame_sender, frame_receiver): (Sender<FrameCollection>, Receiver<FrameCollection>) =
+        let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
-        let move_image_sender = image_sender.clone();
-        thread::spawn(move || {
-            while let Ok(col) = frame_receiver.try_recv() {
-                for frame in col.frames {
-                    if Player::is_stopped() {
-                        break;
-                    }
-                    let _ = move_image_sender.send(frame.buffer);
-                }
-            }
-        });
+        let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
+        // let move_image_sender = image_sender.clone();
+        // thread::spawn(move || {
+        //     while let Ok(col) = frame_receiver.try_recv() {
+        //         panic!();
+        //         info!("Recv player");
+        //         for frame in col.frames {
+        //             if Player::is_stopped() {
+        //                 break;
+        //             }
+        //             let _ = move_image_sender.send(frame.buffer);
+        //         }
+        //     }
+        // });
         Player {
             frame_sender,
             image_sender,
+            stop_sender,
         }
     }
 
     pub fn load_blocking(&self, img_location: &PathBuf) {
-        Self::stop();
+        self.stop();
         send_image_blocking(&img_location, self.image_sender.clone());
     }
 
-    pub fn load(&self, img_location: &PathBuf) {
-        Self::stop();
-        send_image_threaded(&img_location, self.image_sender.clone());
+    pub fn load(&mut self, img_location: &PathBuf) {
+        self.stop();
+        let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
+        self.stop_sender = stop_sender;
+        send_image_threaded(&img_location, self.image_sender.clone(), stop_receiver);
     }
 
-    pub fn stop() {
-        *PLAYER_STOP.lock().unwrap() = true;
+    pub fn stop(&self) {
+        _ = self.stop_sender.send(());
+        // *PLAYER_STOP.lock().unwrap() = true;
     }
 
-    pub fn is_stopped() -> bool {
-        *PLAYER_STOP.lock().unwrap()
-    }
 
-    pub fn start() {
-        *PLAYER_STOP.lock().unwrap() = false;
+}
+
+pub fn send_image_threaded(
+    img_location: &PathBuf,
+    texture_sender: Sender<RgbaImage>,
+    stop_receiver: Receiver<()>,
+) {
+    let loc = img_location.clone();
+
+    thread::spawn(move || {
+        let col = open_image(&loc).expect("Opening failed");
+
+        let cycles = if col.repeat { 200 } else { 1 };
+
+        if col.repeat && col.frames.len() > 1 {
+            let mut i = 0;
+            while i < cycles {
+                // let frames = col.frames.clone();
+                for frame in &col.frames {
+                    if stop_receiver.try_recv().is_ok() {
+                        info!("Stopped from receiver.");
+                        return;
+                    }
+                    let _ = texture_sender.send(frame.buffer.clone());
+                    if frame.delay > 0 {
+                        thread::sleep(Duration::from_millis(frame.delay as u64));
+                    } else {
+                        thread::sleep(Duration::from_millis(40 as u64));
+                    }
+                }
+                i += 1;
+            }
+        } else {
+            // single frame. This saves one clone().
+            for frame in col.frames {
+                let _ = texture_sender.send(frame.buffer);
+            }
+        }
+    });
+}
+
+pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
+    match open_image(&img_location) {
+        Ok(col) => {
+            for frame in col.frames {
+
+
+                let _ = texture_sender.send(frame.buffer);
+                // dbg!(&frame.delay);
+                if frame.delay > 0 {
+                    thread::sleep(Duration::from_millis(frame.delay as u64));
+                }
+            }
+            // let _ = state_sender.send("".into());
+        }
+        Err(e) => error!("Error {:?} from {:?}", e, img_location),
     }
 }
 
@@ -176,7 +231,7 @@ impl Player {
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub buffer: RgbaImage,
-    /// How long to paunse until the next frame
+    /// How long to pause until the next frame
     pub delay: u16,
 }
 
@@ -270,7 +325,6 @@ impl Default for EditState {
         }
     }
 }
-
 
 /// The state of the application
 #[derive(Debug, AppState)]
@@ -515,65 +569,6 @@ pub fn pos_from_coord(
     size
 }
 
-pub fn send_image_threaded(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
-    let loc = img_location.clone();
-
-    thread::spawn(move || {
-        let col = open_image(&loc).expect("Opening failed");
-
-        if col.repeat {
-            let mut i = 0;
-            while !Player::is_stopped() && i < 200 {
-                let frames = col.frames.clone();
-                for frame in frames {
-                    if Player::is_stopped() {
-                        i = 200;
-                        break;
-                    }
-                    let _ = texture_sender.send(frame.buffer);
-                    if frame.delay > 0 {
-                        thread::sleep(Duration::from_millis(frame.delay as u64));
-                    } else {
-                        thread::sleep(Duration::from_millis(40 as u64));
-                    }
-                }
-                i += 1;
-            }
-        } else {
-            for frame in col.frames {
-                if Player::is_stopped() {
-                    break;
-                }
-                let _ = texture_sender.send(frame.buffer);
-
-                if frame.delay > 0 {
-                    thread::sleep(Duration::from_millis(frame.delay as u64));
-                }
-            }
-        }
-    });
-}
-
-pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
-    match open_image(&img_location) {
-        Ok(col) => {
-            for frame in col.frames {
-                if Player::is_stopped() {
-                    break;
-                }
-
-                let _ = texture_sender.send(frame.buffer);
-                // dbg!(&frame.delay);
-                if frame.delay > 0 {
-                    thread::sleep(Duration::from_millis(frame.delay as u64));
-                }
-            }
-            // let _ = state_sender.send("".into());
-        }
-        Err(e) => error!("Error {:?} from {:?}", e, img_location),
-    }
-}
-
 pub fn send_extended_info(
     current_image: &Option<RgbaImage>,
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
@@ -594,7 +589,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     let mut col = FrameCollection::default();
 
     // Stop all current images being sent
-    Player::stop();
+    // Player::stop();
 
     match img_location.extension().unwrap_or_default().to_str() {
         Some("dds") => {
@@ -747,7 +742,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
         },
     }
 
-    Player::start();
+    // Player::start();
     Ok(col)
 }
 
@@ -833,4 +828,3 @@ pub fn clipboard_copy(img: &RgbaImage) {
         });
     }
 }
-

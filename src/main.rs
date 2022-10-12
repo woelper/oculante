@@ -44,7 +44,7 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     std::env::set_var("RUST_LOG", "info");
-    // let _ = env_logger::try_init();
+    let _ = env_logger::try_init();
 
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
