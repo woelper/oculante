@@ -74,3 +74,9 @@
 
 * update arboard and notan (4cb66206)
 
+# 0.6.14 (2022-10-14)
+
+### :beetle: Bug Fixes
+
+* Fix unreliable gif loading (928610b6)
+
