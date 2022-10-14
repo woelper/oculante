@@ -14,6 +14,11 @@ jobs:
       - name: Install deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev nasm
         if: matrix.os == 'ubuntu-latest'
+        
+        
+      - name: Install osxdeps
+        run: brew install nasm
+        if: matrix.os == 'macos-latest'
 
       - name: Run cargo check
         uses: actions-rs/cargo@v1
