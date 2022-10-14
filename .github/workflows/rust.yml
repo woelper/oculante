@@ -11,14 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Install deps
+      - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev nasm
         if: matrix.os == 'ubuntu-latest'
         
-        
-      - name: Install osxdeps
+      - name: Install osx deps
         run: brew install nasm
         if: matrix.os == 'macos-latest'
+        
+      - name: Install win deps
+        run: choco install nasm
+        if: matrix.os == 'windows-latest'
 
       - name: Run cargo check
         uses: actions-rs/cargo@v1
