@@ -107,6 +107,7 @@ Please submit bugs and feature requests on this github repo!
 Misc examples:
 
 Extract a signature:
+
 ![signature example](res/ex-signature.gif "Extracting a signature")
 
 Roadmap:
@@ -119,3 +120,10 @@ Roadmap:
 - ~~Custom display for images with unassociated channels~~
 - ~~EXR support~~
 - ~~Read next image(s) in dir and advance to them~~
+
+
+Test / benchmark pictures:
+
+https://unsplash.com/@mohsen_karimi
+
+https://unsplash.com/@frstvisuals

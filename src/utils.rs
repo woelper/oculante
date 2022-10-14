@@ -37,8 +37,6 @@ use crate::image_editing::ImageOperation;
 use crate::paint::PaintStroke;
 use crate::settings::PersistentSettings;
 
-
-
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
 }
@@ -121,28 +119,15 @@ impl ExtendedImageInfo {
 #[derive(Debug)]
 pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
-    pub image_sender: Sender<RgbaImage>,
+    pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
 }
 
 impl Player {
-    pub fn new(image_sender: Sender<RgbaImage>) -> Player {
+    pub fn new(image_sender: Sender<Frame>) -> Player {
         let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
-        // let move_image_sender = image_sender.clone();
-        // thread::spawn(move || {
-        //     while let Ok(col) = frame_receiver.try_recv() {
-        //         panic!();
-        //         info!("Recv player");
-        //         for frame in col.frames {
-        //             if Player::is_stopped() {
-        //                 break;
-        //             }
-        //             let _ = move_image_sender.send(frame.buffer);
-        //         }
-        //     }
-        // });
         Player {
             frame_sender,
             image_sender,
@@ -166,13 +151,11 @@ impl Player {
         _ = self.stop_sender.send(());
         // *PLAYER_STOP.lock().unwrap() = true;
     }
-
-
 }
 
 pub fn send_image_threaded(
     img_location: &PathBuf,
-    texture_sender: Sender<RgbaImage>,
+    texture_sender: Sender<Frame>,
     stop_receiver: Receiver<()>,
 ) {
     let loc = img_location.clone();
@@ -184,6 +167,13 @@ pub fn send_image_threaded(
 
         if col.repeat && col.frames.len() > 1 {
             let mut i = 0;
+
+            // Send reset frame
+            if let Some(f) = col.frames.first() {
+                _ = texture_sender.clone().send(Frame::new_reset(f.buffer.clone()));
+
+            }
+
             while i < cycles {
                 // let frames = col.frames.clone();
                 for frame in &col.frames {
@@ -191,7 +181,7 @@ pub fn send_image_threaded(
                         info!("Stopped from receiver.");
                         return;
                     }
-                    let _ = texture_sender.send(frame.buffer.clone());
+                    let _ = texture_sender.send(frame.clone());
                     if frame.delay > 0 {
                         thread::sleep(Duration::from_millis(frame.delay as u64));
                     } else {
@@ -203,22 +193,21 @@ pub fn send_image_threaded(
         } else {
             // single frame. This saves one clone().
             for frame in col.frames {
-                let _ = texture_sender.send(frame.buffer);
+                let _ = texture_sender.send(frame);
             }
         }
     });
 }
 
-pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<RgbaImage>) {
+pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<Frame>) {
     match open_image(&img_location) {
         Ok(col) => {
             for frame in col.frames {
-
-
-                let _ = texture_sender.send(frame.buffer);
+                let delay = frame.delay;
+                let _ = texture_sender.send(frame);
                 // dbg!(&frame.delay);
-                if frame.delay > 0 {
-                    thread::sleep(Duration::from_millis(frame.delay as u64));
+                if delay > 0 {
+                    thread::sleep(Duration::from_millis(delay as u64));
                 }
             }
             // let _ = state_sender.send("".into());
@@ -228,16 +217,46 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<RgbaIm
 }
 
 /// A single frame
+#[derive(Debug, Clone, PartialEq)]
+pub enum FrameSource {
+    Animation,
+    Still,
+    EditResult,
+    Reset,
+}
+
+/// A single frame
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub buffer: RgbaImage,
     /// How long to pause until the next frame
     pub delay: u16,
+    pub source: FrameSource,
 }
 
 impl Frame {
-    fn new(buffer: RgbaImage, delay: u16) -> Frame {
-        Frame { buffer, delay }
+    fn new(buffer: RgbaImage, delay: u16, source: FrameSource) -> Frame {
+        Frame {
+            buffer,
+            delay,
+            source,
+        }
+    }
+
+    fn new_reset(buffer: RgbaImage) -> Frame {
+        Frame {
+            buffer,
+            delay: 0,
+            source: FrameSource::Reset
+        }
+    }
+
+    pub fn new_still(buffer: RgbaImage) -> Frame {
+        Frame {
+            buffer,
+            delay: 0,
+            source: FrameSource::Still,
+        }
     }
 }
 /// A collection of frames that can loop/repeat
@@ -248,11 +267,12 @@ pub struct FrameCollection {
 }
 
 impl FrameCollection {
-    fn add(&mut self, buffer: RgbaImage, delay: u16) {
-        self.frames.push(Frame::new(buffer, delay))
+    fn add_anim_frame(&mut self, buffer: RgbaImage, delay: u16) {
+        self.frames
+            .push(Frame::new(buffer, delay, FrameSource::Animation))
     }
-    fn add_default(&mut self, buffer: RgbaImage) {
-        self.frames.push(Frame::new(buffer, 0))
+    fn add_still(&mut self, buffer: RgbaImage) {
+        self.frames.push(Frame::new(buffer, 0, FrameSource::Still))
     }
 }
 
@@ -342,7 +362,7 @@ pub struct OculanteState {
     pub sampled_color: [f32; 4],
     pub info_enabled: bool,
     pub mouse_delta: Vector2<f32>,
-    pub texture_channel: (Sender<RgbaImage>, Receiver<RgbaImage>),
+    pub texture_channel: (Sender<Frame>, Receiver<Frame>),
     pub message_channel: (Sender<String>, Receiver<String>),
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     pub extended_info_loading: bool,
@@ -588,9 +608,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     let img_location = img_location.clone();
     let mut col = FrameCollection::default();
 
-    // Stop all current images being sent
-    // Player::stop();
-
     match img_location.extension().unwrap_or_default().to_str() {
         Some("dds") => {
             let file = File::open(img_location)?;
@@ -601,7 +618,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
                         .ok_or(anyhow!("Can't create DDS ImageBuffer with given res"))?;
-                col.add_default(buf);
+                col.add_still(buf);
             }
         }
         Some("svg") => {
@@ -632,7 +649,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                         pixmap.data().to_vec(),
                     );
                     if let Some(valid_buf) = buf {
-                        col.add_default(valid_buf);
+                        col.add_still(valid_buf);
                     }
                 }
             }
@@ -671,7 +688,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             match maybe_image {
                 Ok(image) => {
                     let png_buffer = image.layer_data.channel_data.pixels;
-                    col.add_default(png_buffer);
+                    col.add_still(png_buffer);
                 }
                 Err(e) => error!("{} from {:?}", e, img_location),
             }
@@ -698,7 +715,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
 
             let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
                 .ok_or(anyhow!("Failed to create RgbaImage with given dimensions"))?;
-            col.add_default(tonemapped_buffer);
+            col.add_still(tonemapped_buffer);
         }
         Some("psd") => {
             let mut file = File::open(img_location)?;
@@ -708,7 +725,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 if let Some(buf) =
                     image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 {
-                    col.add_default(buf);
+                    col.add_still(buf);
                 }
             }
         }
@@ -717,7 +734,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let mut contents = vec![];
             if let Ok(_) = file.read_to_end(&mut contents) {
                 match decode_webp(&contents) {
-                    Some(webp_buf) => col.add_default(webp_buf),
+                    Some(webp_buf) => col.add_still(webp_buf),
                     None => println!("Error decoding data from {:?}", img_location),
                 }
             }
@@ -730,19 +747,18 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             for f in frames {
                 let delay = f.delay().numer_denom_ms().0 as u16;
                 debug!(" Frame delay {delay}");
-                col.add(f.into_buffer(), delay);
+                col.add_anim_frame(f.into_buffer(), delay);
                 col.repeat = true;
             }
         }
         _ => match image::open(&img_location) {
             Ok(img) => {
-                col.add_default(img.to_rgba8());
+                col.add_still(img.to_rgba8());
             }
             Err(e) => println!("Can't open image {:?} from {:?}", e, img_location),
         },
     }
 
-    // Player::start();
     Ok(col)
 }
 

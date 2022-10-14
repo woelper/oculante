@@ -43,8 +43,10 @@ fn main() -> Result<(), String> {
     }
     // on debug builds, override log level
     #[cfg(debug_assertions)]
-    std::env::set_var("RUST_LOG", "info");
-    let _ = env_logger::try_init();
+    {
+        std::env::set_var("RUST_LOG", "info");
+        let _ = env_logger::try_init();
+    }
 
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
@@ -371,15 +373,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     // check if a new texture has been sent
-    if let Ok(img) = state.texture_channel.1.try_recv() {
+    if let Ok(frame) = state.texture_channel.1.try_recv() {
+        let img = frame.buffer;
         debug!("Received image buffer");
         state.image_dimension = img.dimensions();
         state.current_texture = img.to_texture(gfx);
-        state.image_info = None;
 
         //center the image
-        state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
-        state.reset_image = true;
+        if frame.source != FrameSource::Animation {
+            state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
+            state.reset_image = true;
+        state.image_info = None;
+
+        }
         state.is_loaded = true;
         state.current_image = Some(img);
         if state.info_enabled {
@@ -613,7 +619,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     imagedata.height as u32,
                                     (&imagedata.bytes).to_vec(),
                                 ) {
-                                    let _ = state.player.image_sender.send(image);
+                                    // Stop in the even that an animation is running
+                                    state.player.stop();
+                                    _ = state
+                                        .player
+                                        .image_sender
+                                        .send(crate::utils::Frame::new_still(image));
                                     // Since pasted data has no path, make sure it's not set
                                     state.current_path = None;
                                 }

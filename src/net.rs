@@ -4,7 +4,9 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::thread;
 
-fn handle_client(mut stream: TcpStream, texture_sender: Sender<image::RgbaImage>) {
+use crate::utils::Frame;
+
+fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) {
     let mut data = [0 as u8; 100000]; // using 50 byte buffer
     let mut imgbuf: Vec<u8> = vec![];
     while match stream.read(&mut data) {
@@ -19,7 +21,7 @@ fn handle_client(mut stream: TcpStream, texture_sender: Sender<image::RgbaImage>
                 Ok(i) => {
                     // println!("got image");
                     imgbuf.clear();
-                    let _ = texture_sender.send(i.to_rgba8());
+                    let _ = texture_sender.send(Frame::new_still(i.to_rgba8()));
                     std::thread::sleep(std::time::Duration::from_millis(30));
                     // let _ = state_sender.send(String::from("ANIM_FRAME")).unwrap();
                     false
@@ -38,7 +40,7 @@ fn handle_client(mut stream: TcpStream, texture_sender: Sender<image::RgbaImage>
     } {}
 }
 
-pub fn recv(port: i32, texture_sender: Sender<image::RgbaImage>) {
+pub fn recv(port: i32, texture_sender: Sender<Frame>) {
     thread::spawn(move || {
         let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).unwrap();
         // accept connections and process them, spawning a new thread for each one

@@ -1,46 +1,35 @@
-// extern crate test;
-// use test::{Bencher, black_box};
 use super::*;
-use std::path::PathBuf;
-//use std::time::{Duration, Instant};
+use std::{path::PathBuf, time::Instant};
 
 #[test]
 fn load() {
     open_image(&PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg")).unwrap();
 }
 
-// #[bench]
-// fn bench_load_large(b: &mut Bencher) {
-//     // Optionally include some setup
+#[test]
+fn net() {
 
-//     let iters = 5;
-//     let mut total = 0;
+    std::process::Command::new("cargo").args(["run", "--", "-l", "11111"]).status().unwrap();
+    // this is not yet supported
+    std::process::Command::new("nc").args(["localhost", "11111", "<", "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"]).status().unwrap();
+    
+}
 
-//     // for _i in 0..iters {
-//     //     let start = Instant::now();
-//     //     open_image(&PathBuf::from("tests/isabella-juskova-bECrTveml_w-unsplash.jpg"));
-//     //     let elapsed = Instant::now().checked_duration_since(start);
-//     //     total += elapsed.unwrap().as_millis();
-//     // }
-//     // dbg!(total/iters);
-//     // total = 0;
+#[test]
+fn bench_load_large() {
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+    let iters = 5;
+    info!("Benching this with {iters} iterations...");
+    let mut total = 0;
 
-//     for _i in 0..iters {
-//         let start = Instant::now();
-//         open_image(&PathBuf::from("/home/woelper/Documents/oculante/tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"));
-//         let elapsed = Instant::now().checked_duration_since(start);
-//         total += elapsed.unwrap().as_millis();
-//         dbg!(elapsed);
-//     }
-//     dbg!(total/iters);
-
-//     // b.iter(|| {
-//     //     // Inner closure, the actual test
-//     //     for _i in 1..iters {
-//     //         let start = Instant::now();
-//     //         open_image(&PathBuf::from("tests/isabella-juskova-bECrTveml_w-unsplash.jpg"));
-//     //         let elapsed = Instant::now().checked_duration_since(start);
-//     //         dbg!(elapsed);
-//     //     }
-//     // });
-// }
+    for _i in 0..iters {
+        let start = Instant::now();
+        open_image(&PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg")).unwrap();
+        let elapsed = start.elapsed();
+        let d = elapsed.as_millis();
+        total += d;
+        info!("Loaded image in {}", d);
+    }
+    info!("{} ms mean", total / iters);
+}
