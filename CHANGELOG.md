@@ -80,3 +80,5 @@
 
 * Fix unreliable gif loading (928610b6)
 
+# 0.6.15 (2022-10-16)
+
