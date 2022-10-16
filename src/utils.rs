@@ -2,7 +2,7 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, RgbaImage, RgbImage};
+use image::{EncodableLayout, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -218,6 +218,7 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<Frame>
 }
 
 /// A single frame
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameSource {
     Animation,

@@ -8,11 +8,20 @@ fn load() {
 
 #[test]
 fn net() {
-
-    std::process::Command::new("cargo").args(["run", "--", "-l", "11111"]).status().unwrap();
+    std::process::Command::new("cargo")
+        .args(["run", "--", "-l", "11111"])
+        .status()
+        .unwrap();
     // this is not yet supported
-    std::process::Command::new("nc").args(["localhost", "11111", "<", "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"]).status().unwrap();
-    
+    std::process::Command::new("nc")
+        .args([
+            "localhost",
+            "11111",
+            "<",
+            "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg",
+        ])
+        .status()
+        .unwrap();
 }
 
 #[test]
@@ -25,7 +34,10 @@ fn bench_load_large() {
 
     for _i in 0..iters {
         let start = Instant::now();
-        open_image(&PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg")).unwrap();
+        open_image(&PathBuf::from(
+            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        ))
+        .unwrap();
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
