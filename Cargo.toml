@@ -15,33 +15,39 @@ identifier = "com.github.woelper.oculante"
 name = "oculante"
 
 [dependencies]
+anyhow = "1.0"
+arboard = "3.1.0"
 clap = "3.2"
 dds-rs = "0.7.0"
+dirs = "4.0"
+env_logger = "0.9.0"
+evalexpr = "8.1"
 exr = "1.5.0"
 image = "0.24.3"
 libwebp-sys = "0.8"
 log = "0.4.17"
 nalgebra = "0.31"
-psd = "0.3.4"
-rgb = "0.8.3"
-self_update = "0.32"
-anyhow = "1.0"
-arboard = "3.1.0"
-env_logger = "0.9.0"
 notan = {version = "0.7", features = ["drop_files", "egui"]}
 palette = "0.6"
+psd = "0.3.4"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rayon = "1.5.3"
 resvg = "0.23.0"
+rgb = "0.8.3"
+self_update = "0.32"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 strum = {version = "0.24", features = ["derive"]}
 strum_macros = "0.24"
 tiny-skia = "0.6.6"
+turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.23.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-dirs = "4.0"
-evalexpr = "8.1"
+
+[features]
+# Defines a feature named `webp` that does not enable any other features.
+default = ["turbo"]
+turbo = ["turbojpeg"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"

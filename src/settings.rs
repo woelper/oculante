@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 
 #[derive(Debug, Serialize, Deserialize)]

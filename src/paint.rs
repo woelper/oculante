@@ -1,9 +1,8 @@
-use image::{RgbaImage, Rgba, Pixel};
-use notan::egui::{Pos2, Color32};
+use image::{Pixel, Rgba, RgbaImage};
+use notan::egui::{Color32, Pos2};
 use rand::prelude::*;
 
 use rand_chacha::ChaCha8Rng;
-
 
 #[derive(Debug, Clone, Default)]
 pub struct PaintStroke {
@@ -101,7 +100,6 @@ impl PaintStroke {
         }
     }
 }
-
 
 pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
     // To test

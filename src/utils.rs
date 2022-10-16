@@ -170,8 +170,9 @@ pub fn send_image_threaded(
 
             // Send reset frame
             if let Some(f) = col.frames.first() {
-                _ = texture_sender.clone().send(Frame::new_reset(f.buffer.clone()));
-
+                _ = texture_sender
+                    .clone()
+                    .send(Frame::new_reset(f.buffer.clone()));
             }
 
             while i < cycles {
@@ -217,6 +218,7 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<Frame>
 }
 
 /// A single frame
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameSource {
     Animation,
@@ -247,7 +249,7 @@ impl Frame {
         Frame {
             buffer,
             delay: 0,
-            source: FrameSource::Reset
+            source: FrameSource::Reset,
         }
     }
 
@@ -750,6 +752,12 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 col.add_anim_frame(f.into_buffer(), delay);
                 col.repeat = true;
             }
+        }
+        #[cfg(feature = "turbo")]
+        Some("jpg") | Some("jpeg") => {
+            let jpeg_data = std::fs::read(&img_location)?;
+            let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
+            col.add_still(img);
         }
         _ => match image::open(&img_location) {
             Ok(img) => {

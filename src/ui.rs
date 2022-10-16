@@ -11,11 +11,12 @@ use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
 use crate::{
     image_editing::{Channel, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
         ImageExt, OculanteState,
-    }, paint::PaintStroke,
+    },
 };
 pub trait EguiExt {
     fn label_i(&mut self, _text: &str) -> Response {

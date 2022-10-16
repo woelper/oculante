@@ -383,8 +383,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if frame.source != FrameSource::Animation {
             state.offset = gfx.size().size_vec() / 2.0 - img.size_vec() / 2.0;
             state.reset_image = true;
-        state.image_info = None;
-
+            state.image_info = None;
         }
         state.is_loaded = true;
         state.current_image = Some(img);
