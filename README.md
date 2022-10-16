@@ -127,3 +127,18 @@ Test / benchmark pictures:
 https://unsplash.com/@mohsen_karimi
 
 https://unsplash.com/@frstvisuals
+
+## Building
+
+Linux:
+
+`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev nasm`
+
+Win:
+Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
+
+Mac
+`brew install nasm`
+
+## Features
+If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
