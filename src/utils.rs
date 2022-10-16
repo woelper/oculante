@@ -752,6 +752,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 col.repeat = true;
             }
         }
+        #[cfg(feature = "turbo")]
         Some("jpg") | Some("jpeg") => {
             let jpeg_data = std::fs::read(&img_location)?;
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
