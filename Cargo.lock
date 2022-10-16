@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "oculante"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "anyhow",
  "arboard",
