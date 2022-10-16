@@ -52,7 +52,7 @@ jobs:
 
     - name: Install win dependencies
       run: choco install nasm
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-2019'
 
     - name: Build Application
       run: cargo build --release
