@@ -84,3 +84,9 @@
 
 # 0.6.16 (2022-10-16)
 
+# 0.6.17 (2022-10-17)
+
+### :sparkles: Features
+
+* Keep image centered on window resize (a8ca6f1e)
+
