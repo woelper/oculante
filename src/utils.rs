@@ -358,6 +358,7 @@ pub struct OculanteState {
     pub message: Option<String>,
     pub is_loaded: bool,
     pub offset: Vector2<f32>,
+    pub window_size: Vector2<f32>,
     pub cursor: Vector2<f32>,
     pub cursor_relative: Vector2<f32>,
     pub image_dimension: (u32, u32),
@@ -419,6 +420,7 @@ impl Default for OculanteState {
             pointer_over_ui: Default::default(),
             persistent_settings: Default::default(),
             always_on_top: false,
+            window_size: Default::default(),
         }
     }
 }
