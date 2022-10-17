@@ -111,7 +111,7 @@ Extract a signature:
 ![signature example](res/ex-signature.gif "Extracting a signature")
 
 Roadmap:
-- Image loading time is still worse than feh or xv
+- ~~Image loading time is still worse than feh or xv~~ This is now very close, in particular after switching to `turbojpeg`
 - Tests and benchmarks
 - Image rotation (and read EXIF for that)
 - Investigate PVR / ETC support
