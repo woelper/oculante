@@ -8,20 +8,24 @@ fn load() {
 
 #[test]
 fn net() {
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
     std::process::Command::new("cargo")
         .args(["run", "--", "-l", "11111"])
-        .status()
+        .spawn()
         .unwrap();
     // this is not yet supported
-    std::process::Command::new("nc")
-        .args([
-            "localhost",
-            "11111",
-            "<",
-            "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg",
-        ])
-        .status()
-        .unwrap();
+    // std::process::Command::new("nc")
+    //     .args([
+    //         "localhost",
+    //         "11111",
+    //         "<",
+    //         "tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg",
+    //     ])
+    //     .status()
+    //     .unwrap();
+    info!("For now, this test needs to run manually:");
+    info!("nc localhost 11111 < tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg");
 }
 
 #[test]
