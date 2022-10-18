@@ -156,6 +156,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
                 state.message = Some(format!("Listening on {}", p));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
+                state.network_mode = true;
             }
             Err(_) => error!("Port must be a number"),
         }
@@ -265,6 +266,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.is_down(MouseButton::Middle) {
         state.drag_enabled = true;
     }
+ 
 
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
@@ -708,6 +710,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     });
 
+
+    if state.network_mode {
+        app.window().request_frame();
+
+    }
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);

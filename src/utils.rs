@@ -383,6 +383,7 @@ pub struct OculanteState {
     pub pointer_over_ui: bool,
     pub persistent_settings: PersistentSettings,
     pub always_on_top: bool,
+    pub network_mode: bool,
 }
 
 impl Default for OculanteState {
@@ -420,6 +421,7 @@ impl Default for OculanteState {
             pointer_over_ui: Default::default(),
             persistent_settings: Default::default(),
             always_on_top: false,
+            network_mode: false,
             window_size: Default::default(),
         }
     }
