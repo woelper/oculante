@@ -38,7 +38,7 @@ pkgin install oculante
 
 ## Features
 
-Image format support:
+### Image format support:
 - bmp	
 - gif (animation support and correct timing)	
 - hdr, tonemapped
@@ -56,13 +56,13 @@ Image format support:
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
 
-Platform support:
+### Platform support:
 - Linux
 - Mac
 - Windows
 - NetBSD
 
-Misc features
+### Misc features
 - Image info (<kbd>i</kbd>) (pixel position, color info)
 - Threaded image loading
 - Fit image to view
@@ -75,7 +75,7 @@ Misc features
 
 
 
-Shortcuts:
+### Shortcuts:
 > <kbd>Esc</kbd>/<kbd>q</kbd> = quit
 >
 > <kbd>i</kbd> = display extended info
@@ -102,15 +102,15 @@ Shortcuts:
 >
 > `Right mouse` pick color from image (in paint mode)
 
-Please submit bugs and feature requests on this github repo!
 
-Misc examples:
+
+### Misc examples:
 
 Extract a signature:
 
 ![signature example](res/ex-signature.gif "Extracting a signature")
 
-Roadmap:
+## Roadmap:
 - ~~Image loading time is still worse than feh or xv~~ This is now very close, in particular after switching to `turbojpeg`
 - Tests and benchmarks
 - Image rotation (and read EXIF for that)
@@ -121,7 +121,17 @@ Roadmap:
 - ~~EXR support~~
 - ~~Read next image(s) in dir and advance to them~~
 
+### Privacy pledge
+Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics.
+There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
+- Updating the application (must be triggered manually from settings)
+- Listening for incoming images on a custom port (must be set on command line)
 
+In addition, the only data saved locally by the application is:
+- UI accent color
+
+
+## Attribution
 Test / benchmark pictures:
 
 https://unsplash.com/@mohsen_karimi
@@ -140,5 +150,5 @@ Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
 Mac
 `brew install nasm`
 
-## Features
+### Cargo Features
 If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
