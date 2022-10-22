@@ -90,3 +90,14 @@
 
 * Keep image centered on window resize (a8ca6f1e)
 
+# 0.6.18 (2022-10-22)
+
+### :beetle: Bug Fixes
+
+* Remove UI flicker if alpha tools are expanded/closed (1254dffc)
+* Network listen mode now refreshes UI and has a dedicated unit test (00c7a91b)
+
+### :sparkles: Features
+
+* Enable EXIF support (37aeda9d)
+
