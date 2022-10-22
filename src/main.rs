@@ -459,9 +459,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         egui::TopBottomPanel::top("menu")
-            .min_height(25.)
+            .min_height(30.)
+            .default_height(30.)
             .show(&ctx, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_centered(|ui| {
                     ui.label("Channels");
 
                     let mut changed_channels = false;
@@ -492,22 +493,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         changed_channels = true;
                     }
 
-                    egui::ComboBox::from_id_source("channels")
-                        .selected_text(format!("{:?}", state.current_channel))
-                        .show_ui(ui, |ui| {
-                            for channel in Channel::iter() {
-                                let r = ui.selectable_value(
-                                    &mut state.current_channel,
-                                    channel.clone(),
-                                    channel.to_string(),
-                                );
+                    ui.scope(|ui| {
+                        // hack to center combo box in Y
+                        ui.spacing_mut().button_padding = Vec2::new(10., 0.);
 
-                                if tooltip(r, &channel.to_string(), channel.hotkey(), ui).clicked()
-                                {
-                                    changed_channels = true;
+                        egui::ComboBox::from_id_source("channels")
+                            .selected_text(format!("{:?}", state.current_channel))
+                            .show_ui(ui, |ui| {
+                                for channel in Channel::iter() {
+                                    let r = ui.selectable_value(
+                                        &mut state.current_channel,
+                                        channel.clone(),
+                                        channel.to_string(),
+                                    );
+
+                                    if tooltip(r, &channel.to_string(), channel.hotkey(), ui)
+                                        .clicked()
+                                    {
+                                        changed_channels = true;
+                                    }
                                 }
-                            }
-                        });
+                            });
+                    });
 
                     if changed_channels {
                         if let Some(img) = &state.current_image {
