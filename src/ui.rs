@@ -131,7 +131,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let tex_id = gfx.egui_register_texture(&texture);
 
                 // width of image widget
-                let desired_width = ui.available_width();
+                let desired_width = ui.available_width() - ui.spacing().button_padding.x*4.;
 
                 let scale = (desired_width / 8.) / texture.size().0;
                 let img_size = egui::Vec2::new(desired_width, desired_width);
@@ -205,7 +205,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio);
-                let x = ui
+                let preview_rect = ui
                     .add(
                         egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
                             uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
@@ -216,20 +216,20 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
-                ui.painter_at(x).line_segment(
-                    [x.center_bottom(), x.center_top()],
+                ui.painter_at(preview_rect).line_segment(
+                    [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
                 );
-                ui.painter_at(x).line_segment(
-                    [x.left_center(), x.right_center()],
+                ui.painter_at(preview_rect).line_segment(
+                    [preview_rect.left_center(), preview_rect.right_center()],
                     Stroke::new(4., bg_color),
                 );
-                ui.painter_at(x).line_segment(
-                    [x.center_bottom(), x.center_top()],
+                ui.painter_at(preview_rect).line_segment(
+                    [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(1., stroke_color),
                 );
-                ui.painter_at(x).line_segment(
-                    [x.left_center(), x.right_center()],
+                ui.painter_at(preview_rect).line_segment(
+                    [preview_rect.left_center(), preview_rect.right_center()],
                     Stroke::new(1., stroke_color),
                 );
                 // ui.image(tex_id, img_size);
