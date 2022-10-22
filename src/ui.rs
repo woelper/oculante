@@ -348,6 +348,18 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             ui.end_row();
         });
 
+        if !info.exif.is_empty() {
+            ui.collapsing("EXIF", |ui| {
+                egui::Grid::new("extended_exif").striped(true).show(ui, |ui| {
+                    for (key, val) in &info.exif {
+                        ui.label(key);
+                        ui.label(val);
+                        ui.end_row();
+                    }
+                });
+            });
+        }
+
         let red_vals = Points::new(Values::from_values_iter(
             info.red_histogram
                 .iter()
@@ -911,6 +923,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 state.image_info = None;
                 send_extended_info(
                     &Some(state.edit_state.result_pixel_op.clone()),
+                    &state.current_path,
                     &state.extended_info_channel,
                 );
             }

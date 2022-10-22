@@ -235,7 +235,7 @@ fn event(_app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::WindowResize { width, height } => {
             if !state.edit_enabled {
                 let delta = state.window_size - (width, height).size_vec();
-                state.offset -= delta/2.;
+                state.offset -= delta / 2.;
             }
         }
         Event::Drop(file) => {
@@ -266,7 +266,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if app.mouse.is_down(MouseButton::Middle) {
         state.drag_enabled = true;
     }
- 
 
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
@@ -392,7 +391,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.is_loaded = true;
         state.current_image = Some(img);
         if state.info_enabled {
-            send_extended_info(&state.current_image, &state.extended_info_channel);
+            send_extended_info(
+                &state.current_image,
+                &state.current_path,
+                &state.extended_info_channel,
+            );
         }
     }
 
@@ -569,7 +572,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         .changed()
                             || app.keyboard.was_pressed(KeyCode::I)
                         {
-                            send_extended_info(&state.current_image, &state.extended_info_channel);
+                            send_extended_info(
+                                &state.current_image,
+                                &state.current_path,
+                                &state.extended_info_channel,
+                            );
                         }
 
                         tooltip(
@@ -710,10 +717,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     });
 
-
     if state.network_mode {
         app.window().request_frame();
-
     }
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);

@@ -106,7 +106,13 @@ pkgin install oculante
 
 ### Misc examples:
 
-Extract a signature:
+EXIF display
+
+![Screenshot](res/screenshot_exif.png "Screenshot")
+
+
+
+Extract a signature
 
 ![signature example](res/ex-signature.gif "Extracting a signature")
 

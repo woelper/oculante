@@ -12,9 +12,10 @@ use notan::AppState;
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::thread;
 use std::time::Duration;
 
@@ -50,9 +51,28 @@ pub struct ExtendedImageInfo {
     pub red_histogram: Vec<(i32, i32)>,
     pub green_histogram: Vec<(i32, i32)>,
     pub blue_histogram: Vec<(i32, i32)>,
+    pub exif: HashMap<String, String>
 }
 
 impl ExtendedImageInfo {
+
+    pub fn with_exif(&mut self, image_path: &Path) -> Result<()>{
+            if image_path.extension() == Some(OsStr::new("gif")) {
+                return Ok(())
+            }
+
+            let file = std::fs::File::open(image_path)?;
+            let mut bufreader = std::io::BufReader::new(&file);
+            let exifreader = exif::Reader::new();
+            let exif = exifreader.read_from_container(&mut bufreader)?;
+            for f in exif.fields() {
+            //     let s = format!("{} {} {}",
+            //              f.tag, f.ifd_num, f.display_value().with_unit(&exif));
+                self.exif.insert(f.tag.to_string(), f.display_value().with_unit(&exif).to_string());
+            }
+            Ok(())
+    }
+
     pub fn from_image(img: &RgbaImage) -> Self {
         let mut colors: HashSet<Rgba<u8>> = Default::default();
         // let mut histogram: HashMap<u8, usize> = Default::default();
@@ -112,6 +132,7 @@ impl ExtendedImageInfo {
             blue_histogram,
             green_histogram,
             red_histogram,
+            exif: Default::default()
         }
     }
 }
@@ -597,13 +618,19 @@ pub fn pos_from_coord(
 
 pub fn send_extended_info(
     current_image: &Option<RgbaImage>,
+    current_path: &Option<PathBuf>,
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
 ) {
     if let Some(img) = current_image {
         let copied_img = img.clone();
         let sender = channel.0.clone();
+        let current_path = current_path.clone();
         thread::spawn(move || {
-            let e_info = ExtendedImageInfo::from_image(&copied_img);
+            let mut e_info = ExtendedImageInfo::from_image(&copied_img);
+            if let Some(p) = current_path {
+
+                _ = e_info.with_exif(&p);
+            }
             let _ = sender.send(e_info);
         });
     }
