@@ -287,35 +287,44 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
             .default_width(400.)
             // .title_bar(false)
             .show(&ctx, |ui| {
-                ui.label("Accent color");
-                if ui
-                    .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                    .changed()
-                {
-                    let mut style: egui::Style = (*ctx.style()).clone();
 
-                    style.visuals.selection.bg_fill = Color32::from_rgb(
-                        state.persistent_settings.accent_color[0],
-                        state.persistent_settings.accent_color[1],
-                        state.persistent_settings.accent_color[2],
-                    );
-                    ctx.set_style(style);
+                ui.horizontal(|ui| {
+                    if ui
+                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                        .changed()
+                    {
+                        let mut style: egui::Style = (*ctx.style()).clone();
 
-                    _ = state.persistent_settings.save()
-                }
+                        style.visuals.selection.bg_fill = Color32::from_rgb(
+                            state.persistent_settings.accent_color[0],
+                            state.persistent_settings.accent_color[1],
+                            state.persistent_settings.accent_color[2],
+                        );
+                        ctx.set_style(style);
+
+                        _ = state.persistent_settings.save()
+                    }
+                    ui.label("Accent color");
+
+                });
+
 
                 if ui
                     .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
                     .on_hover_text(
-                        "Vsync reduces tearing and saves CPU. Toggling it off reduces latency.",
+                        "Vsync reduces tearing and saves CPU. Toggling it off will make some operations such as panning/zooming more snappy. This needs a restart to take effect.",
                     )
                     .changed()
                 {
                     _ = state.persistent_settings.save()
                 }
 
+                if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
+                    _ = webbrowser::open("https://github.com/woelper/oculante");
+                }
+
                 ui.vertical_centered_justified(|ui| {
-                    if ui.button("Check for updates").clicked() {
+                    if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
                         state.message = Some("Checking for updates...".into());
                         update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
@@ -350,13 +359,15 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 
         if !info.exif.is_empty() {
             ui.collapsing("EXIF", |ui| {
-                egui::Grid::new("extended_exif").striped(true).show(ui, |ui| {
-                    for (key, val) in &info.exif {
-                        ui.label(key);
-                        ui.label(val);
-                        ui.end_row();
-                    }
-                });
+                egui::Grid::new("extended_exif")
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for (key, val) in &info.exif {
+                            ui.label(key);
+                            ui.label(val);
+                            ui.end_row();
+                        }
+                    });
             });
         }
 
@@ -877,13 +888,15 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if let Some(p) = &mut state.current_path {
                         if let Some(pstem) = p.file_stem() {
                             // if let Some(b) = p.file_prefix()
-                            ui.label(pstem.to_string_lossy().to_string());
-                            // let mut stem = pstem.to_string_lossy().to_string();
-                            // if ui.text_edit_singleline(&mut stem).changed() {
-                            //     if let Some(parent) = p.parent() {
-                            //         *p = parent.join(stem).with_extension(&state.edit_state.export_extension);
-                            //     }
-                            // }
+                            // ui.label(pstem.to_string_lossy().to_string());
+                            let mut stem = pstem.to_string_lossy().to_string();
+                            if ui.text_edit_singleline(&mut stem).changed() {
+                                if let Some(parent) = p.parent() {
+                                    *p = parent
+                                        .join(stem)
+                                        .with_extension(&state.edit_state.export_extension);
+                                }
+                            }
                         }
                     }
                     egui::ComboBox::from_id_source("ext")

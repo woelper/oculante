@@ -196,7 +196,26 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     state
 }
 
-fn event(_app: &mut App, state: &mut OculanteState, evt: Event) {
+fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
+    // pan image with keyboard
+    if !state.mouse_grab {
+        if app.keyboard.shift() {
+            if app.keyboard.is_down(KeyCode::Right) {
+                state.offset.x += 10.;
+            }
+            if app.keyboard.is_down(KeyCode::Left) {
+                state.offset.x -= 10.;
+            }
+
+            if app.keyboard.is_down(KeyCode::Up) {
+                state.offset.y -= 10.;
+            }
+            if app.keyboard.is_down(KeyCode::Down) {
+                state.offset.y += 10.;
+            }
+        }
+    }
+
     match evt {
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
@@ -224,9 +243,41 @@ fn event(_app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.info_enabled = !state.info_enabled
             }
         }
+
         Event::KeyDown { key: KeyCode::E } => {
             if !state.mouse_grab {
                 state.edit_enabled = !state.edit_enabled
+            }
+        }
+        // zoom in
+        Event::KeyDown { key: KeyCode::Plus } => {
+            let delta = zoomratio(1.5, state.scale);
+            let new_scale = state.scale + delta;
+            // limit scale
+            if new_scale > 0.05 && new_scale < 40. {
+                // We want to zoom towards the center
+                let center: Vector2<f32> = nalgebra::Vector2::new(
+                    app.window().width() as f32 / 2.,
+                    app.window().height() as f32 / 2.,
+                );
+                state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                state.scale += delta;
+            }
+        }
+        Event::KeyDown {
+            key: KeyCode::Minus,
+        } => {
+            let delta = zoomratio(-1.5, state.scale);
+            let new_scale = state.scale + delta;
+            // limit scale
+            if new_scale > 0.05 && new_scale < 40. {
+                // We want to zoom towards the center
+                let center: Vector2<f32> = nalgebra::Vector2::new(
+                    app.window().width() as f32 / 2.,
+                    app.window().height() as f32 / 2.,
+                );
+                state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                state.scale += delta;
             }
         }
         Event::KeyDown {
@@ -246,6 +297,25 @@ fn event(_app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.current_path = Some(p);
             }
         }
+        Event::MouseDown { button, .. } => {
+            state.drag_enabled = true;
+
+            match button {
+                MouseButton::Left => {
+                    if !state.mouse_grab {
+                        state.drag_enabled = true;
+                    }
+                }
+                MouseButton::Middle => {
+                    state.drag_enabled = true;
+                }
+                _ => {}
+            }
+        }
+        Event::MouseUp { button, .. } => match button {
+            MouseButton::Left | MouseButton::Middle => state.drag_enabled = false,
+            _ => {}
+        },
         _ => {}
     }
 }
@@ -259,12 +329,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         if !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
             state.offset += state.mouse_delta;
         }
-    }
-    if app.mouse.is_down(MouseButton::Left) && !state.mouse_grab {
-        state.drag_enabled = true;
-    }
-    if app.mouse.is_down(MouseButton::Middle) {
-        state.drag_enabled = true;
     }
 
     // Since we can't access the window in the event loop, we store it in the state
@@ -282,65 +346,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
-    if app.mouse.was_released(MouseButton::Left) {
-        state.drag_enabled = false;
-    }
-    if app.mouse.was_released(MouseButton::Middle) {
-        state.drag_enabled = false;
-    }
-    // Zoom in
-    if app.keyboard.is_down(KeyCode::Plus) {
-        let delta = zoomratio(0.5, state.scale);
-        let new_scale = state.scale + delta;
-        // limit scale
-        if new_scale > 0.05 && new_scale < 40. {
-            // We want to zoom towards the center
-            let center: Vector2<f32> = nalgebra::Vector2::new(
-                app.window().width() as f32 / 2.,
-                app.window().height() as f32 / 2.,
-            );
-            state.offset -= scale_pt(state.offset, center, state.scale, delta);
-            state.scale += delta;
-        }
-    }
-    // Zoom out
-    if app.keyboard.is_down(KeyCode::Minus) {
-        let delta = zoomratio(-0.5, state.scale);
-        let new_scale = state.scale + delta;
-        // limit scale
-        if new_scale > 0.05 && new_scale < 40. {
-            // We want to zoom towards the center
-            let center: Vector2<f32> = nalgebra::Vector2::new(
-                app.window().width() as f32 / 2.,
-                app.window().height() as f32 / 2.,
-            );
-            state.offset -= scale_pt(state.offset, center, state.scale, delta);
-            state.scale += delta;
-        }
-    }
-
-    // Keyboard panning
-    if !state.mouse_grab {
-        if app.keyboard.shift() {
-            if app.keyboard.is_down(KeyCode::Right) {
-                state.offset.x += 10.;
-            }
-            if app.keyboard.is_down(KeyCode::Left) {
-                state.offset.x -= 10.;
-            }
-
-            if app.keyboard.is_down(KeyCode::Up) {
-                state.offset.y -= 10.;
-            }
-            if app.keyboard.is_down(KeyCode::Down) {
-                state.offset.y += 10.;
-            }
-        }
-    }
-}
-
-fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
-    // redraw constantly until the image is fully loaded or it's reset on canvas
+    // redraw constantly until the image is fully loaded or it is reset on canvas
     if !state.is_loaded || state.reset_image {
         app.window().request_frame();
     }
@@ -365,14 +371,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
-    let mut draw = gfx.create_draw();
-
     // reload constantly if gif so we keep receiving
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
             app.window().request_frame();
         }
     }
+
+    // check extended info has been sent
+    if let Ok(info) = state.extended_info_channel.1.try_recv() {
+        debug!("Finished calculating extended image info");
+        state.image_info = Some(info);
+    }
+
+    // check if a new texture has been sent
+    if let Ok(msg) = state.message_channel.1.try_recv() {
+        debug!("Received message");
+        state.message = Some(msg);
+    }
+}
+
+fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
+    let mut draw = gfx.create_draw();
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
@@ -397,18 +417,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 &state.extended_info_channel,
             );
         }
-    }
-
-    // check extended info has been sent
-    if let Ok(info) = state.extended_info_channel.1.try_recv() {
-        debug!("Finished calculating extended image info");
-        state.image_info = Some(info);
-    }
-
-    // check if a new texture has been sent
-    if let Ok(msg) = state.message_channel.1.try_recv() {
-        debug!("Received message");
-        state.message = Some(msg);
     }
 
     if let Some(texture) = &state.current_texture {

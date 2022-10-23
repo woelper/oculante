@@ -29,8 +29,8 @@ fn net() {
 
     run_cmd! (
         nc localhost 11111 < tests/test.jpg;
-    ).unwrap();
-
+    )
+    .unwrap();
 }
 
 #[test]

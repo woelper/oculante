@@ -44,6 +44,7 @@ strum_macros = "0.24"
 tiny-skia = "0.6.6"
 turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.23.0"
+webbrowser = "0.8.0"
 
 [features]
 default = ["turbo"]
