@@ -877,7 +877,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .clicked()
                     {
                         state.is_loaded = false;
-                        state.player.load(&path);
+                        state.player.load(&path, state.message_channel.0.clone());
                     }
                 }
 

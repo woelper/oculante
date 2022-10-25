@@ -144,9 +144,11 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(ref img_location) = maybe_img_location {
         state.current_path = Some(img_location.clone());
         if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-            state.player.load(&img_location);
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
         } else {
-            state.player.load_blocking(&img_location);
+            state.player.load_blocking(&img_location, state.message_channel.0.clone());
         }
     }
 
@@ -293,7 +295,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if let Some(p) = file.path {
                 state.is_loaded = false;
                 state.current_image = None;
-                state.player.load(&p);
+                state.player.load(&p, state.message_channel.0.clone());
                 state.current_path = Some(p);
             }
         }
@@ -556,7 +558,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     if &next_img != img_location {
                                         state.is_loaded = false;
                                         *img_location = next_img;
-                                        state.player.load(&img_location);
+                                        state
+                                            .player
+                                            .load(&img_location, state.message_channel.0.clone());
                                     }
                                 }
                             }
@@ -572,7 +576,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     if &next_img != img_location {
                                         state.is_loaded = false;
                                         *img_location = next_img;
-                                        state.player.load(&img_location);
+                                        state
+                                            .player
+                                            .load(&img_location, state.message_channel.0.clone());
                                     }
                                 }
                             }

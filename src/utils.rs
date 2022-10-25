@@ -158,72 +158,87 @@ impl Player {
         }
     }
 
-    pub fn load_blocking(&self, img_location: &PathBuf) {
+    pub fn load_blocking(&self, img_location: &PathBuf, message_sender: Sender<String>) {
         self.stop();
-        send_image_blocking(&img_location, self.image_sender.clone());
+        send_image_blocking(&img_location, self.image_sender.clone(), message_sender);
     }
 
-    pub fn load(&mut self, img_location: &PathBuf) {
+    pub fn load(&mut self, img_location: &PathBuf, message_sender: Sender<String>) {
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
-        send_image_threaded(&img_location, self.image_sender.clone(), stop_receiver);
+        send_image_threaded(
+            &img_location,
+            self.image_sender.clone(),
+            message_sender,
+            stop_receiver,
+        );
     }
 
     pub fn stop(&self) {
         _ = self.stop_sender.send(());
-        // *PLAYER_STOP.lock().unwrap() = true;
     }
 }
 
 pub fn send_image_threaded(
     img_location: &PathBuf,
     texture_sender: Sender<Frame>,
+    message_sender: Sender<String>,
     stop_receiver: Receiver<()>,
 ) {
     let loc = img_location.clone();
 
     thread::spawn(move || {
-        let col = open_image(&loc).expect("Opening failed");
+        match open_image(&loc) {
+            Ok(col) => {
+                let cycles = if col.repeat { 200 } else { 1 };
 
-        let cycles = if col.repeat { 200 } else { 1 };
+                if col.repeat && col.frames.len() > 1 {
+                    let mut i = 0;
 
-        if col.repeat && col.frames.len() > 1 {
-            let mut i = 0;
-
-            // Send reset frame
-            if let Some(f) = col.frames.first() {
-                _ = texture_sender
-                    .clone()
-                    .send(Frame::new_reset(f.buffer.clone()));
-            }
-
-            while i < cycles {
-                // let frames = col.frames.clone();
-                for frame in &col.frames {
-                    if stop_receiver.try_recv().is_ok() {
-                        info!("Stopped from receiver.");
-                        return;
+                    // Send reset frame
+                    if let Some(f) = col.frames.first() {
+                        _ = texture_sender
+                            .clone()
+                            .send(Frame::new_reset(f.buffer.clone()));
                     }
-                    let _ = texture_sender.send(frame.clone());
-                    if frame.delay > 0 {
-                        thread::sleep(Duration::from_millis(frame.delay as u64));
-                    } else {
-                        thread::sleep(Duration::from_millis(40 as u64));
+
+                    while i < cycles {
+                        // let frames = col.frames.clone();
+                        for frame in &col.frames {
+                            if stop_receiver.try_recv().is_ok() {
+                                info!("Stopped from receiver.");
+                                return;
+                            }
+                            let _ = texture_sender.send(frame.clone());
+                            if frame.delay > 0 {
+                                thread::sleep(Duration::from_millis(frame.delay as u64));
+                            } else {
+                                thread::sleep(Duration::from_millis(40 as u64));
+                            }
+                        }
+                        i += 1;
+                    }
+                } else {
+                    // single frame. This saves one clone().
+                    for frame in col.frames {
+                        let _ = texture_sender.send(frame);
                     }
                 }
-                i += 1;
             }
-        } else {
-            // single frame. This saves one clone().
-            for frame in col.frames {
-                let _ = texture_sender.send(frame);
+            Err(e) => {
+                error!("{e}");
+                _ = message_sender.send(e.to_string());
             }
         }
     });
 }
 
-pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<Frame>) {
+pub fn send_image_blocking(
+    img_location: &PathBuf,
+    texture_sender: Sender<Frame>,
+    message_sender: Sender<String>,
+) {
     match open_image(&img_location) {
         Ok(col) => {
             for frame in col.frames {
@@ -236,7 +251,10 @@ pub fn send_image_blocking(img_location: &PathBuf, texture_sender: Sender<Frame>
             }
             // let _ = state_sender.send("".into());
         }
-        Err(e) => error!("Error {:?} from {:?}", e, img_location),
+        Err(e) => {
+            error!("Error {:?} / {:?}", e, img_location);
+            _ = message_sender.send(e.to_string());
+        }
     }
 }
 
@@ -349,19 +367,19 @@ impl Default for EditState {
             paint_fade: false,
             brushes: vec![
                 image::load_from_memory(include_bytes!("../res/brushes/brush1.png"))
-                    .unwrap()
+                    .expect("Brushes must always load")
                     .into_rgba8(),
                 image::load_from_memory(include_bytes!("../res/brushes/brush2.png"))
-                    .unwrap()
+                    .expect("Brushes must always load")
                     .into_rgba8(),
                 image::load_from_memory(include_bytes!("../res/brushes/brush3.png"))
-                    .unwrap()
+                    .expect("Brushes must always load")
                     .into_rgba8(),
                 image::load_from_memory(include_bytes!("../res/brushes/brush4.png"))
-                    .unwrap()
+                    .expect("Brushes must always load")
                     .into_rgba8(),
                 image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
-                    .unwrap()
+                    .expect("Brushes must always load")
                     .into_rgba8(),
             ],
             pixel_op_stack: vec![],
@@ -798,12 +816,10 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
             col.add_still(img);
         }
-        _ => match image::open(&img_location) {
-            Ok(img) => {
-                col.add_still(img.to_rgba8());
-            }
-            Err(e) => println!("Can't open image {:?} from {:?}", e, img_location),
-        },
+        _ => {
+            let img = image::open(&img_location)?;
+            col.add_still(img.to_rgba8());
+        }
     }
 
     Ok(col)
@@ -857,10 +873,9 @@ impl ImageExt for RgbaImage {
     }
 
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
-        gfx.update_texture(texture)
-            .with_data(self)
-            .update()
-            .unwrap();
+        if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
+            error!("{e}");
+        }
     }
 }
 
