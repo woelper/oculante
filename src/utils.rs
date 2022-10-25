@@ -642,8 +642,15 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
     let img_location = img_location.clone();
     let mut col = FrameCollection::default();
 
-    match img_location.extension().unwrap_or_default().to_str() {
-        Some("dds") => {
+    match img_location
+        .extension()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "dds" => {
             let file = File::open(img_location)?;
             let mut reader = BufReader::new(file);
             let dds = DDS::decode(&mut reader).map_err(|e| anyhow!("{:?}", e))?;
@@ -655,7 +662,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 col.add_still(buf);
             }
         }
-        Some("svg") => {
+        "svg" => {
             // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
             //let (width, height) = (3000, 3000);
@@ -688,7 +695,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 }
             }
         }
-        Some("exr") => {
+        "exr" => {
             let reader = exrs::read()
                 .no_deep_data()
                 .largest_resolution_level()
@@ -728,7 +735,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
 
-        Some("hdr") => {
+        "hdr" => {
             let f = File::open(&img_location)?;
             let reader = BufReader::new(f);
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
@@ -751,7 +758,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 .ok_or(anyhow!("Failed to create RgbaImage with given dimensions"))?;
             col.add_still(tonemapped_buffer);
         }
-        Some("psd") => {
+        "psd" => {
             let mut file = File::open(img_location)?;
             let mut contents = vec![];
             if file.read_to_end(&mut contents).is_ok() {
@@ -763,7 +770,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 }
             }
         }
-        Some("webp") => {
+        "webp" => {
             let mut file = File::open(&img_location)?;
             let mut contents = vec![];
             if let Ok(_) = file.read_to_end(&mut contents) {
@@ -773,7 +780,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 }
             }
         }
-        Some("gif") => {
+        "gif" => {
             // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location)?;
             let gif_decoder = GifDecoder::new(file)?;
@@ -786,7 +793,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
         #[cfg(feature = "turbo")]
-        Some("jpg") | Some("jpeg") => {
+        "jpg" | "jpeg" => {
             let jpeg_data = std::fs::read(&img_location)?;
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
             col.add_still(img);
