@@ -101,3 +101,9 @@
 
 * Enable EXIF support (37aeda9d)
 
+# 0.6.19 (2022-10-25)
+
+### :beetle: Bug Fixes
+
+* Prevent thread crashing when opening corrupt images (3360dc7f)
+
