@@ -1,11 +1,6 @@
-#[cfg(windows)]
-extern crate windres;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-
-#[cfg(windows)]
-use windres::Build;
 
 use log::error;
 use log::info;
@@ -36,9 +31,9 @@ fn main() {
         )
         .unwrap();
 
-    // #[cfg(windows)]
-    // match Build::new().compile("winres.rc") {
-    //     Ok(_b) => println!("Made icon ressource file"),
-    //     Err(e) => println!("{:?}", e)
-    // }
+    if cfg!(target_os = "windows") {
+        let mut res = winres::WindowsResource::new();
+        res.set_icon("icon.ico");
+        _ = res.compile();
+    }
 }

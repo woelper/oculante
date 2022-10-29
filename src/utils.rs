@@ -3,7 +3,7 @@ use dds::DDS;
 use exr;
 use image::codecs::gif::GifDecoder;
 use image::{EncodableLayout, RgbaImage};
-use log::{debug, error, info};
+use log::{error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
@@ -799,13 +799,11 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
         }
         "gif" => {
-            // of course this is shit. Don't reload the image all the time.
             let file = File::open(&img_location)?;
             let gif_decoder = GifDecoder::new(file)?;
             let frames = gif_decoder.into_frames().collect_frames()?;
             for f in frames {
                 let delay = f.delay().numer_denom_ms().0 as u16;
-                debug!(" Frame delay {delay}");
                 col.add_anim_frame(f.into_buffer(), delay);
                 col.repeat = true;
             }
