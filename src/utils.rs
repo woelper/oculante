@@ -1,9 +1,9 @@
 use arboard::Clipboard;
 use dds::DDS;
 use exr;
-use image::codecs::gif::GifDecoder;
+// use image::codecs::gif::GifDecoder;
 use image::{EncodableLayout, RgbaImage};
-use log::{error, info};
+use log::{error, info, debug};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
@@ -24,7 +24,7 @@ use exr::prelude::*;
 
 use anyhow::{anyhow, Result};
 use image::Rgba;
-use image::{self, AnimationDecoder};
+use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
@@ -800,13 +800,46 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
         }
         "gif" => {
             let file = File::open(&img_location)?;
-            let gif_decoder = GifDecoder::new(file)?;
-            let frames = gif_decoder.into_frames().collect_frames()?;
-            for f in frames {
-                let delay = f.delay().numer_denom_ms().0 as u16;
-                col.add_anim_frame(f.into_buffer(), delay);
-                col.repeat = true;
+
+            // Below is a workaround for partially corrupt gifs.
+            let mut gif_opts = gif::DecodeOptions::new();
+            gif_opts.set_color_output(gif::ColorOutput::Indexed);
+            let mut decoder = gif_opts.read_info(file)?;
+            let dim = (decoder.width() as u32, decoder.height() as u32);
+            let mut screen = gif_dispose::Screen::new_decoder(&decoder);
+            loop {
+                if let Ok(i) = decoder.read_next_frame() {
+                    debug!("decoded frame");
+                    if let Some(frame) = i {
+                        screen.blit_frame(&frame)?;
+                        let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
+                            dim.0,
+                            dim.1,
+                            screen.pixels.buf().as_bytes().to_vec(),
+                        );
+                        col.add_anim_frame(
+                            buf.ok_or(anyhow!("Can't read gif frame"))?,
+                            frame.delay * 10,
+                        );
+                        col.repeat = true;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
             }
+
+            // TODO: Re-enable if https://github.com/image-rs/image/issues/1818 is resolved
+
+            // let gif_decoder = GifDecoder::new(file)?;
+            // let frames = gif_decoder.into_frames().collect_frames()?;
+            // for f in frames {
+            //     let delay = f.delay().numer_denom_ms().0 as u16;
+            //     col.add_anim_frame(f.into_buffer(), delay);
+            //     col.repeat = true;
+            // }
+            debug!("Done decoding Gif!");
         }
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
