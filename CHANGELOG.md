@@ -1,3 +1,10 @@
+# 0.6.20 (2022-10-30)
+
+### :beetle: Bug Fixes
+
+* Support bad Gif data gracefully (fixes #60) (c0acfa69)
+* Build script generates app icon on windows (548b9749)
+
 # 0.6.19 (2022-10-25)
 
 ### :beetle: Bug Fixes
