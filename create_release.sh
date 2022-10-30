@@ -9,7 +9,9 @@ git commit -m "Release version `cargo get version`"
 # tag the commit with current version
 git tag `cargo get version`
 # create changelog
-kokai release --ref `cargo get version` >> CHANGELOG.md
+kokai release --ref `cargo get version` > tmp
+cat CHANGELOG.md >> tmp
+mv tmp CHANGELOG.md
 git add CHANGELOG.md
 git commit -m "Update changelog for `cargo get version`"
 git push --tags
