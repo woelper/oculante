@@ -1,12 +1,12 @@
 use image::{Pixel, Rgba, RgbaImage};
 use notan::egui::{Color32, Pos2};
 use rand::prelude::*;
-
 use rand_chacha::ChaCha8Rng;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PaintStroke {
-    pub points: Vec<Pos2>,
+    pub points: Vec<(f32, f32)>,
     pub fade: bool,
     pub color: [f32; 4],
     /// brush width from 0-1. 1 is equal to 1/10th of the smallest image dimension.
@@ -54,7 +54,7 @@ impl PaintStroke {
         let abs_points = self
             .points
             .iter()
-            .map(|p| Pos2::new(img.width() as f32 * p.x, img.height() as f32 * p.y))
+            .map(|p| Pos2::new(img.width() as f32 * p.0, img.height() as f32 * p.1))
             .collect::<Vec<_>>();
 
         let points = notan::egui::Shape::dotted_line(

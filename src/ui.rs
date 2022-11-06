@@ -700,8 +700,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             (state.cursor_relative.y / state.image_dimension.1 as f32),
                         );
                         // info!("pnt @ {:?}", uv);
-                        // current_stroke.points.push(Pos2::new(p.x, p.y));
-                        current_stroke.points.push(Pos2::new(uv.0, uv.1));
+                        current_stroke.points.push(uv);
                         pixels_changed = true;
                     } else if !current_stroke.is_empty() {
                         // clone last stroke to inherit settings
@@ -923,11 +922,17 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         "💾 Save"
                     };
 
-                    if ui.button(text).clicked() {
+                    if ui.button(text).on_hover_text("Save the image. This will create a new file or overwrite.").clicked() {
                         _ = state
                             .edit_state
                             .result_pixel_op
                             .save(p.with_extension(&state.edit_state.export_extension));
+                    }
+
+                    if ui.button("💾 Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                        if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
+                            _ = serde_json::to_writer(&f, &state.edit_state);
+                        }
                     }
                 }
             });

@@ -148,7 +148,9 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
                 .player
                 .load(&img_location, state.message_channel.0.clone());
         } else {
-            state.player.load_blocking(&img_location, state.message_channel.0.clone());
+            state
+                .player
+                .load_blocking(&img_location, state.message_channel.0.clone());
         }
     }
 
@@ -369,6 +371,15 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
             state.reset_image = false;
             state.edit_state = Default::default();
+            if let Some(p) = &state.current_path {
+                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                        state.message = Some("Edits have been loaded for this image.".into());
+                        state.edit_state = edit_state;
+                        state.edit_enabled = true;
+                    }
+                }
+            }
             debug!("Image has been reset.");
         }
     }
@@ -681,16 +692,31 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             });
 
         if let Some(message) = &state.message.clone() {
-            egui::TopBottomPanel::bottom("toast").show(&ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(message);
-                    ui.spacing();
+            let max_anim_len = 1.8;
 
-                    if unframed_button("❌", ui).clicked() {
-                        state.message = None;
-                    }
-                });
-            });
+            state.toast_cooldown += app.timer.delta_f32();
+            if state.toast_cooldown > max_anim_len {
+                state.toast_cooldown = 0.;
+                state.message = None;
+            } else {
+                let toast_height = ((max_anim_len - state.toast_cooldown) * 30.).min(25.);
+
+                egui::TopBottomPanel::bottom("toast")
+                    .max_height(toast_height)
+                    .min_height(toast_height)
+                    .show(&ctx, |ui| {
+                        ui.ctx().request_repaint();
+                        ui.horizontal(|ui| {
+                            ui.label(message);
+                            ui.spacing();
+
+                            if unframed_button("❌", ui).clicked() {
+                                state.message = None;
+                                state.toast_cooldown = 0.;
+                            }
+                        });
+                    });
+            }
         }
 
         if state.info_enabled {

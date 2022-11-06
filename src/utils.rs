@@ -3,7 +3,7 @@ use dds::DDS;
 use exr;
 // use image::codecs::gif::GifDecoder;
 use image::{EncodableLayout, RgbaImage};
-use log::{error, info, debug};
+use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::Graphics;
@@ -11,6 +11,7 @@ use notan::AppState;
 
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
@@ -341,15 +342,17 @@ impl Channel {
         }
     }
 }
-
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EditState {
+    #[serde(skip)]
     pub result_pixel_op: RgbaImage,
+    #[serde(skip)]
     pub result_image_op: RgbaImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
+    #[serde(skip, default = "default_brushes")]
     pub brushes: Vec<RgbaImage>,
     pub pixel_op_stack: Vec<ImageOperation>,
     pub image_op_stack: Vec<ImageOperation>,
@@ -365,28 +368,32 @@ impl Default for EditState {
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
             paint_fade: false,
-            brushes: vec![
-                image::load_from_memory(include_bytes!("../res/brushes/brush1.png"))
-                    .expect("Brushes must always load")
-                    .into_rgba8(),
-                image::load_from_memory(include_bytes!("../res/brushes/brush2.png"))
-                    .expect("Brushes must always load")
-                    .into_rgba8(),
-                image::load_from_memory(include_bytes!("../res/brushes/brush3.png"))
-                    .expect("Brushes must always load")
-                    .into_rgba8(),
-                image::load_from_memory(include_bytes!("../res/brushes/brush4.png"))
-                    .expect("Brushes must always load")
-                    .into_rgba8(),
-                image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
-                    .expect("Brushes must always load")
-                    .into_rgba8(),
-            ],
+            brushes: default_brushes(),
             pixel_op_stack: vec![],
             image_op_stack: vec![],
             export_extension: "png".into(),
         }
     }
+}
+
+fn default_brushes() -> Vec<RgbaImage> {
+    vec![
+        image::load_from_memory(include_bytes!("../res/brushes/brush1.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush2.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush3.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush4.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+    ]
 }
 
 /// The state of the application
@@ -425,6 +432,7 @@ pub struct OculanteState {
     pub persistent_settings: PersistentSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
+    pub toast_cooldown: f32,
 }
 
 impl Default for OculanteState {
@@ -464,6 +472,7 @@ impl Default for OculanteState {
             always_on_top: false,
             network_mode: false,
             window_size: Default::default(),
+            toast_cooldown: 0.,
         }
     }
 }

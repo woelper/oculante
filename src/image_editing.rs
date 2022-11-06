@@ -7,10 +7,11 @@ use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
 use crate::ui::EguiExt;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum Channel {
     Red,
     Green,
@@ -18,7 +19,7 @@ pub enum Channel {
     Alpha,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum ScaleFilter {
     Lanzcos3,
     Gaussian,
@@ -27,7 +28,7 @@ pub enum ScaleFilter {
     CatmullRom,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub enum ImageOperation {
     Brightness(i32),
     Expression(String),
