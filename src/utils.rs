@@ -11,7 +11,6 @@ use notan::AppState;
 
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
@@ -35,7 +34,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::image_editing::{ImageOperation, EditState};
+use crate::image_editing::{EditState};
 use crate::settings::PersistentSettings;
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
