@@ -8,8 +8,65 @@ use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-
+use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EditState {
+    #[serde(skip)]
+    pub result_pixel_op: RgbaImage,
+    #[serde(skip)]
+    pub result_image_op: RgbaImage,
+    pub painting: bool,
+    pub non_destructive_painting: bool,
+    pub paint_strokes: Vec<PaintStroke>,
+    pub paint_fade: bool,
+    #[serde(skip, default = "default_brushes")]
+    pub brushes: Vec<RgbaImage>,
+    pub pixel_op_stack: Vec<ImageOperation>,
+    pub image_op_stack: Vec<ImageOperation>,
+    pub export_extension: String,
+    /// If an operation is running
+    pub is_processing: bool
+}
+
+impl Default for EditState {
+    fn default() -> Self {
+        Self {
+            result_pixel_op: RgbaImage::default(),
+            result_image_op: RgbaImage::default(),
+            painting: Default::default(),
+            non_destructive_painting: Default::default(),
+            paint_strokes: Default::default(),
+            paint_fade: false,
+            brushes: default_brushes(),
+            pixel_op_stack: vec![],
+            image_op_stack: vec![],
+            export_extension: "png".into(),
+            is_processing: false
+        }
+    }
+}
+
+fn default_brushes() -> Vec<RgbaImage> {
+    vec![
+        image::load_from_memory(include_bytes!("../res/brushes/brush1.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush2.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush3.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush4.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+    ]
+}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum Channel {

@@ -31,6 +31,8 @@ mod ui;
 mod update;
 use ui::*;
 
+use crate::image_editing::EditState;
+
 mod image_editing;
 pub mod paint;
 
@@ -369,8 +371,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 .min(1.0);
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
-            state.reset_image = false;
+
             state.edit_state = Default::default();
+
+            // Load edit information if any
             if let Some(p) = &state.current_path {
                 if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
                     if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
@@ -380,7 +384,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
                     }
                 }
             }
+
             debug!("Image has been reset.");
+            state.reset_image = false;
         }
     }
 
@@ -412,7 +418,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         let img = frame.buffer;
         debug!("Received image buffer");
         state.image_dimension = img.dimensions();
-        state.current_texture = img.to_texture(gfx);
+        // state.current_texture = img.to_texture(gfx);
+
+        if let Some(tex) = &mut state.current_texture {
+            if tex.width() as u32 == img.width() && img.height() as u32 == img.height() {
+                img.update_texture(gfx, tex);
+            } else {
+                state.current_texture = img.to_texture(gfx);
+            }
+        } else {
+            state.current_texture = img.to_texture(gfx);
+        }
 
         //center the image
         if frame.source != FrameSource::Animation {
@@ -422,7 +438,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.image_info = None;
         }
         state.is_loaded = true;
-        state.current_image = Some(img);
         if state.info_enabled {
             send_extended_info(
                 &state.current_image,
@@ -430,6 +445,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 &state.extended_info_channel,
             );
         }
+
+        match &state.current_channel {
+            // Unpremultiply the image
+            Channel::RGB => state.current_texture = unpremult(&img).to_texture(gfx),
+            // Do nuttin'
+            Channel::RGBA => (),
+            // Display the channel
+            _ => {
+                state.current_texture =
+                    solo_channel(&img, *&state.current_channel as usize).to_texture(gfx)
+            }
+        }
+        state.current_image = Some(img);
     }
 
     if let Some(texture) = &state.current_texture {
