@@ -292,7 +292,7 @@ impl Frame {
             source: FrameSource::Reset,
         }
     }
-    
+
     #[allow(dead_code)]
     pub fn new_edit(buffer: RgbaImage) -> Frame {
         Frame {
@@ -650,9 +650,10 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let opt = usvg::Options::default();
             let svg_data = std::fs::read(&img_location)?;
             if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt.to_ref()) {
-                let pixmap_size = rtree.svg_node().size.to_screen_size()
+                // let pixmap_size = rtree.svg_node().size.to_screen_size()
+                let pixmap_size = rtree.size.to_screen_size();
                 // .scale_to(ScreenSize::new(width, height)?)
-                ;
+                // ;
 
                 if let Some(mut pixmap) =
                     tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
