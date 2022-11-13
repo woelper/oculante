@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::paint::PaintStroke;
+use crate::ui::EguiExt;
 use evalexpr::*;
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
@@ -8,10 +10,8 @@ use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use crate::paint::PaintStroke;
-use crate::ui::EguiExt;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
     #[serde(skip)]
     pub result_pixel_op: RgbaImage,
@@ -26,8 +26,6 @@ pub struct EditState {
     pub pixel_op_stack: Vec<ImageOperation>,
     pub image_op_stack: Vec<ImageOperation>,
     pub export_extension: String,
-    /// If an operation is running
-    pub is_processing: bool
 }
 
 impl Default for EditState {
@@ -43,7 +41,6 @@ impl Default for EditState {
             pixel_op_stack: vec![],
             image_op_stack: vec![],
             export_extension: "png".into(),
-            is_processing: false
         }
     }
 }

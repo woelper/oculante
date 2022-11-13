@@ -14,8 +14,8 @@ use crate::{
     paint::PaintStroke,
     update,
     utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ImageExt, OculanteState,
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info, Frame,
+        ImageExt, OculanteState, self, unpremult, solo_channel,
     },
 };
 pub trait EguiExt {
@@ -764,9 +764,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
-                    let rstamp = Instant::now();
 
-                    // let x = state.edit_state.result_pixel_op.chunks(4).par_bridge().map(|x| x).collect::<&Chunks<u8>>();
                     let ops = &state.edit_state.pixel_op_stack;
 
                     state
@@ -802,10 +800,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
                             px[3] = (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8;
                         });
-                    info!(
-                        "Rayon Pixels changed. Finished evaluating in {} s",
-                        rstamp.elapsed().as_secs_f32()
-                    );
+
                 }
 
                 // draw paint lines
@@ -831,10 +826,18 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
                     }
                 }
+
                 info!(
                     "Pixels changed. Finished evaluating in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
+
+    //             let sender = state.texture_channel.0.clone();
+
+    //             let f = Frame::new_edit(state.edit_state.result_pixel_op.clone());
+                    //  _ = sender.send(f);
+
+
             }
 
             // render uncommitted strokes if destructive to speed up painting

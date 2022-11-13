@@ -46,7 +46,7 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "info");
+        std::env::set_var("RUST_LOG", "debug");
         let _ = env_logger::try_init();
     }
 
@@ -357,6 +357,13 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
+    // make sure that in edit mode, RGBA is set.
+    // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
+    // let's disable it here.
+    if state.edit_enabled {
+        state.current_channel = Channel::RGBA;
+    }
+
     // redraw if extended info is missing so we make sure it's promply displayed
     if state.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
@@ -416,7 +423,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer");
+        debug!("Received image buffer:");
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
@@ -431,12 +438,24 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         //center the image
-        if frame.source != FrameSource::Animation {
-            state.offset = Default::default();
-            state.scale = Default::default();
-            state.reset_image = true;
-            state.image_info = None;
+        if frame.source != FrameSource::Animation {}
+
+        match frame.source {
+            FrameSource::Still => {
+                debug!("Still");
+
+                state.offset = Default::default();
+                state.scale = Default::default();
+                state.reset_image = true;
+                state.image_info = None;
+            }
+            FrameSource::EditResult => {
+                debug!("EditResult");
+                // state.edit_state.is_processing = false;
+            }
+            _ => debug!("Other"),
         }
+
         state.is_loaded = true;
         if state.info_enabled {
             send_extended_info(
@@ -542,10 +561,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         changed_channels = true;
                     }
 
-                    ui.scope(|ui| {
+                    ui.add_enabled_ui(!state.edit_enabled, |ui| {
                         // hack to center combo box in Y
-                        ui.spacing_mut().button_padding = Vec2::new(10., 0.);
 
+                        ui.spacing_mut().button_padding = Vec2::new(10., 0.);
                         egui::ComboBox::from_id_source("channels")
                             .selected_text(format!("{:?}", state.current_channel))
                             .show_ui(ui, |ui| {
@@ -795,6 +814,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if state.network_mode {
         app.window().request_frame();
     }
+    // if state.edit_state.is_processing {
+    //     app.window().request_frame();
+    // }
     draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
     gfx.render(&draw);
     gfx.render(&egui_output);

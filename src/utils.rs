@@ -34,7 +34,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::image_editing::{EditState};
+use crate::image_editing::EditState;
 use crate::settings::PersistentSettings;
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -293,6 +293,14 @@ impl Frame {
         }
     }
 
+    pub fn new_edit(buffer: RgbaImage) -> Frame {
+        Frame {
+            buffer,
+            delay: 0,
+            source: FrameSource::EditResult,
+        }
+    }
+
     pub fn new_still(buffer: RgbaImage) -> Frame {
         Frame {
             buffer,
@@ -340,9 +348,6 @@ impl Channel {
         }
     }
 }
-
-
-
 
 /// The state of the application
 #[derive(Debug, AppState)]
