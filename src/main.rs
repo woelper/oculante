@@ -141,7 +141,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     state.player = Player::new(state.texture_channel.0.clone());
 
-    info!("Image is: {:?}", maybe_img_location);
+    debug!("Image is: {:?}", maybe_img_location);
 
     if let Some(ref img_location) = maybe_img_location {
         state.current_path = Some(img_location.clone());

@@ -14,8 +14,8 @@ use crate::{
     paint::PaintStroke,
     update,
     utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info, Frame,
-        ImageExt, OculanteState, self, unpremult, solo_channel,
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
+        ImageExt, OculanteState,
     },
 };
 pub trait EguiExt {
@@ -422,12 +422,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if let Some(img) = &state.current_image {
                 // Ensure that edit result image is always filled
                 if state.edit_state.result_pixel_op.width() == 0 {
-                    info!("Pxl result is default");
+                    debug!("Edit state pixel comp buffer is default, cloning from image");
                     state.edit_state.result_pixel_op = img.clone();
                     pixels_changed = true;
                 }
                 if state.edit_state.result_image_op.width() == 0 {
-                    info!("Img result is default");
+                    debug!("Edit state image comp buffer is default, cloning from image");
                     state.edit_state.result_image_op = img.clone();
                     image_changed = true;
                 }

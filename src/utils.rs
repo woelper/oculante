@@ -292,7 +292,8 @@ impl Frame {
             source: FrameSource::Reset,
         }
     }
-
+    
+    #[allow(dead_code)]
     pub fn new_edit(buffer: RgbaImage) -> Frame {
         Frame {
             buffer,
