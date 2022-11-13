@@ -1,3 +1,14 @@
+# 0.6.22 (2022-11-13)
+
+### :sparkles: Features
+
+* Save/load edit information in metafile. This allows non-destructive eding while leaving your original pictures intact. (c47bddb6)
+
+### :green_apple: Chore
+
+* Update SVG rendering (9fdc2e56)
+* Slightly relax & update dependencies (bb9c03a8)
+
 # 0.6.20 (2022-10-30)
 
 ### :beetle: Bug Fixes
