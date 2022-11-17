@@ -22,15 +22,18 @@ dds-rs = "0.7.0"
 dirs = "4.0"
 env_logger = "0.9"
 evalexpr = "8.1"
-kamadak-exif = "0.5"
 exr = "1.5"
+gif = "0.11"
+gif-dispose = "3.1"
 image = "0.24"
+kamadak-exif = "0.5"
 libwebp-sys = "0.8"
 log = "0.4"
 nalgebra = "0.31"
 notan = {version = "0.7", features = ["drop_files", "egui"]}
 palette = "0.6"
 psd = "0.3"
+# pulp = "0.8.0"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.5"
@@ -45,8 +48,6 @@ tiny-skia = "0.8.2"
 turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.25.0"
 webbrowser = "0.8"
-gif-dispose = "3.1"
-gif = "0.11"
 
 [features]
 default = ["turbo"]

@@ -7,10 +7,9 @@ use notan::{
     egui::{self, plot::Points, *},
     prelude::Graphics,
 };
-use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
 use crate::{
-    image_editing::{Channel, ImageOperation, ScaleFilter},
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     update,
     utils::{
@@ -764,44 +763,15 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
-
                     let ops = &state.edit_state.pixel_op_stack;
-
-                    state
-                        .edit_state
-                        .result_pixel_op
-                        .par_chunks_mut(4)
-                        .for_each(|px| {
-                            let mut float_pixel = image::Rgba([
-                                px[0] as f32 / 255.,
-                                px[1] as f32 / 255.,
-                                px[2] as f32 / 255.,
-                                px[3] as f32 / 255.,
-                            ]);
-
-                            // degamma to linear
-                            float_pixel[0] = float_pixel[0].powf(2.2);
-                            float_pixel[1] = float_pixel[1].powf(2.2);
-                            float_pixel[2] = float_pixel[2].powf(2.2);
-
-                            // run pixel operations
-                            for operation in ops {
-                                operation.process_pixel(&mut float_pixel);
-                            }
-
-                            // apply gamma again
-                            float_pixel[0] = float_pixel[0].powf(1.0 / 2.2);
-                            float_pixel[1] = float_pixel[1].powf(1.0 / 2.2);
-                            float_pixel[2] = float_pixel[2].powf(1.0 / 2.2);
-
-                            // convert back to u8
-                            px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
-                            px[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
-                            px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
-                            px[3] = (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8;
-                        });
+                    process_pixels(&mut state.edit_state.result_pixel_op, ops);
 
                 }
+                
+                                info!(
+                    "Finished Pixel op stack in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
 
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
@@ -828,7 +798,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
 
                 info!(
-                    "Pixels changed. Finished evaluating in {} s",
+                    "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
 

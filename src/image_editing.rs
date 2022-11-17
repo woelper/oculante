@@ -5,10 +5,12 @@ use crate::ui::EguiExt;
 use evalexpr::*;
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
+use nalgebra::SimdComplexField;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
 use rand::{thread_rng, Rng};
+use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -635,4 +637,62 @@ pub fn desaturate(p: &mut Rgba<f32>, factor: f32) {
     p[0] = egui::lerp(p[0] as f32..=val, factor);
     p[1] = egui::lerp(p[1] as f32..=val, factor);
     p[2] = egui::lerp(p[2] as f32..=val, factor);
+}
+
+pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
+    // use pulp::Arch;
+    // let arch = Arch::new();
+
+    // arch.dispatch(|| {
+    //         for x in &mut buffer.into_vec() {
+    //             *x = 12 as u8;
+    //         }
+    //     });
+
+    buffer
+        // .chunks_mut(4)
+        .par_chunks_mut(4)
+        .for_each(|px| {
+            let mut float_pixel = image::Rgba([
+                px[0] as f32 / 255.,
+                px[1] as f32 / 255.,
+                px[2] as f32 / 255.,
+                px[3] as f32 / 255.,
+            ]);
+
+            // // degamma to linear
+            // float_pixel[0] = float_pixel[0].powf(2.2);
+            // float_pixel[1] = float_pixel[1].powf(2.2);
+            // float_pixel[2] = float_pixel[2].powf(2.2);
+            // a little optimisation (and incorrect)
+            float_pixel[0] = float_pixel[0].powi(2);
+            float_pixel[1] = float_pixel[1].powi(2);
+            float_pixel[2] = float_pixel[2].powi(2);
+
+            // run pixel operations
+            for operation in operators {
+                operation.process_pixel(&mut float_pixel);
+            }
+
+            // // apply gamma again
+            // float_pixel[0] = float_pixel[0].powf(1.0 / 2.2);
+            // float_pixel[1] = float_pixel[1].powf(1.0 / 2.2);
+            // float_pixel[2] = float_pixel[2].powf(1.0 / 2.2);
+            float_pixel[0] = float_pixel[0].powf(1.0 / 2.0);
+            float_pixel[1] = float_pixel[1].powf(1.0 / 2.0);
+            float_pixel[2] = float_pixel[2].powf(1.0 / 2.0);
+
+            // convert back to u8
+            px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
+            px[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
+            px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
+            px[3] = (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8;
+
+            // let int_pixel = image::Rgba([
+            //     (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8,
+            //     (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8,
+            //     (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8,
+            //     (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8,
+            // ]);
+        });
 }

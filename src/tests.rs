@@ -1,5 +1,7 @@
 use cmd_lib::run_cmd;
 
+use crate::image_editing::{process_pixels, ImageOperation};
+
 use super::*;
 use std::{path::PathBuf, time::Instant};
 
@@ -51,6 +53,33 @@ fn bench_load_large() {
         let d = elapsed.as_millis();
         total += d;
         info!("Loaded image in {}", d);
+    }
+    info!("{} ms mean", total / iters);
+}
+
+#[test]
+fn bench_process_large() {
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+    let iters = 5;
+    info!("Benching this with {iters} iterations...");
+    let mut total = 0;
+
+    // let blur = ImageOperation::Blur(10);
+
+    for _i in 0..iters {
+        let brighness = ImageOperation::Brightness(10);
+        let f = open_image(&PathBuf::from(
+            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        ))
+        .unwrap();
+        let mut buffer = f.frames[0].clone().buffer;
+        let start = Instant::now();
+        process_pixels(&mut buffer, &vec![brighness]);
+        let elapsed = start.elapsed();
+        let d = elapsed.as_millis();
+        total += d;
+        info!("Processed image in {} s", elapsed.as_secs_f32());
     }
     info!("{} ms mean", total / iters);
 }
