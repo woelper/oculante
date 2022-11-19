@@ -1,6 +1,6 @@
 use cmd_lib::run_cmd;
 
-use crate::image_editing::{process_pixels, ImageOperation};
+use crate::image_editing::{process_pixels, ImageOperation, ScaleFilter};
 
 use super::*;
 use std::{path::PathBuf, time::Instant};
@@ -58,28 +58,81 @@ fn bench_load_large() {
 }
 
 #[test]
-fn bench_process_large() {
+fn bench_process_pxl() {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
     let iters = 5;
     info!("Benching this with {iters} iterations...");
     let mut total = 0;
 
-    // let blur = ImageOperation::Blur(10);
+    let ops = vec![
+    ImageOperation::Brightness(10),
+    ImageOperation::Contrast(10),
+    ImageOperation::Exposure(20),
+    ImageOperation::Equalize((10,100)),
+    ImageOperation::Posterize(4),
+    ImageOperation::Desaturate(100),
+    ImageOperation::Noise {amt: 50, mono: false},
+    ];
 
     for _i in 0..iters {
-        let brighness = ImageOperation::Brightness(10);
         let f = open_image(&PathBuf::from(
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
         let mut buffer = f.frames[0].clone().buffer;
         let start = Instant::now();
-        process_pixels(&mut buffer, &vec![brighness]);
+        process_pixels(&mut buffer, &ops);
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
         info!("Processed image in {} s", elapsed.as_secs_f32());
+    }
+    info!("{} ms mean", total / iters);
+    info!("295");
+}
+
+#[test]
+fn bench_process_all() {
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+    let iters = 5;
+    info!("Multi-ops: benching this with {iters} iterations...");
+    let mut total = 0;
+
+    // let blur = ImageOperation::Blur(10);
+
+    for _i in 0..iters {
+        let ops = vec![
+            ImageOperation::Brightness(10),
+            ImageOperation::ChromaticAberration(5),
+            // ImageOperation::Blur(5),
+            ImageOperation::Desaturate(100),
+            ImageOperation::Resize {
+                dimensions: (300, 200),
+                aspect: true,
+                filter: ScaleFilter::Gaussian,
+            },
+            // ImageOperation::
+        ];
+        let f = open_image(&PathBuf::from(
+            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        ))
+        .unwrap();
+        let mut buffer = f.frames[0].clone().buffer;
+        let start = Instant::now();
+        process_pixels(&mut buffer, &ops);
+
+        for op in ops {
+            info!("IMG {:?}", op);
+            op.process_image(&mut buffer);
+        }
+
+        let elapsed = start.elapsed();
+        let d = elapsed.as_millis();
+        total += d;
+        info!("Processed image in {} s", elapsed.as_secs_f32());
+        info!("Was 1.467s");
     }
     info!("{} ms mean", total / iters);
 }
