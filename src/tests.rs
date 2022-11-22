@@ -93,6 +93,38 @@ fn bench_process_pxl() {
     info!("295");
 }
 
+
+
+#[test]
+fn bench_process_bright() {
+    std::env::set_var("RUST_LOG", "info");
+    let _ = env_logger::try_init();
+    let iters = 5;
+    info!("Benching this with {iters} iterations...");
+    let mut total = 0;
+
+    let ops = vec![
+        ImageOperation::Brightness(10),
+    ];
+
+    for _i in 0..iters {
+        let f = open_image(&PathBuf::from(
+            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        ))
+        .unwrap();
+        let mut buffer = f.frames[0].clone().buffer;
+        let start = Instant::now();
+        process_pixels(&mut buffer, &ops);
+        let elapsed = start.elapsed();
+        let d = elapsed.as_millis();
+        total += d;
+        info!("Processed image in {} s", elapsed.as_secs_f32());
+    }
+    info!("{} ms mean", total / iters);
+    info!("295");
+}
+
+
 #[test]
 fn bench_process_all() {
     std::env::set_var("RUST_LOG", "info");
