@@ -66,13 +66,14 @@ fn bench_process_pxl() {
     let mut total = 0;
 
     let ops = vec![
-    ImageOperation::Brightness(10),
-    ImageOperation::Contrast(10),
-    ImageOperation::Exposure(20),
-    ImageOperation::Equalize((10,100)),
-    ImageOperation::Posterize(4),
-    ImageOperation::Desaturate(100),
-    ImageOperation::Noise {amt: 50, mono: false},
+        ImageOperation::Brightness(10),
+        ImageOperation::Contrast(10),
+        ImageOperation::Exposure(20),
+        ImageOperation::Equalize((10, 100)),
+        ImageOperation::Posterize(4),
+        ImageOperation::Desaturate(20),
+        ImageOperation::HSV((20, 0, 0)),
+        // ImageOperation::Noise {amt: 50, mono: false},
     ];
 
     for _i in 0..iters {
