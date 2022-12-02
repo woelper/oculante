@@ -1,12 +1,11 @@
 use std::fmt;
-use std::ops::{Mul, MulAssign};
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 use evalexpr::*;
-use image::{imageops, Rgba, RgbaImage};
+use image::{imageops, RgbaImage};
 use imageops::FilterType::*;
-use nalgebra::{Vector4, SimdValue};
+use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
@@ -505,8 +504,6 @@ impl ImageOperation {
         }
     }
 
-
-
     /// Process a single pixel.
     pub fn process_pixel(&self, p: &mut Vector4<f32>) {
         match self {
@@ -527,7 +524,6 @@ impl ImageOperation {
                 let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
                 // *p = lerp_col(Vector4::splat(bounds.0), Vector4::splat(bounds.1), *p);
                 // 0, 0.2, 1.0
-               
 
                 p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
@@ -539,8 +535,6 @@ impl ImageOperation {
                     "g" => p[1] as f64,
                     "b" => p[2] as f64,
                     "a" => p[3] as f64,
-
-
                 }
                 .unwrap(); // Do proper error handling here
 
@@ -568,8 +562,6 @@ impl ImageOperation {
                 }
             }
             Self::Posterize(levels) => {
-
-
                 p[0] = (p[0] * *levels as f32).round() / *levels as f32;
                 p[1] = (p[1] * *levels as f32).round() / *levels as f32;
                 p[2] = (p[2] * *levels as f32).round() / *levels as f32;
@@ -588,9 +580,9 @@ impl ImageOperation {
                 p[2] = egui::lerp(p[2]..=n_b, amt);
             }
             Self::Fill(col) => {
-                p[0] = egui::lerp(p[0]..=col[0] as f32 / 255., col[3] as f32 / 255.);
-                p[1] = egui::lerp(p[1]..=col[1] as f32 / 255., col[3] as f32 / 255.);
-                p[2] = egui::lerp(p[2]..=col[2] as f32 / 255., col[3] as f32 / 255.);
+                let target =
+                    Vector4::new(col[0] as f32, col[1] as f32, col[2] as f32, col[3] as f32) / 255.;
+                *p = p.lerp(&target, target[3]);
             }
             Self::Desaturate(amt) => {
                 desaturate(p, *amt as f32 / 100.);
@@ -637,9 +629,9 @@ impl ImageOperation {
             Self::Contrast(val) => {
                 let factor: f32 = (1.015686275 * (*val as f32 / 255. + 1.0))
                     / (1.0 * (1.015686275 - *val as f32 / 255.)) as f32;
-                p[0] = ((factor * p[0] - 0.5) + 0.5).clamp(0.0, 1.0);
-                p[1] = ((factor * p[1] - 0.5) + 0.5).clamp(0.0, 1.0);
-                p[2] = ((factor * p[2] - 0.5) + 0.5).clamp(0.0, 1.0);
+                p[0] = (factor * p[0] - 0.5) + 0.5;
+                p[1] = (factor * p[1] - 0.5) + 0.5;
+                p[2] = (factor * p[2] - 0.5) + 0.5;
             }
             _ => (),
         }
@@ -690,9 +682,4 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
             px[2] = (float_pixel[2]) as u8;
             px[3] = (float_pixel[3]) as u8;
         });
-}
-
-
-fn lerp_col(v0: Vector4<f32>, v1: Vector4<f32>, t: Vector4<f32>) -> Vector4<f32> {
-    v0 + t.component_mul(&(v1 - v0))
 }
