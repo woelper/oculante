@@ -1,11 +1,12 @@
 use std::fmt;
+use std::ops::{Mul, MulAssign};
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 use evalexpr::*;
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
-use nalgebra::Vector4;
+use nalgebra::{Vector4, SimdValue};
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
@@ -504,23 +505,29 @@ impl ImageOperation {
         }
     }
 
+
+
     /// Process a single pixel.
     pub fn process_pixel(&self, p: &mut Vector4<f32>) {
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;
-                p[0] = p[0] + amt;
-                p[1] = p[1] + amt;
-                p[2] = p[2] + amt;
+                *p = *p + Vector4::new(amt, amt, amt, 0.0);
             }
             Self::Exposure(amt) => {
                 let amt = (*amt as f32 / 100.) * 4.;
+
+                // *p = *p * Vector4::new(2., 2., 2., 2.).;
+
                 p[0] = p[0] * (2 as f32).powf(amt);
                 p[1] = p[1] * (2 as f32).powf(amt);
                 p[2] = p[2] * (2 as f32).powf(amt);
             }
             Self::Equalize(bounds) => {
                 let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
+                // *p = lerp_col(Vector4::splat(bounds.0), Vector4::splat(bounds.1), *p);
+                // 0, 0.2, 1.0
+               
 
                 p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
@@ -561,6 +568,8 @@ impl ImageOperation {
                 }
             }
             Self::Posterize(levels) => {
+
+
                 p[0] = (p[0] * *levels as f32).round() / *levels as f32;
                 p[1] = (p[1] * *levels as f32).round() / *levels as f32;
                 p[2] = (p[2] * *levels as f32).round() / *levels as f32;
@@ -590,14 +599,20 @@ impl ImageOperation {
                 p[channels.0 as usize] = p[channels.1 as usize];
             }
             Self::Mult(amt) => {
-                p[0] = p[0] * amt[0] as f32 / 255.;
-                p[1] = p[1] * amt[1] as f32 / 255.;
-                p[2] = p[2] * amt[2] as f32 / 255.;
+                let amt =
+                    Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255. as f32) / 255.;
+
+                // p[0] = p[0] * amt[0] as f32 / 255.;
+                // p[1] = p[1] * amt[1] as f32 / 255.;
+                // p[2] = p[2] * amt[2] as f32 / 255.;
+                *p = p.component_mul(&amt);
             }
             Self::Add(amt) => {
-                p[0] = p[0] + amt[0] as f32 / 255.;
-                p[1] = p[1] + amt[1] as f32 / 255.;
-                p[2] = p[2] + amt[2] as f32 / 255.;
+                let amt = Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 0.0) / 255.;
+                // p[0] = p[0] + amt[0] as f32 / 255.;
+                // p[1] = p[1] + amt[1] as f32 / 255.;
+                // p[2] = p[2] + amt[2] as f32 / 255.;
+                *p += amt;
             }
             Self::HSV(amt) => {
                 use palette::{rgb::Rgb, Hsl, IntoColor};
@@ -660,46 +675,24 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
             //     px[3] as f32 / 255.,
             // ]);
 
-            let mut float_pixel = Vector4::new(
-                px[0] as f32,
-                px[1] as f32,
-                px[2] as f32,
-                px[3] as f32,
-            )/255.;
-
-            // // degamma to linear
-            // float_pixel[0] = float_pixel[0].powf(2.2);
-            // float_pixel[1] = float_pixel[1].powf(2.2);
-            // float_pixel[2] = float_pixel[2].powf(2.2);
-            // a little optimisation (and incorrect)
-            float_pixel[0] = float_pixel[0].powi(2);
-            float_pixel[1] = float_pixel[1].powi(2);
-            float_pixel[2] = float_pixel[2].powi(2);
+            let mut float_pixel =
+                Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
 
             // run pixel operations
             for operation in operators {
                 operation.process_pixel(&mut float_pixel);
             }
 
-            // // apply gamma again
-            // float_pixel[0] = float_pixel[0].powf(1.0 / 2.2);
-            // float_pixel[1] = float_pixel[1].powf(1.0 / 2.2);
-            // float_pixel[2] = float_pixel[2].powf(1.0 / 2.2);
-            float_pixel[0] = float_pixel[0].powf(1.0 / 2.0);
-            float_pixel[1] = float_pixel[1].powf(1.0 / 2.0);
-            float_pixel[2] = float_pixel[2].powf(1.0 / 2.0);
+            float_pixel *= 255.;
 
-            // convert back to u8
-            px[0] = (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8;
-            px[1] = (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8;
-            px[2] = (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8;
-            px[3] = (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8;
-
-            // let int_pixel = image::Rgba([
-            //     (float_pixel[0].clamp(0.0, 1.0) * 255.) as u8,
-            //     (float_pixel[1].clamp(0.0, 1.0) * 255.) as u8,
-            //     (float_pixel[2].clamp(0.0, 1.0) * 255.) as u8,
-            //     (float_pixel[3].clamp(0.0, 1.0) * 255.) as u8,
-            // ]);
+            px[0] = (float_pixel[0]) as u8;
+            px[1] = (float_pixel[1]) as u8;
+            px[2] = (float_pixel[2]) as u8;
+            px[3] = (float_pixel[3]) as u8;
         });
+}
+
+
+fn lerp_col(v0: Vector4<f32>, v1: Vector4<f32>, t: Vector4<f32>) -> Vector4<f32> {
+    v0 + t.component_mul(&(v1 - v0))
 }
