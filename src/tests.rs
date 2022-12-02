@@ -121,7 +121,7 @@ fn bench_process_bright() {
         info!("Processed image in {} s", elapsed.as_secs_f32());
     }
     info!("{} ms mean", total / iters);
-    info!("295");
+    info!("24 simd");
 }
 
 
@@ -165,7 +165,7 @@ fn bench_process_all() {
         let d = elapsed.as_millis();
         total += d;
         info!("Processed image in {} s", elapsed.as_secs_f32());
-        info!("Was 1.467s");
+        info!("simd 1.467s");
     }
     info!("{} ms mean", total / iters);
 }
