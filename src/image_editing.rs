@@ -5,7 +5,7 @@ use crate::ui::EguiExt;
 use evalexpr::*;
 use image::{imageops, Rgba, RgbaImage};
 use imageops::FilterType::*;
-use nalgebra::SimdComplexField;
+use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::Pixel;
@@ -505,7 +505,7 @@ impl ImageOperation {
     }
 
     /// Process a single pixel.
-    pub fn process_pixel(&self, p: &mut Rgba<f32>) {
+    pub fn process_pixel(&self, p: &mut Vector4<f32>) {
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;
@@ -601,7 +601,7 @@ impl ImageOperation {
             }
             Self::HSV(amt) => {
                 use palette::{rgb::Rgb, Hsl, IntoColor};
-                let rgb: Rgb = *Rgb::from_raw(&p.0);
+                let rgb: Rgb = *Rgb::from_raw(p.as_slice());
 
                 let mut hsv: Hsl = rgb.into_color();
                 hsv.hue += amt.0 as f32;
@@ -609,7 +609,7 @@ impl ImageOperation {
                 hsv.lightness *= amt.2 as f32 / 100.;
                 let rgb: Rgb = hsv.into_color();
 
-                *p = image::Rgba([rgb.red, rgb.green, rgb.blue, p[3]]);
+                // *p = image::Rgba([rgb.red, rgb.green, rgb.blue, p[3]]);
                 p[0] = rgb.red;
                 p[1] = rgb.green;
                 p[2] = rgb.blue;
@@ -631,7 +631,7 @@ impl ImageOperation {
     }
 }
 
-pub fn desaturate(p: &mut Rgba<f32>, factor: f32) {
+pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     // G*.59+R*.3+B*.11
     let val = p[0] * 0.59 + p[1] * 0.3 + p[2] * 0.11;
     p[0] = egui::lerp(p[0] as f32..=val, factor);
@@ -653,12 +653,19 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
         // .chunks_mut(4)
         .par_chunks_mut(4)
         .for_each(|px| {
-            let mut float_pixel = image::Rgba([
-                px[0] as f32 / 255.,
-                px[1] as f32 / 255.,
-                px[2] as f32 / 255.,
-                px[3] as f32 / 255.,
-            ]);
+            // let mut float_pixel = image::Rgba([
+            //     px[0] as f32 / 255.,
+            //     px[1] as f32 / 255.,
+            //     px[2] as f32 / 255.,
+            //     px[3] as f32 / 255.,
+            // ]);
+
+            let mut float_pixel = Vector4::new(
+                px[0] as f32,
+                px[1] as f32,
+                px[2] as f32,
+                px[3] as f32,
+            )/255.;
 
             // // degamma to linear
             // float_pixel[0] = float_pixel[0].powf(2.2);
