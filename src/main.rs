@@ -406,7 +406,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
-        debug!("Finished calculating extended image info");
+        debug!("Finished calculating extended image info for {}", info.name);
+
         state.image_info = Some(info);
     }
 
@@ -440,30 +441,24 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         //center the image
         if frame.source != FrameSource::Animation {}
 
+        debug!("Frame source: {:?}", frame.source);
+
         match frame.source {
             FrameSource::Still => {
-                debug!("Still");
-
                 state.offset = Default::default();
                 state.scale = Default::default();
                 state.reset_image = true;
                 state.image_info = None;
             }
             FrameSource::EditResult => {
-                debug!("EditResult");
+                // debug!("EditResult");
                 // state.edit_state.is_processing = false;
             }
-            _ => debug!("Other"),
+            _ => (),
         }
 
         state.is_loaded = true;
-        if state.info_enabled {
-            send_extended_info(
-                &state.current_image,
-                &state.current_path,
-                &state.extended_info_channel,
-            );
-        }
+
 
         match &state.current_channel {
             // Unpremultiply the image
@@ -477,6 +472,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         state.current_image = Some(img);
+        if state.info_enabled {
+            send_extended_info(
+                &state.current_image,
+                &state.current_path,
+                &state.extended_info_channel,
+            );
+        }
     }
 
     if let Some(texture) = &state.current_texture {
