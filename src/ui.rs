@@ -1,10 +1,14 @@
 use std::{ops::RangeInclusive, time::Instant};
 
-use egui::plot::{Plot, Value, Values};
+use egui::plot::Plot;
 use image::RgbaImage;
 use log::{debug, info};
 use notan::{
-    egui::{self, plot::Points, *},
+    egui::{
+        self,
+        plot::{PlotPoints, Points},
+        *,
+    },
     prelude::Graphics,
 };
 
@@ -40,7 +44,7 @@ impl EguiExt for Ui {
     fn label_i(&mut self, text: &str) -> Response {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.with_layout(egui::Layout::right_to_left(), |ui| {
+        self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
             // self.horizontal(|ui| {
             ui.add_sized(
                 egui::Vec2::new(28., ui.available_height()),
@@ -69,7 +73,7 @@ impl EguiExt for Ui {
                 )
                 .clicked()
             {
-                r.clicked = [true, true, true];
+                r.clicked = [true, true, true, true, true];
             }
             r
         })
@@ -370,30 +374,30 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         }
 
-        let red_vals = Points::new(Values::from_values_iter(
+        let red_vals = Points::new(
             info.red_histogram
                 .iter()
-                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
-        ))
-        // .fill(0.)
+                .map(|(k, v)| [*k as f64, *v as f64])
+                .collect::<PlotPoints>(),
+        )
         .stems(0.0)
         .color(Color32::RED);
 
-        let green_vals = Points::new(Values::from_values_iter(
+        let green_vals = Points::new(
             info.green_histogram
                 .iter()
-                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
-        ))
-        // .fill(0.)
+                .map(|(k, v)| [*k as f64, *v as f64])
+                .collect::<PlotPoints>(),
+        )
         .stems(0.0)
         .color(Color32::GREEN);
 
-        let blue_vals = Points::new(Values::from_values_iter(
+        let blue_vals = Points::new(
             info.blue_histogram
                 .iter()
-                .map(|(k, v)| Value::new(*k as f64, *v as f64)),
-        ))
-        // .fill(0.)
+                .map(|(k, v)| [*k as f64, *v as f64])
+                .collect::<PlotPoints>(),
+        )
         .stems(0.0)
         .color(Color32::BLUE);
 
@@ -767,7 +771,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     process_pixels(&mut state.edit_state.result_pixel_op, ops);
 
                 }
-                
+
                                 info!(
                     "Finished Pixel op stack in {} s",
                     stamp.elapsed().as_secs_f32()
@@ -1065,7 +1069,7 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
             // now draw the ordering/delete ui
             ui.add_space(45.);
 
-            ui.with_layout(egui::Layout::right_to_left(), |ui| {
+            ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                 // ui.add_space(size);
 
                 // ui.vertical(|ui| {

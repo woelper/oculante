@@ -9,7 +9,7 @@ use notan::graphics::Texture;
 use notan::prelude::Graphics;
 use notan::AppState;
 
-use rayon::prelude::ParallelIterator;
+use rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -51,10 +51,12 @@ pub struct ExtendedImageInfo {
     pub green_histogram: Vec<(i32, i32)>,
     pub blue_histogram: Vec<(i32, i32)>,
     pub exif: HashMap<String, String>,
+    pub name: String
 }
 
 impl ExtendedImageInfo {
     pub fn with_exif(&mut self, image_path: &Path) -> Result<()> {
+        self.name = image_path.to_string_lossy().to_string();
         if image_path.extension() == Some(OsStr::new("gif")) {
             return Ok(());
         }
@@ -89,8 +91,8 @@ impl ExtendedImageInfo {
                 num_transparent_pixels += 1;
             }
 
-            let luma_p = ((p.0[0] as i32 + p.0[1] as i32 + p.0[2] as i32) / 3).min(255);
-            *grey_histogram.entry(luma_p as u8).or_default() += 1;
+            // let luma_p = ((p.0[0] as i32 + p.0[1] as i32 + p.0[2] as i32) / 3).min(255);
+            // *grey_histogram.entry(luma_p as u8).or_default() += 1;
             *red_histogram.entry(p.0[0]).or_default() += 1;
             *green_histogram.entry(p.0[1]).or_default() += 1;
             *blue_histogram.entry(p.0[2]).or_default() += 1;
@@ -102,25 +104,25 @@ impl ExtendedImageInfo {
         }
 
         let mut grey_histogram: Vec<(i32, i32)> = grey_histogram
-            .iter()
+            .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
         grey_histogram.sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut green_histogram: Vec<(i32, i32)> = green_histogram
-            .iter()
+            .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
         green_histogram.sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut red_histogram: Vec<(i32, i32)> = red_histogram
-            .iter()
+            .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
         red_histogram.sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut blue_histogram: Vec<(i32, i32)> = blue_histogram
-            .iter()
+            .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
         blue_histogram.sort_by(|a, b| a.0.cmp(&b.0));
@@ -133,6 +135,7 @@ impl ExtendedImageInfo {
             blue_histogram,
             green_histogram,
             red_histogram,
+            name: Default::default(),
             exif: Default::default(),
         }
     }
