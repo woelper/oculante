@@ -454,6 +454,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // debug!("EditResult");
                 // state.edit_state.is_processing = false;
             }
+            FrameSource::Reset => state.reset_image = true,
             _ => (),
         }
 
