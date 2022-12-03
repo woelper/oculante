@@ -46,7 +46,6 @@ pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
     pub num_colors: usize,
-    pub grey_histogram: Vec<(i32, i32)>,
     pub red_histogram: Vec<(i32, i32)>,
     pub green_histogram: Vec<(i32, i32)>,
     pub blue_histogram: Vec<(i32, i32)>,
@@ -78,8 +77,6 @@ impl ExtendedImageInfo {
 
     pub fn from_image(img: &RgbaImage) -> Self {
         let mut colors: HashSet<Rgba<u8>> = Default::default();
-        // let mut histogram: HashMap<u8, usize> = Default::default();
-        let mut grey_histogram: HashMap<u8, usize> = Default::default();
         let mut red_histogram: HashMap<u8, usize> = Default::default();
         let mut green_histogram: HashMap<u8, usize> = Default::default();
         let mut blue_histogram: HashMap<u8, usize> = Default::default();
@@ -91,8 +88,6 @@ impl ExtendedImageInfo {
                 num_transparent_pixels += 1;
             }
 
-            // let luma_p = ((p.0[0] as i32 + p.0[1] as i32 + p.0[2] as i32) / 3).min(255);
-            // *grey_histogram.entry(luma_p as u8).or_default() += 1;
             *red_histogram.entry(p.0[0]).or_default() += 1;
             *green_histogram.entry(p.0[1]).or_default() += 1;
             *blue_histogram.entry(p.0[2]).or_default() += 1;
@@ -103,11 +98,7 @@ impl ExtendedImageInfo {
             num_pixels += 1;
         }
 
-        let mut grey_histogram: Vec<(i32, i32)> = grey_histogram
-            .par_iter()
-            .map(|(k, v)| (*k as i32, *v as i32))
-            .collect();
-        grey_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+        
 
         let mut green_histogram: Vec<(i32, i32)> = green_histogram
             .par_iter()
@@ -131,7 +122,6 @@ impl ExtendedImageInfo {
             num_pixels,
             num_transparent_pixels,
             num_colors: colors.len(),
-            grey_histogram,
             blue_histogram,
             green_histogram,
             red_histogram,
