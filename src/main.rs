@@ -459,7 +459,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         state.is_loaded = true;
 
-
         match &state.current_channel {
             // Unpremultiply the image
             Channel::RGB => state.current_texture = unpremult(&img).to_texture(gfx),

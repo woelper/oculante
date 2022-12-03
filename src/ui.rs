@@ -156,12 +156,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
+                    
                     if let Some(path) = &state.current_path {
+                        // make sure we truncate filenames
+                        let max_chars = 20;
+                        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                        let skip_symbol = if file_name.chars().count() > max_chars {"⏪"} else {""};
+
                         ui.label_i("🖻 File");
                         ui.label(
                             RichText::new(format!(
-                                "{}",
-                                path.file_name().unwrap_or_default().to_string_lossy()
+                                "{skip_symbol}{}",
+                                file_name.chars().rev().take(max_chars).collect::<String>().chars().rev().collect::<String>()
                             ))
                             .monospace(),
                         )

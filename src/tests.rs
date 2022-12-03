@@ -93,8 +93,6 @@ fn bench_process_pxl() {
     info!("295");
 }
 
-
-
 #[test]
 fn bench_process_bright() {
     std::env::set_var("RUST_LOG", "info");
@@ -103,9 +101,7 @@ fn bench_process_bright() {
     info!("Benching this with {iters} iterations...");
     let mut total = 0;
 
-    let ops = vec![
-        ImageOperation::Brightness(10),
-    ];
+    let ops = vec![ImageOperation::Brightness(10)];
 
     for _i in 0..iters {
         let f = open_image(&PathBuf::from(
@@ -123,7 +119,6 @@ fn bench_process_bright() {
     info!("{} ms mean", total / iters);
     info!("24 simd");
 }
-
 
 #[test]
 fn bench_process_all() {

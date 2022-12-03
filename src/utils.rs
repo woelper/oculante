@@ -9,7 +9,7 @@ use notan::graphics::Texture;
 use notan::prelude::Graphics;
 use notan::AppState;
 
-use rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -51,7 +51,7 @@ pub struct ExtendedImageInfo {
     pub green_histogram: Vec<(i32, i32)>,
     pub blue_histogram: Vec<(i32, i32)>,
     pub exif: HashMap<String, String>,
-    pub name: String
+    pub name: String,
 }
 
 impl ExtendedImageInfo {
