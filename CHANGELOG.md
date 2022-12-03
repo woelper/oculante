@@ -1,3 +1,9 @@
+# 0.6.23 (2022-12-03)
+
+### :beetle: Bug Fixes
+
+* Histogram was not computed on image change (2096104a)
+
 # 0.6.22 (2022-11-13)
 
 ### :sparkles: Features
