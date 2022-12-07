@@ -48,6 +48,12 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.27.0"
 webbrowser = "0.8"
 
+pdf = { git = "https://github.com/pdf-rs/pdf" }
+pdf_render = { git = "https://github.com/pdf-rs/pdf_render.git"}
+argh = "*"
+pathfinder_rasterize = { git = "https://github.com/s3bk/pathfinder_rasterizer" }
+pathfinder_geometry = { git = "https://github.com/servo/pathfinder" }
+
 [features]
 default = ["turbo"]
 turbo = ["turbojpeg"]

@@ -98,8 +98,6 @@ impl ExtendedImageInfo {
             num_pixels += 1;
         }
 
-        
-
         let mut green_histogram: Vec<(i32, i32)> = green_histogram
             .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
@@ -506,6 +504,7 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
         "pnm" => true,
         "svg" => true,
         "ff" => true,
+        "pdf" => true,
         _ => false,
     }
 }
@@ -635,6 +634,28 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                         .ok_or(anyhow!("Can't create DDS ImageBuffer with given res"))?;
                 col.add_still(buf);
             }
+        }
+        "pdf" => {
+            use pathfinder_geometry::transform2d::Transform2F;
+            use pathfinder_rasterize::Rasterizer;
+            use pdf_render::{render_page, Cache, SceneBackend};
+            let file = pdf::file::File::open(img_location)?;
+            let page = file.get_page(0)?;
+
+            let mut cache = Cache::new();
+            let mut backend = SceneBackend::new(&mut cache);
+
+            render_page(
+                &mut backend,
+                &file,
+                &page,
+                Transform2F::from_scale(72. / 25.4),
+            )?;
+
+            let image = Rasterizer::new().rasterize(backend.finish(), None);
+            col.add_still(image);
+
+            // image.save(opt.image)?;
         }
         "svg" => {
             // TODO: Should the svg be scaled? if so by what number?
