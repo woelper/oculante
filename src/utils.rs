@@ -98,8 +98,6 @@ impl ExtendedImageInfo {
             num_pixels += 1;
         }
 
-        
-
         let mut green_histogram: Vec<(i32, i32)> = green_histogram
             .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
@@ -463,16 +461,17 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
 /// Advance to the prev/next image
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
-        let mut files = std::fs::read_dir(parent)
-            .unwrap()
-            .map(|x| x.unwrap().path())
-            .filter(|x| is_ext_compatible(x))
-            .collect::<Vec<PathBuf>>();
-        files.sort();
-        for (i, f) in files.iter().enumerate() {
-            if f == file {
-                if let Some(next) = files.get((i as isize + inc) as usize) {
-                    return next.clone();
+        if let Ok(info) = std::fs::read_dir(parent) {
+            let mut files = info
+                .map(|x| x.unwrap().path())
+                .filter(|x| is_ext_compatible(x))
+                .collect::<Vec<PathBuf>>();
+            files.sort();
+            for (i, f) in files.iter().enumerate() {
+                if f == file {
+                    if let Some(next) = files.get((i as isize + inc) as usize) {
+                        return next.clone();
+                    }
                 }
             }
         }
