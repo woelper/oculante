@@ -10,7 +10,7 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Available for Win, Mac, Linux and NetBSD
 - Supports a wide range of images and SVG
 - Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
-- Lets you pick pixels, displays location and color values
+- Lets you pick pixels, display location and color values
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 
 [![build](https://github.com/woelper/oculante/actions/workflows/rust.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/rust.yml)
@@ -69,8 +69,10 @@ pkgin install oculante
 - Window can be configured to be always on top - helpful to keep image as reference
 - Low cpu usage
 - Non-destructive painting and operator stack - edit very large images interactively by scaling them down first, then deleting the downscale operator once you want to export.
+- Metafile support: Edit stack can be saved into a metafile which will be auto-loaded and applied when loading the original.
 - Pretty fast startup / loading time
 - Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
+- Lossless JPEG editing: Crop, rotate, mirror without recmpressing data
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
 
