@@ -1,3 +1,9 @@
+# 0.6.24 (2022-12-08)
+
+### :sparkles: Features
+
+* Lossless JPEG editing (2b4e4d40)
+
 # 0.6.23 (2022-12-03)
 
 ### :beetle: Bug Fixes
