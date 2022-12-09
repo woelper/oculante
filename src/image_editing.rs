@@ -1,10 +1,12 @@
 use std::fmt;
+use std::path::Path;
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 use evalexpr::*;
 use image::{imageops, RgbaImage};
 use imageops::FilterType::*;
+use log::debug;
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
@@ -12,6 +14,7 @@ use palette::Pixel;
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
+use anyhow::Result;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -112,7 +115,9 @@ pub enum ImageOperation {
         aspect: bool,
         filter: ScaleFilter,
     },
-    Crop((u32, u32, u32, u32)),
+    /// Left, right, top, bottom
+    // x,y (top left corner of crop), width, height
+    Crop([u32; 4]),
 }
 
 impl fmt::Display for ImageOperation {
@@ -244,40 +249,53 @@ impl ImageOperation {
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
             Self::Crop(bounds) => {
+                let mut float_bounds = bounds.map(|b| b as f32 / 255.);
+                // debug!("Float bounds {:?}", float_bounds);
+
                 let available_w_single_spacing =
                     ui.available_width() - 60. - ui.style().spacing.item_spacing.x * 3.;
                 ui.horizontal(|ui| {
                     let mut r1 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut bounds.0)
-                            .speed(4.)
-                            .clamp_range(0..=10000)
-                            .prefix("⏴ "),
+                        egui::DragValue::new(&mut float_bounds[0])
+                            .speed(0.004)
+                            .clamp_range(0.0..=1.0)
+                            // X
+                            .prefix("⏴ ")
+                            ,
                     );
                     let r2 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut bounds.2)
-                            .speed(4.)
-                            .clamp_range(0..=10000)
+                        egui::DragValue::new(&mut float_bounds[2])
+                            .speed(0.004)
+                            .clamp_range(0.0..=1.0)
+                            // WIDTH
                             .prefix("⏵ "),
                     );
                     let r3 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut bounds.1)
-                            .speed(4.)
-                            .clamp_range(0..=10000)
+                        egui::DragValue::new(&mut float_bounds[1])
+                            .speed(0.004)
+                            .clamp_range(0.0..=1.0)
+                            // Y
                             .prefix("⏶ "),
                     );
                     let r4 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
-                        egui::DragValue::new(&mut bounds.3)
-                            .speed(4.)
-                            .clamp_range(0..=10000)
+                        egui::DragValue::new(&mut float_bounds[3])
+                            .speed(0.004)
+                            .clamp_range(0.0..=1.0)
+                            // HEIGHT
                             .prefix("⏷ "),
                     );
                     // TODO rewrite with any
                     if r2.changed() || r3.changed() || r4.changed() {
                         r1.changed = true;
+                    }
+                    if r1.changed() {
+                        // commit back changed vals
+                        *bounds = float_bounds.map(|b| (b * 255.) as u32);
+                        debug!("changed bounds {:?}", bounds);
                     }
                     r1
                 })
@@ -405,7 +423,7 @@ impl ImageOperation {
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
-                    r0.changed = r0.drag_released();
+                    r0.changed = r0.drag_released() || r1.drag_released() || r2.changed();
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{:?}", filter))
@@ -440,14 +458,10 @@ impl ImageOperation {
                 }
             }
             Self::Crop(dim) => {
-                if *dim != (0, 0, 0, 0) {
-                    let sub_img = image::imageops::crop_imm(
-                        img,
-                        dim.0.max(0),
-                        dim.1.max(0),
-                        (img.width() as i32 - dim.2 as i32 - dim.0 as i32).max(0) as u32,
-                        (img.height() as i32 - dim.3 as i32 - dim.1 as i32).max(0) as u32,
-                    );
+                if *dim != [0, 0, 0, 0] {
+                    let window = cropped_range(dim, &(img.width(), img.height()));
+                    let sub_img =
+                        image::imageops::crop_imm(img, window[0], window[1], window[2], window[3]);
                     *img = sub_img.to_image();
                 }
             }
@@ -682,4 +696,67 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
             px[2] = (float_pixel[2]) as u8;
             px[3] = (float_pixel[3]) as u8;
         });
+}
+
+/// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
+/// The crop is expected in UV coords, 0-1, encoded as 8 bit (0-255)
+pub fn cropped_range(crop: &[u32; 4], img_dim: &(u32, u32)) -> [u32; 4] {
+    let crop = crop.map(|c| c as f32 / 255.);
+    debug!("crop range fn: {:?}", crop);
+
+    let crop = [
+        crop[0].max(0.0),
+        crop[1].max(0.0),
+        (1.0 - crop[2] - crop[0]).max(0.0),
+        (1.0 - crop[3] - crop[1]).max(0.0),
+    ];
+
+    debug!("crop range window: {:?}", crop);
+
+    let crop = [
+        (crop[0] * img_dim.0 as f32) as u32,
+        (crop[1] * img_dim.1 as f32) as u32,
+        (crop[2] * img_dim.0 as f32) as u32,
+        (crop[3] * img_dim.1 as f32) as u32,
+    ];
+
+    debug!("crop range window abs: {:?} res: {:?}", crop, img_dim);
+
+    crop
+}
+
+/// Transform a JPEG losslessly
+pub fn lossless_tx(p: &Path, transform: turbojpeg::Transform) -> Result<()> {
+    let jpeg_data = std::fs::read(p)?;
+
+    let mut decompressor = turbojpeg::Decompressor::new()?;
+
+    // read the JPEG header
+    let header = decompressor.read_header(&jpeg_data)?;
+    let mcu_h = header.subsamp.mcu_height();
+    let mcu_w = header.subsamp.mcu_width();
+
+    debug!("h {mcu_h} w {mcu_w}");
+
+    // make sure crop is aligned to mcu bounds
+    let mut transform = transform;
+    if let Some(c) = transform.crop.as_mut() {
+        c.x = (c.x as f32 / mcu_w as f32) as usize * mcu_w;
+        c.y = (c.y as f32 / mcu_h as f32) as usize * mcu_h;
+        // the start point may have shifted, make sure we don't go over bounds
+        // if let Some(crop_w) = c.width.as_mut() {
+        //     *crop_w = *crop_w;
+        // }
+        // if let Some(crop_h) = c.height.as_mut() {
+        //     // *crop_h = (*crop_h + c.y).min(header.height - c.y);
+        // }
+        debug!("jpg crop transform {:#?}", c);
+    }
+
+    // apply the transformation
+    let transformed_data = turbojpeg::transform(&transform, &jpeg_data)?;
+
+    // write the changed JPEG back to disk
+    std::fs::write(p, &transformed_data)?;
+    Ok(())
 }

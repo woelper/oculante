@@ -2,7 +2,7 @@ use std::{ops::RangeInclusive, time::Instant};
 
 use egui::plot::Plot;
 use image::RgbaImage;
-use log::{debug, info};
+use log::{debug, info, warn};
 use notan::{
     egui::{
         self,
@@ -13,7 +13,9 @@ use notan::{
 };
 
 use crate::{
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    image_editing::{
+        cropped_range, lossless_tx, process_pixels, Channel, ImageOperation, ScaleFilter,
+    },
     paint::PaintStroke,
     update,
     utils::{
@@ -156,7 +158,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
-                    
+
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
                         let max_chars = 20;
@@ -456,7 +458,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
                         ImageOperation::Rotate(false),
                         ImageOperation::HSV((0, 100, 100)),
-                        ImageOperation::Crop((0, 0, 0, 0)),
+                        ImageOperation::Crop([0, 0, 0, 0]),
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
@@ -894,6 +896,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             }
                         });
                 });
+                jpg_lossles_ui(state, ui);
 
                 if let Some(p) = &state.current_path {
                     let text = if p
@@ -1134,5 +1137,152 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
         if swap.1 < stack.len() {
             stack.swap(swap.0, swap.1);
         }
+    }
+}
+
+/// A ui for lossless JPEG editing
+fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
+    if let Some(p) = &state.current_path.clone() {
+        if p.extension()
+            .map(|e| e.to_string_lossy().to_string().to_lowercase())
+            != Some("jpg".to_string())
+        {
+            return;
+        }
+
+        ui.collapsing("Lossless Jpeg transforms", |ui| {
+            ui.label("These operations will immediately write changes to disk.");
+            let mut reload = false;
+
+            ui.vertical_centered_justified(|ui| {
+                if ui.button("⟳ Rotate 90").clicked() {
+                    if lossless_tx(
+                        p,
+                        turbojpeg::Transform {
+                            op: turbojpeg::TransformOp::Rot90,
+                            ..turbojpeg::Transform::default()
+                        },
+                    )
+                    .is_ok()
+                    {
+                        reload = true;
+                    }
+                }
+
+                if ui.button("⟳ Rotate -90").clicked() {
+                    if lossless_tx(
+                        p,
+                        turbojpeg::Transform {
+                            op: turbojpeg::TransformOp::Rot270,
+                            ..turbojpeg::Transform::default()
+                        },
+                    )
+                    .is_ok()
+                    {
+                        reload = true;
+                    }
+                }
+
+                if ui.button("Flip H").clicked() {
+                    if lossless_tx(
+                        p,
+                        turbojpeg::Transform {
+                            op: turbojpeg::TransformOp::Hflip,
+                            ..turbojpeg::Transform::default()
+                        },
+                    )
+                    .is_ok()
+                    {
+                        reload = true;
+                    }
+                }
+
+                if ui.button("Flip V").clicked() {
+                    if lossless_tx(
+                        p,
+                        turbojpeg::Transform {
+                            op: turbojpeg::TransformOp::Vflip,
+                            ..turbojpeg::Transform::default()
+                        },
+                    )
+                    .is_ok()
+                    {
+                        reload = true;
+                    }
+                }
+
+                let crop_ops = state
+                    .edit_state
+                    .image_op_stack
+                    .iter()
+                    .filter(|op| match op {
+                        ImageOperation::Crop(_) => true,
+                        _ => false,
+                    })
+                    .collect::<Vec<_>>();
+
+                let crop = crop_ops
+                    .first()
+                    .cloned()
+                    .cloned()
+                    .unwrap_or(ImageOperation::Crop([0, 0, 0, 0]));
+
+                if crop_ops.len() == 0 {
+                    info!("A missing crop operator was added.");
+                    state
+                        .edit_state
+                        .image_op_stack
+                        .push(ImageOperation::Crop([0, 0, 0, 0]))
+                }
+
+                ui.add_enabled_ui(crop != ImageOperation::Crop([0, 0, 0, 0]), |ui| {
+
+                    if ui
+                        .button("Crop")
+                        .on_hover_text("Crop according to values defined in the operator stack above")
+                        .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
+                        .clicked()
+                    {
+                        match crop {
+                            ImageOperation::Crop(amt) => {
+                                debug!("CROP {:?}", amt);
+    
+                                let dim = state
+                                    .current_image
+                                    .as_ref()
+                                    .map(|i| i.dimensions())
+                                    .unwrap_or_default();
+    
+                                let crop_range = cropped_range(&amt, &dim);
+    
+                                match lossless_tx(
+                                    p,
+                                    turbojpeg::Transform {
+                                        op: turbojpeg::TransformOp::None,
+                                        crop: Some(turbojpeg::TransformCrop {
+                                            x: crop_range[0] as usize,
+                                            y: crop_range[1] as usize,
+                                            width: Some(crop_range[2] as usize),
+                                            height: Some(crop_range[3] as usize),
+                                        }),
+                                        ..turbojpeg::Transform::default()
+                                    },
+                                ) {
+                                    Ok(_) => reload = true,
+                                    Err(e) => warn!("{e}"),
+                                };
+                            }
+                            _ => (),
+                        };
+                    }
+                });
+                });
+
+
+            if reload {
+                state.is_loaded = false;
+                state.player.load(&p, state.message_channel.0.clone());
+            }
+        });
     }
 }
