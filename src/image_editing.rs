@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
+use anyhow::Result;
 use evalexpr::*;
 use image::{imageops, RgbaImage};
 use imageops::FilterType::*;
@@ -14,7 +15,6 @@ use palette::Pixel;
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -104,7 +104,7 @@ pub enum ImageOperation {
         amt: u8,
         mono: bool,
     },
-    Rotate(bool),
+    Rotate(i16),
     HSV((u16, i32, i32)),
     ChromaticAberration(u8),
     ChannelSwap((Channel, Channel)),
@@ -239,11 +239,20 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Rotate(ccw) => {
-                let mut r = ui.radio_value(ccw, true, "CCW");
-                if ui.radio_value(ccw, false, "CW").changed() {
-                    r.changed = true
+            Self::Rotate(angle) => {
+                let mut r = ui.selectable_value(angle, 90, "◔ 90°");
+
+                if r.clicked() {
+                    r.mark_changed();
                 }
+
+                if ui.selectable_value(angle, 270, "◕ -90°").clicked() {
+                    r.mark_changed();
+                }
+                if ui.selectable_value(angle, 180, "◑ 180°").clicked() {
+                    r.mark_changed();
+                }
+
                 r
             }
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
@@ -261,8 +270,7 @@ impl ImageOperation {
                             .speed(0.004)
                             .clamp_range(0.0..=1.0)
                             // X
-                            .prefix("⏴ ")
-                            ,
+                            .prefix("⏵ "),
                     );
                     let r2 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
@@ -270,7 +278,7 @@ impl ImageOperation {
                             .speed(0.004)
                             .clamp_range(0.0..=1.0)
                             // WIDTH
-                            .prefix("⏵ "),
+                            .prefix("⏴ "),
                     );
                     let r3 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
@@ -278,7 +286,7 @@ impl ImageOperation {
                             .speed(0.004)
                             .clamp_range(0.0..=1.0)
                             // Y
-                            .prefix("⏶ "),
+                            .prefix("⏷ "),
                     );
                     let r4 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
@@ -286,7 +294,7 @@ impl ImageOperation {
                             .speed(0.004)
                             .clamp_range(0.0..=1.0)
                             // HEIGHT
-                            .prefix("⏷ "),
+                            .prefix("⏶ "),
                     );
                     // TODO rewrite with any
                     if r2.changed() || r3.changed() || r4.changed() {
@@ -480,11 +488,14 @@ impl ImageOperation {
                     *img = image::imageops::resize(img, dimensions.0, dimensions.1, filter);
                 }
             }
-            Self::Rotate(ccw) => {
-                if *ccw {
-                    *img = image::imageops::rotate270(img);
-                } else {
-                    *img = image::imageops::rotate90(img);
+            Self::Rotate(angle) => {
+                match angle {
+                    90 => *img = image::imageops::rotate90(img),
+                    -90 => *img = image::imageops::rotate270(img),
+                    270 => *img = image::imageops::rotate270(img),
+                    180 => *img = image::imageops::rotate180(img),
+                    // 270 => *img = image::imageops::rotate270(img),
+                    _ => (),
                 }
             }
             Self::Flip(vert) => {

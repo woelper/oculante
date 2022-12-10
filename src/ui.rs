@@ -456,7 +456,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::Equalize((0, 255)),
                         ImageOperation::Posterize(8),
                         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-                        ImageOperation::Rotate(false),
+                        ImageOperation::Rotate(90),
                         ImageOperation::HSV((0, 100, 100)),
                         ImageOperation::Crop([0, 0, 0, 0]),
                         ImageOperation::Mult([255, 255, 255]),
@@ -1154,8 +1154,8 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
             ui.label("These operations will immediately write changes to disk.");
             let mut reload = false;
 
-            ui.vertical_centered_justified(|ui| {
-                if ui.button("⟳ Rotate 90").clicked() {
+            ui.columns(3, |col| {
+                if col[0].button("◔ Rotate 90°").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1168,8 +1168,8 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                         reload = true;
                     }
                 }
-
-                if ui.button("⟳ Rotate -90").clicked() {
+                //◑
+                if col[1].button("◕ Rotate -90°").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1183,7 +1183,23 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                     }
                 }
 
-                if ui.button("Flip H").clicked() {
+                if col[2].button("◑ Rotate 180°").clicked() {
+                    if lossless_tx(
+                        p,
+                        turbojpeg::Transform {
+                            op: turbojpeg::TransformOp::Rot180,
+                            ..turbojpeg::Transform::default()
+                        },
+                    )
+                    .is_ok()
+                    {
+                        reload = true;
+                    }
+                }
+            });
+
+            ui.columns(2,|col| {
+                if col[0].button("Flip H").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1197,7 +1213,7 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                     }
                 }
 
-                if ui.button("Flip V").clicked() {
+                if col[1].button("Flip V").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1210,6 +1226,11 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                         reload = true;
                     }
                 }
+            });
+
+            ui.vertical_centered_justified(|ui| {
+
+
 
                 let crop_ops = state
                     .edit_state
@@ -1246,15 +1267,15 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                         match crop {
                             ImageOperation::Crop(amt) => {
                                 debug!("CROP {:?}", amt);
-    
+
                                 let dim = state
                                     .current_image
                                     .as_ref()
                                     .map(|i| i.dimensions())
                                     .unwrap_or_default();
-    
+
                                 let crop_range = cropped_range(&amt, &dim);
-    
+
                                 match lossless_tx(
                                     p,
                                     turbojpeg::Transform {
@@ -1276,6 +1297,11 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                         };
                     }
                 });
+                });
+
+
+                ui.vertical_centered_justified(|ui| {
+
                 });
 
 
