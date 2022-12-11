@@ -29,5 +29,4 @@ jobs:
           command: check
 
       - name: Run cargo check without default features
-        with:
-          command: "cargo check --no-default-features"
+        run: cargo check --no-default-features
