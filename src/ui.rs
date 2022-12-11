@@ -1147,10 +1147,10 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
 #[cfg(feature = "turbo")]
 fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
     if let Some(p) = &state.current_path.clone() {
-        if p.extension()
-            .map(|e| e.to_string_lossy().to_string().to_lowercase())
-            != Some("jpg".to_string())
-        {
+        let ext = p
+            .extension()
+            .map(|e| e.to_string_lossy().to_string().to_lowercase());
+        if ext != Some("jpg".to_string()) &&  ext != Some("jpeg".to_string()) {
             return;
         }
 
