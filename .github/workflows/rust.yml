@@ -29,6 +29,5 @@ jobs:
           command: check
 
       - name: Run cargo check without default features
-        uses: actions-rs/cargo@v1
         with:
-          command: "check --no-default-features"
+          command: "cargo check --no-default-features"
