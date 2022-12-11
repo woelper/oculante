@@ -1,9 +1,11 @@
 use std::fmt;
-use std::path::Path;
+
+
+
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
-use anyhow::Result;
+
 use evalexpr::*;
 use image::{imageops, RgbaImage};
 use imageops::FilterType::*;
@@ -737,7 +739,9 @@ pub fn cropped_range(crop: &[u32; 4], img_dim: &(u32, u32)) -> [u32; 4] {
 }
 
 /// Transform a JPEG losslessly
-pub fn lossless_tx(p: &Path, transform: turbojpeg::Transform) -> Result<()> {
+#[cfg(feature = "turbo")]
+pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyhow::Result<()> {
+
     let jpeg_data = std::fs::read(p)?;
 
     let mut decompressor = turbojpeg::Decompressor::new()?;

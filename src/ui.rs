@@ -2,7 +2,7 @@ use std::{ops::RangeInclusive, time::Instant};
 
 use egui::plot::Plot;
 use image::RgbaImage;
-use log::{debug, info, warn};
+use log::{debug, info};
 use notan::{
     egui::{
         self,
@@ -13,9 +13,7 @@ use notan::{
 };
 
 use crate::{
-    image_editing::{
-        cropped_range, lossless_tx, process_pixels, Channel, ImageOperation, ScaleFilter,
-    },
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     update,
     utils::{
@@ -23,6 +21,9 @@ use crate::{
         ImageExt, OculanteState,
     },
 };
+
+#[cfg(feature = "turbo")]
+use crate::image_editing::{cropped_range, lossless_tx};
 pub trait EguiExt {
     fn label_i(&mut self, _text: &str) -> Response {
         unimplemented!()
@@ -896,7 +897,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             }
                         });
                 });
-                jpg_lossles_ui(state, ui);
+
+                #[cfg(feature = "turbo")]
+                jpg_lossless_ui(state, ui);
 
                 if let Some(p) = &state.current_path {
                     let text = if p
@@ -1141,7 +1144,8 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
 }
 
 /// A ui for lossless JPEG editing
-fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
+#[cfg(feature = "turbo")]
+fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
     if let Some(p) = &state.current_path.clone() {
         if p.extension()
             .map(|e| e.to_string_lossy().to_string().to_lowercase())
@@ -1290,18 +1294,13 @@ fn jpg_lossles_ui(state: &mut OculanteState, ui: &mut Ui) {
                                     },
                                 ) {
                                     Ok(_) => reload = true,
-                                    Err(e) => warn!("{e}"),
+                                    Err(e) => log::warn!("{e}"),
                                 };
                             }
                             _ => (),
                         };
                     }
                 });
-                });
-
-
-                ui.vertical_centered_justified(|ui| {
-
                 });
 
 
