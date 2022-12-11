@@ -1,3 +1,9 @@
+# 0.6.28 (2022-12-11)
+
+### :beetle: Bug Fixes
+
+* Allow building without default features (10a0f6a4)
+
 # 0.6.27 (2022-12-10)
 
 # 0.6.26 (2022-12-09)
