@@ -1159,7 +1159,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             let mut reload = false;
 
             ui.columns(3, |col| {
-                if col[0].button("◔ Rotate 90°").clicked() {
+                if col[0].button("➡ Rotate 90°").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1173,7 +1173,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     }
                 }
                 //◑
-                if col[1].button("◕ Rotate -90°").clicked() {
+                if col[1].button("⬅ Rotate -90°").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {
@@ -1187,7 +1187,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     }
                 }
 
-                if col[2].button("◑ Rotate 180°").clicked() {
+                if col[2].button("⬇ Rotate 180°").clicked() {
                     if lossless_tx(
                         p,
                         turbojpeg::Transform {

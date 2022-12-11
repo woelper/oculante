@@ -242,16 +242,16 @@ impl ImageOperation {
                 r
             }
             Self::Rotate(angle) => {
-                let mut r = ui.selectable_value(angle, 90, "◔ 90°");
+                let mut r = ui.selectable_value(angle, 90, "➡ 90°");
 
                 if r.clicked() {
                     r.mark_changed();
                 }
 
-                if ui.selectable_value(angle, 270, "◕ -90°").clicked() {
+                if ui.selectable_value(angle, 270, "⬅ -90°").clicked() {
                     r.mark_changed();
                 }
-                if ui.selectable_value(angle, 180, "◑ 180°").clicked() {
+                if ui.selectable_value(angle, 180, "⬇ 180°").clicked() {
                     r.mark_changed();
                 }
 
