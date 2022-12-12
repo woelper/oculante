@@ -1,3 +1,9 @@
+# 0.6.29 (2022-12-12)
+
+### :beetle: Bug Fixes
+
+* Support lossless ops on jpeg and jpg (757b29fc)
+
 # 0.6.28 (2022-12-11)
 
 ### :beetle: Bug Fixes
