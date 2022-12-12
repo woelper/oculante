@@ -1,14 +1,12 @@
 use std::fmt;
-
-
-
+use std::num::NonZeroU32;
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 
 use evalexpr::*;
+use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
-use imageops::FilterType::*;
 use log::debug;
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
@@ -82,11 +80,12 @@ pub enum Channel {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum ScaleFilter {
-    Lanzcos3,
-    Gaussian,
-    Nearest,
-    Triangle,
+    Box,
+    Bilinear,
+    Hamming,
     CatmullRom,
+    Mitchell,
+    Lanczos3,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -439,11 +438,12 @@ impl ImageOperation {
                         .selected_text(format!("{:?}", filter))
                         .show_ui(ui, |ui| {
                             for f in [
-                                ScaleFilter::Triangle,
-                                ScaleFilter::Gaussian,
+                                ScaleFilter::Box,
+                                ScaleFilter::Bilinear,
+                                ScaleFilter::Hamming,
                                 ScaleFilter::CatmullRom,
-                                ScaleFilter::Nearest,
-                                ScaleFilter::Lanzcos3,
+                                ScaleFilter::Mitchell,
+                                ScaleFilter::Lanczos3,
                             ] {
                                 if ui.selectable_value(filter, f, format!("{:?}", f)).clicked() {
                                     r0.changed = true;
@@ -480,14 +480,54 @@ impl ImageOperation {
             } => {
                 if *dimensions != Default::default() {
                     let filter = match filter {
-                        ScaleFilter::Lanzcos3 => Lanczos3,
-                        ScaleFilter::Gaussian => Gaussian,
-                        ScaleFilter::Nearest => Nearest,
-                        ScaleFilter::Triangle => Triangle,
-                        ScaleFilter::CatmullRom => CatmullRom,
+                        ScaleFilter::Box => fr::FilterType::Box,
+                        ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                        ScaleFilter::Hamming => fr::FilterType::Hamming,
+                        ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                        ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                        ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
                     };
 
-                    *img = image::imageops::resize(img, dimensions.0, dimensions.1, filter);
+                    let width = NonZeroU32::new(img.width()).unwrap_or(NonZeroU32::new(1).unwrap());
+                    let height =
+                        NonZeroU32::new(img.height()).unwrap_or(NonZeroU32::new(1).unwrap());
+                    let mut src_image = fr::Image::from_vec_u8(
+                        width,
+                        height,
+                        img.clone().into_raw(),
+                        fr::PixelType::U8x4,
+                    )
+                    .unwrap();
+
+                    let mapper = fr::create_gamma_22_mapper();
+                    mapper
+                        .forward_map_inplace(&mut src_image.view_mut())
+                        .unwrap();
+
+                    // Create container for data of destination image
+                    let dst_width =
+                        NonZeroU32::new(dimensions.0).unwrap_or(NonZeroU32::new(1).unwrap());
+                    let dst_height =
+                        NonZeroU32::new(dimensions.1).unwrap_or(NonZeroU32::new(1).unwrap());
+                    let mut dst_image =
+                        fr::Image::new(dst_width, dst_height, src_image.pixel_type());
+
+                    let mut resizer = fr::Resizer::new(fr::ResizeAlg::Convolution(filter));
+
+                    resizer
+                        .resize(&src_image.view(), &mut dst_image.view_mut())
+                        .unwrap();
+
+                    mapper
+                        .backward_map_inplace(&mut dst_image.view_mut())
+                        .unwrap();
+
+                    *img = image::RgbaImage::from_raw(
+                        dimensions.0,
+                        dimensions.1,
+                        dst_image.into_vec(),
+                    )
+                    .unwrap();
                 }
             }
             Self::Rotate(angle) => {
@@ -741,7 +781,6 @@ pub fn cropped_range(crop: &[u32; 4], img_dim: &(u32, u32)) -> [u32; 4] {
 /// Transform a JPEG losslessly
 #[cfg(feature = "turbo")]
 pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyhow::Result<()> {
-
     let jpeg_data = std::fs::read(p)?;
 
     let mut decompressor = turbojpeg::Decompressor::new()?;

@@ -472,7 +472,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::Resize {
                             dimensions: state.image_dimension,
                             aspect: true,
-                            filter: ScaleFilter::Triangle,
+                            filter: ScaleFilter::Hamming,
                         },
                         ImageOperation::Invert,
                         ImageOperation::Flip(false),

@@ -139,7 +139,7 @@ fn bench_process_all() {
             ImageOperation::Resize {
                 dimensions: (300, 200),
                 aspect: true,
-                filter: ScaleFilter::Gaussian,
+                filter: ScaleFilter::Hamming,
             },
             // ImageOperation::
         ];
