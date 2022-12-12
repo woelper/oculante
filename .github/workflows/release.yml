@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  MACOS_DEPLOYMENT_TARGET: 10.15
 
 jobs:
   release_job:
