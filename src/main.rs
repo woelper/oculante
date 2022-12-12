@@ -204,7 +204,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     // pan image with keyboard
-    if !state.mouse_grab {
+    if !state.key_grab {
         if app.keyboard.shift() {
             if app.keyboard.is_down(KeyCode::Right) {
                 state.offset.x += 10.;
@@ -235,23 +235,23 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::KeyDown { key: KeyCode::V } => {
-            if !state.mouse_grab {
+            if !state.key_grab {
                 state.reset_image = true
             }
         }
         Event::KeyDown { key: KeyCode::Q } => {
-            if !state.mouse_grab {
+            if !state.key_grab {
                 std::process::exit(0)
             }
         }
         Event::KeyDown { key: KeyCode::I } => {
-            if !state.mouse_grab {
+            if !state.key_grab {
                 state.info_enabled = !state.info_enabled
             }
         }
 
         Event::KeyDown { key: KeyCode::E } => {
-            if !state.mouse_grab {
+            if !state.key_grab {
                 state.edit_enabled = !state.edit_enabled
             }
         }
@@ -537,28 +537,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     let mut changed_channels = false;
 
-                    if app.keyboard.was_pressed(KeyCode::R) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::R) && !state.key_grab {
                         state.current_channel = Channel::Red;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::G) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::G) && !state.key_grab {
                         state.current_channel = Channel::Green;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::B) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::B) && !state.key_grab {
                         state.current_channel = Channel::Blue;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::A) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::A) && !state.key_grab {
                         state.current_channel = Channel::Alpha;
                         changed_channels = true;
                     }
 
-                    if app.keyboard.was_pressed(KeyCode::U) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::U) && !state.key_grab {
                         state.current_channel = Channel::RGB;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::C) && !state.mouse_grab {
+                    if app.keyboard.was_pressed(KeyCode::C) && !state.key_grab {
                         state.current_channel = Channel::RGBA;
                         changed_channels = true;
                     }
@@ -610,7 +610,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 .clicked()
                                 || (!app.keyboard.shift()
                                     && app.keyboard.was_pressed(KeyCode::Left)
-                                    && !state.mouse_grab)
+                                    && !state.key_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, -1);
@@ -628,7 +628,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 .clicked()
                                 || (!app.keyboard.shift()
                                     && app.keyboard.was_pressed(KeyCode::Right)
-                                    && !state.mouse_grab)
+                                    && !state.key_grab)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, 1);
@@ -669,7 +669,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
-                        || app.keyboard.was_pressed(KeyCode::F)
+                        || (app.keyboard.was_pressed(KeyCode::F) && !state.key_grab)
                     {
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
@@ -682,7 +682,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui,
                     )
                     .clicked()
-                        || app.keyboard.was_pressed(KeyCode::T)
+                        || (app.keyboard.was_pressed(KeyCode::T) && !state.key_grab)
                     {
                         state.always_on_top = !state.always_on_top;
                         app.window().set_always_on_top(state.always_on_top);
@@ -810,6 +810,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
+        }
+
+        if ctx.wants_keyboard_input() {
+            state.key_grab = true;
+        } else {
+            state.key_grab = false;
         }
     });
 
