@@ -1,3 +1,13 @@
+# 0.6.30 (2022-12-12)
+
+### :sparkles: Features
+
+* Correct gamma scaling and SIMD speedup (21d7159b)
+
+### :green_apple: Chore
+
+* update dependencies (1c73246b)
+
 # 0.6.29 (2022-12-12)
 
 ### :beetle: Bug Fixes
