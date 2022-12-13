@@ -73,7 +73,7 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true);
+        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
     }
 
     #[cfg(target_os = "macos")]
