@@ -1,3 +1,9 @@
+# 0.6.32 (2022-12-13)
+
+### :sparkles: Features
+
+* Mipmap generation (smoother images when zoomed out) and correct gamme when zooming (SRgba8 format) (b83b1c65)
+
 # 0.6.31 (2022-12-13)
 
 # 0.6.30 (2022-12-12)
