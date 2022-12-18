@@ -842,10 +842,10 @@ impl ImageExt for RgbaImage {
     }
 
     fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
-        gfx.create_texture()
-            .from_bytes(self, self.width() as i32, self.height() as i32)
-            .with_mipmaps(true)
-            .with_format(notan::prelude::TextureFormat::SRgba8)
+gfx.create_texture()
+    .from_bytes(self, self.width() as i32, self.height() as i32)
+    .with_mipmaps(true)
+    .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
             // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)

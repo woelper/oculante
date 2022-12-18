@@ -256,34 +256,41 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         // zoom in
-        Event::KeyDown { key: KeyCode::Plus } => {
-            let delta = zoomratio(1.5, state.scale);
-            let new_scale = state.scale + delta;
-            // limit scale
-            if new_scale > 0.05 && new_scale < 40. {
-                // We want to zoom towards the center
-                let center: Vector2<f32> = nalgebra::Vector2::new(
-                    app.window().width() as f32 / 2.,
-                    app.window().height() as f32 / 2.,
-                );
-                state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                state.scale += delta;
+        Event::KeyDown { key: KeyCode::Plus }
+        | Event::KeyDown {
+            key: KeyCode::Equals,
+        } => {
+            if !state.key_grab {
+                let delta = zoomratio(1.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
             }
         }
         Event::KeyDown {
             key: KeyCode::Minus,
         } => {
-            let delta = zoomratio(-1.5, state.scale);
-            let new_scale = state.scale + delta;
-            // limit scale
-            if new_scale > 0.05 && new_scale < 40. {
-                // We want to zoom towards the center
-                let center: Vector2<f32> = nalgebra::Vector2::new(
-                    app.window().width() as f32 / 2.,
-                    app.window().height() as f32 / 2.,
-                );
-                state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                state.scale += delta;
+            if !state.key_grab {
+                let delta = zoomratio(-1.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
             }
         }
         Event::KeyDown {
@@ -305,7 +312,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::MouseDown { button, .. } => {
             state.drag_enabled = true;
-
             match button {
                 MouseButton::Left => {
                     if !state.mouse_grab {
@@ -322,7 +328,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             MouseButton::Left | MouseButton::Middle => state.drag_enabled = false,
             _ => {}
         },
-        _ => {}
+        _ => {
+            debug!("{:?}", evt);
+        }
     }
 }
 
@@ -669,7 +677,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
-                        || (app.keyboard.was_pressed(KeyCode::F) && !state.key_grab)
+                        || (app.keyboard.was_released(KeyCode::F) && !state.key_grab)
                     {
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
