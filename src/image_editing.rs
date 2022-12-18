@@ -118,6 +118,7 @@ pub enum ImageOperation {
     },
     /// Left, right, top, bottom
     // x,y (top left corner of crop), width, height
+    // 1.0 equals 10000
     Crop([u32; 4]),
 }
 
@@ -259,7 +260,7 @@ impl ImageOperation {
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
             Self::Crop(bounds) => {
-                let mut float_bounds = bounds.map(|b| b as f32 / 255.);
+                let mut float_bounds = bounds.map(|b| b as f32 / 10000.);
                 // debug!("Float bounds {:?}", float_bounds);
 
                 let available_w_single_spacing =
@@ -303,7 +304,7 @@ impl ImageOperation {
                     }
                     if r1.changed() {
                         // commit back changed vals
-                        *bounds = float_bounds.map(|b| (b * 255.) as u32);
+                        *bounds = float_bounds.map(|b| (b * 10000.) as u32);
                         debug!("changed bounds {:?}", bounds);
                     }
                     r1
@@ -754,7 +755,7 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
 /// The crop is expected in UV coords, 0-1, encoded as 8 bit (0-255)
 pub fn cropped_range(crop: &[u32; 4], img_dim: &(u32, u32)) -> [u32; 4] {
-    let crop = crop.map(|c| c as f32 / 255.);
+    let crop = crop.map(|c| c as f32 / 10000.);
     debug!("crop range fn: {:?}", crop);
 
     let crop = [
