@@ -379,6 +379,7 @@ pub struct OculanteState {
     pub always_on_top: bool,
     pub network_mode: bool,
     pub toast_cooldown: f32,
+    pub fullscreen_offset: Option<(i32, i32)>,
 }
 
 impl Default for OculanteState {
@@ -420,6 +421,7 @@ impl Default for OculanteState {
             network_mode: false,
             window_size: Default::default(),
             toast_cooldown: 0.,
+            fullscreen_offset: None,
         }
     }
 }
@@ -842,10 +844,10 @@ impl ImageExt for RgbaImage {
     }
 
     fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
-gfx.create_texture()
-    .from_bytes(self, self.width() as i32, self.height() as i32)
-    .with_mipmaps(true)
-    .with_format(notan::prelude::TextureFormat::SRgba8)
+        gfx.create_texture()
+            .from_bytes(self, self.width() as i32, self.height() as i32)
+            .with_mipmaps(true)
+            .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
             // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
             // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)

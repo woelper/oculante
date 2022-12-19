@@ -297,10 +297,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             key: KeyCode::Paste,
         } => {}
         Event::WindowResize { width, height } => {
-            if !state.edit_enabled {
-                let delta = state.window_size - (width, height).size_vec();
-                state.offset -= delta / 2.;
-            }
+            debug!("Window resize {width}x{height}");
+            // if !state.edit_enabled {
+            //     let delta = state.window_size - (width, height).size_vec();
+            //     state.offset -= delta / 2.;
+            // }
         }
         Event::Drop(file) => {
             if let Some(p) = file.path {
@@ -329,7 +330,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             _ => {}
         },
         _ => {
-            debug!("{:?}", evt);
+            // debug!("{:?}", evt);
         }
     }
 }
@@ -681,7 +682,27 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     {
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
-                        state.reset_image = true;
+
+                        if !fullscreen {
+                            let mut window_pos = app.window().position();
+                            window_pos.1 += 40;
+
+                            debug!("Not fullscreen {:?}", window_pos);
+                            // if going from window to fullscreen, offset by window pos
+                            state.offset.x += window_pos.0 as f32;
+                            state.offset.y += window_pos.1 as f32;
+                            // save old window pos
+                            state.fullscreen_offset = Some(window_pos);
+                        } else {
+                            // info!("Is fullscreen {:?}", window_pos);
+
+                            if let Some(sf) = state.fullscreen_offset {
+                                state.offset.x -= sf.0 as f32;
+                                state.offset.y -= sf.1 as f32;
+                            }
+                        }
+
+                        // state.reset_image = true;
                     }
 
                     if tooltip(

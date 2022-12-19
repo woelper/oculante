@@ -1150,7 +1150,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
         let ext = p
             .extension()
             .map(|e| e.to_string_lossy().to_string().to_lowercase());
-        if ext != Some("jpg".to_string()) &&  ext != Some("jpeg".to_string()) {
+        if ext != Some("jpg".to_string()) && ext != Some("jpeg".to_string()) {
             return;
         }
 
