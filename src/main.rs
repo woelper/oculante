@@ -681,6 +681,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     {
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
+                        state.reset_image = true;
                     }
 
                     if tooltip(
