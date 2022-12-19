@@ -1,3 +1,13 @@
+# 0.6.34 (2022-12-19)
+
+### :beetle: Bug Fixes
+
+* Correct offset when entering/exiting full-screen mode (2ffe2d03)
+
+### :green_apple: Chore
+
+* Enhance crop precision (3b02a304)
+
 # 0.6.33 (2022-12-18)
 
 # 0.6.32 (2022-12-13)
