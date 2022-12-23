@@ -17,7 +17,9 @@ use std::sync::mpsc;
 use strum::IntoEnumIterator;
 
 pub mod settings;
-
+pub mod shortcuts;
+use crate::shortcuts::ShortcutExt;
+use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
 // mod events;
@@ -205,6 +207,13 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     // pan image with keyboard
     if !state.key_grab {
+        if state
+            .shortcuts
+            .was_pressed(&PanRight, &app.keyboard.pressed)
+        {
+            state.offset.x += 10.;
+        }
+
         if app.keyboard.shift() {
             if app.keyboard.is_down(KeyCode::Right) {
                 state.offset.x += 10.;
@@ -712,8 +721,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui,
                     )
                     .clicked()
-                        || (app.keyboard.was_pressed(KeyCode::T) && !state.key_grab)
+                        || ((app.keyboard.was_pressed(KeyCode::F)
+                            || state
+                                .shortcuts
+                                .was_pressed(&AlwaysOnTop, &app.keyboard.pressed))
+                            && !state.key_grab)
                     {
+                        debug!("Set always on top");
                         state.always_on_top = !state.always_on_top;
                         app.window().set_always_on_top(state.always_on_top);
                     }

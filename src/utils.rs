@@ -36,6 +36,7 @@ use strum_macros::EnumIter;
 
 use crate::image_editing::EditState;
 use crate::settings::PersistentSettings;
+use crate::shortcuts::{Shortcuts, ShortcutExt};
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
@@ -380,6 +381,7 @@ pub struct OculanteState {
     pub network_mode: bool,
     pub toast_cooldown: f32,
     pub fullscreen_offset: Option<(i32, i32)>,
+    pub shortcuts: Shortcuts
 }
 
 impl Default for OculanteState {
@@ -422,6 +424,7 @@ impl Default for OculanteState {
             window_size: Default::default(),
             toast_cooldown: 0.,
             fullscreen_offset: None,
+            shortcuts: Shortcuts::default_keys()
         }
     }
 }
