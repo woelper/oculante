@@ -1,4 +1,8 @@
-use std::{ops::RangeInclusive, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::RangeInclusive,
+    time::Instant,
+};
 
 use egui::plot::Plot;
 use image::RgbaImage;
@@ -15,11 +19,12 @@ use notan::{
 use crate::{
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
+    shortcuts::lookup,
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
         ImageExt, OculanteState,
-    }, shortcuts::lookup_as_string,
+    },
 };
 
 #[cfg(feature = "turbo")]
@@ -1331,23 +1336,33 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         }
     });
 
-    egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
-        egui::Grid::new("info").num_columns(2).show(ui, |ui| {
-            let s = state.shortcuts.clone();
-            for (event, keys) in &mut state.shortcuts {
-                ui.label(format!("{:?}", event));
-    
+    let mut changed = false;
 
-                ui.label(lookup_as_string(&s, event));
-                if !no_keys_pressed {
-                    if ui.button("assign").clicked() {
-                        *keys = app.keyboard.down.iter().map(|(k, _)| k.clone()).collect();
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+                let s = state.persistent_settings.shortcuts.clone();
+                for (event, keys) in &mut state.persistent_settings.shortcuts {
+                    ui.label(format!("{:?}", event));
+
+                    ui.label(lookup(&s, event));
+                    if !no_keys_pressed {
+                        if ui.button("assign").clicked() {
+                            *keys = app
+                                .keyboard
+                                .down
+                                .iter()
+                                .map(|(k, _)| format!("{:?}", k))
+                                .collect();
+                            changed = true;
+                        }
                     }
+                    ui.end_row();
                 }
-                ui.end_row();
-            }
+            });
         });
-    });
-
-    
+    if changed {
+        _ = state.persistent_settings.save();
+    }
 }

@@ -381,7 +381,6 @@ pub struct OculanteState {
     pub network_mode: bool,
     pub toast_cooldown: f32,
     pub fullscreen_offset: Option<(i32, i32)>,
-    pub shortcuts: Shortcuts
 }
 
 impl Default for OculanteState {
@@ -424,7 +423,6 @@ impl Default for OculanteState {
             window_size: Default::default(),
             toast_cooldown: 0.,
             fullscreen_offset: None,
-            shortcuts: Shortcuts::default_keys(),
             
         }
     }

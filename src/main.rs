@@ -12,7 +12,7 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use shortcuts::lookup_as_string;
+use shortcuts::lookup;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -21,7 +21,6 @@ use strum::IntoEnumIterator;
 pub mod settings;
 pub mod shortcuts;
 use crate::shortcuts::InputEvent::*;
-use crate::shortcuts::ShortcutExt;
 mod utils;
 use utils::*;
 // mod events;
@@ -244,9 +243,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.edit_enabled = !state.edit_enabled
             }
-
-     
-           
         }
         _ => (),
     }
@@ -302,7 +298,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-
 
         Event::Drop(file) => {
             if let Some(p) = file.path {
@@ -616,11 +611,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     if state.current_image.is_some() {
                         if state.current_path.is_some() {
-                            if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
+                            if tooltip(unframed_button("◀", ui), "Previous image", &lookup(&state.persistent_settings.shortcuts, &PreviousImage), ui)
                                 .clicked()
-                                || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Left)
-                                    && !state.key_grab)
+                                || key_pressed(app, state, PreviousImage)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, -1);
@@ -634,11 +627,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     }
                                 }
                             }
-                            if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
+                            if tooltip(unframed_button("▶", ui), "Next image", &lookup(&state.persistent_settings.shortcuts, &NextImage), ui)
                                 .clicked()
-                                || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Right)
-                                    && !state.key_grab)
+                                || key_pressed(app, state, NextImage)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
                                     let next_img = img_shift(&img_location, 1);
@@ -657,11 +648,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if tooltip(
                             ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
-                            &lookup_as_string(&state.shortcuts, &InfoMode),
+                            &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                             ui,
                         )
                         .changed()
-                            
                         {
                             send_extended_info(
                                 &state.current_image,
@@ -673,12 +663,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         tooltip(
                             ui.checkbox(&mut state.edit_enabled, "✏ Edit"),
                             "Edit the image",
-                            "e",
+                            &lookup(&state.persistent_settings.shortcuts, &EditMode),
                             ui,
                         );
                     }
 
-                    if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
+                    if tooltip(unframed_button("⛶", ui), "Full Screen", &lookup(&state.persistent_settings.shortcuts, &Fullscreen), ui).clicked()
                         || key_pressed(app, state, Fullscreen)
                     {
                         let fullscreen = app.window().is_fullscreen();
@@ -709,7 +699,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if tooltip(
                         unframed_button_colored("📌", state.always_on_top, ui),
                         "Always on top",
-                        "t",
+                        &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
                         ui,
                     )
                     .clicked()
@@ -720,11 +710,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         app.window().set_always_on_top(state.always_on_top);
                     }
 
+                    let copy_pressed = key_pressed(app, state, Copy);
                     if let Some(img) = &state.current_image {
                         if unframed_button("🗐 Copy", ui)
                             .on_hover_text("Copy image to clipboard")
                             .clicked()
-                            || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::C))
+                            || copy_pressed
                         {
                             clipboard_copy(img);
                         }
@@ -733,7 +724,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if unframed_button("📋 Paste", ui)
                         .on_hover_text("Paste image from clipboard")
                         .clicked()
-                        || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::V))
+                        || key_pressed(app, state, Paste)
                     {
                         if let Ok(clipboard) = &mut Clipboard::new() {
                             if let Ok(imagedata) = clipboard.get_image() {
