@@ -1,14 +1,12 @@
-use serde_with::serde_as;
 use std::collections::{HashMap, HashSet};
 // use hashbrown::{HashMap, HashSet};
-use log::{debug, error, info};
+use log::{debug, error};
 // use std::collections::HashMap;
 
 use crate::utils::OculanteState;
 use notan::prelude::App;
 use serde::{Deserialize, Serialize};
 
-#[serde_as]
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum InputEvent {
     AlwaysOnTop,
@@ -131,7 +129,7 @@ impl ShortcutExt for Shortcuts {
 }
 
 pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent) -> bool {
-    let mut alternates: HashMap<String, String>;
+    // let mut alternates: HashMap<String, String>;
     // alternates.insert("+", v)
 
     if state.key_grab {

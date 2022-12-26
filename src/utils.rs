@@ -36,7 +36,6 @@ use strum_macros::EnumIter;
 
 use crate::image_editing::EditState;
 use crate::settings::PersistentSettings;
-use crate::shortcuts::{Shortcuts, ShortcutExt};
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]

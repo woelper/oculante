@@ -1,28 +1,12 @@
 use anyhow::{anyhow, Result};
-use notan::prelude::KeyCode;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::DisplayFromStr;
 use std::fs::File;
-use std::collections::{HashSet, HashMap};
 use crate::shortcuts::*;
 
 
 
 
-// pub fn import_keybindings(bindings: &Shortcuts) -> HashMap<InputEvent, HashSet<u32>>{
-//     bindings.clone()
-//     .into_iter()
-//     .map(|(evt, keys)| (evt, keys.into_iter().map(|k| k as u32).collect::<HashSet<u32>>()))
-//     .collect()   
-// }
 
-// pub fn export_keybindings(bindings: &HashMap<InputEvent, HashSet<u32>>) -> Shortcuts{
-//     bindings.clone()
-//     .into_iter()
-//     .map(|(evt, keys)| (evt, keys.into_iter().map(|k| k.into()).collect::<HashSet<KeyCode>>()))
-//     .collect()   
-// }
 
 
 // #[serde_as]
