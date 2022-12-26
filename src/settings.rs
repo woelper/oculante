@@ -2,10 +2,14 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
+use crate::shortcuts::*;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PersistentSettings {
     pub accent_color: [u8; 3],
     pub vsync: bool,
+    // keybindings: Shortcuts
+
 }
 
 impl Default for PersistentSettings {
@@ -13,6 +17,7 @@ impl Default for PersistentSettings {
         PersistentSettings {
             accent_color: [255, 0, 75],
             vsync: true,
+            // keybindings: Shortcuts::default_keys()
         }
     }
 }

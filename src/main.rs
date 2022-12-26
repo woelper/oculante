@@ -11,6 +11,8 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use shortcuts::key_pressed;
+use shortcuts::lookup_as_string;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -18,8 +20,8 @@ use strum::IntoEnumIterator;
 
 pub mod settings;
 pub mod shortcuts;
-use crate::shortcuts::ShortcutExt;
 use crate::shortcuts::InputEvent::*;
+use crate::shortcuts::ShortcutExt;
 mod utils;
 use utils::*;
 // mod events;
@@ -205,30 +207,48 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 }
 
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
-    // pan image with keyboard
-    if !state.key_grab {
-        if state
-            .shortcuts
-            .was_pressed(&PanRight, &app.keyboard.pressed)
-        {
-            state.offset.x += 10.;
-        }
+    match evt {
+        Event::KeyDown { .. } => {
+            // pan image with keyboard
+            let delta = 80.;
+            if key_pressed(app, state, PanRight) {
+                state.offset.x += delta;
+            }
+            if key_pressed(app, state, PanUp) {
+                state.offset.y += delta;
+            }
+            if key_pressed(app, state, PanLeft) {
+                state.offset.x -= delta;
+            }
+            if key_pressed(app, state, PanDown) {
+                state.offset.y -= delta;
+            }
 
-        if app.keyboard.shift() {
-            if app.keyboard.is_down(KeyCode::Right) {
-                state.offset.x += 10.;
-            }
-            if app.keyboard.is_down(KeyCode::Left) {
-                state.offset.x -= 10.;
+            if key_pressed(app, state, ResetView) {
+                state.reset_image = true
             }
 
-            if app.keyboard.is_down(KeyCode::Up) {
-                state.offset.y -= 10.;
+            if key_pressed(app, state, Quit) {
+                std::process::exit(0)
             }
-            if app.keyboard.is_down(KeyCode::Down) {
-                state.offset.y += 10.;
+
+            if key_pressed(app, state, InfoMode) {
+                state.info_enabled = !state.info_enabled;
+                send_extended_info(
+                    &state.current_image,
+                    &state.current_path,
+                    &state.extended_info_channel,
+                );
             }
+
+            if key_pressed(app, state, EditMode) {
+                state.edit_enabled = !state.edit_enabled
+            }
+
+     
+           
         }
+        _ => (),
     }
 
     match evt {
@@ -243,27 +263,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::KeyDown { key: KeyCode::V } => {
-            if !state.key_grab {
-                state.reset_image = true
-            }
-        }
-        Event::KeyDown { key: KeyCode::Q } => {
-            if !state.key_grab {
-                std::process::exit(0)
-            }
-        }
-        Event::KeyDown { key: KeyCode::I } => {
-            if !state.key_grab {
-                state.info_enabled = !state.info_enabled
-            }
-        }
 
-        Event::KeyDown { key: KeyCode::E } => {
-            if !state.key_grab {
-                state.edit_enabled = !state.edit_enabled
-            }
-        }
         // zoom in
         Event::KeyDown { key: KeyCode::Plus }
         | Event::KeyDown {
@@ -302,16 +302,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::KeyDown {
-            key: KeyCode::Paste,
-        } => {}
-        Event::WindowResize { width, height } => {
-            debug!("Window resize {width}x{height}");
-            // if !state.edit_enabled {
-            //     let delta = state.window_size - (width, height).size_vec();
-            //     state.offset -= delta / 2.;
-            // }
-        }
+
+
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 state.is_loaded = false;
@@ -555,28 +547,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     let mut changed_channels = false;
 
-                    if app.keyboard.was_pressed(KeyCode::R) && !state.key_grab {
+                    if key_pressed(app, state, RedChannel) {
                         state.current_channel = Channel::Red;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::G) && !state.key_grab {
+                    if key_pressed(app, state, GreenChannel) {
                         state.current_channel = Channel::Green;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::B) && !state.key_grab {
+                    if key_pressed(app, state, BlueChannel) {
                         state.current_channel = Channel::Blue;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::A) && !state.key_grab {
+                    if key_pressed(app, state, AlphaChannel) {
                         state.current_channel = Channel::Alpha;
                         changed_channels = true;
                     }
 
-                    if app.keyboard.was_pressed(KeyCode::U) && !state.key_grab {
+                    if key_pressed(app, state, RGBChannel) {
                         state.current_channel = Channel::RGB;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::C) && !state.key_grab {
+                    if key_pressed(app, state, RGBAChannel) {
                         state.current_channel = Channel::RGBA;
                         changed_channels = true;
                     }
@@ -665,11 +657,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if tooltip(
                             ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
-                            "i",
+                            &lookup_as_string(&state.shortcuts, &InfoMode),
                             ui,
                         )
                         .changed()
-                            || app.keyboard.was_pressed(KeyCode::I)
+                            
                         {
                             send_extended_info(
                                 &state.current_image,
@@ -687,7 +679,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
-                        || (app.keyboard.was_released(KeyCode::F) && !state.key_grab)
+                        || key_pressed(app, state, Fullscreen)
                     {
                         let fullscreen = app.window().is_fullscreen();
                         app.window().set_fullscreen(!fullscreen);
@@ -721,11 +713,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui,
                     )
                     .clicked()
-                        || ((app.keyboard.was_pressed(KeyCode::F)
-                            || state
-                                .shortcuts
-                                .was_pressed(&AlwaysOnTop, &app.keyboard.pressed))
-                            && !state.key_grab)
+                        || (key_pressed(app, state, AlwaysOnTop))
                     {
                         debug!("Set always on top");
                         state.always_on_top = !state.always_on_top;
@@ -843,8 +831,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             app.window().request_frame();
         }
 
-        settings_ui(ctx, state);
-
         state.pointer_over_ui = ctx.is_pointer_over_area();
         // info!("using pointer {}", ctx.is_using_pointer());
 
@@ -861,6 +847,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         } else {
             state.key_grab = false;
         }
+        // Settings come last, as they block keyboard grab (for hotkey assigment)
+        settings_ui(app, ctx, state);
     });
 
     if state.network_mode {

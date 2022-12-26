@@ -49,6 +49,7 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.27.0"
 webbrowser = "0.8"
 hashbrown = "0.12.3"
+serde_with = "2.1.0"
 
 [features]
 default = ["turbo"]

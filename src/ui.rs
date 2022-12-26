@@ -9,7 +9,7 @@ use notan::{
         plot::{PlotPoints, Points},
         *,
     },
-    prelude::Graphics,
+    prelude::{App, Graphics},
 };
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
         ImageExt, OculanteState,
-    },
+    }, shortcuts::lookup_as_string,
 };
 
 #[cfg(feature = "turbo")]
@@ -290,7 +290,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     });
 }
 
-pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
+pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
     if state.settings_enabled {
         egui::Window::new("Settings")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
@@ -345,6 +345,10 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                     if ui.button("Close").clicked() {
                         state.settings_enabled = false;
                     }
+                });
+
+                ui.collapsing("Keybindings",|ui| {
+                    keybinding_ui(app, state, ui);
                 });
             });
     }
@@ -1310,4 +1314,40 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             }
         });
     }
+}
+
+fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
+    ui.label("While this is open, regular shortcuts will not work.");
+    state.key_grab = true;
+    let no_keys_pressed = app.keyboard.down.is_empty();
+
+    if no_keys_pressed {
+        ui.label("Please press a key");
+    }
+
+    ui.horizontal(|ui| {
+        for k in &app.keyboard.down {
+            ui.label(format!("{:?}", k.0));
+        }
+    });
+
+    egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui| {
+        egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+            let s = state.shortcuts.clone();
+            for (event, keys) in &mut state.shortcuts {
+                ui.label(format!("{:?}", event));
+    
+
+                ui.label(lookup_as_string(&s, event));
+                if !no_keys_pressed {
+                    if ui.button("assign").clicked() {
+                        *keys = app.keyboard.down.iter().map(|(k, _)| k.clone()).collect();
+                    }
+                }
+                ui.end_row();
+            }
+        });
+    });
+
+    
 }
