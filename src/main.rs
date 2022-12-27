@@ -243,6 +243,37 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.edit_enabled = !state.edit_enabled
             }
+
+            // let zoomratio = 3.5;
+            if key_pressed(app, state, ZoomIn) {
+                let delta = zoomratio(3.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
+            }
+
+            if key_pressed(app, state, ZoomOut) {
+                let delta = zoomratio(-3.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
+            }
         }
         _ => (),
     }
@@ -255,45 +286,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 // limit scale
                 if new_scale > 0.05 && new_scale < 40. {
                     state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                    state.scale += delta;
-                }
-            }
-        }
-
-        // zoom in
-        Event::KeyDown { key: KeyCode::Plus }
-        | Event::KeyDown {
-            key: KeyCode::Equals,
-        } => {
-            if !state.key_grab {
-                let delta = zoomratio(1.5, state.scale);
-                let new_scale = state.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                    state.scale += delta;
-                }
-            }
-        }
-        Event::KeyDown {
-            key: KeyCode::Minus,
-        } => {
-            if !state.key_grab {
-                let delta = zoomratio(-1.5, state.scale);
-                let new_scale = state.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
                     state.scale += delta;
                 }
             }
@@ -611,8 +603,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     if state.current_image.is_some() {
                         if state.current_path.is_some() {
-                            if tooltip(unframed_button("◀", ui), "Previous image", &lookup(&state.persistent_settings.shortcuts, &PreviousImage), ui)
-                                .clicked()
+                            if tooltip(
+                                unframed_button("◀", ui),
+                                "Previous image",
+                                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
+                                ui,
+                            )
+                            .clicked()
                                 || key_pressed(app, state, PreviousImage)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
@@ -627,8 +624,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     }
                                 }
                             }
-                            if tooltip(unframed_button("▶", ui), "Next image", &lookup(&state.persistent_settings.shortcuts, &NextImage), ui)
-                                .clicked()
+                            if tooltip(
+                                unframed_button("▶", ui),
+                                "Next image",
+                                &lookup(&state.persistent_settings.shortcuts, &NextImage),
+                                ui,
+                            )
+                            .clicked()
                                 || key_pressed(app, state, NextImage)
                             {
                                 if let Some(img_location) = state.current_path.as_mut() {
@@ -667,8 +669,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             ui,
                         );
                     }
+                    // TODO for windows/mac
+                    // let mut window_pos = app.window().position();
 
-                    if tooltip(unframed_button("⛶", ui), "Full Screen", &lookup(&state.persistent_settings.shortcuts, &Fullscreen), ui).clicked()
+                    if tooltip(
+                        unframed_button("⛶", ui),
+                        "Full Screen",
+                        &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
+                        ui,
+                    )
+                    .clicked()
                         || key_pressed(app, state, Fullscreen)
                     {
                         let fullscreen = app.window().is_fullscreen();

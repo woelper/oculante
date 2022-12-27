@@ -101,10 +101,10 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::AlphaChannel, "A")
             .add_key(InputEvent::RGBChannel, "U")
             .add_key(InputEvent::RGBAChannel, "C")
-            .add_key(InputEvent::ZoomIn, "=")
+            .add_key(InputEvent::ZoomIn, "Equals")
             .add_key(InputEvent::PreviousImage, "Left")
             .add_key(InputEvent::NextImage, "Right")
-            .add_key(InputEvent::ZoomOut, "-")
+            .add_key(InputEvent::ZoomOut, "Minus")
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
             .add_keys(InputEvent::PanLeft, &["LShift", "Left"])
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])
@@ -141,6 +141,12 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     }
 
     if let Some(keys) = state.persistent_settings.shortcuts.get(&command) {
+        
+        // make sure the appropriate number of keys are down
+        if app.keyboard.down.len() != keys.len() {
+            return false
+        }
+        
         // make sure all modifiers are down
         for m in keys.modifiers() {
             if m.contains("Shift") {
@@ -160,6 +166,8 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             }
         }
 
+        // debug!("Down {:?}", app.keyboard.down);
+        
         for key in keys.alphanumeric() {
             // Workaround macos fullscreen double press bug
             if command == InputEvent::Fullscreen {
@@ -172,6 +180,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             } else {
                 for pressed in &app.keyboard.pressed {
                     if format!("{:?}", pressed) == key {
+                        debug!("Number of keys pressed: {}", app.keyboard.down.len());
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;
                     }

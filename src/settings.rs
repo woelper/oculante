@@ -29,13 +29,13 @@ impl Default for PersistentSettings {
 
 impl PersistentSettings {
     pub fn load() -> Result<Self> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
+        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
         let f = File::open(local_dir.join(".oculante"))?;
         Ok(serde_json::from_reader::<_, PersistentSettings>(f)?)
     }
 
     pub fn save(&self) -> Result<()> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't getlocal dir"))?;
+        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
         let f = File::create(local_dir.join(".oculante"))?;
         Ok(serde_json::to_writer_pretty(f, self)?)
     }

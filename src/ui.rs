@@ -346,6 +346,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         state.settings_enabled = false;
                     }
 
+                    if ui.button("Reset all settings").clicked() {
+                        state.persistent_settings = Default::default();
+                    _ = state.persistent_settings.save()
+
+                    }
+
                     if ui.button("Close").clicked() {
                         state.settings_enabled = false;
                     }
