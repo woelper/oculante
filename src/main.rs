@@ -231,6 +231,22 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            if key_pressed(app, state, Fullscreen) {
+                toggle_fullscreen(app, state);
+            }
+
+            if key_pressed(app, state, NextImage) {
+                next_image(state)
+            }
+            if key_pressed(app, state, PreviousImage) {
+                prev_image(state)
+            }
+
+            if key_pressed(app, state, AlwaysOnTop) {
+                state.always_on_top = !state.always_on_top;
+                app.window().set_always_on_top(state.always_on_top);
+            }
+
             if key_pressed(app, state, InfoMode) {
                 state.info_enabled = !state.info_enabled;
                 send_extended_info(
@@ -599,7 +615,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
 
-                    // ui.add(egui::Separator::default().vertical());
 
                     if state.current_image.is_some() {
                         if state.current_path.is_some() {
@@ -610,19 +625,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 ui,
                             )
                             .clicked()
-                                || key_pressed(app, state, PreviousImage)
                             {
-                                if let Some(img_location) = state.current_path.as_mut() {
-                                    let next_img = img_shift(&img_location, -1);
-                                    // prevent reload if at last or first
-                                    if &next_img != img_location {
-                                        state.is_loaded = false;
-                                        *img_location = next_img;
-                                        state
-                                            .player
-                                            .load(&img_location, state.message_channel.0.clone());
-                                    }
-                                }
+                                prev_image(state)
                             }
                             if tooltip(
                                 unframed_button("▶", ui),
@@ -631,19 +635,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 ui,
                             )
                             .clicked()
-                                || key_pressed(app, state, NextImage)
                             {
-                                if let Some(img_location) = state.current_path.as_mut() {
-                                    let next_img = img_shift(&img_location, 1);
-                                    // prevent reload if at last or first
-                                    if &next_img != img_location {
-                                        state.is_loaded = false;
-                                        *img_location = next_img;
-                                        state
-                                            .player
-                                            .load(&img_location, state.message_channel.0.clone());
-                                    }
-                                }
+                                next_image(state)
                             }
                         }
 
@@ -679,31 +672,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui,
                     )
                     .clicked()
-                        || key_pressed(app, state, Fullscreen)
                     {
-                        let fullscreen = app.window().is_fullscreen();
-                        app.window().set_fullscreen(!fullscreen);
-
-                        if !fullscreen {
-                            let mut window_pos = app.window().position();
-                            window_pos.1 += 40;
-
-                            debug!("Not fullscreen {:?}", window_pos);
-                            // if going from window to fullscreen, offset by window pos
-                            state.offset.x += window_pos.0 as f32;
-                            state.offset.y += window_pos.1 as f32;
-                            // save old window pos
-                            state.fullscreen_offset = Some(window_pos);
-                        } else {
-                            // info!("Is fullscreen {:?}", window_pos);
-
-                            if let Some(sf) = state.fullscreen_offset {
-                                state.offset.x -= sf.0 as f32;
-                                state.offset.y -= sf.1 as f32;
-                            }
-                        }
-
-                        // state.reset_image = true;
+                        toggle_fullscreen(app, state);
                     }
 
                     if tooltip(
@@ -713,9 +683,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         ui,
                     )
                     .clicked()
-                        || (key_pressed(app, state, AlwaysOnTop))
                     {
-                        debug!("Set always on top");
                         state.always_on_top = !state.always_on_top;
                         app.window().set_always_on_top(state.always_on_top);
                     }
@@ -870,3 +838,55 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 //     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
 //     window.set_title(title);
 // }
+
+fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
+    let fullscreen = app.window().is_fullscreen();
+    app.window().set_fullscreen(!fullscreen);
+
+    if !fullscreen {
+        let mut window_pos = app.window().position();
+        window_pos.1 += 40;
+
+        debug!("Not fullscreen {:?}", window_pos);
+        // if going from window to fullscreen, offset by window pos
+        state.offset.x += window_pos.0 as f32;
+        state.offset.y += window_pos.1 as f32;
+        // save old window pos
+        state.fullscreen_offset = Some(window_pos);
+    } else {
+        // info!("Is fullscreen {:?}", window_pos);
+
+        if let Some(sf) = state.fullscreen_offset {
+            state.offset.x -= sf.0 as f32;
+            state.offset.y -= sf.1 as f32;
+        }
+    }
+}
+
+fn prev_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = img_shift(&img_location, -1);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+fn next_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = img_shift(&img_location, 1);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
