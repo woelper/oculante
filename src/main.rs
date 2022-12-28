@@ -854,11 +854,12 @@ fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
 
         debug!("Not fullscreen. Storing offset: {:?}", window_pos);
         
+        let dpi = app.window().dpi();
+        debug!("{:?}", dpi); 
+        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
+        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
         #[cfg(target_os="macos")]
         {
-            // work around retina
-            window_pos.0 /= 2;
-            window_pos.1 /= 2;
             // tweak for osx titlebars
             window_pos.1 += 8;
         }
