@@ -136,17 +136,18 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         return false;
     }
 
-    if app.keyboard.down.is_empty() {
+    if app.keyboard.down.is_empty() && app.keyboard.released.is_empty() {
         return false;
     }
 
     if let Some(keys) = state.persistent_settings.shortcuts.get(&command) {
-        
         // make sure the appropriate number of keys are down
         if app.keyboard.down.len() != keys.len() {
-            return false
+            if command != InputEvent::Fullscreen {
+                return false;
+            }
         }
-        
+
         // make sure all modifiers are down
         for m in keys.modifiers() {
             if m.contains("Shift") {
@@ -167,11 +168,12 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         }
 
         // debug!("Down {:?}", app.keyboard.down);
-        
+
         for key in keys.alphanumeric() {
             // Workaround macos fullscreen double press bug
             if command == InputEvent::Fullscreen {
-                for pressed in &app.keyboard.pressed {
+                debug!("Fullscreen received");
+                for pressed in &app.keyboard.released {
                     if format!("{:?}", pressed) == key {
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;

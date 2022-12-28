@@ -207,6 +207,12 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     match evt {
+        Event::KeyUp { .. } => {
+            // Fullscreen needs to be on key up on mac (bug)
+            if key_pressed(app, state, Fullscreen) {
+                toggle_fullscreen(app, state);
+            }
+        }
         Event::KeyDown { .. } => {
             // pan image with keyboard
             let delta = 80.;
@@ -231,9 +237,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
-            if key_pressed(app, state, Fullscreen) {
-                toggle_fullscreen(app, state);
-            }
+
 
             if key_pressed(app, state, NextImage) {
                 next_image(state)
@@ -349,6 +353,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.offset += state.mouse_delta;
         }
     }
+
+    
 
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
@@ -841,16 +847,27 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
 fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
     let fullscreen = app.window().is_fullscreen();
-    app.window().set_fullscreen(!fullscreen);
 
     if !fullscreen {
         let mut window_pos = app.window().position();
         window_pos.1 += 40;
 
-        debug!("Not fullscreen {:?}", window_pos);
+        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
+        
+        #[cfg(target_os="macos")]
+        {
+            // work around retina
+            window_pos.0 /= 2;
+            window_pos.1 /= 2;
+            // tweak for osx titlebars
+            window_pos.1 += 8;
+        }
+        
         // if going from window to fullscreen, offset by window pos
         state.offset.x += window_pos.0 as f32;
         state.offset.y += window_pos.1 as f32;
+
+    
         // save old window pos
         state.fullscreen_offset = Some(window_pos);
     } else {
@@ -861,6 +878,9 @@ fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
             state.offset.y -= sf.1 as f32;
         }
     }
+    app.window().set_fullscreen(!fullscreen);
+
+
 }
 
 fn prev_image(state: &mut OculanteState) {
