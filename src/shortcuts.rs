@@ -195,16 +195,20 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     false
 }
 
-pub fn lookup(shortcuts: &HashMap<InputEvent, HashSet<String>>, command: &InputEvent) -> String {
+pub fn lookup(shortcuts: &Shortcuts, command: &InputEvent) -> String {
     if let Some(keys) = shortcuts.get(&command) {
-        return keys
-            .iter()
-            // .map(|k| format!("{:?}", k))
-            .map(|s| s.clone())
-            .collect::<Vec<_>>()
-            .join(" ");
+        return keypresses_as_string(keys);
     }
     "None".into()
+}
+
+pub fn keypresses_as_string(keys: &SimultaneousKeypresses) -> String {
+    let mut modifiers = keys.modifiers().into_iter().collect::<Vec<_>>();
+    let mut alpha = keys.alphanumeric().into_iter().collect::<Vec<_>>();
+    modifiers.sort();
+    alpha.sort();
+    modifiers.extend(alpha);
+    modifiers.join(" + ")
 }
 
 fn is_key_modifier(key: &str) -> bool {

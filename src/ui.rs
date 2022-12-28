@@ -1,7 +1,4 @@
-use std::{
-    ops::RangeInclusive,
-    time::Instant,
-};
+use std::{ops::RangeInclusive, time::Instant, collections::{HashMap, HashSet}};
 
 use egui::plot::Plot;
 use image::RgbaImage;
@@ -18,7 +15,7 @@ use notan::{
 use crate::{
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
-    shortcuts::lookup,
+    shortcuts::{lookup, keypresses_as_string},
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
@@ -1327,19 +1324,20 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
 }
 
 fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
-    ui.label("While this is open, regular shortcuts will not work.");
+    // Make sure no shortcuts are received by the application
     state.key_grab = true;
+
     let no_keys_pressed = app.keyboard.down.is_empty();
 
     if no_keys_pressed {
-        ui.label("Please press a key");
+        ui.label(
+            egui::RichText::new("Please press & hold a key, then assign it").color(Color32::RED),
+        );
     }
+    ui.label("While this is open, regular shortcuts will not work.");
 
-    ui.horizontal(|ui| {
-        for k in &app.keyboard.down {
-            ui.label(format!("{:?}", k.0));
-        }
-    });
+    let k = app.keyboard.down.iter().map(|k| format!("{:?}",k.0)).collect::<HashSet<String>>();
+    ui.label(keypresses_as_string(&k));
 
     let mut changed = false;
 
@@ -1371,3 +1369,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         _ = state.persistent_settings.save();
     }
 }
+
+// fn keystrokes(ui: &mut Ui) {
+//     ui.add(Button::new(format!("{:?}", k.0)).fill(Color32::DARK_BLUE));
+// }

@@ -237,8 +237,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
-
-
             if key_pressed(app, state, NextImage) {
                 next_image(state)
             }
@@ -353,8 +351,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
             state.offset += state.mouse_delta;
         }
     }
-
-    
 
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
@@ -621,7 +617,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
 
-
                     if state.current_image.is_some() {
                         if state.current_path.is_some() {
                             if tooltip(
@@ -853,22 +848,21 @@ fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
         window_pos.1 += 40;
 
         debug!("Not fullscreen. Storing offset: {:?}", window_pos);
-        
+
         let dpi = app.window().dpi();
-        debug!("{:?}", dpi); 
+        debug!("{:?}", dpi);
         window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
         window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
-        #[cfg(target_os="macos")]
+        #[cfg(target_os = "macos")]
         {
             // tweak for osx titlebars
             window_pos.1 += 8;
         }
-        
+
         // if going from window to fullscreen, offset by window pos
         state.offset.x += window_pos.0 as f32;
         state.offset.y += window_pos.1 as f32;
 
-    
         // save old window pos
         state.fullscreen_offset = Some(window_pos);
     } else {
@@ -880,8 +874,6 @@ fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
         }
     }
     app.window().set_fullscreen(!fullscreen);
-
-
 }
 
 fn prev_image(state: &mut OculanteState) {

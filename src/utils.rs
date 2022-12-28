@@ -422,7 +422,6 @@ impl Default for OculanteState {
             window_size: Default::default(),
             toast_cooldown: 0.,
             fullscreen_offset: None,
-            
         }
     }
 }
