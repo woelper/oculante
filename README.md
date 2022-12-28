@@ -137,6 +137,8 @@ There are only two instances where oculante interacts with the network, and both
 
 In addition, the only data saved locally by the application is:
 - UI accent color
+- Keybindings
+- Vsync preferences
 
 
 ## Attribution
