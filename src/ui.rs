@@ -1,5 +1,13 @@
-use std::{ops::RangeInclusive, time::Instant, collections::{HashMap, HashSet}};
-
+use crate::{
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    shortcuts::{keypresses_as_string, lookup},
+    update,
+    utils::{
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
+        ImageExt, OculanteState,
+    },
+};
 use egui::plot::Plot;
 use image::RgbaImage;
 use log::{debug, info};
@@ -11,17 +19,7 @@ use notan::{
     },
     prelude::{App, Graphics},
 };
-
-use crate::{
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
-    paint::PaintStroke,
-    shortcuts::{lookup, keypresses_as_string},
-    update,
-    utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ImageExt, OculanteState,
-    },
-};
+use std::{collections::HashSet, ops::RangeInclusive, time::Instant};
 
 #[cfg(feature = "turbo")]
 use crate::image_editing::{cropped_range, lossless_tx};
@@ -1336,7 +1334,12 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     }
     ui.label("While this is open, regular shortcuts will not work.");
 
-    let k = app.keyboard.down.iter().map(|k| format!("{:?}",k.0)).collect::<HashSet<String>>();
+    let k = app
+        .keyboard
+        .down
+        .iter()
+        .map(|k| format!("{:?}", k.0))
+        .collect::<HashSet<String>>();
     ui.label(keypresses_as_string(&k));
 
     let mut changed = false;
