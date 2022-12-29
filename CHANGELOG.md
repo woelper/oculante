@@ -1,3 +1,9 @@
+# 0.6.35  (Unreleased)
+
+### :sparkles: Features
+
+* Ctrl-Scrollwheel can be used to go to the next/previous images (???)
+
 # 0.6.34 (2022-12-19)
 
 ### :beetle: Bug Fixes
