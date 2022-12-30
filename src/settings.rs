@@ -3,7 +3,9 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
+
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PersistentSettings {
     /// The UI accent color
     pub accent_color: [u8; 3],

@@ -6,6 +6,7 @@ use clap::Command;
 use log::debug;
 use log::error;
 use log::info;
+use log::warn;
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
@@ -140,6 +141,10 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     if let Ok(settings) = settings::PersistentSettings::load() {
         state.persistent_settings = settings;
+    } else {
+        warn!("Settings failed to load. This may happen after application updates. Generating a fresh file.");
+        state.persistent_settings = Default::default();
+        _ = state.persistent_settings.save();
     }
 
     state.player = Player::new(state.texture_channel.0.clone());
