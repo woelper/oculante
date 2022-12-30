@@ -39,6 +39,7 @@ rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.5"
 resvg = "0.27.0"
+rfd = "0.6.3"
 rgb = "0.8.3"
 self_update = "0.32"
 serde = {version = "1.0", features = ["derive"]}

@@ -6,6 +6,8 @@
 
 * Go to Next/Prev now cycles through the images in the folder, instead of stopping at either end  (???)
 
+* Ctrl-O or F1 bring up a native file browser dialog to select a file to load (???)
+
 ### :beetle: Bug Fixes
 
 * Use natural/lexical sorting for file ordering instead of standard string-based sorting (d7783bd8)

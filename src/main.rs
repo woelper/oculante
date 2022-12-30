@@ -344,6 +344,37 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::KeyDown {
             key: KeyCode::Paste,
         } => {}
+        Event::KeyDown { key: KeyCode::F1 }
+        | Event::KeyDown {
+            key: KeyCode::O,  /* FIXME: Only when ctrl is pressed */
+        } => {
+            if !state.key_grab {
+                // Browse for image to load
+                // TODO: Include button on toolbar?
+                let start_directory =
+                    if let Some(img_path) = &state.current_path {
+                        img_path.clone()
+                    }
+                    else {
+                        std::env::current_dir().unwrap()
+                    };
+                
+                let file_dialog_result = rfd::FileDialog::new()
+                    .add_filter("All Supported Image Types", 
+                                &["bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpg", "jpeg", "pjpeg", "png", "apng", "pnm", "psd", "svg", "tif", "tiff", "tga", "webp"])
+                    .add_filter("All File Types", &["*"])
+                    .set_directory(&start_directory)
+                    .pick_file();
+                
+                if let Some(file_path) = file_dialog_result {
+                    debug!("Selected File Path = {:?}", file_path);
+                    state.is_loaded = false;
+                    state.current_image = None;
+                    state.player.load(&file_path, state.message_channel.0.clone());
+                    state.current_path = Some(file_path);
+                }
+            }
+        }
         Event::WindowResize { width, height } => {
             debug!("Window resize {width}x{height}");
             // if !state.edit_enabled {
