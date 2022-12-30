@@ -4,9 +4,9 @@
 
 * Ctrl-Scrollwheel can be used to go to the next/previous images (77154a1f)
 
-* Go to Next/Prev now cycles through the images in the folder, instead of stopping at either end  (???)
+* Go to Next/Prev now cycles through the images in the folder, instead of stopping at either end  (6d2cd8cc)
 
-* Ctrl-O or F1 bring up a native file browser dialog to select a file to load (???)
+* Ctrl-O or F1 bring up a native file browser dialog to select a file to load (8778b92c)
 
 ### :beetle: Bug Fixes
 
