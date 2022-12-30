@@ -539,6 +539,27 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     file.clone()
 }
 
+// NOTE: Must keep this list in sync with is_ext_compatible()
+pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
+    "bmp",
+    "dds",
+    "exr",
+    "ff",
+    "gif",
+    "hdr",
+    "ico",
+    "jpeg",
+    "jpg",
+    "png",
+    "pnm",
+    "psd",
+    "svg",
+    "tga",
+    "tif",
+    "tiff",
+    "webp",
+];
+
 pub fn is_ext_compatible(fname: &PathBuf) -> bool {
     match fname
         .extension()
@@ -548,6 +569,7 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
         .to_lowercase()
         .as_str()
     {
+        // NOTE: Must keep this in sync with SUPPORTED_EXTENSIONS
         "png" => true,
         "exr" => true,
         "jpg" => true,

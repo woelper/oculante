@@ -375,7 +375,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 
                 let file_dialog_result = rfd::FileDialog::new()
                     .add_filter("All Supported Image Types", 
-                                &["bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpg", "jpeg", "pjpeg", "png", "apng", "pnm", "psd", "svg", "tif", "tiff", "tga", "webp"])
+                                &utils::SUPPORTED_EXTENSIONS)
                     .add_filter("All File Types", &["*"])
                     .set_directory(&start_directory)
                     .pick_file();
