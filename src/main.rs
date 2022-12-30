@@ -439,9 +439,35 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer:");
+        debug!("Received image buffer: {:?}", img.dimensions());
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
+
+        debug!("Frame source: {:?}", frame.source);
+
+        match frame.source {
+            FrameSource::Still => {
+                if !state.persistent_settings.keep_view {
+                    state.reset_image = true;
+                    state.offset = Default::default();
+                    state.scale = Default::default();
+                }
+                // always reset if first image
+                if state.current_texture.is_none() {
+                    state.reset_image = true;
+                    state.offset = Default::default();
+                    state.scale = Default::default();
+                }
+
+                state.image_info = None;
+            }
+            FrameSource::EditResult => {
+                // debug!("EditResult");
+                // state.edit_state.is_processing = false;
+            }
+            FrameSource::Reset => state.reset_image = true,
+            _ => (),
+        }
 
         if let Some(tex) = &mut state.current_texture {
             if tex.width() as u32 == img.width() && img.height() as u32 == img.height() {
@@ -451,26 +477,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         } else {
             state.current_texture = img.to_texture(gfx);
-        }
-
-        //center the image
-        if frame.source != FrameSource::Animation {}
-
-        debug!("Frame source: {:?}", frame.source);
-
-        match frame.source {
-            FrameSource::Still => {
-                state.offset = Default::default();
-                state.scale = Default::default();
-                state.reset_image = true;
-                state.image_info = None;
-            }
-            FrameSource::EditResult => {
-                // debug!("EditResult");
-                // state.edit_state.is_processing = false;
-            }
-            FrameSource::Reset => state.reset_image = true,
-            _ => (),
         }
 
         state.is_loaded = true;
@@ -601,6 +607,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             });
                     });
 
+                    // TODO: remove redundancy
                     if changed_channels {
                         if let Some(img) = &state.current_image {
                             match &state.current_channel {
@@ -835,11 +842,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-// fn set_title(window: &mut PistonWindow, text: &str) {
-//     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
-//     window.set_title(title);
-// }
-
+// TODO:move to utils
 fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
     let fullscreen = app.window().is_fullscreen();
 
