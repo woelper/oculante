@@ -462,17 +462,38 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
+/// Get sorted list of files in a folder
+// TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
+// TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
+pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathBuf>> {
+    if let Ok(info) = std::fs::read_dir(folder_path) {
+        // TODO: Are symlinks handled correctly?
+        let mut dir_files = info
+            .map(|x| x.unwrap().path())
+            .filter(|x| is_ext_compatible(x))
+            .collect::<Vec<PathBuf>>();
+        
+        dir_files.sort_unstable_by(|a, b| {
+            lexical_sort::natural_lexical_cmp(
+                &a.file_name().unwrap().to_string_lossy(),
+                &b.file_name().unwrap().to_string_lossy(),
+            )
+        });
+        
+        return Some(dir_files);
+    }
+    
+    None
+}
+
 /// Advance to the prev/next image
+// TODO: The iterator should be cached, so we don't need to rebuild each time?
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
-        if let Ok(info) = std::fs::read_dir(parent) {
-            let mut files = info
-                .map(|x| x.unwrap().path())
-                .filter(|x| is_ext_compatible(x))
-                .collect::<Vec<PathBuf>>();
-            files.sort();
+        if let Some(files) = get_image_filenames_for_directory(parent) {
             for (i, f) in files.iter().enumerate() {
                 if f == file {
+                    // TODO: wrap around when we try to increment past the end
                     if let Some(next) = files.get((i as isize + inc) as usize) {
                         return next.clone();
                     }
