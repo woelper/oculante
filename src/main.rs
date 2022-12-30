@@ -143,16 +143,43 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Image is: {:?}", maybe_img_location);
 
-    if let Some(ref img_location) = maybe_img_location {
-        state.current_path = Some(img_location.clone());
-        if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        } else {
-            state
-                .player
-                .load_blocking(&img_location, state.message_channel.0.clone());
+    if let Some(ref maybe_location) = maybe_img_location {
+        // Check if path is a directory or a file (and that it even exists)
+        let mut start_img_location: Option<PathBuf> = None;
+        
+        if let Ok(maybe_location_metadata) = maybe_location.metadata() {
+            if maybe_location_metadata.is_dir() {
+                // Folder - Pick first image from the folder...
+                if let Some(first_img_location) = find_first_image_in_directory(maybe_location) {
+                    start_img_location = Some(first_img_location.clone());
+                }
+            }
+            else if is_ext_compatible(maybe_location) {
+                // Image File with a usable extension
+                start_img_location = Some(maybe_location.clone());
+            }
+            else {
+                // Unsupported extension? Or unusable path?
+                // TODO: Show a warning about this?
+            }
+        }
+        else {
+            // Not a valid path, or user doesn't have permission to access?
+            // TODO: Show a warning about this?
+        }
+        
+        // Assign image path if we have a valid one here
+        if let Some(img_location) = start_img_location {
+            state.current_path = Some(img_location.clone());
+            if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
+                state
+                    .player
+                    .load(&img_location, state.message_channel.0.clone());
+            } else {
+                state
+                    .player
+                    .load_blocking(&img_location, state.message_channel.0.clone());
+            }
         }
     }
 

@@ -486,6 +486,18 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
     None
 }
 
+
+/// Find first valid image from the directory
+/// Assumes the given path is a directory and not a file
+pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
+    if let Some(files) = get_image_filenames_for_directory(folder_path) {
+        // Return first filename from the folder, if it exists
+        return files.iter().nth(0).cloned();
+    }
+    
+    None
+}
+
 /// Advance to the prev/next image
 // TODO: The iterator should be cached, so we don't need to rebuild each time?
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
