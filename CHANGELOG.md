@@ -4,6 +4,8 @@
 
 * Ctrl-Scrollwheel can be used to go to the next/previous images (77154a1f)
 
+* Go to Next/Prev now cycles through the images in the folder, instead of stopping at either end  (???)
+
 ### :beetle: Bug Fixes
 
 * Use natural/lexical sorting for file ordering instead of standard string-based sorting (d7783bd8)

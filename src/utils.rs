@@ -503,12 +503,35 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
 pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     if let Some(parent) = file.parent() {
         if let Some(files) = get_image_filenames_for_directory(parent) {
-            for (i, f) in files.iter().enumerate() {
-                if f == file {
-                    // TODO: wrap around when we try to increment past the end
-                    if let Some(next) = files.get((i as isize + inc) as usize) {
-                        return next.clone();
-                    }
+            if inc > 0 {
+                // Next
+                let mut iter = files
+                    .iter()
+                    .cycle()
+                    .skip_while(|f| *f != file) // TODO: cache current index instead
+                    .skip(1);                   // FIXME: What if abs(inc) > 1?
+                
+                if let Some(next) = iter.next() {
+                    return next.clone();
+                }
+                else {
+                    debug!("Go to next failed: i = {}, N = {}", iter.count(), files.len());
+                }
+            }
+            else {
+                // Prev
+                let mut iter = files
+                    .iter()
+                    .rev()
+                    .cycle()
+                    .skip_while(|f| *f != file) // TODO: cache current index instead
+                    .skip(1);                   // FIXME: What if abs(inc) > 1?
+                
+                if let Some(prev) = iter.next() {
+                    return prev.clone();
+                }
+                else {
+                    debug!("Go to prev failed: i = {}, N = {}", iter.count(), files.len());
                 }
             }
         }
