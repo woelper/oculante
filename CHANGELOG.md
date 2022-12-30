@@ -2,7 +2,13 @@
 
 ### :sparkles: Features
 
-* Ctrl-Scrollwheel can be used to go to the next/previous images (???)
+* Ctrl-Scrollwheel can be used to go to the next/previous images (77154a1f)
+
+### :beetle: Bug Fixes
+
+* Use natural/lexical sorting for file ordering instead of standard string-based sorting (d7783bd8)
+
+* Passing a folder path as a command-line argument will load the first image in the folder, instead of hanging on startup (61547f46)
 
 # 0.6.34 (2022-12-19)
 
