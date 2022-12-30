@@ -331,21 +331,13 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
-                    // Change image to next/prev - map scroll-down == next, as that's the natural scrolling direction
-                    let inc : isize = if delta_y > 0.0 { -1 } else { 1 };
-                    
-                    // TODO: Should this be handled along with the Left/Right arrow / toolbar button code instead?
-                    // TODO: Deduplicate (as in the keybindings branch)
-                    if let Some(img_location) = state.current_path.as_mut() {
-                        let next_img = img_shift(&img_location, inc);
-                        // prevent reload if at last or first
-                        if &next_img != img_location {
-                            state.is_loaded = false;
-                            *img_location = next_img;
-                            state
-                                .player
-                                .load(&img_location, state.message_channel.0.clone());
-                        }
+                    // Change image to next/prev
+                    // - map scroll-down == next, as that's the natural scrolling direction
+                    if delta_y > 0.0 {
+                        prev_image(state)
+                    }
+                    else {
+                        next_image(state)
                     }
                 }
                 else {
