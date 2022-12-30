@@ -11,13 +11,16 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use shortcuts::key_pressed;
+use shortcuts::lookup;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use strum::IntoEnumIterator;
 
 pub mod settings;
-
+pub mod shortcuts;
+use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
 // mod events;
@@ -230,23 +233,94 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 }
 
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
-    // pan image with keyboard
-    if !state.key_grab {
-        if app.keyboard.shift() {
-            if app.keyboard.is_down(KeyCode::Right) {
-                state.offset.x += 10.;
-            }
-            if app.keyboard.is_down(KeyCode::Left) {
-                state.offset.x -= 10.;
-            }
-
-            if app.keyboard.is_down(KeyCode::Up) {
-                state.offset.y -= 10.;
-            }
-            if app.keyboard.is_down(KeyCode::Down) {
-                state.offset.y += 10.;
+    match evt {
+        Event::KeyUp { .. } => {
+            // Fullscreen needs to be on key up on mac (bug)
+            if key_pressed(app, state, Fullscreen) {
+                toggle_fullscreen(app, state);
             }
         }
+        Event::KeyDown { .. } => {
+            // pan image with keyboard
+            let delta = 80.;
+            if key_pressed(app, state, PanRight) {
+                state.offset.x += delta;
+            }
+            if key_pressed(app, state, PanUp) {
+                state.offset.y += delta;
+            }
+            if key_pressed(app, state, PanLeft) {
+                state.offset.x -= delta;
+            }
+            if key_pressed(app, state, PanDown) {
+                state.offset.y -= delta;
+            }
+
+            if key_pressed(app, state, ResetView) {
+                state.reset_image = true
+            }
+
+            if key_pressed(app, state, Quit) {
+                std::process::exit(0)
+            }
+
+            if key_pressed(app, state, NextImage) {
+                next_image(state)
+            }
+            if key_pressed(app, state, PreviousImage) {
+                prev_image(state)
+            }
+
+            if key_pressed(app, state, AlwaysOnTop) {
+                state.always_on_top = !state.always_on_top;
+                app.window().set_always_on_top(state.always_on_top);
+            }
+
+            if key_pressed(app, state, InfoMode) {
+                state.info_enabled = !state.info_enabled;
+                send_extended_info(
+                    &state.current_image,
+                    &state.current_path,
+                    &state.extended_info_channel,
+                );
+            }
+
+            if key_pressed(app, state, EditMode) {
+                state.edit_enabled = !state.edit_enabled
+            }
+
+            // let zoomratio = 3.5;
+            if key_pressed(app, state, ZoomIn) {
+                let delta = zoomratio(3.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
+            }
+
+            if key_pressed(app, state, ZoomOut) {
+                let delta = zoomratio(-3.5, state.scale);
+                let new_scale = state.scale + delta;
+                // limit scale
+                if new_scale > 0.05 && new_scale < 40. {
+                    // We want to zoom towards the center
+                    let center: Vector2<f32> = nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    );
+                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
+                    state.scale += delta;
+                }
+            }
+        }
+        _ => (),
     }
 
     match evt {
@@ -282,68 +356,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::KeyDown { key: KeyCode::V } => {
-            if !state.key_grab {
-                state.reset_image = true
-            }
-        }
-        Event::KeyDown { key: KeyCode::Q } => {
-            if !state.key_grab {
-                std::process::exit(0)
-            }
-        }
-        Event::KeyDown { key: KeyCode::I } => {
-            if !state.key_grab {
-                state.info_enabled = !state.info_enabled
-            }
-        }
-
-        Event::KeyDown { key: KeyCode::E } => {
-            if !state.key_grab {
-                state.edit_enabled = !state.edit_enabled
-            }
-        }
-        // zoom in
-        Event::KeyDown { key: KeyCode::Plus }
-        | Event::KeyDown {
-            key: KeyCode::Equals,
-        } => {
-            if !state.key_grab {
-                let delta = zoomratio(1.5, state.scale);
-                let new_scale = state.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                    state.scale += delta;
-                }
-            }
-        }
-        Event::KeyDown {
-            key: KeyCode::Minus,
-        } => {
-            if !state.key_grab {
-                let delta = zoomratio(-1.5, state.scale);
-                let new_scale = state.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                    state.scale += delta;
-                }
-            }
-        }
-        Event::KeyDown {
-            key: KeyCode::Paste,
-        } => {}
+        
+        // TODO: Port this case to the new shortcuts system
         Event::KeyDown { key: KeyCode::F1 }
         | Event::KeyDown {
             key: KeyCode::O,  /* FIXME: Only when ctrl is pressed */
@@ -375,13 +389,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::WindowResize { width, height } => {
-            debug!("Window resize {width}x{height}");
-            // if !state.edit_enabled {
-            //     let delta = state.window_size - (width, height).size_vec();
-            //     state.offset -= delta / 2.;
-            // }
-        }
+        
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 state.is_loaded = false;
@@ -512,9 +520,35 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer:");
+        debug!("Received image buffer: {:?}", img.dimensions());
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
+
+        debug!("Frame source: {:?}", frame.source);
+
+        match frame.source {
+            FrameSource::Still => {
+                if !state.persistent_settings.keep_view {
+                    state.reset_image = true;
+                    state.offset = Default::default();
+                    state.scale = Default::default();
+                }
+                // always reset if first image
+                if state.current_texture.is_none() {
+                    state.reset_image = true;
+                    state.offset = Default::default();
+                    state.scale = Default::default();
+                }
+
+                state.image_info = None;
+            }
+            FrameSource::EditResult => {
+                // debug!("EditResult");
+                // state.edit_state.is_processing = false;
+            }
+            FrameSource::Reset => state.reset_image = true,
+            _ => (),
+        }
 
         if let Some(tex) = &mut state.current_texture {
             if tex.width() as u32 == img.width() && img.height() as u32 == img.height() {
@@ -524,26 +558,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         } else {
             state.current_texture = img.to_texture(gfx);
-        }
-
-        //center the image
-        if frame.source != FrameSource::Animation {}
-
-        debug!("Frame source: {:?}", frame.source);
-
-        match frame.source {
-            FrameSource::Still => {
-                state.offset = Default::default();
-                state.scale = Default::default();
-                state.reset_image = true;
-                state.image_info = None;
-            }
-            FrameSource::EditResult => {
-                // debug!("EditResult");
-                // state.edit_state.is_processing = false;
-            }
-            FrameSource::Reset => state.reset_image = true,
-            _ => (),
         }
 
         state.is_loaded = true;
@@ -625,28 +639,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     let mut changed_channels = false;
 
-                    if app.keyboard.was_pressed(KeyCode::R) && !state.key_grab {
+                    if key_pressed(app, state, RedChannel) {
                         state.current_channel = Channel::Red;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::G) && !state.key_grab {
+                    if key_pressed(app, state, GreenChannel) {
                         state.current_channel = Channel::Green;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::B) && !state.key_grab {
+                    if key_pressed(app, state, BlueChannel) {
                         state.current_channel = Channel::Blue;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::A) && !state.key_grab {
+                    if key_pressed(app, state, AlphaChannel) {
                         state.current_channel = Channel::Alpha;
                         changed_channels = true;
                     }
 
-                    if app.keyboard.was_pressed(KeyCode::U) && !state.key_grab {
+                    if key_pressed(app, state, RGBChannel) {
                         state.current_channel = Channel::RGB;
                         changed_channels = true;
                     }
-                    if app.keyboard.was_pressed(KeyCode::C) && !state.key_grab {
+                    if key_pressed(app, state, RGBAChannel) {
                         state.current_channel = Channel::RGBA;
                         changed_channels = true;
                     }
@@ -674,6 +688,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             });
                     });
 
+                    // TODO: remove redundancy
                     if changed_channels {
                         if let Some(img) = &state.current_image {
                             match &state.current_channel {
@@ -690,56 +705,37 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
 
-                    // ui.add(egui::Separator::default().vertical());
-
                     if state.current_image.is_some() {
                         if state.current_path.is_some() {
-                            if tooltip(unframed_button("◀", ui), "Previous image", "Left Arrow", ui)
-                                .clicked()
-                                || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Left)
-                                    && !state.key_grab)
+                            if tooltip(
+                                unframed_button("◀", ui),
+                                "Previous image",
+                                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
+                                ui,
+                            )
+                            .clicked()
                             {
-                                if let Some(img_location) = state.current_path.as_mut() {
-                                    let next_img = img_shift(&img_location, -1);
-                                    // prevent reload if at last or first
-                                    if &next_img != img_location {
-                                        state.is_loaded = false;
-                                        *img_location = next_img;
-                                        state
-                                            .player
-                                            .load(&img_location, state.message_channel.0.clone());
-                                    }
-                                }
+                                prev_image(state)
                             }
-                            if tooltip(unframed_button("▶", ui), "Next image", "Right Arrow", ui)
-                                .clicked()
-                                || (!app.keyboard.shift()
-                                    && app.keyboard.was_pressed(KeyCode::Right)
-                                    && !state.key_grab)
+                            if tooltip(
+                                unframed_button("▶", ui),
+                                "Next image",
+                                &lookup(&state.persistent_settings.shortcuts, &NextImage),
+                                ui,
+                            )
+                            .clicked()
                             {
-                                if let Some(img_location) = state.current_path.as_mut() {
-                                    let next_img = img_shift(&img_location, 1);
-                                    // prevent reload if at last or first
-                                    if &next_img != img_location {
-                                        state.is_loaded = false;
-                                        *img_location = next_img;
-                                        state
-                                            .player
-                                            .load(&img_location, state.message_channel.0.clone());
-                                    }
-                                }
+                                next_image(state)
                             }
                         }
 
                         if tooltip(
                             ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                             "Show image info",
-                            "i",
+                            &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                             ui,
                         )
                         .changed()
-                            || app.keyboard.was_pressed(KeyCode::I)
                         {
                             send_extended_info(
                                 &state.current_image,
@@ -751,57 +747,42 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         tooltip(
                             ui.checkbox(&mut state.edit_enabled, "✏ Edit"),
                             "Edit the image",
-                            "e",
+                            &lookup(&state.persistent_settings.shortcuts, &EditMode),
                             ui,
                         );
                     }
+                    // TODO for windows/mac
+                    // let mut window_pos = app.window().position();
 
-                    if tooltip(unframed_button("⛶", ui), "Full Screen", "f", ui).clicked()
-                        || (app.keyboard.was_released(KeyCode::F) && !state.key_grab)
+                    if tooltip(
+                        unframed_button("⛶", ui),
+                        "Full Screen",
+                        &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
+                        ui,
+                    )
+                    .clicked()
                     {
-                        let fullscreen = app.window().is_fullscreen();
-                        app.window().set_fullscreen(!fullscreen);
-
-                        if !fullscreen {
-                            let mut window_pos = app.window().position();
-                            window_pos.1 += 40;
-
-                            debug!("Not fullscreen {:?}", window_pos);
-                            // if going from window to fullscreen, offset by window pos
-                            state.offset.x += window_pos.0 as f32;
-                            state.offset.y += window_pos.1 as f32;
-                            // save old window pos
-                            state.fullscreen_offset = Some(window_pos);
-                        } else {
-                            // info!("Is fullscreen {:?}", window_pos);
-
-                            if let Some(sf) = state.fullscreen_offset {
-                                state.offset.x -= sf.0 as f32;
-                                state.offset.y -= sf.1 as f32;
-                            }
-                        }
-
-                        // state.reset_image = true;
+                        toggle_fullscreen(app, state);
                     }
 
                     if tooltip(
                         unframed_button_colored("📌", state.always_on_top, ui),
                         "Always on top",
-                        "t",
+                        &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
                         ui,
                     )
                     .clicked()
-                        || (app.keyboard.was_pressed(KeyCode::T) && !state.key_grab)
                     {
                         state.always_on_top = !state.always_on_top;
                         app.window().set_always_on_top(state.always_on_top);
                     }
 
+                    let copy_pressed = key_pressed(app, state, Copy);
                     if let Some(img) = &state.current_image {
                         if unframed_button("🗐 Copy", ui)
                             .on_hover_text("Copy image to clipboard")
                             .clicked()
-                            || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::C))
+                            || copy_pressed
                         {
                             clipboard_copy(img);
                         }
@@ -810,7 +791,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if unframed_button("📋 Paste", ui)
                         .on_hover_text("Paste image from clipboard")
                         .clicked()
-                        || (app.keyboard.ctrl() && app.keyboard.was_pressed(KeyCode::V))
+                        || key_pressed(app, state, Paste)
                     {
                         if let Ok(clipboard) = &mut Clipboard::new() {
                             if let Ok(imagedata) = clipboard.get_image() {
@@ -908,8 +889,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             app.window().request_frame();
         }
 
-        settings_ui(ctx, state);
-
         state.pointer_over_ui = ctx.is_pointer_over_area();
         // info!("using pointer {}", ctx.is_using_pointer());
 
@@ -926,6 +905,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         } else {
             state.key_grab = false;
         }
+        // Settings come last, as they block keyboard grab (for hotkey assigment)
+        settings_ui(app, ctx, state);
     });
 
     if state.network_mode {
@@ -942,7 +923,67 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-// fn set_title(window: &mut PistonWindow, text: &str) {
-//     let title = format!("Oculante {} | {}", env!("CARGO_PKG_VERSION"), text);
-//     window.set_title(title);
-// }
+// TODO:move to utils
+fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
+    let fullscreen = app.window().is_fullscreen();
+
+    if !fullscreen {
+        let mut window_pos = app.window().position();
+        window_pos.1 += 40;
+
+        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
+
+        let dpi = app.window().dpi();
+        debug!("{:?}", dpi);
+        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
+        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
+        #[cfg(target_os = "macos")]
+        {
+            // tweak for osx titlebars
+            window_pos.1 += 8;
+        }
+
+        // if going from window to fullscreen, offset by window pos
+        state.offset.x += window_pos.0 as f32;
+        state.offset.y += window_pos.1 as f32;
+
+        // save old window pos
+        state.fullscreen_offset = Some(window_pos);
+    } else {
+        // info!("Is fullscreen {:?}", window_pos);
+
+        if let Some(sf) = state.fullscreen_offset {
+            state.offset.x -= sf.0 as f32;
+            state.offset.y -= sf.1 as f32;
+        }
+    }
+    app.window().set_fullscreen(!fullscreen);
+}
+
+fn prev_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = img_shift(&img_location, -1);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+fn next_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = img_shift(&img_location, 1);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}

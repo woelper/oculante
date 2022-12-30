@@ -1,5 +1,13 @@
-use std::{ops::RangeInclusive, time::Instant};
-
+use crate::{
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    shortcuts::{keypresses_as_string, lookup},
+    update,
+    utils::{
+        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
+        ImageExt, OculanteState,
+    },
+};
 use egui::plot::Plot;
 use image::RgbaImage;
 use log::{debug, info};
@@ -9,18 +17,9 @@ use notan::{
         plot::{PlotPoints, Points},
         *,
     },
-    prelude::Graphics,
+    prelude::{App, Graphics},
 };
-
-use crate::{
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
-    paint::PaintStroke,
-    update,
-    utils::{
-        disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ImageExt, OculanteState,
-    },
-};
+use std::{collections::HashSet, ops::RangeInclusive, time::Instant};
 
 #[cfg(feature = "turbo")]
 use crate::image_editing::{cropped_range, lossless_tx};
@@ -290,7 +289,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     });
 }
 
-pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
+pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
     if state.settings_enabled {
         egui::Window::new("Settings")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
@@ -331,6 +330,16 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                     _ = state.persistent_settings.save()
                 }
 
+                if ui
+                .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
+                .on_hover_text(
+                    "When a new image is loaded, keep current zoom and offset",
+                )
+                .changed()
+            {
+                _ = state.persistent_settings.save()
+            }
+
                 if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");
                 }
@@ -342,9 +351,19 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                         state.settings_enabled = false;
                     }
 
+                    if ui.button("Reset all settings").clicked() {
+                        state.persistent_settings = Default::default();
+                    _ = state.persistent_settings.save()
+
+                    }
+
                     if ui.button("Close").clicked() {
                         state.settings_enabled = false;
                     }
+                });
+
+                ui.collapsing("Keybindings",|ui| {
+                    keybinding_ui(app, state, ui);
                 });
             });
     }
@@ -1311,3 +1330,59 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
         });
     }
 }
+
+fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
+    // Make sure no shortcuts are received by the application
+    state.key_grab = true;
+
+    let no_keys_pressed = app.keyboard.down.is_empty();
+
+    if no_keys_pressed {
+        ui.label(
+            egui::RichText::new("Please press & hold a key, then assign it").color(Color32::RED),
+        );
+    }
+    ui.label("While this is open, regular shortcuts will not work.");
+
+    let k = app
+        .keyboard
+        .down
+        .iter()
+        .map(|k| format!("{:?}", k.0))
+        .collect::<HashSet<String>>();
+    ui.label(keypresses_as_string(&k));
+
+    let mut changed = false;
+
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+                let s = state.persistent_settings.shortcuts.clone();
+                for (event, keys) in &mut state.persistent_settings.shortcuts {
+                    ui.label(format!("{:?}", event));
+
+                    ui.label(lookup(&s, event));
+                    if !no_keys_pressed {
+                        if ui.button("assign").clicked() {
+                            *keys = app
+                                .keyboard
+                                .down
+                                .iter()
+                                .map(|(k, _)| format!("{:?}", k))
+                                .collect();
+                            changed = true;
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        });
+    if changed {
+        _ = state.persistent_settings.save();
+    }
+}
+
+// fn keystrokes(ui: &mut Ui) {
+//     ui.add(Button::new(format!("{:?}", k.0)).fill(Color32::DARK_BLUE));
+// }
