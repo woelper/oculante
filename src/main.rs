@@ -549,6 +549,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     let egui_output = plugins.egui(|ctx| {
+
+        // the top menu bar
         egui::TopBottomPanel::top("menu")
             .min_height(30.)
             .default_height(30.)
@@ -649,13 +651,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
 
                         if tooltip(
-                            ui.checkbox(&mut state.info_enabled, "ℹ Info"),
+                            // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
+                            ui.selectable_label(state.info_enabled, "ℹ Info"),
                             "Show image info",
                             &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                             ui,
                         )
-                        .changed()
+                        .clicked()
                         {
+                            state.info_enabled = !state.info_enabled;
                             send_extended_info(
                                 &state.current_image,
                                 &state.current_path,
@@ -663,12 +667,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             );
                         }
 
-                        tooltip(
-                            ui.checkbox(&mut state.edit_enabled, "✏ Edit"),
+                        if tooltip(
+                            ui.selectable_label(state.edit_enabled, "✏ Edit"),
                             "Edit the image",
                             &lookup(&state.persistent_settings.shortcuts, &EditMode),
                             ui,
-                        );
+                        ).clicked() {
+                            state.edit_enabled = !state.edit_enabled;
+                        }
                     }
                     // TODO for windows/mac
                     // let mut window_pos = app.window().position();
