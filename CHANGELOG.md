@@ -1,3 +1,13 @@
+# 0.6.35 (2022-12-30)
+
+### :sparkles: Features
+
+* Enable persistent offset/zoom in settings (20e33e14)
+
+### :green_apple: Chore
+
+* remove edit/info checkboxes (11613c21)
+
 # 0.6.34 (2022-12-19)
 
 ### :beetle: Bug Fixes
