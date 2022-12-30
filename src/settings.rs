@@ -3,12 +3,16 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-// #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PersistentSettings {
+    /// The UI accent color
     pub accent_color: [u8; 3],
+    /// Should we sync to monitor rate? This makes the app snappier, but also more resource intensive.
     pub vsync: bool,
+    /// Keyboard map to actions
     pub shortcuts: Shortcuts,
+    /// Do not reset view when receiving a new image
+    pub keep_view: bool
 }
 
 impl Default for PersistentSettings {
@@ -17,6 +21,7 @@ impl Default for PersistentSettings {
             accent_color: [255, 0, 75],
             vsync: true,
             shortcuts: Shortcuts::default_keys(),
+            keep_view: Default::default()
         }
     }
 }
