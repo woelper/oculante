@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum InputEvent {
     AlwaysOnTop,
     Fullscreen,
+    Browse,
     Copy,
     Paste,
     EditMode,
@@ -105,6 +106,8 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::PreviousImage, "Left")
             .add_key(InputEvent::NextImage, "Right")
             .add_key(InputEvent::ZoomOut, "Minus")
+            .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
+            .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
             .add_keys(InputEvent::PanLeft, &["LShift", "Left"])
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])

@@ -264,6 +264,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            if key_pressed(app, state, Browse) {
+                browse_for_image_path(state)
+            }
+
             if key_pressed(app, state, NextImage) {
                 next_image(state)
             }
@@ -353,39 +357,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
                         state.scale += delta;
                     }
-                }
-            }
-        }
-        
-        // TODO: Port this case to the new shortcuts system
-        Event::KeyDown { key: KeyCode::F1 }
-        | Event::KeyDown {
-            key: KeyCode::O,  /* FIXME: Only when ctrl is pressed */
-        } => {
-            if !state.key_grab {
-                // Browse for image to load
-                // TODO: Include button on toolbar?
-                let start_directory =
-                    if let Some(img_path) = &state.current_path {
-                        img_path.clone()
-                    }
-                    else {
-                        std::env::current_dir().unwrap()
-                    };
-                
-                let file_dialog_result = rfd::FileDialog::new()
-                    .add_filter("All Supported Image Types", 
-                                &utils::SUPPORTED_EXTENSIONS)
-                    .add_filter("All File Types", &["*"])
-                    .set_directory(&start_directory)
-                    .pick_file();
-                
-                if let Some(file_path) = file_dialog_result {
-                    debug!("Selected File Path = {:?}", file_path);
-                    state.is_loaded = false;
-                    state.current_image = None;
-                    state.player.load(&file_path, state.message_channel.0.clone());
-                    state.current_path = Some(file_path);
                 }
             }
         }
@@ -985,5 +956,31 @@ fn next_image(state: &mut OculanteState) {
                 .player
                 .load(&img_location, state.message_channel.0.clone());
         }
+    }
+}
+
+// Show file browser to select image to load
+fn browse_for_image_path(state: &mut OculanteState) {
+    let start_directory =
+        if let Some(img_path) = &state.current_path {
+            img_path.clone()
+        }
+        else {
+            std::env::current_dir().unwrap()
+        };
+    
+    let file_dialog_result = rfd::FileDialog::new()
+        .add_filter("All Supported Image Types", 
+                    &utils::SUPPORTED_EXTENSIONS)
+        .add_filter("All File Types", &["*"])
+        .set_directory(&start_directory)
+        .pick_file();
+    
+    if let Some(file_path) = file_dialog_result {
+        debug!("Selected File Path = {:?}", file_path);
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load(&file_path, state.message_channel.0.clone());
+        state.current_path = Some(file_path);
     }
 }
