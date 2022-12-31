@@ -151,16 +151,43 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Image is: {:?}", maybe_img_location);
 
-    if let Some(ref img_location) = maybe_img_location {
-        state.current_path = Some(img_location.clone());
-        if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        } else {
-            state
-                .player
-                .load_blocking(&img_location, state.message_channel.0.clone());
+    if let Some(ref maybe_location) = maybe_img_location {
+        // Check if path is a directory or a file (and that it even exists)
+        let mut start_img_location: Option<PathBuf> = None;
+        
+        if let Ok(maybe_location_metadata) = maybe_location.metadata() {
+            if maybe_location_metadata.is_dir() {
+                // Folder - Pick first image from the folder...
+                if let Some(first_img_location) = find_first_image_in_directory(maybe_location) {
+                    start_img_location = Some(first_img_location.clone());
+                }
+            }
+            else if is_ext_compatible(maybe_location) {
+                // Image File with a usable extension
+                start_img_location = Some(maybe_location.clone());
+            }
+            else {
+                // Unsupported extension? Or unusable path?
+                // TODO: Show a warning about this?
+            }
+        }
+        else {
+            // Not a valid path, or user doesn't have permission to access?
+            // TODO: Show a warning about this?
+        }
+        
+        // Assign image path if we have a valid one here
+        if let Some(img_location) = start_img_location {
+            state.current_path = Some(img_location.clone());
+            if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
+                state
+                    .player
+                    .load(&img_location, state.message_channel.0.clone());
+            } else {
+                state
+                    .player
+                    .load_blocking(&img_location, state.message_channel.0.clone());
+            }
         }
     }
 
@@ -242,6 +269,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            if key_pressed(app, state, Browse) {
+                browse_for_image_path(state)
+            }
+
             if key_pressed(app, state, NextImage) {
                 next_image(state)
             }
@@ -304,16 +335,29 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     match evt {
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
-                let delta = zoomratio(delta_y, state.scale);
-                let new_scale = state.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                    state.scale += delta;
+                if app.keyboard.ctrl() {
+                    // Change image to next/prev
+                    // - map scroll-down == next, as that's the natural scrolling direction
+                    if delta_y > 0.0 {
+                        prev_image(state)
+                    }
+                    else {
+                        next_image(state)
+                    }
+                }
+                else {
+                    // Normal scaling
+                    let delta = zoomratio(delta_y, state.scale);
+                    let new_scale = state.scale + delta;
+                    // limit scale
+                    if new_scale > 0.05 && new_scale < 40. {
+                        state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+                        state.scale += delta;
+                    }
                 }
             }
         }
-
+        
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 state.is_loaded = false;
@@ -915,5 +959,31 @@ fn next_image(state: &mut OculanteState) {
                 .player
                 .load(&img_location, state.message_channel.0.clone());
         }
+    }
+}
+
+// Show file browser to select image to load
+fn browse_for_image_path(state: &mut OculanteState) {
+    let start_directory =
+        if let Some(img_path) = &state.current_path {
+            img_path.clone()
+        }
+        else {
+            std::env::current_dir().unwrap()
+        };
+    
+    let file_dialog_result = rfd::FileDialog::new()
+        .add_filter("All Supported Image Types", 
+                    &utils::SUPPORTED_EXTENSIONS)
+        .add_filter("All File Types", &["*"])
+        .set_directory(&start_directory)
+        .pick_file();
+    
+    if let Some(file_path) = file_dialog_result {
+        debug!("Selected File Path = {:?}", file_path);
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load(&file_path, state.message_channel.0.clone());
+        state.current_path = Some(file_path);
     }
 }
