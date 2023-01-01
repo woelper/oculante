@@ -472,20 +472,19 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
             .map(|x| x.unwrap().path())
             .filter(|x| is_ext_compatible(x))
             .collect::<Vec<PathBuf>>();
-        
+
         dir_files.sort_unstable_by(|a, b| {
             lexical_sort::natural_lexical_cmp(
                 &a.file_name().unwrap().to_string_lossy(),
                 &b.file_name().unwrap().to_string_lossy(),
             )
         });
-        
+
         return Some(dir_files);
     }
-    
+
     None
 }
-
 
 /// Find first valid image from the directory
 /// Assumes the given path is a directory and not a file
@@ -494,7 +493,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
         // Return first filename from the folder, if it exists
         return files.iter().nth(0).cloned();
     }
-    
+
     None
 }
 
@@ -509,29 +508,34 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
                     .iter()
                     .cycle()
                     .skip_while(|f| *f != file) // TODO: cache current index instead
-                    .skip(1);                   // FIXME: What if abs(inc) > 1?
-                
+                    .skip(1); // FIXME: What if abs(inc) > 1?
+
                 if let Some(next) = iter.next() {
                     return next.clone();
+                } else {
+                    debug!(
+                        "Go to next failed: i = {}, N = {}",
+                        iter.count(),
+                        files.len()
+                    );
                 }
-                else {
-                    debug!("Go to next failed: i = {}, N = {}", iter.count(), files.len());
-                }
-            }
-            else {
+            } else {
                 // Prev
                 let mut iter = files
                     .iter()
                     .rev()
                     .cycle()
                     .skip_while(|f| *f != file) // TODO: cache current index instead
-                    .skip(1);                   // FIXME: What if abs(inc) > 1?
-                
+                    .skip(1); // FIXME: What if abs(inc) > 1?
+
                 if let Some(prev) = iter.next() {
                     return prev.clone();
-                }
-                else {
-                    debug!("Go to prev failed: i = {}, N = {}", iter.count(), files.len());
+                } else {
+                    debug!(
+                        "Go to prev failed: i = {}, N = {}",
+                        iter.count(),
+                        files.len()
+                    );
                 }
             }
         }
@@ -541,54 +545,21 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
 
 // NOTE: Must keep this list in sync with is_ext_compatible()
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
-    "bmp",
-    "dds",
-    "exr",
-    "ff",
-    "gif",
-    "hdr",
-    "ico",
-    "jpeg",
-    "jpg",
-    "png",
-    "pnm",
-    "psd",
-    "svg",
-    "tga",
-    "tif",
-    "tiff",
-    "webp",
+    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
+    "tga", "tif", "tiff", "webp",
 ];
 
+/// Determine if an enxtension is compatible with oculante
 pub fn is_ext_compatible(fname: &PathBuf) -> bool {
-    match fname
-        .extension()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
-        // NOTE: Must keep this in sync with SUPPORTED_EXTENSIONS
-        "png" => true,
-        "exr" => true,
-        "jpg" => true,
-        "jpeg" => true,
-        "psd" => true,
-        "dds" => true,
-        "gif" => true,
-        "hdr" => true,
-        "bmp" => true,
-        "ico" => true,
-        "tga" => true,
-        "tiff" => true,
-        "tif" => true,
-        "webp" => true,
-        "pnm" => true,
-        "svg" => true,
-        "ff" => true,
-        _ => false,
-    }
+    SUPPORTED_EXTENSIONS.contains(
+        &fname
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_lowercase()
+            .as_str()
+    )
 }
 
 pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
