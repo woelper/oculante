@@ -129,11 +129,22 @@ impl ExtendedImageInfo {
     }
 }
 
+#[derive(Debug, Default)]
+
+struct Cache {}
+
+impl Cache {
+    fn get(path: &Path) {
+        
+    }
+}
+
 #[derive(Debug)]
 pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
+    cache: Cache,
 }
 
 impl Player {
@@ -145,6 +156,7 @@ impl Player {
             frame_sender,
             image_sender,
             stop_sender,
+            cache: Cache::default(),
         }
     }
 
@@ -494,8 +506,12 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
 /// Find first valid image from the directory
 /// Assumes the given path is a directory and not a file
 pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
-    if !folder_path.is_dir() {return None};
-    get_image_filenames_for_directory(folder_path).map(|x|x.first().cloned()).flatten()
+    if !folder_path.is_dir() {
+        return None;
+    };
+    get_image_filenames_for_directory(folder_path)
+        .map(|x| x.first().cloned())
+        .flatten()
 }
 
 /// Advance to the prev/next image
