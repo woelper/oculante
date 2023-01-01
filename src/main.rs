@@ -118,12 +118,12 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             Arg::new("l")
                 .short('l')
                 .help("Listen on port")
-                .takes_value(true),
+                ,
         )
         .arg(
             Arg::new("chainload")
                 .required(false)
-                .takes_value(false)
+                .num_args(0)
                 .short('c')
                 .help("Chainload on Mac"),
         )
@@ -131,7 +131,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Completed argument parsing.");
 
-    let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
+    let maybe_img_location = matches.get_one::<String>("INPUT").map(|arg| PathBuf::from(arg));
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
@@ -191,7 +191,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         }
     }
 
-    if let Some(port) = matches.value_of("l") {
+    if let Some(port) = matches.get_one::<String>("l") {
         match port.parse::<i32>() {
             Ok(p) => {
                 state.message = Some(format!("Listening on {}", p));

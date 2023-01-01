@@ -33,7 +33,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         .arg(
             Arg::new("chainload")
                 .required(false)
-                .takes_value(false)
+                .num_args(0)
                 .short('c')
                 .help("Chainload on Mac"),
         )
@@ -42,6 +42,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     debug!("Completed argument parsing.");
     let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
+    // contains_id("chainload")?
     if !matches.is_present("chainload") && maybe_img_location.is_none() {
         info!("Chainload not specified, and no input file present. Invoking mac hack.");
     } else {
