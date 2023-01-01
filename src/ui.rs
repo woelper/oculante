@@ -10,7 +10,7 @@ use crate::{
 };
 use egui::plot::Plot;
 use image::RgbaImage;
-use log::{debug, info};
+use log::{debug, error, info};
 use notan::{
     egui::{
         self,
@@ -771,7 +771,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     // start with a fresh copy of the unmodified image
                     state.edit_state.result_image_op = img.clone();
                     for operation in &mut state.edit_state.image_op_stack {
-                        operation.process_image(&mut state.edit_state.result_image_op);
+                        if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
+                            error!("{e}")
+                        }
                     }
                     info!(
                         "Image changed. Finished evaluating in {}s",
@@ -888,11 +890,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.horizontal(|ui| {
                     ui.label("File:");
 
-                    //TODO: This needs more time, as hotkeys prevent typing text
                     if let Some(p) = &mut state.current_path {
                         if let Some(pstem) = p.file_stem() {
-                            // if let Some(b) = p.file_prefix()
-                            // ui.label(pstem.to_string_lossy().to_string());
                             let mut stem = pstem.to_string_lossy().to_string();
                             if ui.text_edit_singleline(&mut stem).changed() {
                                 if let Some(parent) = p.parent() {

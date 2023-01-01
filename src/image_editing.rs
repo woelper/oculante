@@ -4,10 +4,11 @@ use std::num::NonZeroU32;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 
+use anyhow::{Result};
 use evalexpr::*;
 use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
-use log::debug;
+use log::{debug, error};
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
@@ -461,7 +462,7 @@ impl ImageOperation {
     }
 
     /// Process all image operators (All things that modify the image and are not "per pixel")
-    pub fn process_image(&self, img: &mut RgbaImage) {
+    pub fn process_image(&self, img: &mut RgbaImage) -> Result<()> {
         match self {
             Self::Blur(amt) => {
                 if *amt != 0 {
@@ -489,27 +490,27 @@ impl ImageOperation {
                         ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
                     };
 
-                    let width = NonZeroU32::new(img.width()).unwrap_or(NonZeroU32::new(1).unwrap());
+                    let width = NonZeroU32::new(img.width()).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
                     let height =
-                        NonZeroU32::new(img.height()).unwrap_or(NonZeroU32::new(1).unwrap());
+                        NonZeroU32::new(img.height()).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
                     let mut src_image = fr::Image::from_vec_u8(
                         width,
                         height,
                         img.clone().into_raw(),
                         fr::PixelType::U8x4,
                     )
-                    .unwrap();
+                    ?;
 
                     let mapper = fr::create_gamma_22_mapper();
                     mapper
                         .forward_map_inplace(&mut src_image.view_mut())
-                        .unwrap();
+                        ?;
 
                     // Create container for data of destination image
                     let dst_width =
-                        NonZeroU32::new(dimensions.0).unwrap_or(NonZeroU32::new(1).unwrap());
+                        NonZeroU32::new(dimensions.0).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
                     let dst_height =
-                        NonZeroU32::new(dimensions.1).unwrap_or(NonZeroU32::new(1).unwrap());
+                        NonZeroU32::new(dimensions.1).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
                     let mut dst_image =
                         fr::Image::new(dst_width, dst_height, src_image.pixel_type());
 
@@ -517,18 +518,17 @@ impl ImageOperation {
 
                     resizer
                         .resize(&src_image.view(), &mut dst_image.view_mut())
-                        .unwrap();
+                        ?;
 
                     mapper
                         .backward_map_inplace(&mut dst_image.view_mut())
-                        .unwrap();
+                        ?;
 
-                    *img = image::RgbaImage::from_raw(
+                    *img = anyhow::Context::context(image::RgbaImage::from_raw(
                         dimensions.0,
                         dimensions.1,
                         dst_image.into_vec(),
-                    )
-                    .unwrap();
+                    ), "Can't create RgbaImage")?;
                 }
             }
             Self::Rotate(angle) => {
@@ -570,10 +570,11 @@ impl ImageOperation {
 
             _ => (),
         }
+        Ok(())
     }
 
     /// Process a single pixel.
-    pub fn process_pixel(&self, p: &mut Vector4<f32>) {
+    pub fn process_pixel(&self, p: &mut Vector4<f32>) -> Result<()>{
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;
@@ -603,8 +604,7 @@ impl ImageOperation {
                     "g" => p[1] as f64,
                     "b" => p[2] as f64,
                     "a" => p[3] as f64,
-                }
-                .unwrap(); // Do proper error handling here
+                }?;
 
                 if let Ok(_) = eval_empty_with_context_mut(expr, &mut context) {
                     if let Some(r) = context.get_value("r") {
@@ -703,6 +703,7 @@ impl ImageOperation {
             }
             _ => (),
         }
+        Ok(())
     }
 }
 
@@ -740,7 +741,9 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
 
             // run pixel operations
             for operation in operators {
-                operation.process_pixel(&mut float_pixel);
+                if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                    error!("{e}")
+                }
             }
 
             float_pixel *= 255.;
