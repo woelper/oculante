@@ -969,7 +969,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
             img_path.clone()
         }
         else {
-            std::env::current_dir().unwrap()
+            std::env::current_dir().unwrap_or_default()
         };
     
     let file_dialog_result = rfd::FileDialog::new()

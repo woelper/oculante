@@ -469,14 +469,19 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
     if let Ok(info) = std::fs::read_dir(folder_path) {
         // TODO: Are symlinks handled correctly?
         let mut dir_files = info
-            .map(|x| x.unwrap().path())
+            .flat_map(|x| x)
+            .map(|x| x.path())
             .filter(|x| is_ext_compatible(x))
             .collect::<Vec<PathBuf>>();
 
         dir_files.sort_unstable_by(|a, b| {
             lexical_sort::natural_lexical_cmp(
-                &a.file_name().unwrap().to_string_lossy(),
-                &b.file_name().unwrap().to_string_lossy(),
+                &a.file_name()
+                    .map(|f| f.to_string_lossy())
+                    .unwrap_or_default(),
+                &b.file_name()
+                    .map(|f| f.to_string_lossy())
+                    .unwrap_or_default(),
             )
         });
 
@@ -558,7 +563,7 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
             .to_str()
             .unwrap_or_default()
             .to_lowercase()
-            .as_str()
+            .as_str(),
     )
 }
 
