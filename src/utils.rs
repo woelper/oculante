@@ -6,7 +6,7 @@ use image::{EncodableLayout, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
-use notan::prelude::Graphics;
+use notan::prelude::{Graphics, TextureFilter};
 use notan::AppState;
 
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
@@ -494,6 +494,7 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
 /// Find first valid image from the directory
 /// Assumes the given path is a directory and not a file
 pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
+    if !folder_path.is_dir() {return None};
     get_image_filenames_for_directory(folder_path).map(|x|x.first().cloned()).flatten()
 }
 
@@ -543,7 +544,6 @@ pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
     file.clone()
 }
 
-// NOTE: Must keep this list in sync with is_ext_compatible()
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp",
@@ -658,7 +658,7 @@ pub fn send_extended_info(
             if let Some(p) = current_path {
                 _ = e_info.with_exif(&p);
             }
-            let _ = sender.send(e_info);
+            _ = sender.send(e_info);
         });
     }
 }
@@ -691,14 +691,10 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
         "svg" => {
             // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
-            //let (width, height) = (3000, 3000);
             let opt = usvg::Options::default();
             let svg_data = std::fs::read(&img_location)?;
             if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt.to_ref()) {
-                // let pixmap_size = rtree.svg_node().size.to_screen_size()
                 let pixmap_size = rtree.size.to_screen_size();
-                // .scale_to(ScreenSize::new(width, height)?)
-                // ;
 
                 if let Some(mut pixmap) =
                     tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
@@ -710,7 +706,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                         pixmap.as_mut(),
                     )
                     .ok_or(anyhow!("Can't render SVG"))?;
-                    // resvg::render(&rtree, usvg::FitTo::Height(height), pixmap.as_mut())?;
                     let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
                         pixmap_size.width(),
                         pixmap_size.height(),
@@ -898,8 +893,8 @@ impl ImageExt for RgbaImage {
             .with_mipmaps(true)
             .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
-            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
-            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
+            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
             .ok()
     }
