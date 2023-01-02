@@ -19,6 +19,6 @@ jobs:
         usesh: true
         prepare: |
           pkg_add curl
-          curl https://sh.rustup.rs -sSf | sh
+          curl https://sh.rustup.rs -sySf | sh
         run: |
           cargo check
