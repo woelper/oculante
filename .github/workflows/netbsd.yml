@@ -18,10 +18,9 @@ jobs:
         envs: 'MYTOKEN MYTOKEN2'
         usesh: true
         prepare: |
-          uname -a
-          pkg_add curl pkg-config cmake openssl libX11 fontconfig
-          PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
-          export PKG_PATH
+          pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2
+          # PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
+          # export PKG_PATH
           # cat /usr/pkg/etc/pkgin/repositories.conf
           # pkgin search rust
           # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
