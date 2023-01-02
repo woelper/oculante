@@ -1,4 +1,4 @@
-name: Test
+name: NetBSD build test
 
 on: [push]
 
@@ -19,7 +19,7 @@ jobs:
         usesh: true
         prepare: |
           pkg_add curl
-          pkg_add 
+          pkg_add rust
 
         run: |
           cargo check
