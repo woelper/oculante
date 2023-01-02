@@ -18,15 +18,14 @@ jobs:
         envs: 'MYTOKEN MYTOKEN2'
         usesh: true
         prepare: |
-          pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gtk3 gdk-pixbuf2 cairo pango atk glib2
-          PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
-          export PKG_PATH
-          pkg_add pkgin
-          pkgin search gtk3
-          # cat /usr/pkg/etc/pkgin/repositories.conf
-          # curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+          pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+-3.24.33
+          # PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
+          # export PKG_PATH
+          # pkg_add pkgin
+          # pkgin search gtk3
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
         run: |
           ls
-          # PATH=$HOME/.cargo/bin:$PATH
-          # export PATH
-          # cargo check --no-default-features
+          PATH=$HOME/.cargo/bin:$PATH
+          export PATH
+          cargo check --no-default-features
