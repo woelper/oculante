@@ -18,6 +18,7 @@ jobs:
         envs: 'MYTOKEN MYTOKEN2'
         usesh: true
         prepare: |
+          pkg_add curl
           curl https://sh.rustup.rs -sSf | sh
         run: |
           cargo check
