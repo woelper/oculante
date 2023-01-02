@@ -19,18 +19,13 @@ jobs:
         usesh: true
         prepare: |
           uname -a
-          pkg_add curl
+          pkg_add curl pkg-config cmake openssl, libX11 fontconfig
           PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
           export PKG_PATH
-          pkg_add cmake
           # cat /usr/pkg/etc/pkgin/repositories.conf
           # pkgin search rust
           # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
-          curl https://sh.rustup.rs -sSf | sh -s -- -y
-          echo $SHELL
-          # chmod +x "$HOME/.cargo/env"
-          # eval "$HOME/.cargo/env"
-          # which cargo
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
