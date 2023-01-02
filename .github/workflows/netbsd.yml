@@ -27,9 +27,9 @@ jobs:
           # pkgin search rust
           curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
           echo $SHELL
-          chmod +x "$HOME/.cargo/env"
-          eval "$HOME/.cargo/env"
-          which cargo
+          # chmod +x "$HOME/.cargo/env"
+          # eval "$HOME/.cargo/env"
+          # which cargo
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
