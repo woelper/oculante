@@ -1,0 +1,25 @@
+name: Test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: macos-12
+    name: Test in NetBSD
+    env:
+      MYTOKEN : ${{ secrets.MYTOKEN }}
+      MYTOKEN2: "value2"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test in NetBSD
+      id: test
+      uses: vmactions/netbsd-vm@v0
+      with:
+        envs: 'MYTOKEN MYTOKEN2'
+        usesh: true
+        prepare: |
+          pkg_add curl
+          pkg_add 
+
+        run: |
+          cargo check
