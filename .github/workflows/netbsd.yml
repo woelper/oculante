@@ -18,6 +18,6 @@ jobs:
         envs: 'MYTOKEN MYTOKEN2'
         usesh: true
         prepare: |
-          pkg_add rust-bin-1.64.0
+          pkg_add rust-1.64.0
         run: |
           cargo check
