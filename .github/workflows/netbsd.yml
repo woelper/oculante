@@ -22,10 +22,11 @@ jobs:
           pkg_add curl
           PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
           export PKG_PATH
-          # pkg_add pkgin
+          pkg_add cmake
           # cat /usr/pkg/etc/pkgin/repositories.conf
           # pkgin search rust
-          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+          # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+          curl https://sh.rustup.rs -sSf | sh -s -- -y
           echo $SHELL
           # chmod +x "$HOME/.cargo/env"
           # eval "$HOME/.cargo/env"
@@ -33,4 +34,4 @@ jobs:
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
-          cargo check
+          cargo check --no-default-features
