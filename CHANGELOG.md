@@ -1,3 +1,27 @@
+# 0.6.37 (2023-01-02)
+
+# 0.6.36 (2023-01-01)
+
+### :beetle: Bug Fixes
+
+* Make it possible to pass a folder-path as a command-line arg, instead of requiring a file within that (61547f46)
+* Use Natural Sorting for filenames (d7783bd8)
+* Prevent old settings file from becoming invalid (fixes #103) (10573c1b)
+
+### :sparkles: Features
+
+* Ctrl-O and/or F1 bring up a file browser dialog to select an image to load (8778b92c)
+* Go to Next/Prev now cycles through the images in the folder, instead of stopping at either end (6d2cd8cc)
+* Ctrl-Scrollwheel can be used to go to the next/prev images too (77154a1f)
+
+### :green_apple: Chore
+
+* update clap (c08f5f1a)
+* update rfd and self_update (8ba00d8e)
+* Update Changelog with the missing revision ID's (01f7bad3)
+* Split out the list of supported image formats to a constant (SUPPORTED_EXTENSIONS) (60762f49)
+* Update Changelog with recent changes (c4ab7fe7)
+
 # 0.6.35 (2022-12-30)
 
 ### :sparkles: Features

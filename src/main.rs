@@ -118,12 +118,12 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             Arg::new("l")
                 .short('l')
                 .help("Listen on port")
-                ,
+                .takes_value(true),
         )
         .arg(
             Arg::new("chainload")
                 .required(false)
-                .num_args(0)
+                .takes_value(false)
                 .short('c')
                 .help("Chainload on Mac"),
         )
@@ -131,7 +131,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Completed argument parsing.");
 
-    let maybe_img_location = matches.get_one::<String>("INPUT").map(|arg| PathBuf::from(arg));
+    let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
@@ -191,7 +191,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         }
     }
 
-    if let Some(port) = matches.get_one::<String>("l") {
+    if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
                 state.message = Some(format!("Listening on {}", p));
@@ -269,6 +269,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
@@ -963,6 +964,7 @@ fn next_image(state: &mut OculanteState) {
 }
 
 // Show file browser to select image to load
+#[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
     let start_directory =
         if let Some(img_path) = &state.current_path {

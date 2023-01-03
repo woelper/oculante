@@ -309,22 +309,24 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.32"
+version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7db700bc935f9e43e88d00b0850dae18a63773cfbec6d8e070fccf7fef89a39"
+checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
 dependencies = [
+ "atty",
  "bitflags",
  "clap_lex",
- "is-terminal",
+ "indexmap",
  "strsim",
  "termcolor",
+ "textwrap",
 ]
 
 [[package]]
 name = "clap_lex"
-version = "0.3.0"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
+checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
 ]
@@ -440,9 +442,9 @@ checksum = "7439becb5fafc780b6f4de382b1a7a3e70234afe783854a4702ee8adbb838609"
 
 [[package]]
 name = "console"
-version = "0.15.3"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5556015fe3aad8b968e5d4124980fbe2f6aaee7aeec6b749de1faaa2ca5d0a4c"
+checksum = "c9b6515d269224923b26b5febea2ed42b2d5f2ce37284a4dd670fedd6cb8347a"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -1954,9 +1956,9 @@ dependencies = [
 
 [[package]]
 name = "lyon_tessellation"
-version = "1.0.7"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66b19b1b39823ddc178d98cbb42c70ffcd3bfbcbde589f38752bedde982269c3"
+checksum = "2e48a1d4a9cef1075ebe0afbf16521db6c7942e6563c136fb15676dafc5135d7"
 dependencies = [
  "float_next_after",
  "lyon_path",
@@ -2217,9 +2219,9 @@ checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "nom"
-version = "7.1.1"
+version = "7.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
+checksum = "e5507769c4919c998e69e49c839d9dc6e693ede4cc4290d6ad8b41d4f09c548c"
 dependencies = [
  "memchr",
  "minimal-lexical",
@@ -2661,7 +2663,7 @@ dependencies = [
 
 [[package]]
 name = "oculante"
-version = "0.6.35"
+version = "0.6.37"
 dependencies = [
  "anyhow",
  "arboard",
@@ -3758,6 +3760,12 @@ checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
 ]
+
+[[package]]
+name = "textwrap"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 
 [[package]]
 name = "thiserror"
