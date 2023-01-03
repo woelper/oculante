@@ -26,9 +26,10 @@ jobs:
           # pkgin -y install curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
           # pkgin search gtk3
           # curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
-        run: |
           /usr > ls
           /usr/bin > ls | grep ssl
+        run: |
+          ls
           # PATH=$HOME/.cargo/bin:$PATH
           # export PATH
           # cargo check
