@@ -4,7 +4,7 @@ use std::num::NonZeroU32;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 
-use anyhow::{Result};
+use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
@@ -490,45 +490,48 @@ impl ImageOperation {
                         ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
                     };
 
-                    let width = NonZeroU32::new(img.width()).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
-                    let height =
-                        NonZeroU32::new(img.height()).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
+                    let width = NonZeroU32::new(img.width()).unwrap_or(anyhow::Context::context(
+                        NonZeroU32::new(1),
+                        "Can't create nonzero",
+                    )?);
+                    let height = NonZeroU32::new(img.height()).unwrap_or(anyhow::Context::context(
+                        NonZeroU32::new(1),
+                        "Can't create nonzero",
+                    )?);
                     let mut src_image = fr::Image::from_vec_u8(
                         width,
                         height,
                         img.clone().into_raw(),
                         fr::PixelType::U8x4,
-                    )
-                    ?;
+                    )?;
 
                     let mapper = fr::create_gamma_22_mapper();
-                    mapper
-                        .forward_map_inplace(&mut src_image.view_mut())
-                        ?;
+                    mapper.forward_map_inplace(&mut src_image.view_mut())?;
 
                     // Create container for data of destination image
-                    let dst_width =
-                        NonZeroU32::new(dimensions.0).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
-                    let dst_height =
-                        NonZeroU32::new(dimensions.1).unwrap_or(anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?);
+                    let dst_width = NonZeroU32::new(dimensions.0).unwrap_or(
+                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
+                    );
+                    let dst_height = NonZeroU32::new(dimensions.1).unwrap_or(
+                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
+                    );
                     let mut dst_image =
                         fr::Image::new(dst_width, dst_height, src_image.pixel_type());
 
                     let mut resizer = fr::Resizer::new(fr::ResizeAlg::Convolution(filter));
 
-                    resizer
-                        .resize(&src_image.view(), &mut dst_image.view_mut())
-                        ?;
+                    resizer.resize(&src_image.view(), &mut dst_image.view_mut())?;
 
-                    mapper
-                        .backward_map_inplace(&mut dst_image.view_mut())
-                        ?;
+                    mapper.backward_map_inplace(&mut dst_image.view_mut())?;
 
-                    *img = anyhow::Context::context(image::RgbaImage::from_raw(
-                        dimensions.0,
-                        dimensions.1,
-                        dst_image.into_vec(),
-                    ), "Can't create RgbaImage")?;
+                    *img = anyhow::Context::context(
+                        image::RgbaImage::from_raw(
+                            dimensions.0,
+                            dimensions.1,
+                            dst_image.into_vec(),
+                        ),
+                        "Can't create RgbaImage",
+                    )?;
                 }
             }
             Self::Rotate(angle) => {
@@ -574,7 +577,7 @@ impl ImageOperation {
     }
 
     /// Process a single pixel.
-    pub fn process_pixel(&self, p: &mut Vector4<f32>) -> Result<()>{
+    pub fn process_pixel(&self, p: &mut Vector4<f32>) -> Result<()> {
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;

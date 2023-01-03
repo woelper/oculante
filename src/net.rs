@@ -1,3 +1,4 @@
+use crate::utils::Frame;
 use anyhow::Result;
 use log::{error, info};
 use std::convert::TryInto;
@@ -5,7 +6,6 @@ use std::io::Read;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::thread;
-use crate::utils::Frame;
 
 fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) -> Result<()> {
     let mut data = [0 as u8; 100000]; // using 50 byte buffer

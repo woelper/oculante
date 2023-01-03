@@ -3,7 +3,6 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PersistentSettings {
@@ -14,7 +13,9 @@ pub struct PersistentSettings {
     /// Keyboard map to actions
     pub shortcuts: Shortcuts,
     /// Do not reset view when receiving a new image
-    pub keep_view: bool
+    pub keep_view: bool,
+    /// How many images to keep in cache
+    pub max_cache: usize,
 }
 
 impl Default for PersistentSettings {
@@ -23,7 +24,8 @@ impl Default for PersistentSettings {
             accent_color: [255, 0, 75],
             vsync: true,
             shortcuts: Shortcuts::default_keys(),
-            keep_view: Default::default()
+            keep_view: Default::default(),
+            max_cache: 30,
         }
     }
 }

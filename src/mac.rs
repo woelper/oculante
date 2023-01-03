@@ -40,7 +40,9 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         .get_matches_from(args);
 
     debug!("Completed argument parsing.");
-    let maybe_img_location = matches.get_one::<String>("INPUT").map(|arg| PathBuf::from(arg));
+    let maybe_img_location = matches
+        .get_one::<String>("INPUT")
+        .map(|arg| PathBuf::from(arg));
 
     if !matches.is_present("chainload") && maybe_img_location.is_none() {
         info!("Chainload not specified, and no input file present. Invoking mac hack.");

@@ -196,10 +196,12 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         error!("Command not registered: '{:?}'. Inserting new.", command);
         // update missing shortcut
         if let Some(default_shortcut) = Shortcuts::default_keys().get(&command) {
-            state.persistent_settings.shortcuts.insert(command, default_shortcut.clone());
+            state
+                .persistent_settings
+                .shortcuts
+                .insert(command, default_shortcut.clone());
             _ = state.persistent_settings.save();
         }
-
     }
     false
 }

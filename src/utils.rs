@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -129,13 +129,46 @@ impl ExtendedImageInfo {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 
-struct Cache {}
+pub struct Cache {
+    data: HashMap<PathBuf, CachedImage>,
+    cache_size: usize,
+}
+
+#[derive(Debug)]
+pub struct CachedImage {
+    data: RgbaImage,
+    created: Instant,
+}
 
 impl Cache {
-    fn get(path: &Path) {
-        
+    fn get(&self, path: &Path) -> Option<RgbaImage> {
+        self.data.get(path).map(|c| c.data.clone())
+    }
+
+    pub fn insert(&mut self, path: &Path, img: RgbaImage) {
+        self.data.insert(
+            path.into(),
+            CachedImage {
+                data: img,
+                created: std::time::Instant::now(),
+            },
+        );
+        if self.data.len() > self.cache_size {
+            debug!("Cache limit hit, deleting oldest");
+            let mut latest = std::time::Instant::now();
+            let mut key = PathBuf::new();
+
+            for (p, c) in &self.data {
+                if c.created < latest {
+                    latest = c.created;
+                    key = p.clone();
+                }
+            }
+
+            _ = self.data.remove(&key);
+        }
     }
 }
 
@@ -144,11 +177,11 @@ pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
-    cache: Cache,
+    pub cache: Cache,
 }
 
 impl Player {
-    pub fn new(image_sender: Sender<Frame>) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
         let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -156,19 +189,24 @@ impl Player {
             frame_sender,
             image_sender,
             stop_sender,
-            cache: Cache::default(),
+            cache: Cache {
+                data: Default::default(),
+                cache_size,
+            },
         }
-    }
-
-    pub fn load_blocking(&self, img_location: &PathBuf, message_sender: Sender<String>) {
-        self.stop();
-        send_image_blocking(&img_location, self.image_sender.clone(), message_sender);
     }
 
     pub fn load(&mut self, img_location: &PathBuf, message_sender: Sender<String>) {
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
+
+        if let Some(cached_image) = self.cache.get(img_location) {
+            _ = self.image_sender.send(Frame::new_still(cached_image));
+            info!("Cache hit for {}", img_location.display());
+            return;
+        }
+
         send_image_threaded(
             &img_location,
             self.image_sender.clone(),
@@ -234,30 +272,6 @@ pub fn send_image_threaded(
             }
         }
     });
-}
-
-pub fn send_image_blocking(
-    img_location: &PathBuf,
-    texture_sender: Sender<Frame>,
-    message_sender: Sender<String>,
-) {
-    match open_image(&img_location) {
-        Ok(col) => {
-            for frame in col.frames {
-                let delay = frame.delay;
-                let _ = texture_sender.send(frame);
-                // dbg!(&frame.delay);
-                if delay > 0 {
-                    thread::sleep(Duration::from_millis(delay as u64));
-                }
-            }
-            // let _ = state_sender.send("".into());
-        }
-        Err(e) => {
-            error!("Error {:?} / {:?}", e, img_location);
-            _ = message_sender.send(e.to_string());
-        }
-    }
 }
 
 /// A single frame
@@ -410,7 +424,7 @@ impl Default for OculanteState {
             image_dimension: (0, 0),
             info_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone()),
+            player: Player::new(tx_channel.0.clone(), 20),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
             extended_info_channel: mpsc::channel(),
