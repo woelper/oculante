@@ -24,6 +24,10 @@ jobs:
           # pkgin -y install curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
           # pkgin search gtk3
           # curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+          pkg_add modular-xorg
+          echo X11_TYPE=modular > /etc/mk.conf
+          cd /usr/pkgsrc/meta-pkgs/modular-xorg
+          make install
           ls /usr
           ls /usr/bin | grep ssl
         run: |
