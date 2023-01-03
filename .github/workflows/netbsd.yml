@@ -16,7 +16,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender
+          pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender xproto
           # gtk3 and libX11 seem to be missing ^^
           # PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
           # export PKG_PATH
