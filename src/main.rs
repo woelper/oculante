@@ -269,6 +269,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
@@ -963,6 +964,7 @@ fn next_image(state: &mut OculanteState) {
 }
 
 // Show file browser to select image to load
+#[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
     let start_directory =
         if let Some(img_path) = &state.current_path {
