@@ -1,15 +1,15 @@
-name: NetBSD check
+name: NetBSD full
 
 on: [push]
 
 jobs:
   test:
     runs-on: macos-12
-    name: Test in NetBSD
+    name: Build in NetBSD
     steps:
     - uses: actions/checkout@v2
-    - name: Test in NetBSD
-      id: test
+    - name: Build in NetBSD
+      id: testnet
       uses: vmactions/netbsd-vm@v0
       with:
         mem: 4096
@@ -26,4 +26,4 @@ jobs:
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
-          cargo check --no-default-features
+          cargo check
