@@ -7,7 +7,7 @@ use crate::utils::OculanteState;
 use notan::prelude::App;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd)]
 pub enum InputEvent {
     AlwaysOnTop,
     Fullscreen,

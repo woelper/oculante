@@ -1375,9 +1375,17 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
+            let s = state.persistent_settings.shortcuts.clone();
+            let mut ordered_shortcuts = state
+                .persistent_settings
+                .shortcuts
+                .iter_mut()
+                .collect::<Vec<_>>();
+            ordered_shortcuts
+                .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
             egui::Grid::new("info").num_columns(2).show(ui, |ui| {
-                let s = state.persistent_settings.shortcuts.clone();
-                for (event, keys) in &mut state.persistent_settings.shortcuts {
+                for (event, keys) in ordered_shortcuts {
                     ui.label(format!("{:?}", event));
 
                     ui.label(lookup(&s, event));
