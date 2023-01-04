@@ -133,7 +133,7 @@ impl ExtendedImageInfo {
 
 pub struct Cache {
     data: HashMap<PathBuf, CachedImage>,
-    cache_size: usize,
+    pub cache_size: usize,
 }
 
 #[derive(Debug)]
