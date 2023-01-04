@@ -21,6 +21,7 @@ use strum::IntoEnumIterator;
 
 pub mod settings;
 pub mod shortcuts;
+pub mod cache;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
