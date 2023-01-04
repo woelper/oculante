@@ -153,7 +153,7 @@ fn bench_process_all() {
 
         for op in ops {
             info!("IMG {:?}", op);
-            op.process_image(&mut buffer);
+            op.process_image(&mut buffer).unwrap();
         }
 
         let elapsed = start.elapsed();
