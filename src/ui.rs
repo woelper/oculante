@@ -295,7 +295,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .resizable(false)
-            .default_width(400.)
+            .default_width(600.)
             // .title_bar(false)
             .show(&ctx, |ui| {
 
@@ -320,6 +320,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 });
 
 
+
+
                 if ui
                     .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
                     .on_hover_text(
@@ -329,6 +331,23 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 {
                     _ = state.persistent_settings.save()
                 }
+
+
+                ui.horizontal(|ui| {
+                    ui.label("Number of image to cache");
+                    if ui
+                    .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
+
+                    .on_hover_text(
+                        "Keep this many images in memory for faster opening.",
+                    )
+                    .changed()
+                {
+                    state.player.cache.cache_size = state.persistent_settings.max_cache;
+                    _ = state.persistent_settings.save()
+                }
+                });
+
 
                 if ui
                 .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")

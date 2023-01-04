@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration};
 
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -34,6 +34,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
+use crate::cache::Cache;
 use crate::image_editing::EditState;
 use crate::settings::PersistentSettings;
 
@@ -129,15 +130,18 @@ impl ExtendedImageInfo {
     }
 }
 
+
+
 #[derive(Debug)]
 pub struct Player {
     pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
+    pub cache: Cache,
 }
 
 impl Player {
-    pub fn new(image_sender: Sender<Frame>) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
         let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -145,18 +149,24 @@ impl Player {
             frame_sender,
             image_sender,
             stop_sender,
+            cache: Cache {
+                data: Default::default(),
+                cache_size,
+            },
         }
-    }
-
-    pub fn load_blocking(&self, img_location: &PathBuf, message_sender: Sender<String>) {
-        self.stop();
-        send_image_blocking(&img_location, self.image_sender.clone(), message_sender);
     }
 
     pub fn load(&mut self, img_location: &PathBuf, message_sender: Sender<String>) {
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
+
+        if let Some(cached_image) = self.cache.get(img_location) {
+            _ = self.image_sender.send(Frame::new_still(cached_image));
+            info!("Cache hit for {}", img_location.display());
+            return;
+        }
+
         send_image_threaded(
             &img_location,
             self.image_sender.clone(),
@@ -222,30 +232,6 @@ pub fn send_image_threaded(
             }
         }
     });
-}
-
-pub fn send_image_blocking(
-    img_location: &PathBuf,
-    texture_sender: Sender<Frame>,
-    message_sender: Sender<String>,
-) {
-    match open_image(&img_location) {
-        Ok(col) => {
-            for frame in col.frames {
-                let delay = frame.delay;
-                let _ = texture_sender.send(frame);
-                // dbg!(&frame.delay);
-                if delay > 0 {
-                    thread::sleep(Duration::from_millis(delay as u64));
-                }
-            }
-            // let _ = state_sender.send("".into());
-        }
-        Err(e) => {
-            error!("Error {:?} / {:?}", e, img_location);
-            _ = message_sender.send(e.to_string());
-        }
-    }
 }
 
 /// A single frame
@@ -398,7 +384,7 @@ impl Default for OculanteState {
             image_dimension: (0, 0),
             info_enabled: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone()),
+            player: Player::new(tx_channel.0.clone(), 20),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
             extended_info_channel: mpsc::channel(),
@@ -494,8 +480,12 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathB
 /// Find first valid image from the directory
 /// Assumes the given path is a directory and not a file
 pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
-    if !folder_path.is_dir() {return None};
-    get_image_filenames_for_directory(folder_path).map(|x|x.first().cloned()).flatten()
+    if !folder_path.is_dir() {
+        return None;
+    };
+    get_image_filenames_for_directory(folder_path)
+        .map(|x| x.first().cloned())
+        .flatten()
 }
 
 /// Advance to the prev/next image
