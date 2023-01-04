@@ -27,11 +27,11 @@ pub enum InputEvent {
     ResetView,
     ZoomOut,
     ZoomIn,
-    Quit,
     PanLeft,
     PanRight,
     PanUp,
     PanDown,
+    Quit,
 }
 
 pub type Shortcuts = HashMap<InputEvent, SimultaneousKeypresses>;

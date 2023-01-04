@@ -253,13 +253,13 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.offset.x += delta;
             }
             if key_pressed(app, state, PanUp) {
-                state.offset.y += delta;
+                state.offset.y -= delta;
             }
             if key_pressed(app, state, PanLeft) {
                 state.offset.x -= delta;
             }
             if key_pressed(app, state, PanDown) {
-                state.offset.y -= delta;
+                state.offset.y += delta;
             }
 
             if key_pressed(app, state, ResetView) {
