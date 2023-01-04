@@ -12,7 +12,6 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
-use scrubber::img_shift;
 use shortcuts::key_pressed;
 use shortcuts::lookup;
 use std::ffi::OsStr;
@@ -20,12 +19,11 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use strum::IntoEnumIterator;
 
-pub mod settings;
-pub mod shortcuts;
 pub mod cache;
 pub mod scrubber;
+pub mod settings;
+pub mod shortcuts;
 use crate::scrubber::find_first_image_in_directory;
-use crate::scrubber::get_image_filenames_for_directory;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 
@@ -184,16 +182,11 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
         // Assign image path if we have a valid one here
         if let Some(img_location) = start_img_location {
+            state.is_loaded = false;
             state.current_path = Some(img_location.clone());
-            if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-                state
-                    .player
-                    .load(&img_location, state.message_channel.0.clone());
-            } else {
-                state
-                    .player
-                    .load(&img_location, state.message_channel.0.clone());
-            }
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
         }
     }
 
@@ -499,21 +492,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         debug!("Frame source: {:?}", frame.source);
 
-
         // fill image sequence
         if let Some(p) = &state.current_path {
-            if let Ok(list) = get_image_filenames_for_directory(p) {
-                state.image_list = list;
-            }
-        }
+            state.scrubber = scrubber::Scrubber::new(p);
+            state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
+            debug!("{:#?} from {}", &state.scrubber, p.display());
+        }
 
         match frame.source {
             FrameSource::Still => {
                 if !state.persistent_settings.keep_view {
                     state.reset_image = true;
-                    state.offset = Default::default();
-                    state.scale = Default::default();
 
                     if let Some(p) = state.current_path.clone() {
                         state.player.cache.insert(&p, img.clone());
@@ -522,8 +512,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // always reset if first image
                 if state.current_texture.is_none() {
                     state.reset_image = true;
-                    state.offset = Default::default();
-                    state.scale = Default::default();
                 }
 
                 state.image_info = None;
@@ -744,8 +732,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             state.edit_enabled = !state.edit_enabled;
                         }
                     }
-                    // TODO for windows/mac
-                    // let mut window_pos = app.window().position();
 
                     if tooltip(
                         unframed_button("⛶", ui),
@@ -822,6 +808,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 });
             });
+
+        if state.persistent_settings.show_scrub_bar {
+            egui::TopBottomPanel::bottom("scrubber")
+                .max_height(22.)
+                .min_height(22.)
+                .show(&ctx, |ui| {
+                    scrubber_ui(state, ui);
+                });
+        }
 
         if let Some(message) = &state.message.clone() {
             let max_anim_len = 1.8;
@@ -916,10 +911,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-
 fn prev_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = img_shift(&img_location, -1);
+        let next_img = state.scrubber.prev();
         // prevent reload if at last or first
         if &next_img != img_location {
             state.is_loaded = false;
@@ -933,7 +927,7 @@ fn prev_image(state: &mut OculanteState) {
 
 fn next_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = img_shift(&img_location, 1);
+        let next_img = state.scrubber.next();
         // prevent reload if at last or first
         if &next_img != img_location {
             state.is_loaded = false;

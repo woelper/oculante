@@ -9,7 +9,6 @@ use notan::graphics::Texture;
 use notan::prelude::{App, Graphics, TextureFilter};
 use notan::AppState;
 
-use anyhow::{bail, Context};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
@@ -37,6 +36,7 @@ use strum_macros::EnumIter;
 
 use crate::cache::Cache;
 use crate::image_editing::EditState;
+use crate::scrubber::Scrubber;
 use crate::settings::PersistentSettings;
 
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
@@ -378,7 +378,7 @@ pub struct OculanteState {
     pub toast_cooldown: f32,
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
-    pub image_list: Vec<PathBuf>,
+    pub scrubber: Scrubber,
 }
 
 impl Default for OculanteState {
@@ -421,7 +421,7 @@ impl Default for OculanteState {
             window_size: Default::default(),
             toast_cooldown: 0.,
             fullscreen_offset: None,
-            image_list: Default::default(),
+            scrubber: Default::default(),
         }
     }
 }
@@ -460,7 +460,6 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
         col[3] / divisor
     )
 }
-
 
 // TODO:move to utils
 pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {

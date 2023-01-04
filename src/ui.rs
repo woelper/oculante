@@ -39,6 +39,14 @@ pub trait EguiExt {
     ) -> Response {
         unimplemented!()
     }
+
+    fn slider_timeline<Num: emath::Numeric>(
+        &mut self,
+        _value: &mut Num,
+        _range: RangeInclusive<Num>,
+    ) -> Response {
+        unimplemented!()
+    }
 }
 
 impl EguiExt for Ui {
@@ -109,6 +117,44 @@ impl EguiExt for Ui {
             ui.horizontal(|ui| {
                 let r = ui.add(Slider::new(value, range).show_value(false).integer());
                 ui.monospace(format!("{:.0}", value.to_f64()));
+                r
+            })
+            .inner
+        })
+        .inner
+    }
+
+    fn slider_timeline<Num: emath::Numeric>(
+        &mut self,
+        value: &mut Num,
+        range: RangeInclusive<Num>,
+    ) -> Response {
+        self.scope(|ui| {
+            let color = ui.style().visuals.selection.bg_fill;
+            // let color = Color32::RED;
+            let available_width = ui.available_width() * 1. - 60.;
+            let mut style = ui.style_mut();
+            style.visuals.widgets.hovered.bg_fill = color;
+            style.visuals.widgets.hovered.fg_stroke.width = 0.;
+
+            style.visuals.widgets.active.bg_fill = color;
+            style.visuals.widgets.active.fg_stroke.width = 0.;
+
+            style.visuals.widgets.inactive.fg_stroke.width = 5.0;
+            style.visuals.widgets.inactive.fg_stroke.color = color;
+            style.visuals.widgets.inactive.rounding =
+                style.visuals.widgets.inactive.rounding.at_least(20.);
+            style.visuals.widgets.inactive.expansion = -5.0;
+
+            style.spacing.slider_width = available_width;
+
+            ui.horizontal(|ui| {
+                let r = ui.add(
+                    Slider::new(value, range.clone())
+                        .show_value(false)
+                        .integer(),
+                );
+                ui.monospace(format!("{:.0}/{:.0}", value.to_f64(), range.end().to_f64()));
                 r
             })
             .inner
@@ -332,6 +378,25 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     _ = state.persistent_settings.save()
                 }
 
+                if ui
+                .checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
+                .on_hover_text(
+                    "Enable an index slider to quickly scrub through lots of images",
+                )
+                .changed()
+            {
+                _ = state.persistent_settings.save()
+            }
+            if ui
+            .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundary")
+            .on_hover_text(
+                "When you move past the first or last image in a folder, should oculante continue or stop?",
+            )
+            .changed()
+        {
+            _ = state.persistent_settings.save();
+            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+        }
 
                 ui.horizontal(|ui| {
                     ui.label("Number of image to cache");
@@ -1346,6 +1411,19 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 state.player.load(&p, state.message_channel.0.clone());
             }
         });
+    }
+}
+
+pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
+    let len = state.scrubber.len().saturating_sub(1);
+
+    if ui
+        .slider_timeline(&mut state.scrubber.index, 0..=len)
+        .changed()
+    {
+        let p = state.scrubber.set(state.scrubber.index);
+        state.current_path = Some(p.clone());
+        state.player.load(&p, state.message_channel.0.clone());
     }
 }
 
