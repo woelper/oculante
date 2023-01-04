@@ -71,8 +71,9 @@ pkgin install oculante
 - Non-destructive painting and operator stack - edit very large images interactively by scaling them down first, then deleting the downscale operator once you want to export.
 - Metafile support: Edit stack can be saved into a metafile which will be auto-loaded and applied when loading the original.
 - Pretty fast startup / loading time
+- Configurable image caching (Select how many images to keep in memory)
 - Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
-- Lossless JPEG editing: Crop, rotate, mirror without recmpressing data
+- Lossless JPEG editing: Crop, rotate, mirror without recompressing data
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
 
