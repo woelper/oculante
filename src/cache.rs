@@ -30,7 +30,6 @@ impl Cache {
             },
         );
         if self.data.len() > self.cache_size {
-            debug!("Cache limit hit, deleting oldest");
             let mut latest = std::time::Instant::now();
             let mut key = PathBuf::new();
 
@@ -40,6 +39,7 @@ impl Cache {
                     key = p.clone();
                 }
             }
+            debug!("Cache limit hit, deleting oldest: {}, {}s old", key.display(), latest.elapsed().as_secs_f32());
 
             _ = self.data.remove(&key);
         }
