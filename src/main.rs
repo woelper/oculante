@@ -12,6 +12,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use scrubber::img_shift;
 use shortcuts::key_pressed;
 use shortcuts::lookup;
 use std::ffi::OsStr;
@@ -22,8 +23,12 @@ use strum::IntoEnumIterator;
 pub mod settings;
 pub mod shortcuts;
 pub mod cache;
+pub mod scrubber;
+use crate::scrubber::find_first_image_in_directory;
+use crate::scrubber::get_image_filenames_for_directory;
 use crate::shortcuts::InputEvent::*;
 mod utils;
+
 use utils::*;
 // mod events;
 #[cfg(target_os = "macos")]
@@ -162,7 +167,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         if let Ok(maybe_location_metadata) = maybe_location.metadata() {
             if maybe_location_metadata.is_dir() {
                 // Folder - Pick first image from the folder...
-                if let Some(first_img_location) = find_first_image_in_directory(maybe_location) {
+                if let Ok(first_img_location) = find_first_image_in_directory(maybe_location) {
                     start_img_location = Some(first_img_location.clone());
                 }
             } else if is_ext_compatible(maybe_location) {
@@ -493,6 +498,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // state.current_texture = img.to_texture(gfx);
 
         debug!("Frame source: {:?}", frame.source);
+
+
+        // fill image sequence
+        if let Some(p) = &state.current_path {
+            if let Ok(list) = get_image_filenames_for_directory(p) {
+                state.image_list = list;
+            }
+        }
+
 
         match frame.source {
             FrameSource::Still => {
@@ -902,42 +916,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-// TODO:move to utils
-fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
-    let fullscreen = app.window().is_fullscreen();
-
-    if !fullscreen {
-        let mut window_pos = app.window().position();
-        window_pos.1 += 40;
-
-        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
-
-        let dpi = app.window().dpi();
-        debug!("{:?}", dpi);
-        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
-        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
-        #[cfg(target_os = "macos")]
-        {
-            // tweak for osx titlebars
-            window_pos.1 += 8;
-        }
-
-        // if going from window to fullscreen, offset by window pos
-        state.offset.x += window_pos.0 as f32;
-        state.offset.y += window_pos.1 as f32;
-
-        // save old window pos
-        state.fullscreen_offset = Some(window_pos);
-    } else {
-        // info!("Is fullscreen {:?}", window_pos);
-
-        if let Some(sf) = state.fullscreen_offset {
-            state.offset.x -= sf.0 as f32;
-            state.offset.y -= sf.1 as f32;
-        }
-    }
-    app.window().set_fullscreen(!fullscreen);
-}
 
 fn prev_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
