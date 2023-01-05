@@ -431,34 +431,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    if state.reset_image {
-        let window_size = app.window().size().size_vec();
-        if let Some(current_image) = &state.current_image {
-            let img_size = current_image.size_vec();
-            let scale_factor = (window_size.x / img_size.x)
-                .min(window_size.y / img_size.y)
-                .min(1.0);
-            state.scale = scale_factor;
-            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
-
-            state.edit_state = Default::default();
-
-            // Load edit information if any
-            if let Some(p) = &state.current_path {
-                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                        state.message = Some("Edits have been loaded for this image.".into());
-                        state.edit_state = edit_state;
-                        state.edit_enabled = true;
-                    }
-                }
-            }
-
-            debug!("Image has been reset.");
-            state.reset_image = false;
-        }
-    }
-
     // reload constantly if gif so we keep receiving
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
@@ -468,9 +440,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
-        debug!("Finished calculating extended image info for {}", info.name);
+        debug!("Received extended image info for {}", info.name);
 
         state.image_info = Some(info);
+        app.window().request_frame();
     }
 
     // check if a new texture has been sent
@@ -549,11 +522,40 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
         state.current_image = Some(img);
         if state.info_enabled {
+            debug!("Sending extended info");
             send_extended_info(
                 &state.current_image,
                 &state.current_path,
                 &state.extended_info_channel,
             );
+        }
+    }
+
+    if state.reset_image {
+        let window_size = app.window().size().size_vec();
+        if let Some(current_image) = &state.current_image {
+            let img_size = current_image.size_vec();
+            let scale_factor = (window_size.x / img_size.x)
+                .min(window_size.y / img_size.y)
+                .min(1.0);
+            state.scale = scale_factor;
+            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
+
+            state.edit_state = Default::default();
+
+            // Load edit information if any
+            if let Some(p) = &state.current_path {
+                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                        state.message = Some("Edits have been loaded for this image.".into());
+                        state.edit_state = edit_state;
+                        state.edit_enabled = true;
+                    }
+                }
+            }
+
+            debug!("Image has been reset.");
+            state.reset_image = false;
         }
     }
 
