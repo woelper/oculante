@@ -279,6 +279,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, PreviousImage) {
                 prev_image(state)
             }
+            if key_pressed(app, state, FirstImage) {
+                first_image(state)
+            }
+            if key_pressed(app, state, LastImage) {
+                last_image(state)
+            }
 
             if key_pressed(app, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
@@ -913,33 +919,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-fn prev_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.prev();
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
-    }
-}
-
-fn next_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.next();
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
-    }
-}
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]

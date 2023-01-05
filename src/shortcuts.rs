@@ -17,6 +17,8 @@ pub enum InputEvent {
     EditMode,
     InfoMode,
     NextImage,
+    FirstImage,
+    LastImage,
     PreviousImage,
     RedChannel,
     GreenChannel,
@@ -104,6 +106,8 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::RGBAChannel, "C")
             .add_key(InputEvent::ZoomIn, "Equals")
             .add_key(InputEvent::PreviousImage, "Left")
+            .add_key(InputEvent::FirstImage, "Home")
+            .add_key(InputEvent::LastImage, "End")
             .add_key(InputEvent::NextImage, "Right")
             .add_key(InputEvent::ZoomOut, "Minus")
             .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered

@@ -892,3 +892,61 @@ pub fn clipboard_copy(img: &RgbaImage) {
         });
     }
 }
+
+
+pub fn prev_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.prev();
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn last_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let last = state.scrubber.len().saturating_sub(1);
+        let next_img = state.scrubber.set(last);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn first_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.set(0);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn next_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.next();
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
