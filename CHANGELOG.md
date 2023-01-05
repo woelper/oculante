@@ -1,3 +1,15 @@
+# 0.6.38 (2023-01-05)
+
+### :beetle: Bug Fixes
+
+* Reverse PanUp/Down (fixes #110) (89e43ef8)
+* Shortcuts are sorted and grouped (8e6d2430)
+
+### :sparkles: Features
+
+* add home/end to move to first/last image (39412c7f)
+* Add slider to step through images (5934b052)
+
 # 0.6.37 (2023-01-02)
 
 # 0.6.36 (2023-01-01)
