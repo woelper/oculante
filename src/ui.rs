@@ -154,7 +154,7 @@ impl EguiExt for Ui {
                         .show_value(false)
                         .integer(),
                 );
-                ui.monospace(format!("{:.0}/{:.0}", value.to_f64(), range.end().to_f64()));
+                ui.monospace(format!("{:.0}/{:.0}", value.to_f64() + 1., range.end().to_f64() + 1.));
                 r
             })
             .inner
