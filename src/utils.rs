@@ -6,7 +6,7 @@ use image::{EncodableLayout, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
-use notan::prelude::{Graphics, TextureFilter};
+use notan::prelude::{App, Graphics, TextureFilter};
 use notan::AppState;
 
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{Duration};
+use std::time::Duration;
 
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -36,7 +36,13 @@ use strum_macros::EnumIter;
 
 use crate::cache::Cache;
 use crate::image_editing::EditState;
+use crate::scrubber::Scrubber;
 use crate::settings::PersistentSettings;
+
+pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
+    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
+    "tga", "tif", "tiff", "webp",
+];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
@@ -129,8 +135,6 @@ impl ExtendedImageInfo {
         }
     }
 }
-
-
 
 #[derive(Debug)]
 pub struct Player {
@@ -330,24 +334,29 @@ impl Channel {
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
+    /// The scale of the displayed image
     pub scale: f32,
     pub scale_increment: f32,
+    /// Image offset on canvas
+    pub offset: Vector2<f32>,
     pub drag_enabled: bool,
     pub reset_image: bool,
     pub message: Option<String>,
+    /// Is the image fully loaded?
     pub is_loaded: bool,
-    pub offset: Vector2<f32>,
     pub window_size: Vector2<f32>,
     pub cursor: Vector2<f32>,
     pub cursor_relative: Vector2<f32>,
     pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
+    /// Show the image info panal
     pub info_enabled: bool,
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
     pub message_channel: (Sender<String>, Receiver<String>),
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     pub extended_info_loading: bool,
+    /// The Player, responsible for loading and sending Frames
     pub player: Player,
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
@@ -361,11 +370,15 @@ pub struct OculanteState {
     pub key_grab: bool,
     pub edit_state: EditState,
     pub pointer_over_ui: bool,
+    /// Things that perisist between launches
     pub persistent_settings: PersistentSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
+    /// how long the toast message appears
     pub toast_cooldown: f32,
     pub fullscreen_offset: Option<(i32, i32)>,
+    /// List of images to cycle through. Usually the current dir or dropped files
+    pub scrubber: Scrubber,
 }
 
 impl Default for OculanteState {
@@ -408,6 +421,7 @@ impl Default for OculanteState {
             window_size: Default::default(),
             toast_cooldown: 0.,
             fullscreen_offset: None,
+            scrubber: Default::default(),
         }
     }
 }
@@ -428,7 +442,6 @@ fn decode_webp(buf: &[u8]) -> Option<RgbaImage> {
 }
 
 pub fn zoomratio(i: f32, s: f32) -> f32 {
-    // i * i * i.signum()
     i * s * 0.1
 }
 
@@ -448,96 +461,42 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
-/// Get sorted list of files in a folder
-// TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
-// TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
-pub fn get_image_filenames_for_directory(folder_path: &Path) -> Option<Vec<PathBuf>> {
-    if let Ok(info) = std::fs::read_dir(folder_path) {
-        // TODO: Are symlinks handled correctly?
-        let mut dir_files = info
-            .flat_map(|x| x)
-            .map(|x| x.path())
-            .filter(|x| is_ext_compatible(x))
-            .collect::<Vec<PathBuf>>();
+// TODO:move to utils
+pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
+    let fullscreen = app.window().is_fullscreen();
 
-        dir_files.sort_unstable_by(|a, b| {
-            lexical_sort::natural_lexical_cmp(
-                &a.file_name()
-                    .map(|f| f.to_string_lossy())
-                    .unwrap_or_default(),
-                &b.file_name()
-                    .map(|f| f.to_string_lossy())
-                    .unwrap_or_default(),
-            )
-        });
+    if !fullscreen {
+        let mut window_pos = app.window().position();
+        window_pos.1 += 40;
 
-        return Some(dir_files);
-    }
+        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
 
-    None
-}
+        let dpi = app.window().dpi();
+        debug!("{:?}", dpi);
+        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
+        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
+        #[cfg(target_os = "macos")]
+        {
+            // tweak for osx titlebars
+            window_pos.1 += 8;
+        }
 
-/// Find first valid image from the directory
-/// Assumes the given path is a directory and not a file
-pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Option<PathBuf> {
-    if !folder_path.is_dir() {
-        return None;
-    };
-    get_image_filenames_for_directory(folder_path)
-        .map(|x| x.first().cloned())
-        .flatten()
-}
+        // if going from window to fullscreen, offset by window pos
+        state.offset.x += window_pos.0 as f32;
+        state.offset.y += window_pos.1 as f32;
 
-/// Advance to the prev/next image
-// TODO: The iterator should be cached, so we don't need to rebuild each time?
-pub fn img_shift(file: &PathBuf, inc: isize) -> PathBuf {
-    if let Some(parent) = file.parent() {
-        if let Some(files) = get_image_filenames_for_directory(parent) {
-            if inc > 0 {
-                // Next
-                let mut iter = files
-                    .iter()
-                    .cycle()
-                    .skip_while(|f| *f != file) // TODO: cache current index instead
-                    .skip(1); // FIXME: What if abs(inc) > 1?
+        // save old window pos
+        state.fullscreen_offset = Some(window_pos);
+    } else {
+        // info!("Is fullscreen {:?}", window_pos);
 
-                if let Some(next) = iter.next() {
-                    return next.clone();
-                } else {
-                    debug!(
-                        "Go to next failed: i = {}, N = {}",
-                        iter.count(),
-                        files.len()
-                    );
-                }
-            } else {
-                // Prev
-                let mut iter = files
-                    .iter()
-                    .rev()
-                    .cycle()
-                    .skip_while(|f| *f != file) // TODO: cache current index instead
-                    .skip(1); // FIXME: What if abs(inc) > 1?
-
-                if let Some(prev) = iter.next() {
-                    return prev.clone();
-                } else {
-                    debug!(
-                        "Go to prev failed: i = {}, N = {}",
-                        iter.count(),
-                        files.len()
-                    );
-                }
-            }
+        if let Some(sf) = state.fullscreen_offset {
+            state.offset.x -= sf.0 as f32;
+            state.offset.y -= sf.1 as f32;
         }
     }
-    file.clone()
+    app.window().set_fullscreen(!fullscreen);
 }
-
-pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
-    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
-    "tga", "tif", "tiff", "webp",
-];
 
 /// Determine if an enxtension is compatible with oculante
 pub fn is_ext_compatible(fname: &PathBuf) -> bool {
@@ -931,5 +890,63 @@ pub fn clipboard_copy(img: &RgbaImage) {
             height: img.height() as usize,
             bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
         });
+    }
+}
+
+
+pub fn prev_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.prev();
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn last_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let last = state.scrubber.len().saturating_sub(1);
+        let next_img = state.scrubber.set(last);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn first_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.set(0);
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
+    }
+}
+
+pub fn next_image(state: &mut OculanteState) {
+    if let Some(img_location) = state.current_path.as_mut() {
+        let next_img = state.scrubber.next();
+        // prevent reload if at last or first
+        if &next_img != img_location {
+            state.is_loaded = false;
+            *img_location = next_img;
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
+        }
     }
 }

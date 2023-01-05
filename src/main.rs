@@ -19,11 +19,14 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use strum::IntoEnumIterator;
 
+pub mod cache;
+pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
-pub mod cache;
+use crate::scrubber::find_first_image_in_directory;
 use crate::shortcuts::InputEvent::*;
 mod utils;
+
 use utils::*;
 // mod events;
 #[cfg(target_os = "macos")]
@@ -162,7 +165,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         if let Ok(maybe_location_metadata) = maybe_location.metadata() {
             if maybe_location_metadata.is_dir() {
                 // Folder - Pick first image from the folder...
-                if let Some(first_img_location) = find_first_image_in_directory(maybe_location) {
+                if let Ok(first_img_location) = find_first_image_in_directory(maybe_location) {
                     start_img_location = Some(first_img_location.clone());
                 }
             } else if is_ext_compatible(maybe_location) {
@@ -179,16 +182,11 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
         // Assign image path if we have a valid one here
         if let Some(img_location) = start_img_location {
+            state.is_loaded = false;
             state.current_path = Some(img_location.clone());
-            if img_location.extension() == Some(&std::ffi::OsString::from("gif")) {
-                state
-                    .player
-                    .load(&img_location, state.message_channel.0.clone());
-            } else {
-                state
-                    .player
-                    .load(&img_location, state.message_channel.0.clone());
-            }
+            state
+                .player
+                .load(&img_location, state.message_channel.0.clone());
         }
     }
 
@@ -280,6 +278,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, PreviousImage) {
                 prev_image(state)
+            }
+            if key_pressed(app, state, FirstImage) {
+                first_image(state)
+            }
+            if key_pressed(app, state, LastImage) {
+                last_image(state)
             }
 
             if key_pressed(app, state, AlwaysOnTop) {
@@ -433,34 +437,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    if state.reset_image {
-        let window_size = app.window().size().size_vec();
-        if let Some(current_image) = &state.current_image {
-            let img_size = current_image.size_vec();
-            let scale_factor = (window_size.x / img_size.x)
-                .min(window_size.y / img_size.y)
-                .min(1.0);
-            state.scale = scale_factor;
-            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
-
-            state.edit_state = Default::default();
-
-            // Load edit information if any
-            if let Some(p) = &state.current_path {
-                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                        state.message = Some("Edits have been loaded for this image.".into());
-                        state.edit_state = edit_state;
-                        state.edit_enabled = true;
-                    }
-                }
-            }
-
-            debug!("Image has been reset.");
-            state.reset_image = false;
-        }
-    }
-
     // reload constantly if gif so we keep receiving
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
@@ -470,9 +446,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
-        debug!("Finished calculating extended image info for {}", info.name);
+        debug!("Received extended image info for {}", info.name);
 
         state.image_info = Some(info);
+        app.window().request_frame();
     }
 
     // check if a new texture has been sent
@@ -494,12 +471,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         debug!("Frame source: {:?}", frame.source);
 
+        // fill image sequence
+        if let Some(p) = &state.current_path {
+            state.scrubber = scrubber::Scrubber::new(p);
+            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+
+            debug!("{:#?} from {}", &state.scrubber, p.display());
+        }
+
         match frame.source {
             FrameSource::Still => {
                 if !state.persistent_settings.keep_view {
                     state.reset_image = true;
-                    state.offset = Default::default();
-                    state.scale = Default::default();
 
                     if let Some(p) = state.current_path.clone() {
                         state.player.cache.insert(&p, img.clone());
@@ -508,8 +491,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // always reset if first image
                 if state.current_texture.is_none() {
                     state.reset_image = true;
-                    state.offset = Default::default();
-                    state.scale = Default::default();
                 }
 
                 state.image_info = None;
@@ -547,11 +528,40 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
         state.current_image = Some(img);
         if state.info_enabled {
+            debug!("Sending extended info");
             send_extended_info(
                 &state.current_image,
                 &state.current_path,
                 &state.extended_info_channel,
             );
+        }
+    }
+
+    if state.reset_image {
+        let window_size = app.window().size().size_vec();
+        if let Some(current_image) = &state.current_image {
+            let img_size = current_image.size_vec();
+            let scale_factor = (window_size.x / img_size.x)
+                .min(window_size.y / img_size.y)
+                .min(1.0);
+            state.scale = scale_factor;
+            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
+
+            state.edit_state = Default::default();
+
+            // Load edit information if any
+            if let Some(p) = &state.current_path {
+                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                        state.message = Some("Edits have been loaded for this image.".into());
+                        state.edit_state = edit_state;
+                        state.edit_enabled = true;
+                    }
+                }
+            }
+
+            debug!("Image has been reset.");
+            state.reset_image = false;
         }
     }
 
@@ -730,8 +740,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             state.edit_enabled = !state.edit_enabled;
                         }
                     }
-                    // TODO for windows/mac
-                    // let mut window_pos = app.window().position();
 
                     if tooltip(
                         unframed_button("⛶", ui),
@@ -808,6 +816,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 });
             });
+
+        if state.persistent_settings.show_scrub_bar {
+            egui::TopBottomPanel::bottom("scrubber")
+                .max_height(22.)
+                .min_height(22.)
+                .show(&ctx, |ui| {
+                    scrubber_ui(state, ui);
+                });
+        }
 
         if let Some(message) = &state.message.clone() {
             let max_anim_len = 1.8;
@@ -902,70 +919,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 }
 
-// TODO:move to utils
-fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
-    let fullscreen = app.window().is_fullscreen();
-
-    if !fullscreen {
-        let mut window_pos = app.window().position();
-        window_pos.1 += 40;
-
-        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
-
-        let dpi = app.window().dpi();
-        debug!("{:?}", dpi);
-        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
-        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
-        #[cfg(target_os = "macos")]
-        {
-            // tweak for osx titlebars
-            window_pos.1 += 8;
-        }
-
-        // if going from window to fullscreen, offset by window pos
-        state.offset.x += window_pos.0 as f32;
-        state.offset.y += window_pos.1 as f32;
-
-        // save old window pos
-        state.fullscreen_offset = Some(window_pos);
-    } else {
-        // info!("Is fullscreen {:?}", window_pos);
-
-        if let Some(sf) = state.fullscreen_offset {
-            state.offset.x -= sf.0 as f32;
-            state.offset.y -= sf.1 as f32;
-        }
-    }
-    app.window().set_fullscreen(!fullscreen);
-}
-
-fn prev_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = img_shift(&img_location, -1);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
-    }
-}
-
-fn next_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = img_shift(&img_location, 1);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
-    }
-}
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]

@@ -16,6 +16,8 @@ pub struct PersistentSettings {
     pub keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
+    pub show_scrub_bar: bool,
+    pub wrap_folder: bool,
 }
 
 impl Default for PersistentSettings {
@@ -26,6 +28,8 @@ impl Default for PersistentSettings {
             shortcuts: Shortcuts::default_keys(),
             keep_view: Default::default(),
             max_cache: 30,
+            show_scrub_bar: false,
+            wrap_folder: true
         }
     }
 }
