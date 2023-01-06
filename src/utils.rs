@@ -14,7 +14,7 @@ use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
@@ -751,6 +751,13 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 }
             }
         }
+        "png" => {
+            let file = File::open(&img_location)?;
+            let bufread = BufReader::new(file);
+            let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
+            reader.no_limits();
+            col.add_still(reader.decode()?.into_rgba8());
+        }
         "gif" => {
             let file = File::open(&img_location)?;
 
@@ -892,7 +899,6 @@ pub fn clipboard_copy(img: &RgbaImage) {
         });
     }
 }
-
 
 pub fn prev_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
