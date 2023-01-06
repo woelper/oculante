@@ -245,8 +245,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::KeyDown { .. } => {
+            debug!("key down");
+
+
+            // return;
             // pan image with keyboard
-            let delta = 80.;
+            let delta = 40.;
             if key_pressed(app, state, PanRight) {
                 state.offset.x += delta;
             }
@@ -274,10 +278,14 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, NextImage) {
-                next_image(state)
+                if state.is_loaded {
+                    next_image(state)
+                }
             }
             if key_pressed(app, state, PreviousImage) {
-                prev_image(state)
+                if state.is_loaded {
+                    prev_image(state)
+                }
             }
             if key_pressed(app, state, FirstImage) {
                 first_image(state)
@@ -918,7 +926,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 }
-
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
