@@ -8,6 +8,10 @@ name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
 version = "0.6.39"
+exclude = [
+    "res/*.gif",
+]
+
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
