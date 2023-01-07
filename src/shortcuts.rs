@@ -11,11 +11,8 @@ use serde::{Deserialize, Serialize};
 pub enum InputEvent {
     AlwaysOnTop,
     Fullscreen,
-    Browse,
-    Copy,
-    Paste,
-    EditMode,
     InfoMode,
+    EditMode,
     NextImage,
     FirstImage,
     LastImage,
@@ -33,6 +30,9 @@ pub enum InputEvent {
     PanRight,
     PanUp,
     PanDown,
+    Copy,
+    Paste,
+    Browse,
     Quit,
 }
 
@@ -223,6 +223,19 @@ pub fn keypresses_as_string(keys: &SimultaneousKeypresses) -> String {
     modifiers.sort();
     alpha.sort();
     modifiers.extend(alpha);
+    modifiers.join(" + ")
+}
+
+pub fn keypresses_as_markdown(keys: &SimultaneousKeypresses) -> String {
+    let mut modifiers = keys.modifiers().into_iter().collect::<Vec<_>>();
+    let mut alpha = keys.alphanumeric().into_iter().collect::<Vec<_>>();
+    modifiers.sort();
+    alpha.sort();
+    modifiers.extend(alpha);
+    modifiers = modifiers
+        .into_iter()
+        .map(|k| format!("<kbd>{}</kbd>", k))
+        .collect();
     modifiers.join(" + ")
 }
 
