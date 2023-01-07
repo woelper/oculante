@@ -22,16 +22,18 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
-
-
 ## Flipbook
 With configurable caching, Oculante can quickly step through image sequences:
 ![Screenshot](res/flipbook.gif "Screenshot")
 
-
 ## Inspection
 Get info about pixel values and position, with precise picking:
 ![Screenshot](res/picker.gif "Screenshot")
+
+## Network
+Raw image data can be sent to Oculante and will be loaded if possible, regardless of format. Streams of images will be played as a video. You can send images from cameras or headless systems such as a Raspberry Pi for example.
+![Screenshot](res/net.gif "Screenshot")
+
 ## Correct color channel display:
 Images may contain color information that is masked by the alpha channel. Although it is present you will not see it since usually RGB values are multiplied with the A channel when displayed. Oculante allows you to inspect all channels individually and see color data without transparency applied.
 ![Screenshot](res/premult.png "Screenshot")
