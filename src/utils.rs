@@ -14,7 +14,7 @@ use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
