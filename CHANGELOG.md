@@ -1,3 +1,13 @@
+# 0.6.39 (2023-01-07)
+
+### :beetle: Bug Fixes
+
+* slider is 1-based (fixes #116) (63226d5e)
+
+### :green_apple: Chore
+
+* update deps (2bc54c8f)
+
 # 0.6.38 (2023-01-05)
 
 ### :beetle: Bug Fixes
