@@ -1,10 +1,7 @@
 # This is a script to be locally run in order to release.
 
-# deny master
-
+# deny releasing from non-main branches
 branch="$(git symbolic-ref --short HEAD)"
-echo $branch
-
 if [ $branch != "master" ]
 then
     echo "You must be on master branch"
