@@ -362,7 +362,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     let delta = zoomratio(delta_y, state.scale);
                     let new_scale = state.scale + delta;
                     // limit scale
-                    if new_scale > 0.05 && new_scale < 40. {
+                    if new_scale > 0.01 && new_scale < 40. {
                         state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
                         state.scale += delta;
                     }
@@ -670,7 +670,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                         channel.to_string(),
                                     );
 
-                                    if tooltip(r, &channel.to_string(), channel.hotkey(), ui)
+                                    if tooltip(r, &channel.to_string(), &channel.hotkey(&state.persistent_settings.shortcuts), ui)
                                         .clicked()
                                     {
                                         changed_channels = true;

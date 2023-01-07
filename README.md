@@ -13,7 +13,7 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Lets you pick pixels, display location and color values
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 
-[![build](https://github.com/woelper/oculante/actions/workflows/rust.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/rust.yml)
+[![Cross-platform check](https://github.com/woelper/oculante/actions/workflows/build_checks.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/build_checks.yml)
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
 
@@ -39,16 +39,16 @@ pkgin install oculante
 ## Features
 
 ### Image format support:
-- bmp	
-- gif (animation support and correct timing)	
+- bmp
+- gif (animation support and correct timing)
 - hdr, tonemapped
-- ico	
-- jpeg	
-- png	
-- pnm	
+- ico
+- jpeg
+- png
+- pnm
 - tga
 - avif
-- tiff	
+- tiff
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
 - farbfeld  
 - DDS (DXT1-5, via `dds-rs`)
@@ -101,9 +101,11 @@ pkgin install oculante
 >
 > `left mouse`,`middle mouse`,  <kbd>Left</kbd> <kbd>Right</kbd> <kbd>Up</kbd> <kbd>Down</kbd> = pan
 >
-> <kbd>Left</kbd>/<kbd>Right</kbd> = prev/next image in folder
+> <kbd>Left</kbd>/<kbd>Right</kbd>, `ctrl + mouse wheel` = prev/next image in folder
 >
 > `Right mouse` pick color from image (in paint mode)
+>
+> <kbd>Ctrl+O</kbd>, <kbd>F1</kbd> = show file picker to open an image
 
 
 

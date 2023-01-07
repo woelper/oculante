@@ -1,9 +1,12 @@
 use cmd_lib::run_cmd;
 
-use crate::image_editing::{process_pixels, ImageOperation, ScaleFilter};
+use crate::{
+    image_editing::{process_pixels, ImageOperation, ScaleFilter},
+    shortcuts::{keypresses_as_markdown, ShortcutExt, Shortcuts},
+};
 
 use super::*;
-use std::{path::PathBuf, time::Instant};
+use std::{fs::File, path::PathBuf, time::Instant};
 
 #[test]
 fn load() {
@@ -118,6 +121,20 @@ fn bench_process_bright() {
     }
     info!("{} ms mean", total / iters);
     info!("24 simd");
+}
+
+#[test]
+fn dump_shortcuts() {
+    use std::io::prelude::*;
+    let mut shortcuts_file = File::create("shortcutstxt").unwrap();
+
+    let shortcuts=Shortcuts::default_keys();
+    let mut ordered_shortcuts = shortcuts.iter().collect::<Vec<_>>();
+    ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (k, v) in ordered_shortcuts {
+        writeln!(shortcuts_file, "{} = {:?}\n", keypresses_as_markdown(&v), k).unwrap();
+    }
 }
 
 #[test]

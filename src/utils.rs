@@ -38,6 +38,7 @@ use crate::cache::Cache;
 use crate::image_editing::EditState;
 use crate::scrubber::Scrubber;
 use crate::settings::PersistentSettings;
+use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
@@ -319,14 +320,14 @@ pub enum Channel {
 }
 
 impl Channel {
-    pub fn hotkey(&self) -> &str {
+    pub fn hotkey(&self, shortcuts: &Shortcuts) -> String {
         match self {
-            Self::Red => "r",
-            Self::Green => "g",
-            Self::Blue => "b",
-            Self::Alpha => "a",
-            Self::RGB => "c",
-            Self::RGBA => "u",
+            Self::Red => lookup(shortcuts, &InputEvent::RedChannel),
+            Self::Green => lookup(shortcuts, &InputEvent::GreenChannel),
+            Self::Blue => lookup(shortcuts, &InputEvent::BlueChannel),
+            Self::Alpha => lookup(shortcuts, &InputEvent::AlphaChannel),
+            Self::RGB => lookup(shortcuts, &InputEvent::RGBChannel),
+            Self::RGBA => lookup(shortcuts, &InputEvent::RGBAChannel),
         }
     }
 }
@@ -751,6 +752,13 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 }
             }
         }
+        "png" => {
+            let file = File::open(&img_location)?;
+            let bufread = BufReader::new(file);
+            let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
+            reader.no_limits();
+            col.add_still(reader.decode()?.into_rgba8());
+        }
         "gif" => {
             let file = File::open(&img_location)?;
 
@@ -892,7 +900,6 @@ pub fn clipboard_copy(img: &RgbaImage) {
         });
     }
 }
-
 
 pub fn prev_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
