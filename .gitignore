@@ -5,3 +5,7 @@
 *.log
 Info.plist
 paint/target
+
+# project's built/temp docs
+Changelog.html
+ReadMe.html

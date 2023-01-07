@@ -27,14 +27,49 @@ Images may contain color information that is masked by the alpha channel. Althou
 ![Screenshot](res/premult.png "Screenshot")
 
 
-## Installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 10MB.
+## Installation, Update, and Uninstallation
 
-On NetBSD, a pre-compiled binary is available through the native package manager.
-To install it, simply run
-```sh
-pkgin install oculante
-```
+Manually
+
+  - Install: just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 10MB.
+  - Update: use the app's builtin updater via ⚙`Open settings` → `Check for updates`
+  - Uninstall: just delete the executable from your system and the settings from
+    - Windows `~/AppData/Local/.oculante`
+    - macOS `~/Library/Saved Application State/com.github.woelper.oculante.savedState`
+
+Via a package manager
+
+  - __Windows__: a pre-compiled binary is available via [Scoop](https://scoop.sh/)
+    ```sh
+    # Install
+    scoop bucket add extras
+    scoop install oculante
+    # Update (might not be needed if you update all apps via 'scoop update *')
+    scoop update oculante
+    # Uninstall (except for settings at '~\AppData\Local\.oculante')
+    scoop uninstall oculante
+    ```
+  - (TBD) __macOS__: a pre-compiled binary (aka `cask`) is available via [Homebrew](https://brew.sh/)
+    ```sh
+    # Install
+    brew tap woelper/oculante
+    brew install --no-quarantine oculante
+      # or replace ↑ with ↓ to install to a custome folder
+    brew install --no-quarantine '--appdir=/Applications/2 Play/2 Pic' oculante
+    # Update (might not be needed if you update/upgrade all apps)
+    brew update
+    brew upgrade --no-quarantine oculante
+    # Uninstall
+    brew uninstall oculante
+      # or replace ↑ with ↓ to remove settings at '~/Library/Saved Application State/com.github.woelper.oculante.savedState'
+    brew uninstall --zap oculante
+    brew untap woelper/oculante
+    ```
+  - __NetBSD__: a pre-compiled binary is available through the native package manager
+    ```sh
+    # Install
+    pkgin install oculante
+    ```
 
 ## Features
 
