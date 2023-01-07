@@ -662,7 +662,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                         channel.to_string(),
                                     );
 
-                                    if tooltip(r, &channel.to_string(), channel.hotkey(), ui)
+                                    if tooltip(r, &channel.to_string(), &channel.hotkey(&state.persistent_settings.shortcuts), ui)
                                         .clicked()
                                     {
                                         changed_channels = true;
