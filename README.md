@@ -13,7 +13,7 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Lets you pick pixels, display location and color values
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 
-[![build](https://github.com/woelper/oculante/actions/workflows/rust.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/rust.yml)
+[![Cross-platform check](https://github.com/woelper/oculante/actions/workflows/build_checks.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/build_checks.yml)
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
 
