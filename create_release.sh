@@ -1,4 +1,17 @@
 # This is a script to be locally run in order to release.
+
+# deny master
+
+branch="$(git symbolic-ref --short HEAD)"
+echo $branch
+
+if [ $branch != "master" ]
+then
+    echo "You must be on master branch"
+    exit
+fi
+
+echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
 cargo bump patch
