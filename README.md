@@ -6,12 +6,15 @@ _A no-nonsense hardware-accelerated image viewer_
 
 
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
-- Completely bloat-free
+- Free of charge, bloat-free, ad-free, privacy-respecting open source application
+- Fast opening of images, fast startup
 - Available for Win, Mac, Linux and NetBSD
 - Supports a wide range of images and SVG
+- Caches images for faster reloading
 - Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
 - Lets you pick pixels, display location and color values
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
+- SIMD-accelerated image editing
 
 [![Cross-platform check](https://github.com/woelper/oculante/actions/workflows/build_checks.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/build_checks.yml)
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
@@ -20,15 +23,21 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
 
+
+## Flipbook
+With configurable caching, Oculante can quickly step through image sequences:
+![Screenshot](res/flipbook.gif "Screenshot")
+
+
+## Inspection
+Get info about pixel values and position, with precise picking:
+![Screenshot](res/picker.gif "Screenshot")
 ## Correct color channel display:
-
-Images may contain color information that is masked by the alpha channel. Although it's present you will not see it since usually RGB values are multiplied with the A channel when displayed. If you press <kbd>u</kbd> you will be able to inspect such data.
-
+Images may contain color information that is masked by the alpha channel. Although it is present you will not see it since usually RGB values are multiplied with the A channel when displayed. Oculante allows you to inspect all channels individually and see color data without transparency applied.
 ![Screenshot](res/premult.png "Screenshot")
 
-
 ## Installation
-Just download the executable for your system from the releases tab (https://github.com/woelper/oculante/releases). No installation is required. In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 10MB.
+Oculante needs no installation, as it is just one executable. Just download it for your system from the releases tab (https://github.com/woelper/oculante/releases). In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 12MB.
 
 On NetBSD, a pre-compiled binary is available through the native package manager.
 To install it, simply run
@@ -143,6 +152,7 @@ In addition, the only data saved locally by the application is:
 - Keybindings
 - Vsync preferences
 - Keep view offset/scale
+- Whether the directory index bar is displayed
 
 ## Attribution
 Test / benchmark pictures:
@@ -165,3 +175,4 @@ Mac
 
 ### Cargo Features
 If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
+The feature `file_open` will enable/disable a file open dialog. This pulls in additional dependencies and is enabled by default.
