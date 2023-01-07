@@ -139,15 +139,26 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // let mut alternates: HashMap<String, String>;
     // alternates.insert("+", v)
 
+    // don't do anything if keyboard is grabbed (typing in textbox etc)
     if state.key_grab {
         return false;
     }
 
+    // if nothing is down, just return
     if app.keyboard.down.is_empty() && app.keyboard.released.is_empty() {
         return false;
     }
 
+    // early out if just one key is pressed, and it's a modifier
+    if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
+        if app.keyboard.down.len() == 1 {
+            debug!("just modifier down");
+            return false
+        }
+    }
+
     if let Some(keys) = state.persistent_settings.shortcuts.get(&command) {
+        
         // make sure the appropriate number of keys are down
         if app.keyboard.down.len() != keys.len() {
             if command != InputEvent::Fullscreen {
@@ -179,14 +190,37 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         for key in keys.alphanumeric() {
             // Workaround macos fullscreen double press bug
             if command == InputEvent::Fullscreen {
-                debug!("Fullscreen received");
                 for pressed in &app.keyboard.released {
                     if format!("{:?}", pressed) == key {
+                        debug!("Fullscreen received");
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;
                     }
                 }
             } else {
+                // List of "repeating" keys. Basically "early out" before checking if there were pressed keys
+                if [
+                    InputEvent::NextImage,
+                    InputEvent::PreviousImage,
+                    InputEvent::PanRight,
+                    InputEvent::PanLeft,
+                    InputEvent::PanDown,
+                    InputEvent::PanUp,
+                    InputEvent::ZoomIn,
+                    InputEvent::ZoomOut,
+                ]
+                .contains(&command)
+                {
+                    for (dn, _) in &app.keyboard.down {
+                        if format!("{:?}", dn) == key {
+                            debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
+                            debug!("Matched {:?} / {:?}", command, key);
+                            debug!("d {}",app.system_timer.delta_f32());
+                            return true;
+                        }
+                    }
+                }
+
                 for pressed in &app.keyboard.pressed {
                     if format!("{:?}", pressed) == key {
                         debug!("Number of keys pressed: {}", app.keyboard.down.len());
