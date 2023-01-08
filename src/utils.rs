@@ -2,13 +2,13 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 // use image::codecs::gif::GifDecoder;
-use image::{EncodableLayout, RgbaImage};
+use image::{DynamicImage, EncodableLayout, RgbImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::{App, Graphics, TextureFilter};
 use notan::AppState;
-
+use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
@@ -22,7 +22,7 @@ use std::time::Duration;
 use exr::prelude as exrs;
 use exr::prelude::*;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use image::Rgba;
 use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
@@ -42,7 +42,8 @@ use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
-    "tga", "tif", "tiff", "webp",
+    "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
+    "srf", "sr2", "braw", "r3d", "nrw", "raw",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -706,7 +707,32 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 Err(e) => error!("{} from {:?}", e, img_location),
             }
         }
+        "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
+        | "braw" | "r3d" | "nrw" | "raw" => {
+            debug!("Loading RAW");
 
+            let export_job = Export::new(
+                Input::ByFile(&img_location.to_string_lossy()),
+                Output::new(
+                    DemosaicingMethod::Linear,
+                    data::XYZ2SRGB,
+                    data::GAMMA_SRGB,
+                    OutputType::Raw16,
+                    true,
+                    true,
+                ),
+            )?;
+
+            let (image, width, height) = export_job.export_8bit_image();
+
+            // Construct rgb image
+            let x = RgbImage::from_raw(width as u32, height as u32, image)
+                .context("can't decode raw output as image")?;
+            // make it a Dynamic image
+            let d = DynamicImage::ImageRgb8(x);
+            col.add_still(d.to_rgba8());
+            // x.save("test.png");
+        }
         "hdr" => {
             let f = File::open(&img_location)?;
             let reader = BufReader::new(f);

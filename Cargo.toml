@@ -2,16 +2,15 @@
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2018"
+exclude = [
+  "res/*.gif",
+]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
 version = "0.6.39"
-exclude = [
-    "res/*.gif",
-]
-
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
@@ -39,6 +38,7 @@ nalgebra = "0.31"
 notan = {version = "0.8", features = ["drop_files", "egui"]}
 palette = "0.6"
 psd = "0.3"
+quickraw = "0.1.6"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.5"
