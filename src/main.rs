@@ -158,26 +158,26 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Image is: {:?}", maybe_img_location);
 
-    if let Some(ref maybe_location) = maybe_img_location {
+    if let Some(ref location) = maybe_img_location {
         // Check if path is a directory or a file (and that it even exists)
         let mut start_img_location: Option<PathBuf> = None;
 
-        if let Ok(maybe_location_metadata) = maybe_location.metadata() {
+        if let Ok(maybe_location_metadata) = location.metadata() {
             if maybe_location_metadata.is_dir() {
                 // Folder - Pick first image from the folder...
-                if let Ok(first_img_location) = find_first_image_in_directory(maybe_location) {
+                if let Ok(first_img_location) = find_first_image_in_directory(location) {
                     start_img_location = Some(first_img_location.clone());
                 }
-            } else if is_ext_compatible(maybe_location) {
+            } else if is_ext_compatible(location) {
                 // Image File with a usable extension
-                start_img_location = Some(maybe_location.clone());
+                start_img_location = Some(location.clone());
             } else {
-                // Unsupported extension? Or unusable path?
-                // TODO: Show a warning about this?
+                // Unsupported extension
+                state.message = Some(format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
-            // TODO: Show a warning about this?
+            state.message = Some(format!("ERROR: Can't open file: {}", location.display()));
         }
 
         // Assign image path if we have a valid one here
@@ -246,7 +246,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::KeyDown { .. } => {
             debug!("key down");
-
 
             // return;
             // pan image with keyboard
@@ -670,8 +669,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                         channel.to_string(),
                                     );
 
-                                    if tooltip(r, &channel.to_string(), &channel.hotkey(&state.persistent_settings.shortcuts), ui)
-                                        .clicked()
+                                    if tooltip(
+                                        r,
+                                        &channel.to_string(),
+                                        &channel.hotkey(&state.persistent_settings.shortcuts),
+                                        ui,
+                                    )
+                                    .clicked()
                                     {
                                         changed_channels = true;
                                     }
@@ -835,7 +839,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if let Some(message) = &state.message.clone() {
-            let max_anim_len = 1.8;
+            let max_anim_len = 2.8;
 
             state.toast_cooldown += app.timer.delta_f32();
             if state.toast_cooldown > max_anim_len {

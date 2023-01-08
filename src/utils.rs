@@ -2,6 +2,8 @@ use arboard::Clipboard;
 use dds::DDS;
 use exr;
 // use image::codecs::gif::GifDecoder;
+use exr::prelude as exrs;
+use exr::prelude::*;
 use image::{DynamicImage, EncodableLayout, RgbImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
@@ -9,7 +11,7 @@ use notan::graphics::Texture;
 use notan::prelude::{App, Graphics, TextureFilter};
 use notan::AppState;
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -18,9 +20,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
-
-use exr::prelude as exrs;
-use exr::prelude::*;
+use tonemap::filmic::*;
 
 use anyhow::{anyhow, Context, Result};
 use image::Rgba;
@@ -561,11 +561,16 @@ pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
 
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
     [
-        (px[0].powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8,
-        (px[1].powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8,
-        (px[2].powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8,
-        (px[3].powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8,
+        tonemap_f32(px[0]),
+        tonemap_f32(px[1]),
+        tonemap_f32(px[2]),
+        tonemap_f32(px[3]),
     ]
+}
+
+fn tonemap_f32(px: f32) -> u8 {
+    // (px.powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8
+    (px.filmic() * 255.) as u8
 }
 
 fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
@@ -723,7 +728,11 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 ),
             )?;
 
-            let (image, width, height) = export_job.export_8bit_image();
+            let (image, width, height) = export_job.export_16bit_image();
+            let image = image
+                .into_par_iter()
+                .map(|x| tonemap_f32(x as f32 / 65536.))
+                .collect::<Vec<_>>();
 
             // Construct rgb image
             let x = RgbImage::from_raw(width as u32, height as u32, image)
@@ -731,7 +740,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             // make it a Dynamic image
             let d = DynamicImage::ImageRgb8(x);
             col.add_still(d.to_rgba8());
-            // x.save("test.png");
         }
         "hdr" => {
             let f = File::open(&img_location)?;

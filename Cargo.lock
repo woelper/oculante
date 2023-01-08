@@ -2710,6 +2710,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tiny-skia 0.8.2",
+ "tonemap",
  "turbojpeg",
  "usvg",
  "webbrowser",
@@ -4044,6 +4045,12 @@ checksum = "1333c76748e868a4d9d1017b5ab53171dfd095f70c712fdb4653a406547f598f"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "tonemap"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d97478858c823077ed7bc79d6a84be4e0af8e9882b222e61a8a5dbae458f45d"
 
 [[package]]
 name = "tower-service"

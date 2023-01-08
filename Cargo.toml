@@ -54,6 +54,7 @@ tiny-skia = "0.8.2"
 turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.27.0"
 webbrowser = "0.8"
+tonemap = "0.0.4"
 
 [features]
 default = ["turbo", "file_open"]
