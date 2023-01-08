@@ -719,7 +719,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let export_job = Export::new(
                 Input::ByFile(&img_location.to_string_lossy()),
                 Output::new(
-                    DemosaicingMethod::Linear,
+                    DemosaicingMethod::SuperPixel,
                     data::XYZ2SRGB,
                     data::GAMMA_SRGB,
                     OutputType::Raw16,
