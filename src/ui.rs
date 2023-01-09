@@ -1022,7 +1022,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     if ui.button("💾 Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
-                            _ = serde_json::to_writer(&f, &state.edit_state);
+                            _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
                 }

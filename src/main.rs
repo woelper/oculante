@@ -500,6 +500,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     state.reset_image = true;
                 }
 
+                state.edit_state = Default::default();
+
+                // Load edit information if any
+                if let Some(p) = &state.current_path {
+                    if p.with_extension("oculante").is_file() {
+                        if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                            if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                                state.message = Some("Edits have been loaded for this image.".into());
+                                state.edit_state = edit_state;
+                                state.edit_enabled = true;
+                            }
+                        }
+                    }
+                }
+
                 state.image_info = None;
             }
             FrameSource::EditResult => {
@@ -554,18 +569,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
 
-            state.edit_state = Default::default();
-
-            // Load edit information if any
-            if let Some(p) = &state.current_path {
-                if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-                    if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                        state.message = Some("Edits have been loaded for this image.".into());
-                        state.edit_state = edit_state;
-                        state.edit_enabled = true;
-                    }
-                }
-            }
+       
 
             debug!("Image has been reset.");
             state.reset_image = false;
