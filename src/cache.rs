@@ -21,6 +21,10 @@ impl Cache {
         self.data.get(path).map(|c| c.data.clone())
     }
 
+    pub fn clear(&mut self) {
+        self.data.clear()
+    }
+
     pub fn insert(&mut self, path: &Path, img: RgbaImage) {
         self.data.insert(
             path.into(),

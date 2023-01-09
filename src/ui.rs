@@ -1408,6 +1408,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
 
             if reload {
                 state.is_loaded = false;
+                state.player.cache.clear();
                 state.player.load(&p, state.message_channel.0.clone());
             }
         });

@@ -30,6 +30,8 @@ pub enum InputEvent {
     PanRight,
     PanUp,
     PanDown,
+    LosslessRotateRight,
+    LosslessRotateLeft,
     Copy,
     Paste,
     Browse,
@@ -110,6 +112,8 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LastImage, "End")
             .add_key(InputEvent::NextImage, "Right")
             .add_key(InputEvent::ZoomOut, "Minus")
+            .add_key(InputEvent::LosslessRotateLeft, "LBracket")
+            .add_key(InputEvent::LosslessRotateRight, "RBracket")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
@@ -233,6 +237,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 }
 
                 for pressed in &app.keyboard.pressed {
+                    debug!("{:?}", pressed);
                     if format!("{:?}", pressed) == key {
                         debug!("Number of keys pressed: {}", app.keyboard.down.len());
                         debug!("Matched {:?} / {:?}", command, key);
