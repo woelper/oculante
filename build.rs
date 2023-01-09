@@ -1,6 +1,8 @@
 use std::fs::read_to_string;
 use std::fs::remove_file;
 use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 
 use log::error;
