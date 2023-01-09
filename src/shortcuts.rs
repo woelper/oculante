@@ -91,7 +91,7 @@ impl KeyTrait for SimultaneousKeypresses {
 
 impl ShortcutExt for Shortcuts {
     fn default_keys() -> Self {
-        Shortcuts::default()
+        let mut s = Shortcuts::default()
             .add_key(InputEvent::AlwaysOnTop, "T")
             .add_key(InputEvent::Fullscreen, "F")
             .add_key(InputEvent::ResetView, "V")
@@ -110,14 +110,21 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LastImage, "End")
             .add_key(InputEvent::NextImage, "Right")
             .add_key(InputEvent::ZoomOut, "Minus")
-            .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
+            // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
             .add_keys(InputEvent::PanLeft, &["LShift", "Left"])
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])
             .add_keys(InputEvent::PanUp, &["LShift", "Up"])
             .add_keys(InputEvent::Paste, &["LControl", "V"])
-            .add_keys(InputEvent::Copy, &["LControl", "C"])
+            .add_keys(InputEvent::Copy, &["LControl", "C"]);
+        #[cfg(target_os = "macos")]
+        {
+            for (_, keys) in s.iter_mut() {
+                *keys = keys.iter().map(|k| k.replace("LControl", "LWin")).collect();
+            }
+        }
+        s
     }
     fn add_key(mut self, function: InputEvent, key: &str) -> Self {
         self.insert(
@@ -153,12 +160,11 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
         if app.keyboard.down.len() == 1 {
             debug!("just modifier down");
-            return false
+            return false;
         }
     }
 
     if let Some(keys) = state.persistent_settings.shortcuts.get(&command) {
-        
         // make sure the appropriate number of keys are down
         if app.keyboard.down.len() != keys.len() {
             if command != InputEvent::Fullscreen {
@@ -180,6 +186,11 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             }
             if m.contains("Control") {
                 if !app.keyboard.ctrl() {
+                    return false;
+                }
+            }
+            if m.contains("Win") {
+                if !app.keyboard.logo() {
                     return false;
                 }
             }
@@ -215,7 +226,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                         if format!("{:?}", dn) == key {
                             debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
                             debug!("Matched {:?} / {:?}", command, key);
-                            debug!("d {}",app.system_timer.delta_f32());
+                            debug!("d {}", app.system_timer.delta_f32());
                             return true;
                         }
                     }
@@ -275,7 +286,7 @@ pub fn keypresses_as_markdown(keys: &SimultaneousKeypresses) -> String {
 
 fn is_key_modifier(key: &str) -> bool {
     match key {
-        "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" => true,
+        "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" | "LWin" | "Rwin" => true,
         _ => false,
     }
 }
