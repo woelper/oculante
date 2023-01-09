@@ -11,8 +11,10 @@ fi
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
+cargo test shortcuts
 cargo bump patch
 cargo build
+git add README.md
 git add Cargo.toml
 git add Cargo.lock
 git commit -m "Release version `cargo get version`"

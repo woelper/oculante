@@ -88,39 +88,6 @@ pkgin install oculante
 - Lossless JPEG editing: Crop, rotate, mirror without recompressing data
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
 
-
-
-### Shortcuts:
-> <kbd>Esc</kbd>/<kbd>q</kbd> = quit
->
-> <kbd>i</kbd> = display extended info
->
-> <kbd>e</kbd> = display edit toolbox
->
-> <kbd>v</kbd> = reset view
->
-> <kbd>r</kbd>,<kbd>g</kbd>,<kbd>b</kbd>,<kbd>a</kbd> = display `r`ed/`g`reen/`b`lue/`a`lpha channel
->
-> <kbd>c</kbd> = display color channel
->
-> <kbd>u</kbd> = display colors unpremultiplied
->
-> <kbd>f</kbd> = toggle fullscreen
-
-> <kbd>t</kbd> = toggle always on top
->
-> `mouse wheel`,  <kbd>+</kbd> <kbd>-</kbd> = zoom
->
-> `left mouse`,`middle mouse`,  <kbd>Left</kbd> <kbd>Right</kbd> <kbd>Up</kbd> <kbd>Down</kbd> = pan
->
-> <kbd>Left</kbd>/<kbd>Right</kbd>, `ctrl + mouse wheel` = prev/next image in folder
->
-> `Right mouse` pick color from image (in paint mode)
->
-> <kbd>Ctrl+O</kbd>, <kbd>F1</kbd> = show file picker to open an image
-
-
-
 ### Misc examples:
 
 EXIF display
@@ -179,3 +146,68 @@ Mac
 ### Cargo Features
 If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
 The feature `file_open` will enable/disable a file open dialog. This pulls in additional dependencies and is enabled by default.
+
+### Shortcuts:
+`mouse wheel` = zoom
+
+`left mouse`,`middle mouse` = pan
+
+`ctrl + mouse wheel` = prev/next image in folder
+
+`Right mouse` pick color from image (in paint mode)
+
+
+<kbd>T</kbd> = AlwaysOnTop
+
+<kbd>F</kbd> = Fullscreen
+
+<kbd>I</kbd> = InfoMode
+
+<kbd>E</kbd> = EditMode
+
+<kbd>Right</kbd> = NextImage
+
+<kbd>Home</kbd> = FirstImage
+
+<kbd>End</kbd> = LastImage
+
+<kbd>Left</kbd> = PreviousImage
+
+<kbd>R</kbd> = RedChannel
+
+<kbd>G</kbd> = GreenChannel
+
+<kbd>B</kbd> = BlueChannel
+
+<kbd>A</kbd> = AlphaChannel
+
+<kbd>U</kbd> = RGBChannel
+
+<kbd>C</kbd> = RGBAChannel
+
+<kbd>V</kbd> = ResetView
+
+<kbd>Minus</kbd> = ZoomOut
+
+<kbd>Equals</kbd> = ZoomIn
+
+<kbd>LShift</kbd> + <kbd>Left</kbd> = PanLeft
+
+<kbd>LShift</kbd> + <kbd>Right</kbd> = PanRight
+
+<kbd>LShift</kbd> + <kbd>Up</kbd> = PanUp
+
+<kbd>LShift</kbd> + <kbd>Down</kbd> = PanDown
+
+<kbd>RBracket</kbd> = LosslessRotateRight
+
+<kbd>LBracket</kbd> = LosslessRotateLeft
+
+<kbd>LWin</kbd> + <kbd>C</kbd> = Copy
+
+<kbd>LWin</kbd> + <kbd>V</kbd> = Paste
+
+<kbd>LWin</kbd> + <kbd>O</kbd> = Browse
+
+<kbd>Q</kbd> = Quit
+

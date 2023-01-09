@@ -126,7 +126,7 @@ fn bench_process_bright() {
 #[test]
 fn dump_shortcuts() {
     use std::io::prelude::*;
-    let mut shortcuts_file = File::create("shortcutstxt").unwrap();
+    let mut shortcuts_file = File::create("shortcuts.txt").unwrap();
 
     let shortcuts=Shortcuts::default_keys();
     let mut ordered_shortcuts = shortcuts.iter().collect::<Vec<_>>();
