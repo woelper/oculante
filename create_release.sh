@@ -11,6 +11,7 @@ fi
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
+cargo check --no-default-features
 cargo test shortcuts
 cargo bump patch
 cargo build

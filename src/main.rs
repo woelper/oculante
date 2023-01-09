@@ -23,6 +23,7 @@ pub mod cache;
 pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
+#[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
 use crate::shortcuts::InputEvent::*;
@@ -272,6 +273,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 std::process::exit(0)
             }
 
+            #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateRight) {
                 debug!("Lossless rotate right");
 
@@ -293,6 +295,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
 
+            #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
                 if let Some(p) = &state.current_path {
@@ -309,13 +312,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         // This needs "deep" reload
                         state.player.cache.clear();
                         state.player.load(p, state.message_channel.0.clone());
-                    }
-                    else {
+                    } else {
                         warn!("rotate left failed")
                     }
                 }
             }
-
 
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
@@ -553,7 +554,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if p.with_extension("oculante").is_file() {
                         if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
                             if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                state.message = Some("Edits have been loaded for this image.".into());
+                                state.message =
+                                    Some("Edits have been loaded for this image.".into());
                                 state.edit_state = edit_state;
                                 state.edit_enabled = true;
                             }
@@ -614,8 +616,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .min(1.0);
             state.scale = scale_factor;
             state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
-
-       
 
             debug!("Image has been reset.");
             state.reset_image = false;
