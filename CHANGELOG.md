@@ -1,3 +1,9 @@
+# 0.6.40 (2023-01-09)
+
+### :sparkles: Features
+
+* RAW file support (02fa90e2)
+
 # 0.6.39 (2023-01-07)
 
 ### :beetle: Bug Fixes
