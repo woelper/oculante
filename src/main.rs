@@ -167,7 +167,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             if maybe_location_metadata.is_dir() {
                 // Folder - Pick first image from the folder...
                 if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                    start_img_location = Some(first_img_location.clone());
+                    start_img_location = Some(first_img_location);
                 }
             } else if is_ext_compatible(location) {
                 // Image File with a usable extension
@@ -288,7 +288,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.is_loaded = false;
                         // This needs "deep" reload
                         state.player.cache.clear();
-                        state.player.load(&p, state.message_channel.0.clone());
+                        state.player.load(p, state.message_channel.0.clone());
                     }
                 }
             }
@@ -308,7 +308,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.is_loaded = false;
                         // This needs "deep" reload
                         state.player.cache.clear();
-                        state.player.load(&p, state.message_channel.0.clone());
+                        state.player.load(p, state.message_channel.0.clone());
                     }
                     else {
                         warn!("rotate left failed")
@@ -572,7 +572,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if let Some(tex) = &mut state.current_texture {
-            if tex.width() as u32 == img.width() && img.height() as u32 == img.height() {
+            if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture(gfx, tex);
             } else {
                 state.current_texture = img.to_texture(gfx);
@@ -626,11 +626,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.tiling < 2 {
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
-                .translate(state.offset.x as f32, state.offset.y as f32)
+                .translate(state.offset.x, state.offset.y)
                 .scale(state.scale, state.scale);
         } else {
             draw.pattern(texture)
-                .translate(state.offset.x as f32, state.offset.y as f32)
+                .translate(state.offset.x, state.offset.y)
                 .scale(state.scale, state.scale)
                 .size(
                     texture.width() * state.tiling as f32,
@@ -673,7 +673,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         egui::TopBottomPanel::top("menu")
             .min_height(30.)
             .default_height(30.)
-            .show(&ctx, |ui| {
+            .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
                     ui.label("Channels");
 
@@ -715,7 +715,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 for channel in Channel::iter() {
                                     let r = ui.selectable_value(
                                         &mut state.current_channel,
-                                        channel.clone(),
+                                        channel,
                                         channel.to_string(),
                                     );
 
@@ -847,7 +847,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 if let Some(image) = image::RgbaImage::from_raw(
                                     imagedata.width as u32,
                                     imagedata.height as u32,
-                                    (&imagedata.bytes).to_vec(),
+                                    (imagedata.bytes).to_vec(),
                                 ) {
                                     // Stop in the even that an animation is running
                                     state.player.stop();
@@ -883,7 +883,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             egui::TopBottomPanel::bottom("scrubber")
                 .max_height(22.)
                 .min_height(22.)
-                .show(&ctx, |ui| {
+                .show(ctx, |ui| {
                     scrubber_ui(state, ui);
                 });
         }
@@ -901,7 +901,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 egui::TopBottomPanel::bottom("toast")
                     .max_height(toast_height)
                     .min_height(toast_height)
-                    .show(&ctx, |ui| {
+                    .show(ctx, |ui| {
                         ui.ctx().request_repaint();
                         ui.horizontal(|ui| {
                             ui.label(message);
@@ -931,7 +931,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .resizable(false)
                 .default_width(400.)
                 .title_bar(false)
-                .show(&ctx, |ui| {
+                .show(ctx, |ui| {
                     if state.current_path.is_some() {
                         ui.horizontal(|ui| {
                             ui.add(egui::Spinner::default());
@@ -991,9 +991,9 @@ fn browse_for_image_path(state: &mut OculanteState) {
     };
 
     let file_dialog_result = rfd::FileDialog::new()
-        .add_filter("All Supported Image Types", &utils::SUPPORTED_EXTENSIONS)
+        .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
         .add_filter("All File Types", &["*"])
-        .set_directory(&start_directory)
+        .set_directory(start_directory)
         .pick_file();
 
     if let Some(file_path) = file_dialog_result {
