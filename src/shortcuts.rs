@@ -93,6 +93,7 @@ impl KeyTrait for SimultaneousKeypresses {
 
 impl ShortcutExt for Shortcuts {
     fn default_keys() -> Self {
+        #[allow(unused_mut)]
         let mut s = Shortcuts::default()
             .add_key(InputEvent::AlwaysOnTop, "T")
             .add_key(InputEvent::Fullscreen, "F")
