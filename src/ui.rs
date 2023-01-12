@@ -365,6 +365,16 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                 });
 
+                ui.horizontal(|ui| {
+                    if ui
+                        .color_edit_button_srgb(&mut state.persistent_settings.background_color)
+                        .changed()
+                    {
+                        _ = state.persistent_settings.save()
+                    }
+                    ui.label("Background color");
+                });
+
 
 
 

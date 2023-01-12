@@ -8,6 +8,8 @@ use std::fs::File;
 pub struct PersistentSettings {
     /// The UI accent color
     pub accent_color: [u8; 3],
+    /// The BG color
+    pub background_color: [u8; 3],
     /// Should we sync to monitor rate? This makes the app snappier, but also more resource intensive.
     pub vsync: bool,
     /// Keyboard map to actions
@@ -24,12 +26,13 @@ impl Default for PersistentSettings {
     fn default() -> Self {
         PersistentSettings {
             accent_color: [255, 0, 75],
+            background_color: [51, 51, 51],
             vsync: true,
             shortcuts: Shortcuts::default_keys(),
             keep_view: Default::default(),
             max_cache: 30,
             show_scrub_bar: false,
-            wrap_folder: true
+            wrap_folder: true,
         }
     }
 }

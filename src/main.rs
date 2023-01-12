@@ -973,7 +973,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // if state.edit_state.is_processing {
     //     app.window().request_frame();
     // }
-    draw.clear(Color::from_rgb(0.2, 0.2, 0.2));
+    let c = state.persistent_settings.background_color;
+    draw.clear(Color::from_bytes(c[0], c[1], c[2], 255));
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
