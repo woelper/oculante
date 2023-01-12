@@ -1434,12 +1434,16 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
     let no_keys_pressed = app.keyboard.down.is_empty();
 
-    if no_keys_pressed {
-        ui.label(
-            egui::RichText::new("Please press & hold a key, then assign it").color(Color32::RED),
-        );
-    }
-    ui.label("While this is open, regular shortcuts will not work.");
+    
+    ui.horizontal(|ui| {
+        ui.label("While this is open, regular shortcuts will not work.");
+        if no_keys_pressed {
+            ui.label(
+                egui::RichText::new("Please press & hold a key").color(Color32::RED),
+            );
+        }
+    });
+
 
     let k = app
         .keyboard
@@ -1447,7 +1451,6 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .iter()
         .map(|k| format!("{:?}", k.0))
         .collect::<HashSet<String>>();
-    ui.label(keypresses_as_string(&k));
 
     let mut changed = false;
 
@@ -1469,7 +1472,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
                     ui.label(lookup(&s, event));
                     if !no_keys_pressed {
-                        if ui.button("assign").clicked() {
+                        if ui.button(format!("Assign {}", keypresses_as_string(&k))).clicked() {
                             *keys = app
                                 .keyboard
                                 .down
@@ -1478,6 +1481,8 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
                                 .collect();
                             changed = true;
                         }
+                    } else {
+                        ui.add_enabled(false, egui::Button::new("Press key(s)..."));
                     }
                     ui.end_row();
                 }
