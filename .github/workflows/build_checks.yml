@@ -20,11 +20,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         
       - name: Install osx deps
-        run: brew install nasm
+        run: brew install nasm meson
         if: matrix.os == 'macos-latest'
         
       - name: Install win deps
-        run: choco install nasm
+        run: choco install nasm meson
         if: matrix.os == 'windows-latest'
 
       - name: cargo check
