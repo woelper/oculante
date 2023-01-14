@@ -39,7 +39,7 @@ jobs:
           override: true
       
       - name: Install linux deps
-        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build
+        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
 
       - name: Install required cargo
         run: cargo install clippy-sarif sarif-fmt
