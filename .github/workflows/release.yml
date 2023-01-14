@@ -44,7 +44,7 @@ jobs:
       if: matrix.os == 'macOS-latest'
 
     - name: Install linux dependencies
-      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build
       if: matrix.os == 'ubuntu-20.04'
 
     - name: Install osx dependencies

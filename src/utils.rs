@@ -43,7 +43,7 @@ use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
-    "srf", "sr2", "braw", "r3d", "nrw", "raw",
+    "srf", "sr2", "braw", "r3d", "nrw", "raw","avif"
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -643,6 +643,14 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                         .ok_or(anyhow!("Can't create DDS ImageBuffer with given res"))?;
                 col.add_still(buf);
             }
+        }
+        #[cfg(feature = "turbo")]
+        "avif" => {
+            let mut file = File::open(img_location)?;
+            let mut buf = vec![];
+            file.read_to_end(&mut buf)?;
+            let i = libavif_image::read(buf.as_slice())?;
+            col.add_still(i.to_rgba8());
         }
         "svg" => {
             // TODO: Should the svg be scaled? if so by what number?

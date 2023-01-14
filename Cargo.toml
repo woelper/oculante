@@ -55,11 +55,12 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.27.0"
 webbrowser = "0.8"
 tonemap = "0.0.4"
+libavif-image = { version = "0.9.0", optional = true }
 
 [features]
 default = ["turbo", "file_open"]
 file_open = ["rfd"]
-turbo = ["turbojpeg"]
+turbo = ["turbojpeg", "libavif-image"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
