@@ -36,4 +36,4 @@ jobs:
         run: cargo check --no-default-features
 
       - name: cargo check 
-        run: cargo checks
+        run: cargo check
