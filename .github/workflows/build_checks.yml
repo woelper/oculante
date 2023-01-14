@@ -24,13 +24,12 @@ jobs:
         if: matrix.os == 'macos-latest'
         
       - name: Install win deps
-        run: choco install ninja meson --ignore-package-exit-codes
+        run: choco install ninja nasm
         if: matrix.os == 'windows-latest'
 
       - name: Install win deps
-        run: python -m pip install nasm
+        run: python -m pip install meson
         if: matrix.os == 'windows-latest'
-
 
       - name: cargo check without default features
         run: cargo check --no-default-features
