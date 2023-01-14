@@ -24,7 +24,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         
       - name: Install win deps
-        run: choco install nasm ninja meson
+        run: choco install --ignoredetectedreboot nasm ninja meson
         if: matrix.os == 'windows-latest'
 
       # - name: Install win deps
