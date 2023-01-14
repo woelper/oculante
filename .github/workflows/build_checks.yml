@@ -23,13 +23,13 @@ jobs:
         run: brew install nasm meson ninja
         if: matrix.os == 'macos-latest'
         
-      # - name: Install win deps
-      #   run: choco install nasm
-      #   if: matrix.os == 'windows-latest'
-
       - name: Install win deps
-        run: pip install --use-pep517 ninja meson nasm
+        run: choco -y install nasm meson
         if: matrix.os == 'windows-latest'
+
+      # - name: Install win deps
+      #   run: pip install --use-pep517 ninja meson nasm
+      #   if: matrix.os == 'windows-latest'
 
       - name: cargo check
         uses: actions-rs/cargo@v1
