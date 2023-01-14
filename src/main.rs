@@ -862,6 +862,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
 
+                    #[cfg(feature = "file_open")]
+                    if unframed_button("🗁", ui)
+                        .on_hover_text("Browse for image")
+                        .clicked()
+                    {
+                        browse_for_image_path(state)
+                    }
                     if unframed_button_colored("⛭", state.settings_enabled, ui)
                         .on_hover_text("Open settings")
                         .clicked()
