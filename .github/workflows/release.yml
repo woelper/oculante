@@ -113,7 +113,7 @@ jobs:
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante
-        asset_name: oculante_linux_classic
+        asset_name: oculante_linux_legacy
         asset_content_type: application/zip
 
     - name: Upload Linux latest Release
@@ -172,8 +172,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
-        asset_path: target/release/oculante_classic.exe
-        asset_name: oculante.exe
+        asset_path: target/release/oculante.exe
+        asset_name: oculante_legacy.exe
         asset_content_type: application/zip
 
   publish_release:
