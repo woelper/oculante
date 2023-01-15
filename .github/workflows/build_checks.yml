@@ -24,7 +24,11 @@ jobs:
         if: matrix.os == 'macos-latest'
         
       - name: Install win deps
-        run: choco install ninja nasm
+        run: choco install ninja nasm pkgconfiglite
+        if: matrix.os == 'windows-latest'
+
+      - name: Install win dav1d
+        run: vcpkg install dav1d:x64-windows
         if: matrix.os == 'windows-latest'
 
       - name: Install win deps
