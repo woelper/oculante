@@ -68,9 +68,9 @@ jobs:
       run: cargo build --release
       if: matrix.os == 'windows-2019'
 
-    - name: Zip Windows
-      run: zip -r oculante_windows.zip target/release/oculante.exe
-      if: matrix.os == 'windows-2019'
+    # - name: Zip Windows
+    #   run: zip -r oculante_windows.zip target/release/oculante.exe
+    #   if: matrix.os == 'windows-2019'
 
     - name: Build Linux classic Application
       run: cargo build --release
@@ -88,7 +88,7 @@ jobs:
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
       if: matrix.os == 'macOS-latest'
 
-    - name: Upload Linux classic Release
+    - name: Upload Linux 20.04 Release
       if: matrix.os == 'ubuntu-20.04'
       id: upload-release-asset-lin-classic
       uses: actions/upload-release-asset@v1
@@ -98,6 +98,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante
         asset_name: oculante_linux
+        asset_content_type: application/zip
+
+    - name: Upload Linux 20.04 Release zip
+      if: matrix.os == 'ubuntu-20.04'
+      id: upload-release-asset-lin-classic-zip
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_linux.zip
+        asset_name: oculante_linux.zip
         asset_content_type: application/zip
 
     - name: Upload Mac Release
@@ -124,7 +136,7 @@ jobs:
         asset_name: oculante_mac
         asset_content_type: application/zip
 
-    - name: Upload Windows classic Release
+    - name: Upload Windows 2019 Release exe
       if: matrix.os == 'windows-2019'
       id: upload-release-asset-windows-classic
       uses: actions/upload-release-asset@v1
@@ -135,6 +147,18 @@ jobs:
         asset_path: target/release/oculante.exe
         asset_name: oculante.exe
         asset_content_type: application/zip
+
+    # - name: Upload Windows 2019 Release zip
+    #   if: matrix.os == 'windows-2019'
+    #   id: upload-release-asset-windows-classic-zip
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ needs.release_job.outputs.upload_url }}
+    #     asset_path: oculante_windows.zip
+    #     asset_name: oculante_windows.zip
+    #     asset_content_type: application/zip
 
   publish_release:
     name: Publish release
