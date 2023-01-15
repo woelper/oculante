@@ -19,6 +19,11 @@ jobs:
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev meson ninja-build libdav1d-dev dav1d
         if: matrix.os == 'ubuntu-latest'
+
+
+      - name: Update Rust
+        run: rustup update
+        if: matrix.os == 'ubuntu-latest'
         
       - name: Install osx deps
         run: brew install meson ninja
@@ -26,6 +31,10 @@ jobs:
 
       - name: Install win ninja
         run: choco install ninja
+        if: matrix.os == 'windows-latest'
+
+      - name: Install win Dav1d
+        run: vcpkg install dav1d:x64-windows
         if: matrix.os == 'windows-latest'
 
       - name: Install win meson
