@@ -32,8 +32,8 @@ jobs:
         run: python -m pip install meson
         if: matrix.os == 'windows-latest'
 
-      - name: cargo check 
-        run: cargo check
+      - name: cargo build 
+        run: cargo build
 
       - name: cargo check without default features
         run: cargo check --no-default-features
