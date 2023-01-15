@@ -79,7 +79,7 @@ jobs:
     - name: Install win meson
       run: python -m pip install meson
       if: matrix.os == 'windows-latest'
-      
+
     - name: Build Windows Application
       run: cargo build --release
       if: matrix.os == 'windows-latest'
@@ -166,7 +166,7 @@ jobs:
 
     - name: Upload Windows classic Release
       if: matrix.os == 'windows-2019'
-      id: upload-release-asset-windows
+      id: upload-release-asset-windows-classic
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
