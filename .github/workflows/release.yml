@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macOS-latest, ubuntu-latest]
+        os: [ubuntu-20.04, windows-2019, macOS-latest, ubuntu-latest, windows-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v2
@@ -72,9 +72,21 @@ jobs:
       run: python -m pip install meson
       if: matrix.os == 'windows-2019'
 
+    - name: Install win ninja
+      run: choco install ninja
+      if: matrix.os == 'windows-latest'
+
+    - name: Install win meson
+      run: python -m pip install meson
+      if: matrix.os == 'windows-latest'
+      
     - name: Build Windows Application
       run: cargo build --release
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-latest'
+
+    - name: Build Windows classic Application
+      run: cargo build --release --no-default-features
+      if: matrix.os == 'windows-latest'
 
     - name: Build Linux latest Application
       run: cargo build --release
@@ -141,7 +153,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Windows Release
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-latest'
       id: upload-release-asset-windows
       uses: actions/upload-release-asset@v1
       env:
@@ -149,6 +161,18 @@ jobs:
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante.exe
+        asset_name: oculante.exe
+        asset_content_type: application/zip
+
+    - name: Upload Windows classic Release
+      if: matrix.os == 'windows-2019'
+      id: upload-release-asset-windows
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: target/release/oculante_classic.exe
         asset_name: oculante.exe
         asset_content_type: application/zip
 
