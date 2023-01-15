@@ -64,13 +64,13 @@ jobs:
       run: brew install nasm meson ninja
       if: matrix.os == 'macos-latest'
 
-    - name: Install win ninja
-      run: choco install ninja
-      if: matrix.os == 'windows-2019'
+    # - name: Install win ninja
+    #   run: choco install ninja
+    #   if: matrix.os == 'windows-2019'
 
-    - name: Install win meson
-      run: python -m pip install meson
-      if: matrix.os == 'windows-2019'
+    # - name: Install win meson
+    #   run: python -m pip install meson
+    #   if: matrix.os == 'windows-2019'
 
     - name: Install win ninja
       run: choco install ninja
@@ -84,9 +84,9 @@ jobs:
       run: cargo build --release
       if: matrix.os == 'windows-latest'
 
-    - name: Build Windows classic Application
-      run: cargo build --release --no-default-features
-      if: matrix.os == 'windows-2019'
+    # - name: Build Windows classic Application
+    #   run: cargo build --release --no-default-features
+    #   if: matrix.os == 'windows-2019'
 
     - name: Build Linux latest Application
       run: cargo build --release
@@ -164,17 +164,17 @@ jobs:
         asset_name: oculante.exe
         asset_content_type: application/zip
 
-    - name: Upload Windows classic Release
-      if: matrix.os == 'windows-2019'
-      id: upload-release-asset-windows-classic
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.release_job.outputs.upload_url }}
-        asset_path: target/release/oculante.exe
-        asset_name: oculante_legacy.exe
-        asset_content_type: application/zip
+    # - name: Upload Windows classic Release
+    #   if: matrix.os == 'windows-2019'
+    #   id: upload-release-asset-windows-classic
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ needs.release_job.outputs.upload_url }}
+    #     asset_path: target/release/oculante.exe
+    #     asset_name: oculante_legacy.exe
+    #     asset_content_type: application/zip
 
   publish_release:
     name: Publish release
