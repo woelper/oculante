@@ -22,7 +22,7 @@ use std::thread;
 use std::time::Duration;
 use tonemap::filmic::*;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use image::Rgba;
 use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
@@ -43,7 +43,7 @@ use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
-    "srf", "sr2", "braw", "r3d", "nrw", "raw","avif"
+    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -647,10 +647,44 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
         #[cfg(feature = "turbo")]
         "avif" => {
             let mut file = File::open(img_location)?;
-            let mut buf = vec![];
-            file.read_to_end(&mut buf)?;
-            let i = libavif_image::read(buf.as_slice())?;
-            col.add_still(i.to_rgba8());
+            // let mut buf = vec![];
+            // file.read_to_end(&mut buf)?;
+            let avif = avif_decode::Decoder::from_reader(&mut file)?.to_image()?;
+            match avif {
+                avif_decode::Image::Rgb8(img) => {
+                    let mut img_buffer = vec![];
+                    let (buf, width, height) = img.into_contiguous_buf();
+                    for b in buf {
+                        img_buffer.push(b.r);
+                        img_buffer.push(b.g);
+                        img_buffer.push(b.b);
+                        img_buffer.push(255);
+                    }
+
+                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
+                        .ok_or(anyhow!("Can't create avif ImageBuffer with given res"))?;
+                    col.add_still(buf);
+                }
+                avif_decode::Image::Rgba8(img) => {
+                    let mut img_buffer = vec![];
+                    let (buf, width, height) = img.into_contiguous_buf();
+                    for b in buf {
+                        img_buffer.push(b.r);
+                        img_buffer.push(b.g);
+                        img_buffer.push(b.b);
+                        img_buffer.push(b.a);
+                    }
+
+                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
+                        .ok_or(anyhow!("Can't create avif ImageBuffer with given res"))?;
+                    col.add_still(buf);
+
+
+                }
+                _ => {
+                    bail!("This avif is not yet supported.")
+                }
+            }
         }
         "svg" => {
             // TODO: Should the svg be scaled? if so by what number?
