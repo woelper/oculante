@@ -61,7 +61,7 @@ jobs:
       if: matrix.os == 'ubuntu-20.04'
 
     - name: Install osx dependencies
-      run: brew install nasm
+      run: brew install nasm meson ninja
       if: matrix.os == 'macos-latest'
 
     - name: Install win ninja
@@ -86,7 +86,7 @@ jobs:
 
     - name: Build Windows classic Application
       run: cargo build --release --no-default-features
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-2019'
 
     - name: Build Linux latest Application
       run: cargo build --release
