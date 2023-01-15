@@ -1,6 +1,5 @@
-# oculante 
+# <img src="res/oculante.png" align="top" width="45">Oculante 
 
-![Logo](res/oculante.png "Logo")
 
 _A no-nonsense hardware-accelerated image viewer_
 
