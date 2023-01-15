@@ -37,6 +37,10 @@ jobs:
           toolchain: stable
           components: clippy
           override: true
+
+      - name: Patch azure linux deps
+        run: sudo apt update
+        if: matrix.os == 'ubuntu-latest'
       
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
