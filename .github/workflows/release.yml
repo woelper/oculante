@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macOS-latest]
+        os: [ubuntu-20.04, windows-2019, macOS-latest, ubuntu-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v2
@@ -48,8 +48,16 @@ jobs:
       run: sudo apt update
       if: matrix.os == 'ubuntu-20.04'
 
-    - name: Install linux dependencies
+    - name: Patch azure linux deps
+      run: sudo apt update
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Install linux latest dependencies
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Install linux classic dependencies
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm
       if: matrix.os == 'ubuntu-20.04'
 
     - name: Install osx dependencies
@@ -64,8 +72,17 @@ jobs:
       run: python -m pip install meson
       if: matrix.os == 'windows-latest'
 
-    - name: Build Application
+    - name: Build Windows Application
       run: cargo build --release
+      if: matrix.os == 'windows-latest'
+
+    - name: Build Linux latest Application
+      run: cargo build --release
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Build Linux classic Application
+      run: cargo build --no-default-features --release
+      if: matrix.os == 'ubuntu-20.04'
 
     - name: Build Mac Bundle
       run: ./build_mac.sh
@@ -75,8 +92,20 @@ jobs:
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
       if: matrix.os == 'macOS-latest'
 
-    - name: Upload Linux Release
+    - name: Upload Linux classic Release
       if: matrix.os == 'ubuntu-20.04'
+      id: upload-release-asset-lin-classic
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: target/release/oculante
+        asset_name: oculante_linux_classic
+        asset_content_type: application/zip
+
+    - name: Upload Linux latest Release
+      if: matrix.os == 'ubuntu-latest'
       id: upload-release-asset-lin 
       uses: actions/upload-release-asset@v1
       env:
