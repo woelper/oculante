@@ -30,4 +30,4 @@ git commit -m "Update changelog for `cargo get version`"
 git push --tags
 git push
 # this needs no-verify as we modify the plist during the build, and cargo does not accept that.
-cargo publish --no-verify
+# cargo publish --no-verify
