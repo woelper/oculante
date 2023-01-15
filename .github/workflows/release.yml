@@ -40,10 +40,13 @@ jobs:
     - uses: actions/checkout@v2
     - uses: ilammy/setup-nasm@v1
 
-
     - name: Install cargo bundle
       run: cargo install cargo-bundle
       if: matrix.os == 'macOS-latest'
+
+    - name: Patch azure linux deps
+      run: sudo apt update
+      if: matrix.os == 'ubuntu-20.04'
 
     - name: Install linux dependencies
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
