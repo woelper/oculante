@@ -23,10 +23,14 @@ jobs:
       - name: Install osx deps
         run: brew install meson ninja
         if: matrix.os == 'macos-latest'
-        
+
       - name: Install win deps
-        run: choco install ninja pkgconfiglite
+        run: choco install ninja
         if: matrix.os == 'windows-latest'
+        
+      # - name: Install win deps
+      #   run: choco install --allow-empty-checksums ninja pkgconfiglite
+      #   if: matrix.os == 'windows-latest'
 
       # - name: Install win dav1d
       #   run: vcpkg install dav1d:x64-windows
