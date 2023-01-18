@@ -696,7 +696,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             // This should be specified in a smarter way, maybe resolution * x?
             let opt = usvg::Options::default();
             let svg_data = std::fs::read(&img_location)?;
-            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt.to_ref()) {
+            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
                 let pixmap_size = rtree.size.to_screen_size();
 
                 if let Some(mut pixmap) =
