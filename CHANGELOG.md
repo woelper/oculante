@@ -1,24 +1,8 @@
 # 0.6.50 (2023-01-16)
+* AVIF support
 
-# 0.6.49 (2023-01-15)
-
-# 0.6.48 (2023-01-15)
-
-# 0.6.47 (2023-01-15)
-
-# 0.6.46 (2023-01-15)
-
-# 0.6.45 (2023-01-15)
-
-# 0.6.44 (2023-01-15)
-
-# 0.6.43 (2023-01-15)
-
-# 0.6.42 (2023-01-15)
-
-# 0.6.41 (2023-01-09)
-
-# 0.6.40 (2023-01-09)
+There are two features to choose from: `avif_native` (default, less images supported) and `dav1d` (optional, harder to build, better support)
+`david` requires meson, ninja and nasm at least.
 
 ### :sparkles: Features
 
