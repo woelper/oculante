@@ -644,11 +644,18 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 col.add_still(buf);
             }
         }
-        #[cfg(feature = "turbo")]
+        #[cfg(feature = "dav1d")]
         "avif" => {
             let mut file = File::open(img_location)?;
-            // let mut buf = vec![];
-            // file.read_to_end(&mut buf)?;
+            let mut buf = vec![];
+            file.read_to_end(&mut buf)?;
+            let i = libavif_image::read(buf.as_slice())?;
+            col.add_still(i.to_rgba8());
+        }
+        #[cfg(feature = "avif_native")]
+        #[cfg(not(feature = "dav1d"))]
+        "avif" => {
+            let mut file = File::open(img_location)?;
             let avif = avif_decode::Decoder::from_reader(&mut file)?.to_image()?;
             match avif {
                 avif_decode::Image::Rgb8(img) => {
@@ -678,8 +685,6 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .ok_or(anyhow!("Can't create avif ImageBuffer with given res"))?;
                     col.add_still(buf);
-
-
                 }
                 _ => {
                     bail!("This avif is not yet supported.")
