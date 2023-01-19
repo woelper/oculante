@@ -1,7 +1,12 @@
 on: [push]
 
-name: Cross-platform check
+- name: Set Swap Space
+  uses: pierotofy/set-swap-space@master
+  with:
+    swap-size-gb: 10
 
+
+name: Cross-platform check
 jobs:
   check:
     strategy:
