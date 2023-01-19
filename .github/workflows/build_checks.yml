@@ -18,7 +18,17 @@ jobs:
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
-
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-20.04'
+        
+      - name: Configure pagefile
+        uses: al-cheb/configure-pagefile-action@v1.2
+        if: matrix.os == windows-latest' || matrix.os == 'windows-2019'
+        
+      - name: Set up pagefile
+        run: |
+          (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
+        if: matrix.os == windows-latest' || matrix.os == 'windows-2019'
+        
       - name: Patch azure linux deps
         run: sudo apt update
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-20.04'
