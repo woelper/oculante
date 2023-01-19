@@ -1,9 +1,6 @@
 on: [push]
 
-- name: Set Swap Space
-  uses: pierotofy/set-swap-space@master
-  with:
-    swap-size-gb: 10
+
 
 
 name: Cross-platform check
@@ -16,6 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
+      
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
 
       - name: Patch azure linux deps
         run: sudo apt update
