@@ -22,12 +22,12 @@ jobs:
         
       - name: Configure pagefile
         uses: al-cheb/configure-pagefile-action@v1.2
-        if: matrix.os == windows-latest' || matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
         
       - name: Set up pagefile
         run: |
           (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
-        if: matrix.os == windows-latest' || matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
         
       - name: Patch azure linux deps
         run: sudo apt update
