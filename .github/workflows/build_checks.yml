@@ -13,12 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
-      
-      - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 10
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-20.04'
         
       - name: Configure pagefile
         uses: al-cheb/configure-pagefile-action@v1.2
@@ -41,12 +35,12 @@ jobs:
         run: rustup update
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-20.04'
         
-      - name: Install osx deps
-        run: brew install nasm
-        if: matrix.os == 'macos-latest'
+      # - name: Install osx deps
+      #   run: brew install nasm
+      #   if: matrix.os == 'macos-latest'
 
       - name: cargo build 
-        run: cargo build --features jpgxl
+        run: cargo build
 
       - name: cargo check without default features
         run: cargo check --no-default-features
