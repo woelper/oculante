@@ -15,7 +15,13 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 - SIMD-accelerated image editing
 
-[![Cross-platform check](https://github.com/woelper/oculante/actions/workflows/build_checks.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/build_checks.yml)
+[![OSX](https://github.com/woelper/oculante/actions/workflows/osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/osx.yml)
+[![NetBSD](https://github.com/woelper/oculante/actions/workflows/netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/netbsd_minimal.yml)
+[![Ubuntu](https://github.com/woelper/oculante/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/ubuntu.yml)
+[![Windows](https://github.com/woelper/oculante/actions/workflows/windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/windows.yml)
+[![ARM v7](https://github.com/woelper/oculante/actions/workflows/arm7.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/arm7.yml)
+
+
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
 
