@@ -48,21 +48,17 @@ jobs:
       run: sudo apt update
       if: matrix.os == 'ubuntu-20.04'
 
-    - name: Patch azure linux deps
-      run: sudo apt update
-      if: matrix.os == 'ubuntu-20.04'
-
     - name: Update Rust
       run: rustup update
       if: matrix.os == 'ubuntu-20.04'
 
     - name: Install linux classic dependencies
-      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm
+      run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
       if: matrix.os == 'ubuntu-20.04'
 
-    - name: Install osx dependencies
-      run: brew install nasm
-      if: matrix.os == 'macos-latest'
+    # - name: Install osx dependencies
+    #   run: brew install nasm
+    #   if: matrix.os == 'macos-latest'
 
     - name: Build Windows Application
       run: cargo build --release
@@ -73,12 +69,16 @@ jobs:
     #   if: matrix.os == 'windows-2019'
 
     - name: Build Linux classic Application
-      run: cargo build --release
+      run: |
+        cargo build --release --no-default-features
+        zip -r oculante_linux_minimal.zip target/release/oculante
+        cargo build --release
+        zip -r oculante_linux.zip target/release/oculante
       if: matrix.os == 'ubuntu-20.04'
 
-    - name: Zip Linux
-      run: zip -r oculante_linux.zip target/release/oculante
-      if: matrix.os == 'ubuntu-20.04'
+    # - name: Zip Linux
+    #   run: zip -r oculante_linux.zip target/release/oculante
+    #   if: matrix.os == 'ubuntu-20.04'
 
     - name: Build Mac Bundle
       run: ./build_mac.sh
@@ -110,6 +110,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_linux.zip
         asset_name: oculante_linux.zip
+        asset_content_type: application/zip
+
+    - name: Upload Linux 20.04 Release minimal zip
+      if: matrix.os == 'ubuntu-20.04'
+      id: upload-release-asset-lin-classic-zip-min
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_linux_minimal.zip
+        asset_name: oculante_linux_minimal.zip
         asset_content_type: application/zip
 
     - name: Upload Mac Release
