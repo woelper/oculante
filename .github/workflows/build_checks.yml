@@ -1,8 +1,5 @@
 on: [push]
 
-
-
-
 name: Cross-platform check
 jobs:
   check:
@@ -26,10 +23,10 @@ jobs:
         run: cross build --target armv7-unknown-linux-musleabihf --no-default-features
         if: matrix.os == 'ubuntu-18.04'
 
-      - name: Set up pagefile
-        run: |
-          (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
-        if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
+      # - name: Set up pagefile
+      #   run: |
+      #     (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
+      #   if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
         
       - name: Patch azure linux deps
         run: sudo apt update
