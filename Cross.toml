@@ -1,0 +1,4 @@
+[target.armv7-unknown-linux-musleabihf]
+pre-build = [
+    "dpkg --add-architecture arm64",
+    "apt-get update && apt-get install --assume-yes libssl-dev:arm64 build-essential:arm64"]
