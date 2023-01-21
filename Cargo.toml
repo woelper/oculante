@@ -95,5 +95,5 @@ debug = false
 incremental = true
 opt-level = 1
 
-# [target.armv7-unknown-linux-musleabihf]
-# pre-build = ["dpkg --add-architecture arm64 && apt-get update && apt-get install --assume-yes libfoo:arm64"]
+[target.armv7-unknown-linux-musleabihf]
+pre-build = ["dpkg --add-architecture arm64 && apt-get update && apt-get install --assume-yes libssl-dev:arm64"]
