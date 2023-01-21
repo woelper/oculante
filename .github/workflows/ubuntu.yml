@@ -1,0 +1,28 @@
+on: [push]
+
+name: Ubuntu
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/setup-nasm@v1
+        
+      - name: Patch azure linux deps
+        run: sudo apt update
+
+      - name: Install linux deps
+        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
+
+      - name: Update Rust
+        run: rustup update
+
+      - name: cargo build 
+        run: cargo build
+
+      - name: cargo check without default features
+        run: cargo check --no-default-features
+

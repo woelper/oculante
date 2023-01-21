@@ -1,0 +1,33 @@
+on: [push]
+
+name: Windows
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [windows-latest, windows-2019]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/setup-nasm@v1
+        
+      # - name: Configure pagefile
+      #   uses: al-cheb/configure-pagefile-action@v1.2
+      #   if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
+        
+
+      # - name: Set up pagefile
+      #   run: |
+      #     (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
+      #   if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
+        
+
+      - name: Update Rust
+        run: rustup update
+
+      - name: cargo build 
+        run: cargo build
+
+      - name: cargo check without default features
+        run: cargo check --no-default-features
+

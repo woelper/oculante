@@ -1,0 +1,25 @@
+on: [push]
+
+name: OSX
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/setup-nasm@v1
+        
+
+        
+      # - name: Install osx deps
+      #   run: brew install nasm
+      #   if: matrix.os == 'macos-latest'
+
+      - name: cargo build 
+        run: cargo build
+
+      - name: cargo check without default features
+        run: cargo check --no-default-features
+
