@@ -8,7 +8,7 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, windows-2019, ubuntu-20.04]
+        os: [ubuntu-latest, windows-latest, macos-latest, windows-2019, ubuntu-20.04, ubuntu-18.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -18,6 +18,14 @@ jobs:
         uses: al-cheb/configure-pagefile-action@v1.2
         if: matrix.os == 'windows-latest' || matrix.os == 'windows-2019'
         
+      - name: Install cargo cross
+        run: cargo install cross
+        if: matrix.os == 'ubuntu-18.04'
+
+      - name: Cross-compile arm
+        run: cross build --target armv7-unknown-linux-musleabihf --no-default-features
+        if: matrix.os == 'ubuntu-18.04'
+
       - name: Set up pagefile
         run: |
           (Get-CimInstance Win32_PageFileUsage).AllocatedBaseSize
