@@ -9,7 +9,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - uses: ilammy/setup-nasm@v1
         
       # - name: Patch azure linux deps
       #   run: sudo apt update
@@ -21,7 +20,7 @@ jobs:
         run: rustup update
         
       - name: Install cargo cross
-        run: cargo install --version 0.1.16 cross
+        run: cargo install cross
 
       - name: Cross-compile arm
         run: cross build --target armv7-unknown-linux-musleabihf --no-default-features
