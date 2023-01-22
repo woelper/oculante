@@ -1,3 +1,6 @@
+[build] 
+zig = true
+
 [target.armv7-unknown-linux-musleabihf]
 pre-build = [
     "dpkg --add-architecture arm64",
