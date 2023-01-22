@@ -1,4 +1,9 @@
 [target.armv7-unknown-linux-gnueabihf]
+[build] 
+zig = true
+
+[target.armv7-unknown-linux-musleabihf]
 pre-build = [
-    "dpkg --add-architecture arm64",
-    "apt-get update && apt-get install --assume-yes make:arm64 g++:arm64 libssl-dev:arm64"]
+  "dpkg --add-architecture arm64",
+  "apt-get update && apt-get install --assume-yes make:arm64 g++:arm64 libssl-dev:arm64",
+]
