@@ -1,9 +1,20 @@
-[target.armv7-unknown-linux-gnueabihf]
-[build] 
-zig = true
+[build]
+# zig = true
+# pre-build = [
+#   "dpkg --add-architecture $CROSS_DEB_ARCH",
+#   "apt-get update && apt-get install --assume-yes make:$CROSS_DEB_ARCH g++:$CROSS_DEB_ARCH libssl-dev:$CROSS_DEB_ARCH",
+# ]
+# pre-build = [
+#     "dpkg --print-architecture",
+#     "dpkg --add-architecture armhf",
+#     "apt update && apt install --assume-yes g++:armhf libfontconfig1-dev:armhf libfontconfig-dev:armhf libssl-dev:armhf libxcb-shape0-dev:armhf libxcb-xfixes0-dev:armhf",
+# ]
 
-[target.armv7-unknown-linux-musleabihf]
+[target.armv7-unknown-linux-gnueabihf]
 pre-build = [
+  "dpkg --add-architecture armhf",
   "dpkg --add-architecture arm64",
-  "apt-get update && apt-get install --assume-yes make:arm64 g++:arm64 libssl-dev:arm64",
+  "apt-get update",
+  "apt-get install --assume-yes libssl-dev:arm64 libfontconfig-dev:arm64",
+  "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf",
 ]
