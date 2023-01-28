@@ -44,7 +44,6 @@ pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
     "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif",
-    
     #[cfg(feature = "jpgxl")]
     "jxl",
 ];
