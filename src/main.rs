@@ -64,7 +64,11 @@ fn main() -> Result<(), String> {
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
         .resizable(true) // window can be resized
-        .min_size(600, 400); // Set a minimum window size
+        .min_size(600, 400)
+        // this needs to be on disk it seems. This is not great as we only want one binary.
+        // .window_icon(Some(PathBuf::from("./icon.icoa")))
+        // .taskbar_icon(Some(PathBuf::from("./icon.icoa")))
+        ;
 
     #[cfg(target_os = "windows")]
     {
@@ -208,23 +212,25 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     plugins.egui(|ctx| {
         let mut fonts = FontDefinitions::default();
 
+        // this should not be necessary, especially since we don't set it as priority.
+        // but otherwise it panics.
+        // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
-            "customfont".to_owned(),
+            "my_font".to_owned(),
             FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")),
         );
 
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "customfont".into());
+        // Put my font first (highest priority):
+        // fonts.families.get_mut(&FontFamily::Proportional).unwrap()
+        //     .insert(0, "my_font".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
+        let font_scale = 0.8;
 
-        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18.;
-        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18.;
-        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15.;
-        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22.;
+        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
+        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
+        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
+        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -233,6 +239,37 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
+
+        // let mut fonts = FontDefinitions::default();
+
+        // fonts.font_data.insert(
+        //     "customfont".to_owned(),
+        //     // FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")),
+        //     FontData::from_static(include_bytes!("../res/fonts/IBMPlexSans-Regular.ttf")),
+        // );
+
+        // fonts
+        //     .families
+        //     .get_mut(&FontFamily::Proportional)
+        //     .unwrap()
+        //     .insert(0, "customfont".into());
+
+        // let mut style: egui::Style = (*ctx.style()).clone();
+
+        // let font_scale = 0.62;
+
+        // style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
+        // style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
+        // style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
+        // style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
+        // style.visuals.selection.bg_fill = Color32::from_rgb(
+        //     state.persistent_settings.accent_color[0],
+        //     state.persistent_settings.accent_color[1],
+        //     state.persistent_settings.accent_color[2],
+        // );
+        // // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
+        // ctx.set_style(style);
+        // ctx.set_fonts(fonts);
     });
 
     state

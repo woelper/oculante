@@ -128,7 +128,7 @@ fn dump_shortcuts() {
     use std::io::prelude::*;
     let mut shortcuts_file = File::create("shortcuts.txt").unwrap();
 
-    let shortcuts=Shortcuts::default_keys();
+    let shortcuts = Shortcuts::default_keys();
     let mut ordered_shortcuts = shortcuts.iter().collect::<Vec<_>>();
     ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 

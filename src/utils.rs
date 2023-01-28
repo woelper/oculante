@@ -43,7 +43,7 @@ use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
-    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl"
+    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -794,7 +794,10 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             use jpegxl_rs::image::ToDynamic;
             let sample = std::fs::read(&img_location)?;
             let decoder = decoder_builder().build()?;
-            let img = decoder.decode(&sample)?.into_dynamic_image().context("Can't decode image from jpgxl")?;
+            let img = decoder
+                .decode(&sample)?
+                .into_dynamic_image()
+                .context("Can't decode image from jpgxl")?;
             col.add_still(img.into_rgba8());
         }
         "hdr" => {

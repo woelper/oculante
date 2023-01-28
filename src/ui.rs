@@ -154,7 +154,11 @@ impl EguiExt for Ui {
                         .show_value(false)
                         .integer(),
                 );
-                ui.monospace(format!("{:.0}/{:.0}", value.to_f64() + 1., range.end().to_f64() + 1.));
+                ui.monospace(format!(
+                    "{:.0}/{:.0}",
+                    value.to_f64() + 1.,
+                    range.end().to_f64() + 1.
+                ));
                 r
             })
             .inner
@@ -594,7 +598,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label_i("➕ Filter");
                     let available_w_single_spacing =
-                        ui.available_width() - ui.style().spacing.item_spacing.x;
+                        ui.available_width();
+                        //  - ui.style().spacing.item_spacing.x;
 
                     egui::ComboBox::from_id_source("Imageops")
                         .selected_text("Select a filter to add...")
@@ -998,7 +1003,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                     egui::ComboBox::from_id_source("ext")
                         .selected_text(&state.edit_state.export_extension)
-                        .width(ui.available_width() - ui.style().spacing.item_spacing.x)
+                        .width(ui.available_width())
                         .show_ui(ui, |ui| {
                             for f in ["png", "jpg", "bmp", "webp", "tif", "tga"] {
                                 ui.selectable_value(
@@ -1070,18 +1075,22 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
 }
 
 // TODO redo as impl UI
-pub fn unframed_button(text: impl Into<WidgetText>, ui: &mut Ui) -> Response {
-    ui.add(egui::Button::new(text).frame(false))
+pub fn unframed_button(text: impl Into<String>, ui: &mut Ui) -> Response {
+    ui.add(egui::Button::new(RichText::new(text)).frame(false))
 }
 
 pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
     if is_colored {
         ui.add(
-            egui::Button::new(RichText::new(text).color(ui.style().visuals.selection.bg_fill))
-                .frame(false),
+            egui::Button::new(
+                RichText::new(text)
+                    .heading()
+                    .color(ui.style().visuals.selection.bg_fill),
+            )
+            .frame(false),
         )
     } else {
-        ui.add(egui::Button::new(RichText::new(text)).frame(false))
+        ui.add(egui::Button::new(RichText::new(text).heading()).frame(false))
     }
 }
 
@@ -1444,16 +1453,12 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
     let no_keys_pressed = app.keyboard.down.is_empty();
 
-    
     ui.horizontal(|ui| {
         ui.label("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
-            ui.label(
-                egui::RichText::new("Please press & hold a key").color(Color32::RED),
-            );
+            ui.label(egui::RichText::new("Please press & hold a key").color(Color32::RED));
         }
     });
-
 
     let k = app
         .keyboard
@@ -1482,7 +1487,10 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
                     ui.label(lookup(&s, event));
                     if !no_keys_pressed {
-                        if ui.button(format!("Assign {}", keypresses_as_string(&k))).clicked() {
+                        if ui
+                            .button(format!("Assign {}", keypresses_as_string(&k)))
+                            .clicked()
+                        {
                             *keys = app
                                 .keyboard
                                 .down

@@ -1,4 +1,8 @@
-use std::{path::{PathBuf, Path}, collections::HashMap, time::Instant};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 use image::RgbaImage;
 use log::debug;
@@ -14,7 +18,6 @@ pub struct CachedImage {
     data: RgbaImage,
     created: Instant,
 }
-
 
 impl Cache {
     pub fn get(&self, path: &Path) -> Option<RgbaImage> {
@@ -43,7 +46,11 @@ impl Cache {
                     key = p.clone();
                 }
             }
-            debug!("Cache limit hit, deleting oldest: {}, {}s old", key.display(), latest.elapsed().as_secs_f32());
+            debug!(
+                "Cache limit hit, deleting oldest: {}, {}s old",
+                key.display(),
+                latest.elapsed().as_secs_f32()
+            );
 
             _ = self.data.remove(&key);
         }
