@@ -103,6 +103,20 @@
 					<string>public.images</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleTypeExtensions</key>
+				<array>
+					<string>AVIF</string>
+				</array>
+				<key>CFBundleTypeIconFile</key>
+				<string>oculante.icns</string>
+				<key>CFBundleTypeName</key>
+				<string>AV1 Image Document</string>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSHandlerRank</key>
+				<string>Default</string>
+			</dict>
 		</array>
 </dict>
 </plist>
