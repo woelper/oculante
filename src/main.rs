@@ -161,7 +161,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     debug!("Completed argument parsing.");
 
-    let maybe_img_location = matches.value_of("INPUT").map(|arg| PathBuf::from(arg));
+    let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
@@ -219,7 +219,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                state.message = Some(format!("Listening on {}", p));
+                state.message = Some(format!("Listening on {p}"));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;

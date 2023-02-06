@@ -698,8 +698,8 @@ impl ImageOperation {
                 p[2] = 1. - p[2];
             }
             Self::Contrast(val) => {
-                let factor: f32 = (1.015686275 * (*val as f32 / 255. + 1.0))
-                    / (1.0 * (1.015686275 - *val as f32 / 255.)) as f32;
+                let factor: f32 = (1.015_686_3 * (*val as f32 / 255. + 1.0))
+                    / (1.0 * (1.015_686_3 - *val as f32 / 255.));
                 p[0] = (factor * p[0] - 0.5) + 0.5;
                 p[1] = (factor * p[1] - 0.5) + 0.5;
                 p[2] = (factor * p[2] - 0.5) + 0.5;
@@ -713,9 +713,9 @@ impl ImageOperation {
 pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     // G*.59+R*.3+B*.11
     let val = p[0] * 0.59 + p[1] * 0.3 + p[2] * 0.11;
-    p[0] = egui::lerp(p[0] as f32..=val, factor);
-    p[1] = egui::lerp(p[1] as f32..=val, factor);
-    p[2] = egui::lerp(p[2] as f32..=val, factor);
+    p[0] = egui::lerp(p[0]..=val, factor);
+    p[1] = egui::lerp(p[1]..=val, factor);
+    p[2] = egui::lerp(p[2]..=val, factor);
 }
 
 pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {

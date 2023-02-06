@@ -40,9 +40,10 @@ fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) -> Result
 
 pub fn recv(port: i32, texture_sender: Sender<Frame>) {
     thread::spawn(move || {
-        let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).unwrap();
+        // FIXME remove unwrap
+        let listener = TcpListener::bind(format!("0.0.0.0:{port}")).unwrap();
         // accept connections and process them, spawning a new thread for each one
-        info!("Server listening on port {}", port);
+        info!("Server listening on port {port}");
 
         for stream in listener.incoming() {
             match stream {
