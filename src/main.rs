@@ -237,7 +237,8 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf"))
+            .tweak(FontTweak { scale: 1.0, y_offset_factor: -0.3, y_offset: 0.0 }),
         );
 
         // Put my font first (highest priority):
@@ -245,7 +246,8 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         //     .insert(0, "my_font".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
-        let font_scale = 0.8;
+        // let font_scale = 0.76;
+        let font_scale = 0.78;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
@@ -260,36 +262,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ctx.set_style(style);
         ctx.set_fonts(fonts);
 
-        // let mut fonts = FontDefinitions::default();
-
-        // fonts.font_data.insert(
-        //     "customfont".to_owned(),
-        //     // FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")),
-        //     FontData::from_static(include_bytes!("../res/fonts/IBMPlexSans-Regular.ttf")),
-        // );
-
-        // fonts
-        //     .families
-        //     .get_mut(&FontFamily::Proportional)
-        //     .unwrap()
-        //     .insert(0, "customfont".into());
-
-        // let mut style: egui::Style = (*ctx.style()).clone();
-
-        // let font_scale = 0.62;
-
-        // style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
-        // style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
-        // style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
-        // style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
-        // style.visuals.selection.bg_fill = Color32::from_rgb(
-        //     state.persistent_settings.accent_color[0],
-        //     state.persistent_settings.accent_color[1],
-        //     state.persistent_settings.accent_color[2],
-        // );
-        // // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
-        // ctx.set_style(style);
-        // ctx.set_fonts(fonts);
+        
     });
 
     state
