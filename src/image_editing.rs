@@ -112,6 +112,8 @@ pub enum ImageOperation {
     ChannelSwap((Channel, Channel)),
     Invert,
     Blur(u8),
+    MMult,
+    MDiv,
     Resize {
         dimensions: (u32, u32),
         aspect: bool,
@@ -146,6 +148,8 @@ impl fmt::Display for ImageOperation {
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
             Self::Expression(_) => write!(f, "📄 Expression"),
+            Self::MMult => write!(f, "✖ Multiply with alpha"),
+            Self::MDiv => write!(f, "➗ Divide by alpha"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -696,6 +700,17 @@ impl ImageOperation {
                 p[0] = 1. - p[0];
                 p[1] = 1. - p[1];
                 p[2] = 1. - p[2];
+            }
+            Self::MMult => {
+                p[0] *= p[3];
+                p[1] *= p[3];
+                p[2] *= p[3];
+            }
+            Self::MDiv => {
+                p[0] /=p[3];
+                p[1] /= p[3];
+                p[2] /= p[3];
+
             }
             Self::Contrast(val) => {
                 let factor: f32 = (1.015_686_3 * (*val as f32 / 255. + 1.0))

@@ -580,6 +580,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
+                        ImageOperation::MMult,
+                        ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
                             amt: 50,
