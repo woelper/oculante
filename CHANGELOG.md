@@ -1,3 +1,16 @@
+# 0.6.51 (2023-02-12)
+
+### :sparkles: Features
+
+* Add multiply / divide by aplha operator (8b3eda86)
+* Add window and taskbar icon (32900ab5)
+
+### :green_apple: Chore
+
+* update dependencies (92f3eb87)
+* Update resvg and usvg (c2f96b47)
+* update notan and rfd (6e0c00c2)
+
 # 0.6.50 (2023-01-16)
 * AVIF support
 
