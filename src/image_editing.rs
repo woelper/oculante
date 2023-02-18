@@ -707,10 +707,9 @@ impl ImageOperation {
                 p[2] *= p[3];
             }
             Self::MDiv => {
-                p[0] /=p[3];
+                p[0] /= p[3];
                 p[1] /= p[3];
                 p[2] /= p[3];
-
             }
             Self::Contrast(val) => {
                 let factor: f32 = (1.015_686_3 * (*val as f32 / 255. + 1.0))
