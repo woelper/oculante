@@ -237,8 +237,13 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf"))
-            .tweak(FontTweak { scale: 1.0, y_offset_factor: -0.3, y_offset: 0.0 }),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")).tweak(
+                FontTweak {
+                    scale: 1.0,
+                    y_offset_factor: -0.3,
+                    y_offset: 0.0,
+                },
+            ),
         );
 
         // Put my font first (highest priority):
@@ -261,8 +266,6 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
-
-        
     });
 
     state
@@ -284,15 +287,19 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
                 state.offset.x += delta;
+                limit_offset(app, state);
             }
             if key_pressed(app, state, PanUp) {
                 state.offset.y -= delta;
+                limit_offset(app, state);
             }
             if key_pressed(app, state, PanLeft) {
                 state.offset.x -= delta;
+                limit_offset(app, state);
             }
             if key_pressed(app, state, PanDown) {
                 state.offset.y += delta;
+                limit_offset(app, state);
             }
 
             if key_pressed(app, state, ResetView) {
@@ -486,6 +493,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if state.drag_enabled {
         if !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
             state.offset += state.mouse_delta;
+            limit_offset(app, state);
         }
     }
 
@@ -1043,4 +1051,23 @@ fn browse_for_image_path(state: &mut OculanteState) {
             .load(&file_path, state.message_channel.0.clone());
         state.current_path = Some(file_path);
     }
+}
+
+// Make sure offset is restricted to window size so we don't offset to infinity
+fn limit_offset(app: &mut App, state: &mut OculanteState) {
+    let window_size = app.window().size();
+    let scaled_image_size = (
+        state.image_dimension.0 as f32 * state.scale,
+        state.image_dimension.1 as f32 * state.scale,
+    );
+    state.offset.x = state
+        .offset
+        .x
+        .min(window_size.0 as f32)
+        .max(-scaled_image_size.0);
+    state.offset.y = state
+        .offset
+        .y
+        .min(window_size.1 as f32)
+        .max(-scaled_image_size.1);
 }
