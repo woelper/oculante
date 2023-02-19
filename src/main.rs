@@ -58,34 +58,13 @@ fn main() -> Result<(), String> {
         let _ = env_logger::try_init();
     }
 
-    let icon_data = include_bytes!("../icon.ico");
-    let icon_path = dirs::cache_dir().map(|p| p.join("oculante.ico"));
-
-    // Quite hacky. Create icon if missing
-    if let Some(p) = &icon_path {
-        if !p.exists() {
-            if let Ok(mut f) = File::create(p) {
-                _ = f.write_all(icon_data);
-                info!("No icon found. Creating {}", p.display());
-            }
-        }
-    }
-
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
         .resizable(true) // window can be resized
+        .set_window_icon_data(Some(include_bytes!("../icon.ico")))
+        .set_taskbar_icon_data(Some(include_bytes!("../icon.ico")))
         .min_size(600, 400);
-
-    // Set icon if present
-    // TODO: load from bytes
-    if let Some(p) = &icon_path {
-        if p.exists() {
-            info!("Loading icon from {}", p.display());
-            window_config = window_config.window_icon(Some(PathBuf::from(p)));
-            window_config = window_config.taskbar_icon(Some(PathBuf::from(p)));
-        }
-    }
 
     #[cfg(target_os = "windows")]
     {
