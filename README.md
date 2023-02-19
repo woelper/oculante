@@ -196,6 +196,16 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 
 <kbd>Equals</kbd> = ZoomIn
 
+<kbd>Key1</kbd> = ZoomActualSize
+
+<kbd>Key2</kbd> = ZoomDouble
+
+<kbd>Key3</kbd> = ZoomThree
+
+<kbd>Key4</kbd> = ZoomFour
+
+<kbd>Key5</kbd> = ZoomFive
+
 <kbd>LShift</kbd> + <kbd>Left</kbd> = PanLeft
 
 <kbd>LShift</kbd> + <kbd>Right</kbd> = PanRight
