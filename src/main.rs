@@ -306,6 +306,28 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.reset_image = true
             }
 
+            fn set_zoom(scale: f32, state: &mut OculanteState) {
+                let delta = scale - state.scale;
+                state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
+                state.scale = scale;
+            }
+
+            if key_pressed(app, state, ZoomActualSize) {
+                set_zoom(1.0, state);
+            }
+            if key_pressed(app, state, ZoomDouble) {
+                set_zoom(2.0, state);
+            }
+            if key_pressed(app, state, ZoomThree) {
+                set_zoom(3.0, state);
+            }
+            if key_pressed(app, state, ZoomFour) {
+                set_zoom(4.0, state);
+            }
+            if key_pressed(app, state, ZoomFive) {
+                set_zoom(5.0, state);
+            }
+
             if key_pressed(app, state, Quit) {
                 std::process::exit(0)
             }
@@ -395,7 +417,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.edit_enabled = !state.edit_enabled
             }
 
-            // let zoomratio = 3.5;
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.scale);
                 let new_scale = state.scale + delta;

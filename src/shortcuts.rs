@@ -26,6 +26,11 @@ pub enum InputEvent {
     ResetView,
     ZoomOut,
     ZoomIn,
+    ZoomActualSize,
+    ZoomDouble,
+    ZoomThree,
+    ZoomFour,
+    ZoomFive,
     PanLeft,
     PanRight,
     PanUp,
@@ -107,12 +112,17 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::AlphaChannel, "A")
             .add_key(InputEvent::RGBChannel, "U")
             .add_key(InputEvent::RGBAChannel, "C")
-            .add_key(InputEvent::ZoomIn, "Equals")
             .add_key(InputEvent::PreviousImage, "Left")
             .add_key(InputEvent::FirstImage, "Home")
             .add_key(InputEvent::LastImage, "End")
             .add_key(InputEvent::NextImage, "Right")
+            .add_key(InputEvent::ZoomIn, "Equals")
             .add_key(InputEvent::ZoomOut, "Minus")
+            .add_key(InputEvent::ZoomActualSize, "Key1")
+            .add_key(InputEvent::ZoomDouble, "Key2")
+            .add_key(InputEvent::ZoomThree, "Key3")
+            .add_key(InputEvent::ZoomFour, "Key4")
+            .add_key(InputEvent::ZoomFive, "Key5")
             .add_key(InputEvent::LosslessRotateLeft, "LBracket")
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
