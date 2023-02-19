@@ -39,7 +39,7 @@ libavif-image = {version = "0.10", optional = true}
 libwebp-sys = "0.9"
 log = "0.4"
 nalgebra = "0.32"
-notan = {version = "0.9", default-features = false, features = ["backend", "draw", "glsl-to-spirv","drop_files", "egui"]}
+notan = {version = "0.9.5", default-features = false, features = ["backend", "draw", "glsl-to-spirv","drop_files", "egui"]}
 palette = "0.6"
 psd = "0.3"
 quickraw = "0.1.6"
