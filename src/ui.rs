@@ -340,49 +340,50 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 }
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
-    if state.settings_enabled {
-        egui::Window::new("Settings")
+    let mut settings_enabled = state.settings_enabled;
+
+    egui::Window::new("Preferences")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
+            .open(&mut settings_enabled)
             .resizable(false)
             .default_width(600.)
-            // .title_bar(false)
             .show(&ctx, |ui| {
 
-                ui.horizontal(|ui| {
+                egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui
+                            .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                            .changed()
+                        {
+                            let mut style: egui::Style = (*ctx.style()).clone();
+
+                            style.visuals.selection.bg_fill = Color32::from_rgb(
+                                state.persistent_settings.accent_color[0],
+                                state.persistent_settings.accent_color[1],
+                                state.persistent_settings.accent_color[2],
+                            );
+                            ctx.set_style(style);
+
+                            _ = state.persistent_settings.save()
+                        }
+                        ui.label("Accent color");
+
+                    });
+
+                    ui.horizontal(|ui| {
+                        if ui
+                            .color_edit_button_srgb(&mut state.persistent_settings.background_color)
+                            .changed()
+                        {
+                            _ = state.persistent_settings.save()
+                        }
+                        ui.label("Background color");
+                    });
+
+                    ui.end_row();
+
                     if ui
-                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                        .changed()
-                    {
-                        let mut style: egui::Style = (*ctx.style()).clone();
-
-                        style.visuals.selection.bg_fill = Color32::from_rgb(
-                            state.persistent_settings.accent_color[0],
-                            state.persistent_settings.accent_color[1],
-                            state.persistent_settings.accent_color[2],
-                        );
-                        ctx.set_style(style);
-
-                        _ = state.persistent_settings.save()
-                    }
-                    ui.label("Accent color");
-
-                });
-
-                ui.horizontal(|ui| {
-                    if ui
-                        .color_edit_button_srgb(&mut state.persistent_settings.background_color)
-                        .changed()
-                    {
-                        _ = state.persistent_settings.save()
-                    }
-                    ui.label("Background color");
-                });
-
-
-
-
-                if ui
                     .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
                     .on_hover_text(
                         "Vsync reduces tearing and saves CPU. Toggling it off will make some operations such as panning/zooming more snappy. This needs a restart to take effect.",
@@ -391,27 +392,27 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 {
                     _ = state.persistent_settings.save()
                 }
-
                 if ui
                 .checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
                 .on_hover_text(
                     "Enable an index slider to quickly scrub through lots of images",
                 )
                 .changed()
-            {
-                _ = state.persistent_settings.save()
-            }
-            if ui
-            .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundary")
-            .on_hover_text(
-                "When you move past the first or last image in a folder, should oculante continue or stop?",
-            )
-            .changed()
-        {
-            _ = state.persistent_settings.save();
-            state.scrubber.wrap = state.persistent_settings.wrap_folder;
-        }
+                {
+                    _ = state.persistent_settings.save()
+                }
+                    ui.end_row();
 
+                    if ui
+                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundary")
+                    .on_hover_text(
+                        "When you move past the first or last image in a folder, should oculante continue or stop?",
+                    )
+                    .changed()
+                {
+                    _ = state.persistent_settings.save();
+                    state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                }
                 ui.horizontal(|ui| {
                     ui.label("Number of image to cache");
                     if ui
@@ -427,6 +428,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 }
                 });
 
+                    ui.end_row();
+                });
+
 
                 if ui
                 .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
@@ -434,9 +438,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     "When a new image is loaded, keep current zoom and offset",
                 )
                 .changed()
-            {
-                _ = state.persistent_settings.save()
-            }
+                {
+                    _ = state.persistent_settings.save()
+                }
 
                 if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");
@@ -455,16 +459,15 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                     }
 
-                    if ui.button("Close").clicked() {
-                        state.settings_enabled = false;
-                    }
+
                 });
 
                 ui.collapsing("Keybindings",|ui| {
                     keybinding_ui(app, state, ui);
                 });
+
             });
-    }
+    state.settings_enabled = settings_enabled;
 }
 
 pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {

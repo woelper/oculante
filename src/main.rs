@@ -306,26 +306,20 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.reset_image = true
             }
 
-            fn set_zoom(scale: f32, state: &mut OculanteState) {
-                let delta = scale - state.scale;
-                state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                state.scale = scale;
-            }
-
             if key_pressed(app, state, ZoomActualSize) {
-                set_zoom(1.0, state);
+                set_zoom(1.0, None, state);
             }
             if key_pressed(app, state, ZoomDouble) {
-                set_zoom(2.0, state);
+                set_zoom(2.0, None, state);
             }
             if key_pressed(app, state, ZoomThree) {
-                set_zoom(3.0, state);
+                set_zoom(3.0, None, state);
             }
             if key_pressed(app, state, ZoomFour) {
-                set_zoom(4.0, state);
+                set_zoom(4.0, None, state);
             }
             if key_pressed(app, state, ZoomFive) {
-                set_zoom(5.0, state);
+                set_zoom(5.0, None, state);
             }
 
             if key_pressed(app, state, Quit) {
@@ -734,6 +728,65 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .default_height(30.)
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
+                    ui.menu_button("☰", |ui| {
+                        if ui.button("Reset view").clicked() {
+                            state.reset_image = true;
+                            ui.close_menu();
+                        }
+                        if ui.button("View 1:1").clicked() {
+                            set_zoom(1.0, Some(nalgebra::Vector2::new(
+                                app.window().width() as f32 / 2.,
+                                app.window().height() as f32 / 2.,
+                            )),state);
+                            ui.close_menu();
+                        }
+
+                        let copy_pressed = key_pressed(app, state, Copy);
+                        if let Some(img) = &state.current_image {
+                            if ui
+                                .button("🗐 Copy")
+                                .on_hover_text("Copy image to clipboard")
+                                .clicked()
+                                || copy_pressed
+                            {
+                                clipboard_copy(img);
+                                ui.close_menu();
+                            }
+                        }
+
+                        if ui
+                            .button("📋 Paste")
+                            .on_hover_text("Paste image from clipboard")
+                            .clicked()
+                            || key_pressed(app, state, Paste)
+                        {
+                            if let Ok(clipboard) = &mut Clipboard::new() {
+                                if let Ok(imagedata) = clipboard.get_image() {
+                                    if let Some(image) = image::RgbaImage::from_raw(
+                                        imagedata.width as u32,
+                                        imagedata.height as u32,
+                                        (imagedata.bytes).to_vec(),
+                                    ) {
+                                        // Stop in the even that an animation is running
+                                        state.player.stop();
+                                        _ = state
+                                            .player
+                                            .image_sender
+                                            .send(crate::utils::Frame::new_still(image));
+                                        // Since pasted data has no path, make sure it's not set
+                                        state.current_path = None;
+                                    }
+                                }
+                            }
+                            ui.close_menu();
+                        }
+
+                        if ui.button("⛭ Preferences").clicked() {
+                            state.settings_enabled = !state.settings_enabled;
+                            ui.close_menu();
+                        }
+                    });
+
                     ui.label("Channels");
 
                     let mut changed_channels = false;
@@ -863,7 +916,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if tooltip(
-                        unframed_button("⛶", ui),
+                        unframed_button_colored("⛶", app.window().is_fullscreen(), ui),
                         "Full Screen",
                         &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
                         ui,
@@ -885,42 +938,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         app.window().set_always_on_top(state.always_on_top);
                     }
 
-                    let copy_pressed = key_pressed(app, state, Copy);
-                    if let Some(img) = &state.current_image {
-                        if unframed_button("🗐 Copy", ui)
-                            .on_hover_text("Copy image to clipboard")
-                            .clicked()
-                            || copy_pressed
-                        {
-                            clipboard_copy(img);
-                        }
-                    }
-
-                    if unframed_button("📋 Paste", ui)
-                        .on_hover_text("Paste image from clipboard")
-                        .clicked()
-                        || key_pressed(app, state, Paste)
-                    {
-                        if let Ok(clipboard) = &mut Clipboard::new() {
-                            if let Ok(imagedata) = clipboard.get_image() {
-                                if let Some(image) = image::RgbaImage::from_raw(
-                                    imagedata.width as u32,
-                                    imagedata.height as u32,
-                                    (imagedata.bytes).to_vec(),
-                                ) {
-                                    // Stop in the even that an animation is running
-                                    state.player.stop();
-                                    _ = state
-                                        .player
-                                        .image_sender
-                                        .send(crate::utils::Frame::new_still(image));
-                                    // Since pasted data has no path, make sure it's not set
-                                    state.current_path = None;
-                                }
-                            }
-                        }
-                    }
-
                     #[cfg(feature = "file_open")]
                     if unframed_button("🗁", ui)
                         .on_hover_text("Browse for image")
@@ -928,12 +945,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     {
                         browse_for_image_path(state)
                     }
-                    if unframed_button_colored("⛭", state.settings_enabled, ui)
-                        .on_hover_text("Open settings")
-                        .clicked()
-                    {
-                        state.settings_enabled = !state.settings_enabled;
-                    }
+
                     if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten()
                     {
                         ui.label(format!("{}", file.to_string_lossy()));
@@ -1091,4 +1103,11 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
+}
+
+fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
+    let delta = scale - state.scale;
+    let zoom_point = from_center.unwrap_or(state.cursor);
+    state.offset -= scale_pt(state.offset, zoom_point, state.scale, delta);
+    state.scale = scale;
 }
