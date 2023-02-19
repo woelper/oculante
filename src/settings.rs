@@ -33,7 +33,7 @@ pub struct PersistentSettings {
     pub show_checker_background: bool,
     pub show_minimap: bool,
     pub show_frame: bool,
-    pub current_channel:ColorChannel,
+    pub current_channel: ColorChannel,
 }
 
 impl Default for PersistentSettings {
@@ -76,6 +76,10 @@ impl PersistentSettings {
         std::thread::spawn(move || {
             _ = save(&settings);
         });
+    }
+
+    pub fn save_blocking(&self) {
+        _ = save(&self);
     }
 }
 

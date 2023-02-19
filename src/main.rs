@@ -344,7 +344,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
             if key_pressed(app, state, Quit) {
                 // std::process::exit(0)
-                state.persistent_settings.save();
+                state.persistent_settings.save_blocking();
                 app.backend.exit();
             }
 
@@ -487,7 +487,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             // save position
             state.persistent_settings.window_geometry =
                 (app.window().position(), app.window().size());
-            state.persistent_settings.save();
+            state.persistent_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
