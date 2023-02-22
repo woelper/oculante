@@ -827,8 +827,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             let sample = std::fs::read(&img_location)?;
             let decoder = decoder_builder().build()?;
             let img = decoder
-                .decode(&sample)?
-                .into_dynamic_image()
+                .decode_to_image(&sample)?
                 .context("Can't decode image from jpgxl")?;
             col.add_still(img.into_rgba8());
         }
