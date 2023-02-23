@@ -672,7 +672,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                 let buf = main_layer.as_bytes();
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
-                        .ok_or(anyhow!("Can't create DDS ImageBuffer with given res"))?;
+                        .context("Can't create DDS ImageBuffer with given res")?;
                 col.add_still(buf);
             }
         }
@@ -701,7 +701,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                     }
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
-                        .ok_or(anyhow!("Can't create avif ImageBuffer with given res"))?;
+                        .context("Can't create avif ImageBuffer with given res")?;
                     col.add_still(buf);
                 }
                 avif_decode::Image::Rgba8(img) => {
@@ -715,7 +715,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                     }
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
-                        .ok_or(anyhow!("Can't create avif ImageBuffer with given res"))?;
+                        .context("Can't create avif ImageBuffer with given res")?;
                     col.add_still(buf);
                 }
                 _ => {
@@ -740,7 +740,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                         tiny_skia::Transform::identity(),
                         pixmap.as_mut(),
                     )
-                    .ok_or(anyhow!("Can't render SVG"))?;
+                    .context("Can't render SVG")?;
                     let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
                         pixmap_size.width(),
                         pixmap_size.height(),
@@ -851,7 +851,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
             }
 
             let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
-                .ok_or(anyhow!("Failed to create RgbaImage with given dimensions"))?;
+                .context("Failed to create RgbaImage with given dimensions")?;
             col.add_still(tonemapped_buffer);
         }
         "psd" => {
@@ -903,7 +903,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                             screen.pixels.buf().as_bytes().to_vec(),
                         );
                         col.add_anim_frame(
-                            buf.ok_or(anyhow!("Can't read gif frame"))?,
+                            buf.context("Can't read gif frame")?,
                             frame.delay * 10,
                         );
                         col.repeat = true;
