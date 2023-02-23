@@ -734,10 +734,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             ui.close_menu();
                         }
                         if ui.button("View 1:1").clicked() {
-                            set_zoom(1.0, Some(nalgebra::Vector2::new(
-                                app.window().width() as f32 / 2.,
-                                app.window().height() as f32 / 2.,
-                            )),state);
+                            set_zoom(
+                                1.0,
+                                Some(nalgebra::Vector2::new(
+                                    app.window().width() as f32 / 2.,
+                                    app.window().height() as f32 / 2.,
+                                )),
+                                state,
+                            );
                             ui.close_menu();
                         }
 
