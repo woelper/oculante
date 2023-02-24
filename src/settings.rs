@@ -21,7 +21,7 @@ pub struct PersistentSettings {
     pub show_scrub_bar: bool,
     pub wrap_folder: bool,
     /// Whether to keep the image edit stack
-    pub keep_edits: bool
+    pub keep_edits: bool,
 }
 
 impl Default for PersistentSettings {
@@ -35,7 +35,7 @@ impl Default for PersistentSettings {
             max_cache: 30,
             show_scrub_bar: Default::default(),
             wrap_folder: true,
-            keep_edits: Default::default()
+            keep_edits: Default::default(),
         }
     }
 }
