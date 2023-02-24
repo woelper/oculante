@@ -600,7 +600,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     state.reset_image = true;
                 }
 
-                state.edit_state = Default::default();
+                if !state.persistent_settings.keep_edits {
+                    state.edit_state = Default::default();
+                } else {
+                    state.edit_state.result_pixel_op = Default::default();
+                    state.edit_state.result_image_op = Default::default();
+                }
 
                 // Load edit information if any
                 if let Some(p) = &state.current_path {

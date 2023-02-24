@@ -357,7 +357,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                             .changed()
                         {
                             let mut style: egui::Style = (*ctx.style()).clone();
-
                             style.visuals.selection.bg_fill = Color32::from_rgb(
                                 state.persistent_settings.accent_color[0],
                                 state.persistent_settings.accent_color[1],
@@ -368,7 +367,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                             _ = state.persistent_settings.save()
                         }
                         ui.label("Accent color");
-
                     });
 
                     ui.horizontal(|ui| {
@@ -429,18 +427,32 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 });
 
                     ui.end_row();
+                    if ui
+                    .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
+                    .on_hover_text(
+                        "When a new image is loaded, keep current zoom and offset",
+                    )
+                    .changed()
+                    {
+                        _ = state.persistent_settings.save()
+                    }
+
+                    if ui
+                    .checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
+                    .on_hover_text(
+                        "When a new image is loaded, keep current edits",
+                    )
+                    .changed()
+                    {
+                        _ = state.persistent_settings.save()
+                    }
+
+
                 });
 
 
-                if ui
-                .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
-                .on_hover_text(
-                    "When a new image is loaded, keep current zoom and offset",
-                )
-                .changed()
-                {
-                    _ = state.persistent_settings.save()
-                }
+
+
 
                 if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");

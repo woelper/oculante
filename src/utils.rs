@@ -902,10 +902,7 @@ pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
                             dim.1,
                             screen.pixels.buf().as_bytes().to_vec(),
                         );
-                        col.add_anim_frame(
-                            buf.context("Can't read gif frame")?,
-                            frame.delay * 10,
-                        );
+                        col.add_anim_frame(buf.context("Can't read gif frame")?, frame.delay * 10);
                         col.repeat = true;
                     } else {
                         break;
