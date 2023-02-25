@@ -925,7 +925,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if tooltip(
-                        unframed_button_colored("⛶", app.window().is_fullscreen(), ui),
+                        unframed_button("⛶", ui),
                         "Full Screen",
                         &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
                         ui,
