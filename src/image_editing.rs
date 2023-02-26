@@ -188,7 +188,7 @@ impl ImageOperation {
                         .show_ui(ui, |ui| {
                             for f in [Channel::Red, Channel::Green, Channel::Blue, Channel::Alpha] {
                                 if ui
-                                    .selectable_value(&mut val.0, f, format!("{:?}", f))
+                                    .selectable_value(&mut val.0, f, format!("{f:?}"))
                                     .clicked()
                                 {
                                     r.changed = true;
@@ -204,7 +204,7 @@ impl ImageOperation {
                         .show_ui(ui, |ui| {
                             for f in [Channel::Red, Channel::Green, Channel::Blue, Channel::Alpha] {
                                 if ui
-                                    .selectable_value(&mut val.1, f, format!("{:?}", f))
+                                    .selectable_value(&mut val.1, f, format!("{f:?}"))
                                     .clicked()
                                 {
                                     r.changed = true;
@@ -441,7 +441,7 @@ impl ImageOperation {
                     r0.changed = r0.drag_released() || r1.drag_released() || r2.changed();
 
                     egui::ComboBox::from_id_source("filter")
-                        .selected_text(format!("{:?}", filter))
+                        .selected_text(format!("{filter:?}"))
                         .show_ui(ui, |ui| {
                             for f in [
                                 ScaleFilter::Box,
@@ -451,7 +451,7 @@ impl ImageOperation {
                                 ScaleFilter::Mitchell,
                                 ScaleFilter::Lanczos3,
                             ] {
-                                if ui.selectable_value(filter, f, format!("{:?}", f)).clicked() {
+                                if ui.selectable_value(filter, f, format!("{f:?}")).clicked() {
                                     r0.changed = true;
                                 }
                             }
@@ -585,25 +585,25 @@ impl ImageOperation {
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;
-                *p = *p + Vector4::new(amt, amt, amt, 0.0);
+                *p += Vector4::new(amt, amt, amt, 0.0);
             }
             Self::Exposure(amt) => {
                 let amt = (*amt as f32 / 100.) * 4.;
 
                 // *p = *p * Vector4::new(2., 2., 2., 2.).;
 
-                p[0] = p[0] * (2 as f32).powf(amt);
-                p[1] = p[1] * (2 as f32).powf(amt);
-                p[2] = p[2] * (2 as f32).powf(amt);
+                p[0] = p[0] * (2_f32).powf(amt);
+                p[1] = p[1] * (2_f32).powf(amt);
+                p[2] = p[2] * (2_f32).powf(amt);
             }
             Self::Equalize(bounds) => {
                 let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
                 // *p = lerp_col(Vector4::splat(bounds.0), Vector4::splat(bounds.1), *p);
                 // 0, 0.2, 1.0
 
-                p[0] = egui::lerp(bounds.0..=bounds.1, p[0] as f32);
-                p[1] = egui::lerp(bounds.0..=bounds.1, p[1] as f32);
-                p[2] = egui::lerp(bounds.0..=bounds.1, p[2] as f32);
+                p[0] = egui::lerp(bounds.0..=bounds.1, p[0]);
+                p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
+                p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
             }
             Self::Expression(expr) => {
                 let mut context = context_map! {
@@ -613,7 +613,7 @@ impl ImageOperation {
                     "a" => p[3] as f64,
                 }?;
 
-                if let Ok(_) = eval_empty_with_context_mut(expr, &mut context) {
+                if eval_empty_with_context_mut(expr, &mut context).is_ok() {
                     if let Some(r) = context.get_value("r") {
                         if let Ok(r) = r.as_float() {
                             p[0] = r as f32
@@ -667,7 +667,7 @@ impl ImageOperation {
             }
             Self::Mult(amt) => {
                 let amt =
-                    Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255. as f32) / 255.;
+                    Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255_f32) / 255.;
 
                 // p[0] = p[0] * amt[0] as f32 / 255.;
                 // p[1] = p[1] * amt[1] as f32 / 255.;

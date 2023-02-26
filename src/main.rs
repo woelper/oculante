@@ -811,7 +811,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             for r in &state.persistent_settings.recent_images.clone() {
                                 if let Some(filename) = r.file_name() {
                                     if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(&r, state);
+                                        load_image_from_path(r, state);
                                         ui.close_menu();
                                     }
                                 }

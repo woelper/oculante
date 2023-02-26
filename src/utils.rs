@@ -727,7 +727,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
             let opt = usvg::Options::default();
-            let svg_data = std::fs::read(&img_location)?;
+            let svg_data = std::fs::read(img_location)?;
             if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
                 let pixmap_size = rtree.size.to_screen_size();
 
@@ -781,7 +781,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let maybe_image: Result<
                 Image<Layer<SpecificChannels<RgbaImage, RgbaChannels>>>,
                 exrs::Error,
-            > = reader.from_file(&img_location);
+            > = reader.from_file(img_location);
 
             match maybe_image {
                 Ok(image) => {
@@ -832,7 +832,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             col.add_still(img.into_rgba8());
         }
         "hdr" => {
-            let f = File::open(&img_location)?;
+            let f = File::open(img_location)?;
             let reader = BufReader::new(f);
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
@@ -867,24 +867,24 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             }
         }
         "webp" => {
-            let mut file = File::open(&img_location)?;
+            let mut file = File::open(img_location)?;
             let mut contents = vec![];
-            if let Ok(_) = file.read_to_end(&mut contents) {
+            if file.read_to_end(&mut contents).is_ok() {
                 match decode_webp(&contents) {
                     Some(webp_buf) => col.add_still(webp_buf),
-                    None => println!("Error decoding data from {:?}", img_location),
+                    None => println!("Error decoding data from {img_location:?}"),
                 }
             }
         }
         "png" => {
-            let file = File::open(&img_location)?;
+            let file = File::open(img_location)?;
             let bufread = BufReader::new(file);
             let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
             reader.no_limits();
             col.add_still(reader.decode()?.into_rgba8());
         }
         "gif" => {
-            let file = File::open(&img_location)?;
+            let file = File::open(img_location)?;
 
             // Below is a workaround for partially corrupt gifs.
             let mut gif_opts = gif::DecodeOptions::new();
@@ -925,12 +925,12 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         }
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
-            let jpeg_data = std::fs::read(&img_location)?;
+            let jpeg_data = std::fs::read(img_location)?;
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
             col.add_still(img);
         }
         _ => {
-            let img = image::open(&img_location)?;
+            let img = image::open(img_location)?;
             col.add_still(img.to_rgba8());
         }
     }
@@ -1031,7 +1031,7 @@ pub fn prev_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
+                .load(img_location, state.message_channel.0.clone());
         }
     }
 }
@@ -1052,7 +1052,7 @@ pub fn last_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
+                .load(img_location, state.message_channel.0.clone());
         }
     }
 }
@@ -1066,7 +1066,7 @@ pub fn first_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
+                .load(img_location, state.message_channel.0.clone());
         }
     }
 }

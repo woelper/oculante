@@ -19,16 +19,16 @@ fn gh_update() -> Result<String, Box<dyn std::error::Error>> {
         .build()?
         .update()?;
     println!("Update status: `{}`!", status.version());
-    Ok(format!("{:?}", status))
+    Ok(format!("{status:?}"))
 }
 
 pub fn update(sender: Option<Sender<String>>) {
     thread::spawn(move || match gh_update() {
         Ok(res) => {
-            let _ = sender.map(|s| s.send(res));
+            _ = sender.map(|s| s.send(res));
         }
         Err(e) => {
-            let _ = sender.map(|s| s.send(format!("{:?}", e)));
+            _ = sender.map(|s| s.send(format!("{e:?}")));
         }
     });
 }

@@ -183,7 +183,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
                 // texture.
-                let tex_id = gfx.egui_register_texture(&texture);
+                let tex_id = gfx.egui_register_texture(texture);
 
                 // width of image widget
                 let desired_width = ui.available_width() - ui.spacing().button_padding.x*4.;
@@ -229,7 +229,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label_i("🌗 RGBA");
                     ui.label(
-                        RichText::new(format!("{}", disp_col(state.sampled_color)))
+                        RichText::new(disp_col(state.sampled_color).to_string())
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
@@ -237,7 +237,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label_i("🌗 RGBA");
                     ui.label(
-                        RichText::new(format!("{}", disp_col_norm(state.sampled_color, 255.)))
+                        RichText::new(disp_col_norm(state.sampled_color, 255.).to_string())
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
@@ -348,7 +348,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
             .open(&mut settings_enabled)
             .resizable(false)
             .default_width(600.)
-            .show(&ctx, |ui| {
+            .show(ctx, |ui| {
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -364,7 +364,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                             );
                             ctx.set_style(style);
 
-                            _ = state.persistent_settings.save()
+                            state.persistent_settings.save()
                         }
                         ui.label("Accent color");
                     });
@@ -374,7 +374,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                             .color_edit_button_srgb(&mut state.persistent_settings.background_color)
                             .changed()
                         {
-                            _ = state.persistent_settings.save()
+                            state.persistent_settings.save()
                         }
                         ui.label("Background color");
                     });
@@ -388,7 +388,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     )
                     .changed()
                 {
-                    _ = state.persistent_settings.save()
+                    state.persistent_settings.save()
                 }
                 if ui
                 .checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
@@ -397,7 +397,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 )
                 .changed()
                 {
-                    _ = state.persistent_settings.save()
+                    state.persistent_settings.save()
                 }
                     ui.end_row();
 
@@ -408,7 +408,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     )
                     .changed()
                 {
-                    _ = state.persistent_settings.save();
+                    state.persistent_settings.save();
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
                 }
                 ui.horizontal(|ui| {
@@ -422,7 +422,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                 {
                     state.player.cache.cache_size = state.persistent_settings.max_cache;
-                    _ = state.persistent_settings.save()
+                    state.persistent_settings.save()
                 }
                 });
 
@@ -434,7 +434,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     )
                     .changed()
                     {
-                        _ = state.persistent_settings.save()
+                        state.persistent_settings.save()
                     }
 
                     if ui
@@ -444,7 +444,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     )
                     .changed()
                     {
-                        _ = state.persistent_settings.save()
+                        state.persistent_settings.save()
                     }
                 });
 
@@ -458,7 +458,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                     {
                         set_title(app, state);
-                        _ = state.persistent_settings.save()
+                        state.persistent_settings.save()
                     }
                 });
 
@@ -563,7 +563,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
-        .show(&ctx, |ui| {
+        .show(ctx, |ui| {
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
             let mut pixels_changed = false;
@@ -628,7 +628,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .width(available_w_single_spacing)
                         .show_ui(ui, |ui| {
                             for op in &mut ops {
-                                if ui.label_i_selected(false, &format!("{}", op)).clicked() {
+                                if ui.label_i_selected(false, &format!("{op}")).clicked() {
                                     if op.is_per_pixel() {
                                         state.edit_state.pixel_op_stack.push(op.clone());
                                         pixels_changed = true;
@@ -760,7 +760,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             pixels_changed = true;
                         }
                         if ui.button("Clear all").clicked() {
-                            let _ = state.edit_state.paint_strokes.clear();
+                            state.edit_state.paint_strokes.clear();
                             pixels_changed = true;
                         }
                     });
@@ -942,7 +942,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 if let Some(tex) = &mut state.current_texture {
                     if let Some(img) = &state.current_image {
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
-                            && state.edit_state.result_pixel_op.height() as u32 == img.height()
+                            && state.edit_state.result_pixel_op.height() == img.height()
                         {
                             state.edit_state.result_pixel_op.update_texture(gfx, tex);
                         } else {
@@ -1118,7 +1118,7 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
 
 pub fn stroke_ui(
     stroke: &mut PaintStroke,
-    brushes: &Vec<RgbaImage>,
+    brushes: &[RgbaImage],
     ui: &mut Ui,
     gfx: &mut Graphics,
 ) -> Response {
@@ -1505,7 +1505,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
             egui::Grid::new("info").num_columns(2).show(ui, |ui| {
                 for (event, keys) in ordered_shortcuts {
-                    ui.label(format!("{:?}", event));
+                    ui.label(format!("{event:?}"));
 
                     ui.label(lookup(&s, event));
                     if !no_keys_pressed {
@@ -1517,7 +1517,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
                                 .keyboard
                                 .down
                                 .iter()
-                                .map(|(k, _)| format!("{:?}", k))
+                                .map(|(k, _)| format!("{k:?}"))
                                 .collect();
                             changed = true;
                         }
@@ -1529,7 +1529,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
             });
         });
     if changed {
-        _ = state.persistent_settings.save();
+        state.persistent_settings.save();
     }
 }
 
