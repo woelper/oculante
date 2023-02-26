@@ -542,7 +542,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
     if state.edit_enabled {
-        state.current_channel = Channel::RGBA;
+        state.current_channel = Channel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
@@ -657,9 +657,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match &state.current_channel {
             // Unpremultiply the image
-            Channel::RGB => state.current_texture = unpremult(&img).to_texture(gfx),
+            Channel::Rgb => state.current_texture = unpremult(&img).to_texture(gfx),
             // Do nuttin'
-            Channel::RGBA => (),
+            Channel::Rgba => (),
             // Display the channel
             _ => {
                 state.current_texture =
@@ -854,11 +854,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
 
                     if key_pressed(app, state, RGBChannel) {
-                        state.current_channel = Channel::RGB;
+                        state.current_channel = Channel::Rgb;
                         changed_channels = true;
                     }
                     if key_pressed(app, state, RGBAChannel) {
-                        state.current_channel = Channel::RGBA;
+                        state.current_channel = Channel::Rgba;
                         changed_channels = true;
                     }
 
@@ -894,10 +894,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if changed_channels {
                         if let Some(img) = &state.current_image {
                             match &state.current_channel {
-                                Channel::RGB => {
+                                Channel::Rgb => {
                                     state.current_texture = unpremult(img).to_texture(gfx)
                                 }
-                                Channel::RGBA => state.current_texture = img.to_texture(gfx),
+                                Channel::Rgba => state.current_texture = img.to_texture(gfx),
                                 _ => {
                                     state.current_texture =
                                         solo_channel(img, *&state.current_channel as usize)

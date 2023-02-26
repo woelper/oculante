@@ -1,6 +1,6 @@
 use arboard::Clipboard;
 use dds::DDS;
-use exr;
+
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -40,7 +40,7 @@ use crate::scrubber::Scrubber;
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
-pub const SUPPORTED_EXTENSIONS: &'static [&'static str] = &[
+pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
     "dds",
     "exr",
@@ -133,9 +133,9 @@ impl ExtendedImageInfo {
             *green_histogram.entry(p.0[1]).or_default() += 1;
             *blue_histogram.entry(p.0[2]).or_default() += 1;
 
-            let mut p = p.clone();
+            let mut p = *p;
             p.0[3] = 255;
-            colors.insert(p.clone());
+            colors.insert(p);
             num_pixels += 1;
         }
 
@@ -206,7 +206,7 @@ impl Player {
         }
 
         send_image_threaded(
-            &img_location,
+            img_location,
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
@@ -252,7 +252,7 @@ pub fn send_image_threaded(
                             if frame.delay > 0 {
                                 thread::sleep(Duration::from_millis(frame.delay as u64));
                             } else {
-                                thread::sleep(Duration::from_millis(40 as u64));
+                                thread::sleep(Duration::from_millis(40_u64));
                             }
                         }
                         i += 1;
@@ -348,8 +348,8 @@ pub enum Channel {
     Green,
     Blue,
     Alpha,
-    RGB,
-    RGBA,
+    Rgb,
+    Rgba,
 }
 
 impl Channel {
@@ -359,8 +359,8 @@ impl Channel {
             Self::Green => lookup(shortcuts, &InputEvent::GreenChannel),
             Self::Blue => lookup(shortcuts, &InputEvent::BlueChannel),
             Self::Alpha => lookup(shortcuts, &InputEvent::AlphaChannel),
-            Self::RGB => lookup(shortcuts, &InputEvent::RGBChannel),
-            Self::RGBA => lookup(shortcuts, &InputEvent::RGBAChannel),
+            Self::Rgb => lookup(shortcuts, &InputEvent::RGBChannel),
+            Self::Rgba => lookup(shortcuts, &InputEvent::RGBAChannel),
         }
     }
 }
@@ -440,7 +440,7 @@ impl Default for OculanteState {
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
-            current_channel: Channel::RGBA,
+            current_channel: Channel::Rgba,
             settings_enabled: Default::default(),
             edit_enabled: Default::default(),
             image_info: Default::default(),
@@ -495,7 +495,6 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
-// TODO:move to utils
 pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
     let fullscreen = app.window().is_fullscreen();
 
@@ -533,7 +532,7 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
 }
 
 /// Determine if an enxtension is compatible with oculante
-pub fn is_ext_compatible(fname: &PathBuf) -> bool {
+pub fn is_ext_compatible(fname: &Path) -> bool {
     SUPPORTED_EXTENSIONS.contains(
         &fname
             .extension()
@@ -546,7 +545,6 @@ pub fn is_ext_compatible(fname: &PathBuf) -> bool {
 }
 
 pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
-    // TODO make this FP
     let mut updated_img = img.clone();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         pixel[0] = pixel[channel];
@@ -584,8 +582,8 @@ pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         if pixel[3] != 0 && pixel[3] != 255 {
-            pixel[1] = pixel[1].checked_add(100).unwrap_or(255);
-            pixel[3] = pixel[1].checked_add(100).unwrap_or(255);
+            pixel[1] = pixel[1].saturating_add(100);
+            pixel[3] = pixel[1].saturating_add(100);
         }
     });
     updated_img
@@ -653,7 +651,7 @@ pub fn send_extended_info(
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
-    let img_location = img_location.clone();
+    let img_location = &(*img_location).to_owned();
     let mut col = FrameCollection::default();
 
     match img_location
@@ -1080,7 +1078,7 @@ pub fn next_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
+                .load(img_location, state.message_channel.0.clone());
         }
     }
 }
@@ -1097,12 +1095,9 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
                 .replacen("{FULLPATH}", &format!("{}", p.display()),10)
                 .replacen(
                     "{FILENAME}",
-                    &format!(
-                        "{}",
-                        p.file_name()
+                    &p.file_name()
                             .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                    ),
+                            .unwrap_or_default(),
                    10,
                 )
                 .replacen(

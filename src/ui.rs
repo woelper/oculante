@@ -177,7 +177,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         }
     }
 
-    egui::SidePanel::left("side_panel").show(&ctx, |ui| {
+    egui::SidePanel::left("side_panel").show(ctx, |ui| {
 
 
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -229,7 +229,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label_i("🌗 RGBA");
                     ui.label(
-                        RichText::new(disp_col(state.sampled_color).to_string())
+                        RichText::new(disp_col(state.sampled_color))
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
@@ -237,7 +237,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     ui.label_i("🌗 RGBA");
                     ui.label(
-                        RichText::new(disp_col_norm(state.sampled_color, 255.).to_string())
+                        RichText::new(disp_col_norm(state.sampled_color, 255.))
                             .monospace()
                             .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
@@ -476,7 +476,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                     if ui.button("Reset all settings").clicked() {
                         state.persistent_settings = Default::default();
-                    _ = state.persistent_settings.save()
+                    state.persistent_settings.save();
                     }
                 });
 
@@ -491,7 +491,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_info {
         egui::Grid::new("extended").show(ui, |ui| {
-            ui.label(format!("Number of colors"));
+            ui.label("Number of colors");
             ui.label(format!("{}", info.num_colors));
             ui.end_row();
 
@@ -1176,7 +1176,7 @@ pub fn stroke_ui(
                             .selectable_value(
                                 &mut stroke.brush_index,
                                 b_i,
-                                format!("Brush {}", b_i),
+                                format!("Brush {b_i}"),
                             )
                             .clicked()
                         {
@@ -1209,7 +1209,7 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
 
     // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
     for (i, operation) in stack.iter_mut().enumerate() {
-        ui.label_i(&format!("{}", operation));
+        ui.label_i(&format!("{operation}"));
 
         // let op draw itself and check for response
 
