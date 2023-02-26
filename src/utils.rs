@@ -194,7 +194,7 @@ impl Player {
         }
     }
 
-    pub fn load(&mut self, img_location: &PathBuf, message_sender: Sender<String>) {
+    pub fn load(&mut self, img_location: &Path, message_sender: Sender<String>) {
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
@@ -219,12 +219,12 @@ impl Player {
 }
 
 pub fn send_image_threaded(
-    img_location: &PathBuf,
+    img_location: &Path,
     texture_sender: Sender<Frame>,
     message_sender: Sender<String>,
     stop_receiver: Receiver<()>,
 ) {
-    let loc = img_location.clone();
+    let loc = img_location.to_owned();
 
     thread::spawn(move || {
         match open_image(&loc) {
@@ -435,26 +435,26 @@ impl Default for OculanteState {
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
             extended_info_channel: mpsc::channel(),
-            extended_info_loading: false,
+            extended_info_loading: Default::default(),
             mouse_delta: Default::default(),
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
             current_channel: Channel::RGBA,
-            settings_enabled: false,
-            edit_enabled: false,
-            image_info: None,
+            settings_enabled: Default::default(),
+            edit_enabled: Default::default(),
+            image_info: Default::default(),
             tiling: 1,
-            mouse_grab: false,
-            key_grab: false,
+            mouse_grab: Default::default(),
+            key_grab: Default::default(),
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: Default::default(),
-            always_on_top: false,
-            network_mode: false,
+            always_on_top: Default::default(),
+            network_mode: Default::default(),
             window_size: Default::default(),
-            toast_cooldown: 0.,
-            fullscreen_offset: None,
+            toast_cooldown: Default::default(),
+            fullscreen_offset: Default::default(),
             scrubber: Default::default(),
         }
     }
@@ -652,7 +652,7 @@ pub fn send_extended_info(
 }
 
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &PathBuf) -> Result<FrameCollection> {
+pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
     let img_location = img_location.clone();
     let mut col = FrameCollection::default();
 
@@ -1034,6 +1034,12 @@ pub fn prev_image(state: &mut OculanteState) {
                 .load(&img_location, state.message_channel.0.clone());
         }
     }
+}
+
+pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
+    state.is_loaded = false;
+    state.player.load(p, state.message_channel.0.clone());
+    state.current_path = Some(p.to_owned());
 }
 
 pub fn last_image(state: &mut OculanteState) {

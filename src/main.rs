@@ -174,7 +174,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     } else {
         warn!("Settings failed to load. This may happen after application updates. Generating a fresh file.");
         state.persistent_settings = Default::default();
-        _ = state.persistent_settings.save();
+        state.persistent_settings.save();
     }
 
     state.player = Player::new(
@@ -323,7 +323,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, Quit) {
-                std::process::exit(0)
+                // std::process::exit(0)
+                state.persistent_settings.save();
+                app.backend.exit();
             }
 
             #[cfg(feature = "turbo")]
@@ -445,6 +447,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     }
 
     match evt {
+        Event::Exit => {
+            info!("About to exit");
+            state.persistent_settings.save();
+        }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
@@ -554,7 +560,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
         debug!("Received extended image info for {}", info.name);
-
         state.image_info = Some(info);
         app.window().request_frame();
     }
@@ -584,6 +589,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
             debug!("{:#?} from {}", &state.scrubber, p.display());
+            if !state.persistent_settings.recent_images.contains(p) {
+                state.persistent_settings.recent_images.insert(0, p.clone());
+                state.persistent_settings.recent_images.truncate(10);
+                state.persistent_settings.save();
+            }
         }
 
         match frame.source {
@@ -794,6 +804,30 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             state.settings_enabled = !state.settings_enabled;
                             ui.close_menu();
                         }
+
+                        ui.menu_button("Recent", |ui| {
+                            for r in &state.persistent_settings.recent_images.clone() {
+                                if let Some(filename) = r.file_name() {
+                                    if ui.button(filename.to_string_lossy()).clicked() {
+                                        load_image_from_path(&r, state);
+                                        ui.close_menu();
+                                    }
+                                }
+                            }
+                        });
+
+                        // TODO: expose favourites with a tool button
+                        // ui.menu_button("Favourites", |ui| {
+                        //     for r in &state.persistent_settings.favourite_images.clone() {
+                        //         if let Some(filename) = r.file_name() {
+                        //             if ui.button(filename.to_string_lossy()).clicked() {
+                        //ui.close_menu();
+
+                        //             }
+                        //         }
+                        //     }
+
+                        // });
                     });
 
                     ui.label("Channels");

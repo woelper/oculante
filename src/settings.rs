@@ -1,9 +1,9 @@
 use crate::shortcuts::*;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::{fs::File, collections::HashSet, path::PathBuf};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct PersistentSettings {
     /// The UI accent color
@@ -22,6 +22,8 @@ pub struct PersistentSettings {
     pub wrap_folder: bool,
     /// Whether to keep the image edit stack
     pub keep_edits: bool,
+    pub favourite_images: HashSet<PathBuf>,
+    pub recent_images: Vec<PathBuf>,
 }
 
 impl Default for PersistentSettings {
@@ -36,6 +38,8 @@ impl Default for PersistentSettings {
             show_scrub_bar: Default::default(),
             wrap_folder: true,
             keep_edits: Default::default(),
+            favourite_images: Default::default(),
+            recent_images: Default::default(),
         }
     }
 }
@@ -47,9 +51,18 @@ impl PersistentSettings {
         Ok(serde_json::from_reader::<_, PersistentSettings>(f)?)
     }
 
-    pub fn save(&self) -> Result<()> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
-        let f = File::create(local_dir.join(".oculante"))?;
-        Ok(serde_json::to_writer_pretty(f, self)?)
+    // save settings in a thread so we don't block
+    pub fn save(&self) {
+        let settings = self.clone();
+        std::thread::spawn( move || { 
+            _ = save(&settings);
+        });
+      
     }
+}
+
+fn save(s: &PersistentSettings) -> Result<()> {
+    let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
+    let f = File::create(local_dir.join(".oculante"))?;
+    Ok(serde_json::to_writer_pretty(f, s)?)
 }
