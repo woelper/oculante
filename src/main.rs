@@ -550,7 +550,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // reload constantly if gif so we keep receiving
+    // reload constantly if gif so we keep receiving sub-frames wit no delay
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
             app.window().request_frame();
@@ -663,7 +663,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // Display the channel
             _ => {
                 state.current_texture =
-                    solo_channel(&img, *&state.current_channel as usize).to_texture(gfx)
+                    solo_channel(&img, state.current_channel as usize).to_texture(gfx)
             }
         }
         state.current_image = Some(img);
