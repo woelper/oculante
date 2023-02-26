@@ -411,10 +411,8 @@ impl ImageOperation {
                             .prefix("Y "),
                     );
 
-                    if r0.changed() {
-                        if *aspect {
-                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32
-                        }
+                    if r0.changed() && *aspect {
+                        dimensions.1 = (dimensions.0 as f32 * ratio) as u32
                     }
 
                     if r1.changed() {

@@ -1395,7 +1395,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     .cloned()
                     .unwrap_or(ImageOperation::Crop([0, 0, 0, 0]));
 
-                if crop_ops.len() == 0 {
+                if crop_ops.is_empty() {
                     info!("A missing crop operator was added.");
                     state
                         .edit_state
