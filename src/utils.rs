@@ -1084,3 +1084,33 @@ pub fn next_image(state: &mut OculanteState) {
         }
     }
 }
+
+/// Set the window title
+pub fn set_title(app: &mut App, state: &mut OculanteState) {
+    if let Some(p) = &state.current_path {
+        app.window().set_title(
+            &state
+                .persistent_settings
+                .title_format
+                .replacen("{APP}", env!("CARGO_PKG_NAME"), 1)
+                .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 1)
+                .replacen("{FULLPATH}", &format!("{}", p.display()), 1)
+                .replacen(
+                    "{FILENAME}",
+                    &format!(
+                        "{}",
+                        p.file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                    ),
+                    1,
+                )
+                .replacen(
+                    "{RES}",
+                    &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
+                    1,
+                ),
+        );
+
+    }
+}

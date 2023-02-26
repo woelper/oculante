@@ -582,6 +582,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // state.current_texture = img.to_texture(gfx);
 
         debug!("Frame source: {:?}", frame.source);
+        
+        set_title(app, state);
 
         // fill image sequence
         if let Some(p) = &state.current_path {
@@ -987,15 +989,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         .clicked()
                     {
                         browse_for_image_path(state)
-                    }
-
-                    if let Some(file) = state.current_path.as_ref().map(|p| p.file_name()).flatten()
-                    {
-                        ui.label(format!("{}", file.to_string_lossy()));
-                        ui.label(format!(
-                            "{}x{}",
-                            state.image_dimension.0, state.image_dimension.1
-                        ));
                     }
                 });
             });

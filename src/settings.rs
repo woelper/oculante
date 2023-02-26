@@ -1,7 +1,7 @@
 use crate::shortcuts::*;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, fs::File, path::PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
@@ -24,6 +24,7 @@ pub struct PersistentSettings {
     pub keep_edits: bool,
     pub favourite_images: HashSet<PathBuf>,
     pub recent_images: Vec<PathBuf>,
+    pub title_format: String,
 }
 
 impl Default for PersistentSettings {
@@ -40,6 +41,7 @@ impl Default for PersistentSettings {
             keep_edits: Default::default(),
             favourite_images: Default::default(),
             recent_images: Default::default(),
+            title_format: "{APP} | {VERSION} | {FULLPATH}".into(),
         }
     }
 }
@@ -54,10 +56,9 @@ impl PersistentSettings {
     // save settings in a thread so we don't block
     pub fn save(&self) {
         let settings = self.clone();
-        std::thread::spawn( move || { 
+        std::thread::spawn(move || {
             _ = save(&settings);
         });
-      
     }
 }
 

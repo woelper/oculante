@@ -5,7 +5,7 @@ use crate::{
     update,
     utils::{
         disp_col, disp_col_norm, highlight_bleed, highlight_semitrans, send_extended_info,
-        ImageExt, OculanteState,
+        set_title, ImageExt, OculanteState,
     },
 };
 use egui::plot::Plot;
@@ -446,19 +446,28 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     {
                         _ = state.persistent_settings.save()
                     }
-
-
                 });
 
-
-
-
+                ui.horizontal(|ui| {
+                    ui.label("Configure window title");
+                    if ui
+                    .text_edit_singleline(&mut state.persistent_settings.title_format)
+                    .on_hover_text(
+                        "Configure the title. Use {APP}, {VERSION}, {FULLPATH}, {FILENAME} and {RES} as placeholders.",
+                    )
+                    .changed()
+                    {
+                        set_title(app, state);
+                        _ = state.persistent_settings.save()
+                    }
+                });
 
                 if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");
                 }
 
-                ui.vertical_centered_justified(|ui| {
+
+                        ui.vertical_centered_justified(|ui| {
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
                         state.message = Some("Checking for updates...".into());
                         update::update(Some(state.message_channel.0.clone()));
@@ -468,10 +477,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     if ui.button("Reset all settings").clicked() {
                         state.persistent_settings = Default::default();
                     _ = state.persistent_settings.save()
-
                     }
-
-
                 });
 
                 ui.collapsing("Keybindings",|ui| {
@@ -495,7 +501,6 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                 (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
             ));
             ui.end_row();
-
             ui.label("Pixels");
             ui.label(format!("{}", info.num_pixels));
             ui.end_row();
