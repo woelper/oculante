@@ -8,3 +8,4 @@ paint/target
 shortcuts.txt
 perf.*
 flamegraph.svg
+.notes
