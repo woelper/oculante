@@ -140,7 +140,7 @@ https://unsplash.com/@frstvisuals
 
 Linux:
 
-`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm`
+`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake libssl-dev`
 
 Win:
 Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
