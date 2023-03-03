@@ -1173,11 +1173,7 @@ pub fn stroke_ui(
                         }
 
                         if ui
-                            .selectable_value(
-                                &mut stroke.brush_index,
-                                b_i,
-                                format!("Brush {b_i}"),
-                            )
+                            .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {b_i}"))
                             .clicked()
                         {
                             combined_response.changed = true

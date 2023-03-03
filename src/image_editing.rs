@@ -664,8 +664,7 @@ impl ImageOperation {
                 p[channels.0 as usize] = p[channels.1 as usize];
             }
             Self::Mult(amt) => {
-                let amt =
-                    Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255_f32) / 255.;
+                let amt = Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255_f32) / 255.;
 
                 // p[0] = p[0] * amt[0] as f32 / 255.;
                 // p[1] = p[1] * amt[1] as f32 / 255.;

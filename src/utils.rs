@@ -1090,22 +1090,21 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
             &state
                 .persistent_settings
                 .title_format
-                .replacen("{APP}", env!("CARGO_PKG_NAME"),10)
-                .replacen("{VERSION}", env!("CARGO_PKG_VERSION"),10)
-                .replacen("{FULLPATH}", &format!("{}", p.display()),10)
+                .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
+                .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
+                .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
                 .replacen(
                     "{FILENAME}",
                     &p.file_name()
-                            .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default(),
-                   10,
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    10,
                 )
                 .replacen(
                     "{RES}",
                     &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
-                   10,
+                    10,
                 ),
         );
-
     }
 }
