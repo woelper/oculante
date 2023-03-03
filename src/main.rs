@@ -582,7 +582,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // state.current_texture = img.to_texture(gfx);
 
         debug!("Frame source: {:?}", frame.source);
-        
+
         set_title(app, state);
 
         // fill image sequence
@@ -1039,25 +1039,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if !state.is_loaded {
-            egui::Window::new("")
-                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-                .collapsible(false)
-                .resizable(false)
-                .default_width(400.)
-                .title_bar(false)
-                .show(ctx, |ui| {
-                    if state.current_path.is_some() {
-                        ui.horizontal(|ui| {
-                            ui.add(egui::Spinner::default());
-                            ui.label(format!(
-                                "Loading {}",
-                                state.current_path.clone().unwrap_or_default().display()
-                            ));
-                        });
-                    } else {
-                        ui.heading("🖼 Please drag an image here!");
-                    }
-                });
+            egui::TopBottomPanel::bottom("loader").show_animated(ctx, state.current_path.is_some(),|ui| {
+                if let Some(p) = &state.current_path {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::Spinner::default());
+                        ui.label(format!(
+                            "Loading {}",
+                            p.display()
+                        ));
+                    });
+                } 
+            });
             app.window().request_frame();
         }
 
