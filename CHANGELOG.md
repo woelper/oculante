@@ -1,3 +1,20 @@
+# 0.6.53 (2023-03-04)
+
+### :beetle: Bug Fixes
+
+* Prevent freezing when window resizes (91424bac)
+* update jpegxl (8779d04b)
+
+### :sparkles: Features
+
+* Allow window title to be configured (000a34db)
+* Keep track of recently opened images (77857a8f)
+
+### :green_apple: Chore
+
+* update dependencies (2dad8909)
+* Update dependencies (8c78fa9f)
+
 # 0.6.52 (2023-02-19)
 
 # 0.6.51 (2023-02-12)
