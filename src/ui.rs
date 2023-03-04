@@ -715,10 +715,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     {
                         state.edit_state.painting = false;
                     }
-                } else {
-                    if ui.button("🖊 Paint mode").clicked() {
-                        state.edit_state.painting = true;
-                    }
+                } else if ui.button("🖊 Paint mode").clicked() {
+                    state.edit_state.painting = true;
                 }
             });
 
@@ -980,15 +978,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     let stroke_count = state.edit_state.paint_strokes.len();
 
                     for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
-                        if i < stroke_count - 1 {
-                            if !stroke.committed && !stroke.is_empty() {
-                                stroke.render(
-                                    &mut state.edit_state.result_image_op,
-                                    &state.edit_state.brushes,
-                                );
-                                stroke.committed = true;
-                                info!("Committed stroke {}", i);
-                            }
+                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
+                            stroke.render(
+                                &mut state.edit_state.result_image_op,
+                                &state.edit_state.brushes,
+                            );
+                            stroke.committed = true;
+                            info!("Committed stroke {}", i);
                         }
                     }
                 }
@@ -1379,10 +1375,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     .edit_state
                     .image_op_stack
                     .iter()
-                    .filter(|op| match op {
-                        ImageOperation::Crop(_) => true,
-                        _ => false,
-                    })
+                    .filter(|op| matches!(op, ImageOperation::Crop(_)))
                     .collect::<Vec<_>>();
 
                 let crop = crop_ops
