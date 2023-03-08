@@ -745,92 +745,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .default_height(30.)
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    ui.menu_button("☰", |ui| {
-                        if ui.button("Reset view").clicked() {
-                            state.reset_image = true;
-                            ui.close_menu();
-                        }
-                        if ui.button("View 1:1").clicked() {
-                            set_zoom(
-                                1.0,
-                                Some(nalgebra::Vector2::new(
-                                    app.window().width() as f32 / 2.,
-                                    app.window().height() as f32 / 2.,
-                                )),
-                                state,
-                            );
-                            ui.close_menu();
-                        }
 
-                        let copy_pressed = key_pressed(app, state, Copy);
-                        if let Some(img) = &state.current_image {
-                            if ui
-                                .button("🗐 Copy")
-                                .on_hover_text("Copy image to clipboard")
-                                .clicked()
-                                || copy_pressed
-                            {
-                                clipboard_copy(img);
-                                ui.close_menu();
-                            }
-                        }
 
-                        if ui
-                            .button("📋 Paste")
-                            .on_hover_text("Paste image from clipboard")
-                            .clicked()
-                            || key_pressed(app, state, Paste)
-                        {
-                            if let Ok(clipboard) = &mut Clipboard::new() {
-                                if let Ok(imagedata) = clipboard.get_image() {
-                                    if let Some(image) = image::RgbaImage::from_raw(
-                                        imagedata.width as u32,
-                                        imagedata.height as u32,
-                                        (imagedata.bytes).to_vec(),
-                                    ) {
-                                        // Stop in the even that an animation is running
-                                        state.player.stop();
-                                        _ = state
-                                            .player
-                                            .image_sender
-                                            .send(crate::utils::Frame::new_still(image));
-                                        // Since pasted data has no path, make sure it's not set
-                                        state.current_path = None;
-                                    }
-                                }
-                            }
-                            ui.close_menu();
-                        }
+                   
 
-                        if ui.button("⛭ Preferences").clicked() {
-                            state.settings_enabled = !state.settings_enabled;
-                            ui.close_menu();
-                        }
-
-                        ui.menu_button("Recent", |ui| {
-                            for r in &state.persistent_settings.recent_images.clone() {
-                                if let Some(filename) = r.file_name() {
-                                    if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(r, state);
-                                        ui.close_menu();
-                                    }
-                                }
-                            }
-                        });
-
-                        // TODO: expose favourites with a tool button
-                        // ui.menu_button("Favourites", |ui| {
-                        //     for r in &state.persistent_settings.favourite_images.clone() {
-                        //         if let Some(filename) = r.file_name() {
-                        //             if ui.button(filename.to_string_lossy()).clicked() {
-                        //ui.close_menu();
-
-                        //             }
-                        //         }
-                        //     }
-
-                        // });
-                    });
+                    
 
                     ui.label("Channels");
 
@@ -990,6 +909,114 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     {
                         browse_for_image_path(state)
                     }
+
+                    ui.scope(|ui| {
+
+                        // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
+                        // maybe override font size?
+                        ui.style_mut().visuals.button_frame = false;
+                        ui.style_mut().visuals.widgets.inactive.expansion = 20.;
+    
+                        ui.menu_button("☰", |ui| {
+                            if ui.button("Reset view").clicked() {
+                                state.reset_image = true;
+                                ui.close_menu();
+                            }
+                            if ui.button("View 1:1").clicked() {
+                                set_zoom(
+                                    1.0,
+                                    Some(nalgebra::Vector2::new(
+                                        app.window().width() as f32 / 2.,
+                                        app.window().height() as f32 / 2.,
+                                    )),
+                                    state,
+                                );
+                                ui.close_menu();
+                            }
+    
+                            let copy_pressed = key_pressed(app, state, Copy);
+                            if let Some(img) = &state.current_image {
+                                if ui
+                                    .button("🗐 Copy")
+                                    .on_hover_text("Copy image to clipboard")
+                                    .clicked()
+                                    || copy_pressed
+                                {
+                                    clipboard_copy(img);
+                                    ui.close_menu();
+                                }
+                            }
+    
+                            if ui
+                                .button("📋 Paste")
+                                .on_hover_text("Paste image from clipboard")
+                                .clicked()
+                                || key_pressed(app, state, Paste)
+                            {
+                                if let Ok(clipboard) = &mut Clipboard::new() {
+                                    if let Ok(imagedata) = clipboard.get_image() {
+                                        if let Some(image) = image::RgbaImage::from_raw(
+                                            imagedata.width as u32,
+                                            imagedata.height as u32,
+                                            (imagedata.bytes).to_vec(),
+                                        ) {
+                                            // Stop in the even that an animation is running
+                                            state.player.stop();
+                                            _ = state
+                                                .player
+                                                .image_sender
+                                                .send(crate::utils::Frame::new_still(image));
+                                            // Since pasted data has no path, make sure it's not set
+                                            state.current_path = None;
+                                        }
+                                    }
+                                }
+                                ui.close_menu();
+                            }
+    
+                            if ui.button("⛭ Preferences").clicked() {
+                                state.settings_enabled = !state.settings_enabled;
+                                ui.close_menu();
+                            }
+    
+                            ui.menu_button("Recent", |ui| {
+                                for r in &state.persistent_settings.recent_images.clone() {
+                                    if let Some(filename) = r.file_name() {
+                                        if ui.button(filename.to_string_lossy()).clicked() {
+                                            load_image_from_path(r, state);
+                                            ui.close_menu();
+                                        }
+                                    }
+                                }
+                            });
+    
+                            // TODO: expose favourites with a tool button
+                            // ui.menu_button("Favourites", |ui| {
+                            //     for r in &state.persistent_settings.favourite_images.clone() {
+                            //         if let Some(filename) = r.file_name() {
+                            //             if ui.button(filename.to_string_lossy()).clicked() {
+                            //ui.close_menu();
+    
+                            //             }
+                            //         }
+                            //     }
+    
+                            // });
+                        });
+
+                    });
+
+
+
+
+
+
+
+
+
+
+
+
                 });
             });
 
