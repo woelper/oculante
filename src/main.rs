@@ -1,6 +1,5 @@
 #![windows_subsystem = "windows"]
 
-use arboard::Clipboard;
 use clap::Arg;
 use clap::Command;
 use log::debug;
@@ -13,14 +12,11 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use shortcuts::lookup;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use strum::IntoEnumIterator;
-
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -542,7 +538,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
     if state.edit_enabled {
-        state.current_channel = Channel::Rgba;
+        state.current_channel = ColorChannel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
@@ -657,9 +653,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match &state.current_channel {
             // Unpremultiply the image
-            Channel::Rgb => state.current_texture = unpremult(&img).to_texture(gfx),
+            ColorChannel::Rgb => state.current_texture = unpremult(&img).to_texture(gfx),
             // Do nuttin'
-            Channel::Rgba => (),
+            ColorChannel::Rgba => (),
             // Display the channel
             _ => {
                 state.current_texture =
@@ -744,280 +740,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(30.)
             .default_height(30.)
             .show(ctx, |ui| {
-                ui.horizontal_centered(|ui| {
 
-
-                   
-
-                    
-
-                    ui.label("Channels");
-
-                    let mut changed_channels = false;
-
-                    if key_pressed(app, state, RedChannel) {
-                        state.current_channel = Channel::Red;
-                        changed_channels = true;
-                    }
-                    if key_pressed(app, state, GreenChannel) {
-                        state.current_channel = Channel::Green;
-                        changed_channels = true;
-                    }
-                    if key_pressed(app, state, BlueChannel) {
-                        state.current_channel = Channel::Blue;
-                        changed_channels = true;
-                    }
-                    if key_pressed(app, state, AlphaChannel) {
-                        state.current_channel = Channel::Alpha;
-                        changed_channels = true;
-                    }
-
-                    if key_pressed(app, state, RGBChannel) {
-                        state.current_channel = Channel::Rgb;
-                        changed_channels = true;
-                    }
-                    if key_pressed(app, state, RGBAChannel) {
-                        state.current_channel = Channel::Rgba;
-                        changed_channels = true;
-                    }
-
-                    ui.add_enabled_ui(!state.edit_enabled, |ui| {
-                        // hack to center combo box in Y
-
-                        ui.spacing_mut().button_padding = Vec2::new(10., 0.);
-                        egui::ComboBox::from_id_source("channels")
-                            .selected_text(format!("{:?}", state.current_channel))
-                            .show_ui(ui, |ui| {
-                                for channel in Channel::iter() {
-                                    let r = ui.selectable_value(
-                                        &mut state.current_channel,
-                                        channel,
-                                        channel.to_string(),
-                                    );
-
-                                    if tooltip(
-                                        r,
-                                        &channel.to_string(),
-                                        &channel.hotkey(&state.persistent_settings.shortcuts),
-                                        ui,
-                                    )
-                                    .clicked()
-                                    {
-                                        changed_channels = true;
-                                    }
-                                }
-                            });
-                    });
-
-                    // TODO: remove redundancy
-                    if changed_channels {
-                        if let Some(img) = &state.current_image {
-                            match &state.current_channel {
-                                Channel::Rgb => {
-                                    state.current_texture = unpremult(img).to_texture(gfx)
-                                }
-                                Channel::Rgba => state.current_texture = img.to_texture(gfx),
-                                _ => {
-                                    state.current_texture =
-                                        solo_channel(img, *&state.current_channel as usize)
-                                            .to_texture(gfx)
-                                }
-                            }
-                        }
-                    }
-
-                    if state.current_image.is_some() {
-                        if state.current_path.is_some() {
-                            if tooltip(
-                                unframed_button("◀", ui),
-                                "Previous image",
-                                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
-                                ui,
-                            )
-                            .clicked()
-                            {
-                                prev_image(state)
-                            }
-                            if tooltip(
-                                unframed_button("▶", ui),
-                                "Next image",
-                                &lookup(&state.persistent_settings.shortcuts, &NextImage),
-                                ui,
-                            )
-                            .clicked()
-                            {
-                                next_image(state)
-                            }
-                        }
-
-                        if tooltip(
-                            // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                            ui.selectable_label(state.info_enabled, "ℹ Info"),
-                            "Show image info",
-                            &lookup(&state.persistent_settings.shortcuts, &InfoMode),
-                            ui,
-                        )
-                        .clicked()
-                        {
-                            state.info_enabled = !state.info_enabled;
-                            send_extended_info(
-                                &state.current_image,
-                                &state.current_path,
-                                &state.extended_info_channel,
-                            );
-                        }
-
-                        if tooltip(
-                            ui.selectable_label(state.edit_enabled, "✏ Edit"),
-                            "Edit the image",
-                            &lookup(&state.persistent_settings.shortcuts, &EditMode),
-                            ui,
-                        )
-                        .clicked()
-                        {
-                            state.edit_enabled = !state.edit_enabled;
-                        }
-                    }
-
-                    if tooltip(
-                        unframed_button("⛶", ui),
-                        "Full Screen",
-                        &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
-                        ui,
-                    )
-                    .clicked()
-                    {
-                        toggle_fullscreen(app, state);
-                    }
-
-                    if tooltip(
-                        unframed_button_colored("📌", state.always_on_top, ui),
-                        "Always on top",
-                        &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
-                        ui,
-                    )
-                    .clicked()
-                    {
-                        state.always_on_top = !state.always_on_top;
-                        app.window().set_always_on_top(state.always_on_top);
-                    }
-
-                    #[cfg(feature = "file_open")]
-                    if unframed_button("🗁", ui)
-                        .on_hover_text("Browse for image")
-                        .clicked()
-                    {
-                        browse_for_image_path(state)
-                    }
-
-                    ui.scope(|ui| {
-
-                        // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
-                        // maybe override font size?
-                        ui.style_mut().visuals.button_frame = false;
-                        ui.style_mut().visuals.widgets.inactive.expansion = 20.;
-    
-                        ui.menu_button("☰", |ui| {
-                            if ui.button("Reset view").clicked() {
-                                state.reset_image = true;
-                                ui.close_menu();
-                            }
-                            if ui.button("View 1:1").clicked() {
-                                set_zoom(
-                                    1.0,
-                                    Some(nalgebra::Vector2::new(
-                                        app.window().width() as f32 / 2.,
-                                        app.window().height() as f32 / 2.,
-                                    )),
-                                    state,
-                                );
-                                ui.close_menu();
-                            }
-    
-                            let copy_pressed = key_pressed(app, state, Copy);
-                            if let Some(img) = &state.current_image {
-                                if ui
-                                    .button("🗐 Copy")
-                                    .on_hover_text("Copy image to clipboard")
-                                    .clicked()
-                                    || copy_pressed
-                                {
-                                    clipboard_copy(img);
-                                    ui.close_menu();
-                                }
-                            }
-    
-                            if ui
-                                .button("📋 Paste")
-                                .on_hover_text("Paste image from clipboard")
-                                .clicked()
-                                || key_pressed(app, state, Paste)
-                            {
-                                if let Ok(clipboard) = &mut Clipboard::new() {
-                                    if let Ok(imagedata) = clipboard.get_image() {
-                                        if let Some(image) = image::RgbaImage::from_raw(
-                                            imagedata.width as u32,
-                                            imagedata.height as u32,
-                                            (imagedata.bytes).to_vec(),
-                                        ) {
-                                            // Stop in the even that an animation is running
-                                            state.player.stop();
-                                            _ = state
-                                                .player
-                                                .image_sender
-                                                .send(crate::utils::Frame::new_still(image));
-                                            // Since pasted data has no path, make sure it's not set
-                                            state.current_path = None;
-                                        }
-                                    }
-                                }
-                                ui.close_menu();
-                            }
-    
-                            if ui.button("⛭ Preferences").clicked() {
-                                state.settings_enabled = !state.settings_enabled;
-                                ui.close_menu();
-                            }
-    
-                            ui.menu_button("Recent", |ui| {
-                                for r in &state.persistent_settings.recent_images.clone() {
-                                    if let Some(filename) = r.file_name() {
-                                        if ui.button(filename.to_string_lossy()).clicked() {
-                                            load_image_from_path(r, state);
-                                            ui.close_menu();
-                                        }
-                                    }
-                                }
-                            });
-    
-                            // TODO: expose favourites with a tool button
-                            // ui.menu_button("Favourites", |ui| {
-                            //     for r in &state.persistent_settings.favourite_images.clone() {
-                            //         if let Some(filename) = r.file_name() {
-                            //             if ui.button(filename.to_string_lossy()).clicked() {
-                            //ui.close_menu();
-    
-                            //             }
-                            //         }
-                            //     }
-    
-                            // });
-                        });
-
-                    });
-
-
-
-
-
-
-
-
-
-
-
-
-                });
+                main_menu(ui, state, app, gfx);
             });
 
         if state.persistent_settings.show_scrub_bar {
@@ -1066,17 +790,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if !state.is_loaded {
-            egui::TopBottomPanel::bottom("loader").show_animated(ctx, state.current_path.is_some(),|ui| {
-                if let Some(p) = &state.current_path {
-                    ui.horizontal(|ui| {
-                        ui.add(egui::Spinner::default());
-                        ui.label(format!(
-                            "Loading {}",
-                            p.display()
-                        ));
-                    });
-                } 
-            });
+            egui::TopBottomPanel::bottom("loader").show_animated(
+                ctx,
+                state.current_path.is_some(),
+                |ui| {
+                    if let Some(p) = &state.current_path {
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Spinner::default());
+                            ui.label(format!("Loading {}", p.display()));
+                        });
+                    }
+                },
+            );
             app.window().request_frame();
         }
 
