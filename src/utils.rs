@@ -343,7 +343,7 @@ impl FrameCollection {
 }
 
 #[derive(Debug, PartialEq, EnumIter, Display, Clone, Copy)]
-pub enum Channel {
+pub enum ColorChannel {
     Red,
     Green,
     Blue,
@@ -352,7 +352,7 @@ pub enum Channel {
     Rgba,
 }
 
-impl Channel {
+impl ColorChannel {
     pub fn hotkey(&self, shortcuts: &Shortcuts) -> String {
         match self {
             Self::Red => lookup(shortcuts, &InputEvent::RedChannel),
@@ -395,7 +395,7 @@ pub struct OculanteState {
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
-    pub current_channel: Channel,
+    pub current_channel: ColorChannel,
     pub settings_enabled: bool,
     pub edit_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
@@ -440,7 +440,7 @@ impl Default for OculanteState {
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
-            current_channel: Channel::Rgba,
+            current_channel: ColorChannel::Rgba,
             settings_enabled: Default::default(),
             edit_enabled: Default::default(),
             image_info: Default::default(),
