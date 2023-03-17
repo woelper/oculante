@@ -34,11 +34,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macOS-latest]
+        os: [ubuntu-20.04, windows-2019, macOS-latest, ubuntu-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v2
     - uses: ilammy/setup-nasm@v1
+
+    - name: Install cargo cross
+      run: cargo install cross
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Cross-compile arm
+      run: |
+        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features
+        zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf
+      if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
@@ -103,6 +113,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante
         asset_name: oculante_linux
+        asset_content_type: application/zip
+
+    - name: Upload ARM Release
+      if: matrix.os == 'ubuntu-latest'
+      id: upload-release-arm
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_armv7_minimal.zip
+        asset_name: oculante_armv7_minimal.zip
         asset_content_type: application/zip
 
     - name: Upload Linux 20.04 Release zip
