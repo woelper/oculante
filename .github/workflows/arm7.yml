@@ -23,5 +23,8 @@ jobs:
         run: cargo install cross
 
       - name: Cross-compile arm
-        run: cross build --verbose --target armv7-unknown-linux-gnueabihf --no-default-features
+        run: cross build --target armv7-unknown-linux-gnueabihf --no-default-features
+
+      - name: Check output
+        run: ls target/
 
