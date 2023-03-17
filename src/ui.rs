@@ -1,5 +1,4 @@
 use crate::{
-    browse_for_image_path,
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -11,6 +10,9 @@ use crate::{
         toggle_fullscreen, unpremult, ColorChannel, ImageExt, OculanteState,
     },
 };
+#[cfg(feature = "file_open")]
+use crate::browse_for_image_path;
+
 use arboard::Clipboard;
 use egui::plot::Plot;
 use image::RgbaImage;
@@ -1062,6 +1064,15 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
+                    }
+                    if ui.button("💾 Save edits for directory").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                        if let Some(parent) = p.parent() {
+                            if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
+                                _ = serde_json::to_writer_pretty(&f, &state.edit_state);
+                            }
+
+                        }
+                        
                     }
                 }
             });

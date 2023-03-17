@@ -586,7 +586,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scrubber = scrubber::Scrubber::new(p);
             state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
-            debug!("{:#?} from {}", &state.scrubber, p.display());
+            // debug!("{:#?} from {}", &state.scrubber, p.display());
             if !state.persistent_settings.recent_images.contains(p) {
                 state.persistent_settings.recent_images.insert(0, p.clone());
                 state.persistent_settings.recent_images.truncate(10);
@@ -624,6 +624,24 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     Some("Edits have been loaded for this image.".into());
                                 state.edit_state = edit_state;
                                 state.edit_enabled = true;
+                    state.reset_image = true;
+
+                            }
+                        }
+                    } else if let Some(parent) = p.parent() {
+                        info!("Looking for {}",parent.join(".oculante").display());
+                        if parent.join(".oculante").is_file() {
+                        info!("is file {}",parent.join(".oculante").display());
+
+                            if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
+                                if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                                    state.message =
+                                        Some("Directory edits have been loaded for this image.".into());
+                                    state.edit_state = edit_state;
+                                    state.edit_enabled = true;
+                    state.reset_image = true;
+
+                                }
                             }
                         }
                     }

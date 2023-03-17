@@ -22,7 +22,7 @@ use std::thread;
 use std::time::Duration;
 use tonemap::filmic::*;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use image::Rgba;
 use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
@@ -717,7 +717,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     col.add_still(buf);
                 }
                 _ => {
-                    bail!("This avif is not yet supported.")
+                    anyhow::bail!("This avif is not yet supported.")
                 }
             }
         }
