@@ -4,6 +4,7 @@
 
 * Support directory-specific edits (.oculante file). If such an edit file is present, the edit operations will be applied to any image.
 * Minor UI tweaks
+* The release process now builds `armv7-unknown-linux-gnueabihf` (Raspberry pi and others) and includes it in the release. This is Oculante with minimal features for now, with some external libraries disabled (have a look at Cargo.toml for details what is left out)
 
 # 0.6.53 (2023-03-04)
 
