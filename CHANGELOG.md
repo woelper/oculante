@@ -1,5 +1,10 @@
 # 0.6.54 (2023-03-18)
 
+### :sparkles: Features
+
+* Support directory-specific edits (.oculante file). If such an edit file is present, the edit operations will be applied to any image.
+* Minor UI tweaks
+
 # 0.6.53 (2023-03-04)
 
 ### :beetle: Bug Fixes
