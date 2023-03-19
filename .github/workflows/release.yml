@@ -47,7 +47,7 @@ jobs:
     - name: Cross-compile arm
       run: |
         cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features
-        zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf
+        zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
