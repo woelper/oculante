@@ -365,14 +365,18 @@ impl ColorChannel {
     }
 }
 
+#[derive(Debug)]
+pub struct ImageGeometry {
+    /// The scale of the displayed image
+    pub scale: f32,
+    /// Image offset on canvas
+    pub offset: Vector2<f32>
+}
+
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
-    /// The scale of the displayed image
-    pub scale: f32,
-    pub scale_increment: f32,
-    /// Image offset on canvas
-    pub offset: Vector2<f32>,
+    pub image_geometry: ImageGeometry,
     pub drag_enabled: bool,
     pub reset_image: bool,
     pub message: Option<String>,
@@ -419,13 +423,11 @@ impl Default for OculanteState {
     fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
         OculanteState {
-            scale: 1.0,
-            scale_increment: 0.1,
+            image_geometry: ImageGeometry { scale: 1.0, offset: Default::default() },
             drag_enabled: Default::default(),
             reset_image: Default::default(),
             message: Default::default(),
             is_loaded: Default::default(),
-            offset: Default::default(),
             cursor: Default::default(),
             cursor_relative: Default::default(),
             image_dimension: (0, 0),
@@ -515,8 +517,8 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
         }
 
         // if going from window to fullscreen, offset by window pos
-        state.offset.x += window_pos.0 as f32;
-        state.offset.y += window_pos.1 as f32;
+        state.image_geometry.offset.x += window_pos.0 as f32;
+        state.image_geometry.offset.y += window_pos.1 as f32;
 
         // save old window pos
         state.fullscreen_offset = Some(window_pos);
@@ -524,8 +526,8 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
         // info!("Is fullscreen {:?}", window_pos);
 
         if let Some(sf) = state.fullscreen_offset {
-            state.offset.x -= sf.0 as f32;
-            state.offset.y -= sf.1 as f32;
+            state.image_geometry.offset.x -= sf.0 as f32;
+            state.image_geometry.offset.y -= sf.1 as f32;
         }
     }
     app.window().set_fullscreen(!fullscreen);

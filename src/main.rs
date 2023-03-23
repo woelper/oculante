@@ -282,19 +282,19 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             // pan image with keyboard
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
-                state.offset.x += delta;
+                state.image_geometry.offset.x += delta;
                 limit_offset(app, state);
             }
             if key_pressed(app, state, PanUp) {
-                state.offset.y -= delta;
+                state.image_geometry.offset.y -= delta;
                 limit_offset(app, state);
             }
             if key_pressed(app, state, PanLeft) {
-                state.offset.x -= delta;
+                state.image_geometry.offset.x -= delta;
                 limit_offset(app, state);
             }
             if key_pressed(app, state, PanDown) {
-                state.offset.y += delta;
+                state.image_geometry.offset.y += delta;
                 limit_offset(app, state);
             }
 
@@ -410,8 +410,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, ZoomIn) {
-                let delta = zoomratio(3.5, state.scale);
-                let new_scale = state.scale + delta;
+                let delta = zoomratio(3.5, state.image_geometry.scale);
+                let new_scale = state.image_geometry.scale + delta;
                 // limit scale
                 if new_scale > 0.05 && new_scale < 40. {
                     // We want to zoom towards the center
@@ -419,14 +419,14 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         app.window().width() as f32 / 2.,
                         app.window().height() as f32 / 2.,
                     );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                    state.scale += delta;
+                    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, center, state.image_geometry.scale, delta);
+                    state.image_geometry.scale += delta;
                 }
             }
 
             if key_pressed(app, state, ZoomOut) {
-                let delta = zoomratio(-3.5, state.scale);
-                let new_scale = state.scale + delta;
+                let delta = zoomratio(-3.5, state.image_geometry.scale);
+                let new_scale = state.image_geometry.scale + delta;
                 // limit scale
                 if new_scale > 0.05 && new_scale < 40. {
                     // We want to zoom towards the center
@@ -434,8 +434,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         app.window().width() as f32 / 2.,
                         app.window().height() as f32 / 2.,
                     );
-                    state.offset -= scale_pt(state.offset, center, state.scale, delta);
-                    state.scale += delta;
+                    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, center, state.image_geometry.scale, delta);
+                    state.image_geometry.scale += delta;
                 }
             }
         }
@@ -459,12 +459,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 } else {
                     // Normal scaling
-                    let delta = zoomratio(delta_y, state.scale);
-                    let new_scale = state.scale + delta;
+                    let delta = zoomratio(delta_y, state.image_geometry.scale);
+                    let new_scale = state.image_geometry.scale + delta;
                     // limit scale
                     if new_scale > 0.01 && new_scale < 40. {
-                        state.offset -= scale_pt(state.offset, state.cursor, state.scale, delta);
-                        state.scale += delta;
+                        state.image_geometry.offset -= scale_pt(state.image_geometry.offset, state.cursor, state.image_geometry.scale, delta);
+                        state.image_geometry.scale += delta;
                     }
                 }
             }
@@ -509,7 +509,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.cursor = mouse_pos.size_vec();
     if state.drag_enabled {
         if !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
-            state.offset += state.mouse_delta;
+            state.image_geometry.offset += state.mouse_delta;
             limit_offset(app, state);
         }
     }
@@ -519,13 +519,13 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     if state.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
-            state.offset,
+            state.image_geometry.offset,
             state.cursor,
             Vector2::new(
                 state.image_dimension.0 as f32,
                 state.image_dimension.1 as f32,
             ),
-            state.scale,
+            state.image_geometry.scale,
         );
     }
 
@@ -698,8 +698,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             let scale_factor = (window_size.x / img_size.x)
                 .min(window_size.y / img_size.y)
                 .min(1.0);
-            state.scale = scale_factor;
-            state.offset = window_size / 2.0 - (img_size * state.scale) / 2.0;
+            state.image_geometry.scale = scale_factor;
+            state.image_geometry.offset = window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
 
             debug!("Image has been reset.");
             state.reset_image = false;
@@ -710,12 +710,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.tiling < 2 {
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
-                .translate(state.offset.x, state.offset.y)
-                .scale(state.scale, state.scale);
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .scale(state.image_geometry.scale, state.image_geometry.scale);
         } else {
             draw.pattern(texture)
-                .translate(state.offset.x, state.offset.y)
-                .scale(state.scale, state.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .size(
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
@@ -731,7 +731,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     .translate(state.cursor.x, state.cursor.y)
                     .alpha(0.5)
                     .stroke(1.5)
-                    .scale(state.scale, state.scale)
+                    .scale(state.image_geometry.scale, state.image_geometry.scale)
                     .scale(stroke.width * dim, stroke.width * dim);
 
                 // For later: Maybe paint the actual brush? Maybe overkill.
@@ -888,24 +888,24 @@ fn browse_for_image_path(state: &mut OculanteState) {
 fn limit_offset(app: &mut App, state: &mut OculanteState) {
     let window_size = app.window().size();
     let scaled_image_size = (
-        state.image_dimension.0 as f32 * state.scale,
-        state.image_dimension.1 as f32 * state.scale,
+        state.image_dimension.0 as f32 * state.image_geometry.scale,
+        state.image_dimension.1 as f32 * state.image_geometry.scale,
     );
-    state.offset.x = state
-        .offset
+    state.image_geometry.offset.x = state
+        .image_geometry.offset
         .x
         .min(window_size.0 as f32)
         .max(-scaled_image_size.0);
-    state.offset.y = state
-        .offset
+    state.image_geometry.offset.y = state
+        .image_geometry.offset
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
 }
 
 fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
-    let delta = scale - state.scale;
+    let delta = scale - state.image_geometry.scale;
     let zoom_point = from_center.unwrap_or(state.cursor);
-    state.offset -= scale_pt(state.offset, zoom_point, state.scale, delta);
-    state.scale = scale;
+    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, zoom_point, state.image_geometry.scale, delta);
+    state.image_geometry.scale = scale;
 }
