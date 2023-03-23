@@ -6,7 +6,6 @@ use crate::{
     paint::PaintStroke,
     set_zoom,
     shortcuts::{key_pressed, keypresses_as_string, lookup},
-    update,
     utils::{
         clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
@@ -515,7 +514,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     #[cfg(feature = "update")]
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
                         state.message = Some("Checking for updates...".into());
-                        update::update(Some(state.message_channel.0.clone()));
+                        crate::update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
                     }
 
