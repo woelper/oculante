@@ -1,3 +1,9 @@
+# 0.6.55 (2023-03-23)
+
+### :green_apple: Chore
+
+* Zip only executable for arm (57dfc4d4)
+
 # 0.6.54 (2023-03-18)
 
 ### :sparkles: Features
