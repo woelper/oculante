@@ -510,7 +510,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 }
 
 
-                        ui.vertical_centered_justified(|ui| {
+                ui.vertical_centered_justified(|ui| {
+                    
+                    #[cfg(feature = "update")]
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
                         state.message = Some("Checking for updates...".into());
                         update::update(Some(state.message_channel.0.clone()));

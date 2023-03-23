@@ -48,7 +48,7 @@ rayon = "1.5"
 resvg = "0.29"
 rfd = {version = "0.11.0", optional = true}
 rgb = "0.8"
-self_update = {version = "0.36", features = ["rustls"]}
+self_update = {version = "0.36", features = ["rustls"], optional = true}
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 strum = {version = "0.24", features = ["derive"]}
@@ -66,6 +66,7 @@ default = ["turbo", "file_open", "avif_native"]
 file_open = ["rfd"]
 jpgxl = ["jpegxl-rs"]
 turbo = ["turbojpeg"]
+update = ["self_update"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"

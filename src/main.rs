@@ -37,6 +37,7 @@ use net::*;
 #[cfg(test)]
 mod tests;
 mod ui;
+#[cfg(feature = "update")]
 mod update;
 use ui::*;
 
