@@ -522,13 +522,9 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
 
         // save old window pos
         state.fullscreen_offset = Some(window_pos);
-    } else {
-        // info!("Is fullscreen {:?}", window_pos);
-
-        if let Some(sf) = state.fullscreen_offset {
-            state.image_geometry.offset.x -= sf.0 as f32;
-            state.image_geometry.offset.y -= sf.1 as f32;
-        }
+    } else if let Some(sf) = state.fullscreen_offset {
+        state.image_geometry.offset.x -= sf.0 as f32;
+        state.image_geometry.offset.y -= sf.1 as f32;
     }
     app.window().set_fullscreen(!fullscreen);
 }
@@ -569,11 +565,9 @@ pub fn unpremult(img: &RgbaImage) -> RgbaImage {
 pub fn highlight_bleed(img: &RgbaImage) -> RgbaImage {
     let mut updated_img = img.clone();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
-        if pixel[3] == 0 {
-            if pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0 {
-                pixel[1] = pixel[1].checked_add(100).unwrap_or(255);
-                pixel[3] = 255;
-            }
+        if pixel[3] == 0 && (pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
+            pixel[1] = pixel[1].saturating_add(100);
+            pixel[3] = 255;
         }
     });
     updated_img
