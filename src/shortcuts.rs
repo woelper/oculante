@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use log::{debug, error};
 // use std::collections::HashMap;
 
-use crate::utils::OculanteState;
+use crate::OculanteState;
 use notan::prelude::App;
 use serde::{Deserialize, Serialize};
 

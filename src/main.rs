@@ -26,8 +26,9 @@ use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
 use crate::shortcuts::InputEvent::*;
 mod utils;
-
 use utils::*;
+mod appstate;
+use appstate::*;
 // mod events;
 #[cfg(target_os = "macos")]
 mod mac;

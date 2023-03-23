@@ -7,8 +7,8 @@ use crate::{
     utils::{
         clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
-        toggle_fullscreen, unpremult, ColorChannel, ImageExt, OculanteState,
-    },
+        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+    }, appstate::OculanteState,
 };
 #[cfg(feature = "file_open")]
 use crate::browse_for_image_path;
