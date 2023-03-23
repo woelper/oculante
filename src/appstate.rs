@@ -1,24 +1,30 @@
-use std::{sync::mpsc::{Sender, Receiver, self}, path::PathBuf};
-
+use crate::{
+    image_editing::EditState,
+    scrubber::Scrubber,
+    settings::PersistentSettings,
+    utils::{ColorChannel, ExtendedImageInfo, Frame, Player},
+};
 use image::RgbaImage;
 use nalgebra::Vector2;
-use notan::{AppState, prelude::Texture};
+use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
+use std::{
+    path::PathBuf,
+    sync::mpsc::{self, Receiver, Sender},
+};
 
-use crate::{utils::{Frame, ExtendedImageInfo, Player, ColorChannel}, image_editing::EditState, settings::PersistentSettings, scrubber::Scrubber};
-
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ImageGeometry {
     /// The scale of the displayed image
     pub scale: f32,
     /// Image offset on canvas
-    pub offset: Vector2<f32>
+    pub offset: Vector2<f32>,
 }
 
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
+    pub compare_list: HashMap<PathBuf, ImageGeometry>,
     pub drag_enabled: bool,
     pub reset_image: bool,
     pub message: Option<String>,
@@ -56,6 +62,7 @@ pub struct OculanteState {
     pub network_mode: bool,
     /// how long the toast message appears
     pub toast_cooldown: f32,
+    /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
@@ -65,7 +72,11 @@ impl Default for OculanteState {
     fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
         OculanteState {
-            image_geometry: ImageGeometry { scale: 1.0, offset: Default::default() },
+            image_geometry: ImageGeometry {
+                scale: 1.0,
+                offset: Default::default(),
+            },
+            compare_list: Default::default(),
             drag_enabled: Default::default(),
             reset_image: Default::default(),
             message: Default::default(),

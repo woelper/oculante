@@ -1,4 +1,7 @@
+#[cfg(feature = "file_open")]
+use crate::browse_for_image_path;
 use crate::{
+    appstate::OculanteState,
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -8,10 +11,8 @@ use crate::{
         clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }, appstate::OculanteState,
+    },
 };
-#[cfg(feature = "file_open")]
-use crate::browse_for_image_path;
 
 use arboard::Clipboard;
 use egui::plot::Plot;
@@ -187,7 +188,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::left("side_panel").show(ctx, |ui| {
 
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::vertical().auto_shrink([false,true]).always_show_scroll(true).show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
                 // texture.
                 let tex_id = gfx.egui_register_texture(texture);
@@ -302,6 +303,41 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
                 // ui.image(tex_id, img_size);
             }
+            ui.collapsing("Compare", |ui| {
+                ui.vertical_centered_justified(|ui| {
+                if let Some(p) = &(state.current_path).clone() {
+                    if ui.button("Add/update current image").clicked() {
+                        state.compare_list.insert(p.clone(), state.image_geometry.clone());
+                    }
+                    for (path, geo) in state.compare_list.clone() {
+
+                        //perma-update image
+                        // if p == &path {
+                        // state.compare_list.insert(p.clone(), state.image_geometry.clone());
+
+                        //     // if let Some(cur_geo) = state.compare_list.get_mut(p) {
+                        //     //     *cur_geo = state.image_geometry.clone();
+                        //     // }
+                        // }
+
+                        if ui.button(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked() {
+                            state.image_geometry = geo.clone();
+                            state.is_loaded = false;
+                            state.current_image = None;
+                            state
+                                .player
+                                .load(&path, state.message_channel.0.clone());
+                            state.current_path = Some(path);
+                            state.persistent_settings.keep_view = true;
+                        }
+                    }
+                }
+                if state.is_loaded {
+                    state.persistent_settings.keep_view = false;
+
+                }
+            });
+            });
 
             ui.collapsing("Alpha tools", |ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -1072,7 +1108,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             }
 
                         }
-                        
+
                     }
                 }
             });
@@ -1683,18 +1719,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         //     toggle_fullscreen(app, state);
         // }
 
-
-        if
-            unframed_button("⛶", ui)
-
-        .clicked()
-        {
+        if unframed_button("⛶", ui).clicked() {
             toggle_fullscreen(app, state);
         }
-
-
-
-
 
         if tooltip(
             unframed_button_colored("📌", state.always_on_top, ui),

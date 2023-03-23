@@ -420,7 +420,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         app.window().width() as f32 / 2.,
                         app.window().height() as f32 / 2.,
                     );
-                    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, center, state.image_geometry.scale, delta);
+                    state.image_geometry.offset -= scale_pt(
+                        state.image_geometry.offset,
+                        center,
+                        state.image_geometry.scale,
+                        delta,
+                    );
                     state.image_geometry.scale += delta;
                 }
             }
@@ -435,7 +440,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         app.window().width() as f32 / 2.,
                         app.window().height() as f32 / 2.,
                     );
-                    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, center, state.image_geometry.scale, delta);
+                    state.image_geometry.offset -= scale_pt(
+                        state.image_geometry.offset,
+                        center,
+                        state.image_geometry.scale,
+                        delta,
+                    );
                     state.image_geometry.scale += delta;
                 }
             }
@@ -464,7 +474,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     let new_scale = state.image_geometry.scale + delta;
                     // limit scale
                     if new_scale > 0.01 && new_scale < 40. {
-                        state.image_geometry.offset -= scale_pt(state.image_geometry.offset, state.cursor, state.image_geometry.scale, delta);
+                        state.image_geometry.offset -= scale_pt(
+                            state.image_geometry.offset,
+                            state.cursor,
+                            state.image_geometry.scale,
+                            delta,
+                        );
                         state.image_geometry.scale += delta;
                     }
                 }
@@ -625,23 +640,22 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     Some("Edits have been loaded for this image.".into());
                                 state.edit_state = edit_state;
                                 state.edit_enabled = true;
-                    state.reset_image = true;
-
+                                state.reset_image = true;
                             }
                         }
                     } else if let Some(parent) = p.parent() {
-                        info!("Looking for {}",parent.join(".oculante").display());
+                        info!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
-                        info!("is file {}",parent.join(".oculante").display());
+                            info!("is file {}", parent.join(".oculante").display());
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                    state.message =
-                                        Some("Directory edits have been loaded for this image.".into());
+                                    state.message = Some(
+                                        "Directory edits have been loaded for this image.".into(),
+                                    );
                                     state.edit_state = edit_state;
                                     state.edit_enabled = true;
-                    state.reset_image = true;
-
+                                    state.reset_image = true;
                                 }
                             }
                         }
@@ -700,7 +714,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .min(window_size.y / img_size.y)
                 .min(1.0);
             state.image_geometry.scale = scale_factor;
-            state.image_geometry.offset = window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
+            state.image_geometry.offset =
+                window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
 
             debug!("Image has been reset.");
             state.reset_image = false;
@@ -759,7 +774,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             .min_height(30.)
             .default_height(30.)
             .show(ctx, |ui| {
-
                 main_menu(ui, state, app, gfx);
             });
 
@@ -893,12 +907,14 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         state.image_dimension.1 as f32 * state.image_geometry.scale,
     );
     state.image_geometry.offset.x = state
-        .image_geometry.offset
+        .image_geometry
+        .offset
         .x
         .min(window_size.0 as f32)
         .max(-scaled_image_size.0);
     state.image_geometry.offset.y = state
-        .image_geometry.offset
+        .image_geometry
+        .offset
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
@@ -907,6 +923,11 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
 fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
     let delta = scale - state.image_geometry.scale;
     let zoom_point = from_center.unwrap_or(state.cursor);
-    state.image_geometry.offset -= scale_pt(state.image_geometry.offset, zoom_point, state.image_geometry.scale, delta);
+    state.image_geometry.offset -= scale_pt(
+        state.image_geometry.offset,
+        zoom_point,
+        state.image_geometry.scale,
+        delta,
+    );
     state.image_geometry.scale = scale;
 }
