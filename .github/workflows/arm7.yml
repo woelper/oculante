@@ -9,12 +9,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-        
-      # - name: Patch azure linux deps
-      #   run: sudo apt update
-
-      # - name: Install linux deps
-      #   run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
 
       - name: Update Rust
         run: rustup update
@@ -23,7 +17,7 @@ jobs:
         run: cargo install cross
 
       - name: Cross-compile arm
-        run: cross build --target armv7-unknown-linux-gnueabihf --no-default-features
+        run: cross build --target armv7-unknown-linux-musleabihf --no-default-features
 
       - name: Check output
         run: ls target/
