@@ -18,3 +18,12 @@ pre-build = [
   "apt-get install --assume-yes libssl-dev:arm64 libfontconfig-dev:arm64",
   "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf",
 ]
+
+[target.armv7-unknown-linux-musleabihf]
+pre-build = [
+  "dpkg --add-architecture armhf",
+  "dpkg --add-architecture arm64",
+  "apt-get update",
+  "apt-get install --assume-yes libssl-dev:arm64 libfontconfig-dev:arm64",
+  "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf",
+]
