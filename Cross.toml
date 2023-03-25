@@ -21,9 +21,12 @@ pre-build = [
 
 [target.armv7-unknown-linux-musleabihf]
 pre-build = [
+  "uname -a",
+  "uname -r",
   "dpkg --add-architecture armhf",
   "dpkg --add-architecture arm64",
   "apt-get update",
-  "apt-get install --assume-yes libssl-dev:arm64 libfontconfig-dev:arm64 fontconfig:arm64 librust-servo-fontconfig-dev:arm64 librust-servo-fontconfig-sys-dev:arm64 librust-yeslogic-fontconfig-sys-dev:arm64 librust-crossfont+force-system-fontconfig-dev:arm64",
-  "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf fontconfig:armhf librust-servo-fontconfig-dev:armhf librust-servo-fontconfig-sys-dev:armhf librust-yeslogic-fontconfig-sys-dev:armhf librust-crossfont+force-system-fontconfig-dev:armhf",
+  "apt-get install --assume-yes libssl-dev:arm64 libfontconfig-dev:arm64 fontconfig:arm64 librust-servo-fontconfig-dev:arm64 librust-servo-fontconfig-sys-dev:arm64",
+  "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf fontconfig:armhf librust-servo-fontconfig-dev:armhf librust-servo-fontconfig-sys-dev:armhf",
 ]
+  # "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf fontconfig:armhf librust-servo-fontconfig-dev:armhf librust-servo-fontconfig-sys-dev:armhf librust-yeslogic-fontconfig-sys-dev:armhf librust-crossfont+force-system-fontconfig-dev:armhf",
