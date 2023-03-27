@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 use tonemap::filmic::*;
+use usvg::TreeParsing;
 
 use anyhow::{anyhow, Context, Result};
 use image::Rgba;
@@ -620,24 +621,30 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         "svg" => {
             // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
+
+            let render_scale = 1.;
             let opt = usvg::Options::default();
             let svg_data = std::fs::read(img_location)?;
             if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
                 let pixmap_size = rtree.size.to_screen_size();
 
-                if let Some(mut pixmap) =
-                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
-                {
+                let scaled_size = ((pixmap_size.width() as f32 * render_scale) as u32,
+                (pixmap_size.height() as f32 * render_scale) as u32);
+
+                if let Some(mut pixmap) = tiny_skia::Pixmap::new(
+                    scaled_size.0,
+                    scaled_size.1
+                ) {
                     resvg::render(
                         &rtree,
-                        usvg::FitTo::Original,
+                        resvg::FitTo::Size(scaled_size.0, scaled_size.1),
                         tiny_skia::Transform::identity(),
                         pixmap.as_mut(),
                     )
                     .context("Can't render SVG")?;
                     let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
-                        pixmap_size.width(),
-                        pixmap_size.height(),
+                        scaled_size.0,
+                        scaled_size.1,
                         pixmap.data().to_vec(),
                     );
                     if let Some(valid_buf) = buf {
