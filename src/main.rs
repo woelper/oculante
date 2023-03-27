@@ -235,22 +235,23 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoSans-Regular.ttf")).tweak(
-                FontTweak {
-                    scale: 1.0,
-                    y_offset_factor: -0.3,
-                    y_offset: 0.0,
-                },
-            ),
+            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf"))
+            // .tweak(
+            //     FontTweak {
+            //         scale: 1.0,
+            //         y_offset_factor: -0.5,
+            //         y_offset: 0.0,
+            //     },
+            // ),
         );
 
         // Put my font first (highest priority):
-        // fonts.families.get_mut(&FontFamily::Proportional).unwrap()
-        //     .insert(0, "my_font".to_owned());
+        fonts.families.get_mut(&FontFamily::Proportional).unwrap()
+            .insert(0, "my_font".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
-        // let font_scale = 0.76;
-        let font_scale = 0.78;
+        let font_scale = 0.82;
+        // let font_scale = 0.78;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
@@ -261,6 +262,14 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             state.persistent_settings.accent_color[1],
             state.persistent_settings.accent_color[2],
         );
+
+        let accent_color = style.visuals.selection.bg_fill.to_array();
+        info!("Luma {:?}", accent_color);
+
+        let accent_color_luma =  (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color [2] as f32 * 0.114).max(0.).min(255.) as u8;
+        info!("Luma {accent_color_luma}");
+        let accent_color_luma = if accent_color_luma <  80 {220} else { 80};
+        style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
         // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
