@@ -1746,6 +1746,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             ui.style_mut().visuals.button_frame = false;
             ui.style_mut().visuals.widgets.inactive.expansion = 20.;
 
+
+            // FIXME: Needs submenu not to be out of bounds
+            // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+             
+            
+            
             ui.menu_button("☰", |ui| {
                 if ui.button("Reset view").clicked() {
                     state.reset_image = true;
@@ -1832,6 +1838,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
                 // });
             });
+
+        // });
+
         });
     });
 }
