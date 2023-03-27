@@ -1,3 +1,9 @@
+# 0.6.57 (2023-03-27)
+
+### :green_apple: Chore
+
+* Update libwebp-sys and dirs (8fd3f97b)
+
 # 0.6.56 (2023-03-23)
 
 # 0.6.55 (2023-03-23)
