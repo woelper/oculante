@@ -206,6 +206,8 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 
 <kbd>Key5</kbd> = ZoomFive
 
+<kbd>LShift</kbd> + <kbd>C</kbd> = CompareNext
+
 <kbd>LShift</kbd> + <kbd>Left</kbd> = PanLeft
 
 <kbd>LShift</kbd> + <kbd>Right</kbd> = PanRight
