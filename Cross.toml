@@ -1,5 +1,5 @@
 [build]
-zig = true
+# zig = true
 
 # pre-build = [
 #   "dpkg --add-architecture $CROSS_DEB_ARCH",
@@ -13,36 +13,45 @@ zig = true
 
 [target.armv7-unknown-linux-gnueabihf]
 pre-build = [
-  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "dpkg --add-architecture armhf",
   "apt-get update",
-  "apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH libfontconfig-dev:$CROSS_DEB_ARCH",
+  "apt-get install --assume-yes libfontconfig-dev:armhf libglib2.0-dev:armhf",
 ]
 
 [target.armv7-unknown-linux-gnueabi]
 pre-build = [
   "dpkg --add-architecture armhf",
   "apt-get update",
-  "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf",
+  "apt-get install --assume-yes libfontconfig-dev:armhf",
 ]
 
 
 [target.armv7-unknown-linux-musleabihf]
 pre-build = [
   "export DEBIAN_FRONTEND=noninteractive",
-  # "dpkg --add-architecture armhf",
+  "dpkg --add-architecture armhf",
   # "dpkg --add-architecture arm64",
   "apt-get update",
   # "apt-get install -yq libssl-dev:arm64 libfontconfig-dev:arm64 libfontconfig1:arm64 libfontconfig1-dev:arm64",
-  # "apt-get install -yq libssl-dev:armhf libfontconfig-dev:armhf libfontconfig1:armhf libfontconfig1-dev:armhf",
-  "apt-get install -yq pkg-config libssl-dev libfontconfig-dev libfontconfig1 libfontconfig1-dev",
+  "apt-get install -yq libfontconfig-dev:armhf libfontconfig1:armhf libfontconfig1-dev:armhf libglib2.0-dev:armhf",
+  # "apt-get install -yq pkg-config libfontconfig-dev libfontconfig1 libfontconfig1-dev",
 ]
   # "apt-get update",
-  # "apt-get install --assume-yes libssl-dev:armhf libfontconfig-dev:armhf fontconfig:armhf librust-servo-fontconfig-dev:armhf librust-servo-fontconfig-sys-dev:armhf librust-yeslogic-fontconfig-sys-dev:armhf librust-crossfont+force-system-fontconfig-dev:armhf",
+  # "apt-get install --assume-yes:armhf libfontconfig-dev:armhf fontconfig:armhf librust-servo-fontconfig-dev:armhf librust-servo-fontconfig-sys-dev:armhf librust-yeslogic-fontconfig-sys-dev:armhf librust-crossfont+force-system-fontconfig-dev:armhf",
 
 
 [target.armv7-unknown-linux-musleabi]
 pre-build = [
-  # "dpkg --add-architecture arm64",
+  "dpkg --add-architecture arm64",
   "apt-get update",
-  "apt-get install --assume-yes libssl-dev libfontconfig-dev",
+  "apt-get install --assume-yes libfontconfig-dev:arm64 libglib2.0-dev:arm64",
 ]
+
+[target.aarch64-unknown-linux-musl]
+pre-build = [
+  "dpkg --add-architecture arm64",
+  "apt-get update",
+  "apt-get install --assume-yes libfontconfig-dev:arm64",
+]
+
+
