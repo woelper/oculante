@@ -23,7 +23,7 @@ arboard = "3.2"
 avif-decode = {version = "0.2.2", optional = true}
 clap = "3.2"
 dds-rs = "0.7.0"
-dirs = "4.0"
+dirs = "5.0"
 env_logger = "0.10"
 evalexpr = "8.1"
 exr = "1.5"
@@ -35,7 +35,7 @@ jpegxl-rs = {version = "0.8", optional = true, default-features = false, feature
 kamadak-exif = "0.5"
 lexical-sort = "0.3.1"
 libavif-image = {version = "0.10.0", optional = true}
-libwebp-sys = "0.8"
+libwebp-sys = "0.9"
 log = "0.4"
 nalgebra = "0.32"
 notan = {version = "0.9", default-features = false, features = ["backend", "draw", "glsl-to-spirv","drop_files", "egui"]}
