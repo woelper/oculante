@@ -1,7 +1,7 @@
 #[cfg(feature = "file_open")]
 use crate::browse_for_image_path;
 use crate::{
-    appstate::OculanteState,
+    appstate::{ImageGeometry, OculanteState},
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -25,7 +25,7 @@ use notan::{
     },
     prelude::{App, Graphics},
 };
-use std::{collections::HashSet, ops::RangeInclusive, time::Instant};
+use std::{collections::HashSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
 
 #[cfg(feature = "turbo")]
@@ -308,18 +308,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if ui.button("Add/update current image").clicked() {
                         state.compare_list.insert(p.clone(), state.image_geometry.clone());
                     }
-                    for (path, geo) in state.compare_list.clone() {
 
-                        //perma-update image
-                        // if p == &path {
-                        // state.compare_list.insert(p.clone(), state.image_geometry.clone());
 
-                        //     // if let Some(cur_geo) = state.compare_list.get_mut(p) {
-                        //     //     *cur_geo = state.image_geometry.clone();
-                        //     // }
-                        // }
-
-                        if ui.button(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked() {
+        let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
+        compare_list.sort_by(|a,b| a.0.cmp(&b.0));
+                    for (path, geo) in compare_list {
+                        if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                             state.image_geometry = geo.clone();
                             state.is_loaded = false;
                             state.current_image = None;
@@ -330,10 +324,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             state.persistent_settings.keep_view = true;
                         }
                     }
+                    if ui.button("Clear").clicked() {
+                        state.compare_list.clear();
+                    }
                 }
                 if state.is_loaded {
                     state.persistent_settings.keep_view = false;
-
                 }
             });
             });
@@ -510,7 +506,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
 
                 ui.vertical_centered_justified(|ui| {
-                    
+
                     #[cfg(feature = "update")]
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
                         state.message = Some("Checking for updates...".into());

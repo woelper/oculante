@@ -299,7 +299,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.image_geometry.offset.y += delta;
                 limit_offset(app, state);
             }
-
+            if key_pressed(app, state, CompareNext) {
+                compare_next(state);
+            }
             if key_pressed(app, state, ResetView) {
                 state.reset_image = true
             }

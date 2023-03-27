@@ -34,7 +34,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::appstate::OculanteState;
+use crate::appstate::{ImageGeometry, OculanteState};
 use crate::cache::Cache;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
@@ -628,13 +628,12 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
                 let pixmap_size = rtree.size.to_screen_size();
 
-                let scaled_size = ((pixmap_size.width() as f32 * render_scale) as u32,
-                (pixmap_size.height() as f32 * render_scale) as u32);
+                let scaled_size = (
+                    (pixmap_size.width() as f32 * render_scale) as u32,
+                    (pixmap_size.height() as f32 * render_scale) as u32,
+                );
 
-                if let Some(mut pixmap) = tiny_skia::Pixmap::new(
-                    scaled_size.0,
-                    scaled_size.1
-                ) {
+                if let Some(mut pixmap) = tiny_skia::Pixmap::new(scaled_size.0, scaled_size.1) {
                     resvg::render(
                         &rtree,
                         resvg::FitTo::Size(scaled_size.0, scaled_size.1),
@@ -1009,5 +1008,31 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
                     10,
                 ),
         );
+    }
+}
+
+pub fn compare_next(state: &mut OculanteState) {
+    if let Some(p) = &(state.current_path).clone() {
+        let mut compare_list: Vec<(PathBuf, ImageGeometry)> =
+            state.compare_list.clone().into_iter().collect();
+        compare_list.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let index = compare_list.iter().position(|x| &x.0 == p).unwrap_or(0);
+        let index = if index + 1 < compare_list.len() {
+            index + 1
+        } else {
+            0
+        };
+
+        if let Some(c) = compare_list.get(index) {
+            let path = &c.0;
+            let geo = &c.1;
+            state.image_geometry = geo.clone();
+            state.is_loaded = false;
+            state.current_image = None;
+            state.player.load(path, state.message_channel.0.clone());
+            state.current_path = Some(path.clone());
+            state.persistent_settings.keep_view = true;
+        }
     }
 }

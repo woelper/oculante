@@ -31,6 +31,7 @@ pub enum InputEvent {
     ZoomThree,
     ZoomFour,
     ZoomFive,
+    CompareNext,
     PanLeft,
     PanRight,
     PanUp,
@@ -112,6 +113,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::AlphaChannel, "A")
             .add_key(InputEvent::RGBChannel, "U")
             .add_key(InputEvent::RGBAChannel, "C")
+            .add_keys(InputEvent::CompareNext, &["LShift", "C"])
             .add_key(InputEvent::PreviousImage, "Left")
             .add_key(InputEvent::FirstImage, "Home")
             .add_key(InputEvent::LastImage, "End")
