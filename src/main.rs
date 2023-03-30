@@ -469,6 +469,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.image_geometry.scale += delta;
                 }
             }
+        },
+        Event::WindowResize { width, height } => {
+            //TODO: remove this if save on exit works
+            state.persistent_settings.window_geometry.1 = (width,height);
+            state.persistent_settings.save();
         }
         _ => (),
     }
