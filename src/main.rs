@@ -410,7 +410,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, InfoMode) {
-                state.info_enabled = !state.info_enabled;
+                state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
                 send_extended_info(
                     &state.current_image,
                     &state.current_path,
@@ -419,7 +421,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, EditMode) {
-                state.edit_enabled = !state.edit_enabled
+                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
             }
 
             if key_pressed(app, state, ZoomIn) {
@@ -545,7 +549,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
-    if state.info_enabled || state.edit_state.painting {
+    if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.image_geometry.offset,
             state.cursor,
@@ -565,12 +569,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // make sure that in edit mode, RGBA is set.
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
-    if state.edit_enabled {
+    if state.persistent_settings.edit_enabled {
         state.current_channel = ColorChannel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
-    if state.info_enabled && state.image_info.is_none() {
+    if state.persistent_settings.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
     }
 
@@ -651,7 +655,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 state.message =
                                     Some("Edits have been loaded for this image.".into());
                                 state.edit_state = edit_state;
-                                state.edit_enabled = true;
+                                state.persistent_settings.edit_enabled = true;
                                 state.reset_image = true;
                             }
                         }
@@ -666,7 +670,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                         "Directory edits have been loaded for this image.".into(),
                                     );
                                     state.edit_state = edit_state;
-                                    state.edit_enabled = true;
+                                    state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
                                 }
                             }
@@ -708,7 +712,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         state.current_image = Some(img);
-        if state.info_enabled {
+        if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(
                 &state.current_image,
@@ -826,11 +830,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
-        if state.info_enabled {
+        if state.persistent_settings.info_enabled {
             info_ui(ctx, state, gfx);
         }
 
-        if state.edit_enabled {
+        if state.persistent_settings.edit_enabled {
             edit_ui(ctx, state, gfx);
         }
 
