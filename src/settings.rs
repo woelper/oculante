@@ -25,6 +25,8 @@ pub struct PersistentSettings {
     pub favourite_images: HashSet<PathBuf>,
     pub recent_images: Vec<PathBuf>,
     pub title_format: String,
+    pub info_enabled: bool,
+    pub edit_enabled: bool,
 }
 
 impl Default for PersistentSettings {
@@ -42,6 +44,8 @@ impl Default for PersistentSettings {
             favourite_images: Default::default(),
             recent_images: Default::default(),
             title_format: "{APP} | {VERSION} | {FULLPATH}".into(),
+            info_enabled: Default::default(),
+            edit_enabled: Default::default(),
         }
     }
 }
