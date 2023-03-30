@@ -116,6 +116,10 @@ fn main() -> Result<(), String> {
 
     if let Ok(settings) = settings::PersistentSettings::load() {
         window_config.vsync = settings.vsync;
+        if settings.window_geometry != Default::default() {
+            window_config.width = settings.window_geometry.1.0;
+            window_config.height = settings.window_geometry.1.1;
+        }
         info!("Loaded vsync.");
     }
 
@@ -472,6 +476,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
     match evt {
         Event::Exit => {
             info!("About to exit");
+            // save position
+            state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
             state.persistent_settings.save();
         }
         Event::MouseWheel { delta_y, .. } => {
