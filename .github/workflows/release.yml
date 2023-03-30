@@ -44,10 +44,16 @@ jobs:
       run: cargo install cross
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Cross-compile arm
+    - name: Cross-compile armv7
       run: |
         cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features
         zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Cross-compile arm64
+      run: |
+        cross build --release --target aarch64-unknown-linux-gnu --no-default-features
+        zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
@@ -68,10 +74,6 @@ jobs:
     - name: Install linux classic dependencies
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
       if: matrix.os == 'ubuntu-20.04'
-
-    # - name: Install osx dependencies
-    #   run: brew install nasm
-    #   if: matrix.os == 'macos-latest'
 
     - name: Build Windows Application
       run: cargo build --release
@@ -115,7 +117,7 @@ jobs:
         asset_name: oculante_linux
         asset_content_type: application/zip
 
-    - name: Upload ARM Release
+    - name: Upload ARMv7 Release
       if: matrix.os == 'ubuntu-latest'
       id: upload-release-arm
       uses: actions/upload-release-asset@v1
@@ -125,6 +127,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_armv7_minimal.zip
         asset_name: oculante_armv7_minimal.zip
+        asset_content_type: application/zip
+
+    - name: Upload ARM64 Release
+      if: matrix.os == 'ubuntu-latest'
+      id: upload-release-arm64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_aarch64_minimal.zip
+        asset_name: oculante_aarch64_minimal.zip
         asset_content_type: application/zip
 
     - name: Upload Linux 20.04 Release zip
