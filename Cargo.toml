@@ -58,6 +58,7 @@ tonemap = "0.0.4"
 turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.30"
 webbrowser = "0.8"
+tiff = "0.9"
 
 [features]
 avif_native = ["avif-decode"]
