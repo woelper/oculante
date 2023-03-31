@@ -234,19 +234,9 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     plugins.egui(|ctx| {
         let mut fonts = FontDefinitions::default();
 
-        // this should not be necessary, especially since we don't set it as priority.
-        // but otherwise it panics.
-        // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
             "my_font".to_owned(),
             FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf"))
-            // .tweak(
-            //     FontTweak {
-            //         scale: 1.0,
-            //         y_offset_factor: -0.5,
-            //         y_offset: 0.0,
-            //     },
-            // ),
         );
 
         // Put my font first (highest priority):
@@ -268,13 +258,13 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         );
 
         let accent_color = style.visuals.selection.bg_fill.to_array();
-        info!("Luma {:?}", accent_color);
+        debug!("Luma {:?}", accent_color);
 
         let accent_color_luma =  (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color [2] as f32 * 0.114).max(0.).min(255.) as u8;
-        info!("Luma {accent_color_luma}");
+        debug!("Luma {accent_color_luma}");
         let accent_color_luma = if accent_color_luma <  80 {220} else { 80};
+        // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-        // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
     });
@@ -473,6 +463,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
             state.persistent_settings.window_geometry.1 = (width,height);
+            state.persistent_settings.window_geometry.0 = app.backend.window().position();
             state.persistent_settings.save();
         }
         _ => (),
