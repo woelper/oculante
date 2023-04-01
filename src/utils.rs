@@ -914,34 +914,36 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
             match decoder.colortype()? {
                 tiff::ColorType::Gray(_) => {
+                    debug!("Loading gray color");
                     let i = image::GrayImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray img")?;
                     col.add_still(image::DynamicImage::ImageLuma8(i).into_rgba8());
                 }
                 tiff::ColorType::RGB(_) => {
+                    debug!("Loading rgb color");
                     let i = image::RgbImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGB img")?;
                     col.add_still(image::DynamicImage::ImageRgb8(i).into_rgba8());
                 }
                 tiff::ColorType::RGBA(_) => {
+                    debug!("Loading rgba color");
                     let i = image::RgbaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGBA img")?;
                     col.add_still(i);
                 }
                 tiff::ColorType::GrayA(_) => {
+                    debug!("Loading gray color with alpha");
                     let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray alpha img")?;
                     col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
                 }
                 _ => {
                     bail!(
-                        "This TIFF image type is unsupported, please open a ticket! {:?}",
+                        "Error: This TIFF image type is unsupported, please open a ticket! {:?}",
                         decoder.colortype()
                     )
                 }
             }
-
-            bail!("All TIFF options exhausted, can't open");
         }
         _ => {
             // All other supported image files are handled by using `image`
