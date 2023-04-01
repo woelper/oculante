@@ -64,7 +64,7 @@ pkgin install oculante
 - pnm
 - tga
 - avif
-- tiff
+- tiff (via `tiff` with additional float/half support)
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
 - farbfeld  
 - DDS (DXT1-5, via `dds-rs`)
