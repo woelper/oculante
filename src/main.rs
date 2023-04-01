@@ -117,8 +117,8 @@ fn main() -> Result<(), String> {
     if let Ok(settings) = settings::PersistentSettings::load() {
         window_config.vsync = settings.vsync;
         if settings.window_geometry != Default::default() {
-            window_config.width = settings.window_geometry.1.0;
-            window_config.height = settings.window_geometry.1.1;
+            window_config.width = settings.window_geometry.1 .0;
+            window_config.height = settings.window_geometry.1 .1;
         }
         info!("Loaded vsync.");
     }
@@ -236,11 +236,14 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf"))
+            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf")),
         );
 
         // Put my font first (highest priority):
-        fonts.families.get_mut(&FontFamily::Proportional).unwrap()
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
             .insert(0, "my_font".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
@@ -260,9 +263,13 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         let accent_color = style.visuals.selection.bg_fill.to_array();
         debug!("Luma {:?}", accent_color);
 
-        let accent_color_luma =  (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color [2] as f32 * 0.114).max(0.).min(255.) as u8;
+        let accent_color_luma = (accent_color[0] as f32 * 0.299
+            + accent_color[1] as f32 * 0.587
+            + accent_color[2] as f32 * 0.114)
+            .max(0.)
+            .min(255.) as u8;
         debug!("Luma {accent_color_luma}");
-        let accent_color_luma = if accent_color_luma <  80 {220} else { 80};
+        let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
         ctx.set_style(style);
@@ -459,10 +466,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.image_geometry.scale += delta;
                 }
             }
-        },
+        }
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
-            state.persistent_settings.window_geometry.1 = (width,height);
+            state.persistent_settings.window_geometry.1 = (width, height);
             state.persistent_settings.window_geometry.0 = app.backend.window().position();
             state.persistent_settings.save();
         }
@@ -473,7 +480,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Exit => {
             info!("About to exit");
             // save position
-            state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
+            state.persistent_settings.window_geometry =
+                (app.window().position(), app.window().size());
             state.persistent_settings.save();
         }
         Event::MouseWheel { delta_y, .. } => {
@@ -597,6 +605,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // check if a new texture has been sent
     if let Ok(msg) = state.message_channel.1.try_recv() {
         debug!("Received message");
+        if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
+            state.current_path = None;
+            // state.is_loaded
+        }
         state.message = Some(msg);
     }
 }
