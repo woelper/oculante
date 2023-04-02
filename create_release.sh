@@ -18,6 +18,7 @@ cargo build
 git add README.md
 git add Cargo.toml
 git add Cargo.lock
+git add PKGBUILD
 git commit -m "Release version `cargo get version`"
 # tag the commit with current version
 git tag `cargo get version`
