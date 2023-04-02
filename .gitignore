@@ -4,6 +4,7 @@
 .DS_Store
 *.log
 Info.plist
+PKGBUILD
 paint/target
 shortcuts.txt
 perf.*
