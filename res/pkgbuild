@@ -2,7 +2,7 @@
 pkgname=oculante
 pkgver=$$VERSION$$
 pkgrel=1
-depends=('aom' 'libwebp')
+depends=('aom' 'libwebp' 'expat' 'freetype2' 'gtk3' 'cairo')
 makedepends=('rust' 'cargo' 'tar' 'nasm')
 arch=('i686' 'x86_64' 'armv6h' 'armv7h')
 pkgdesc="A minimalistic image viewer with analysis and editing tools"
