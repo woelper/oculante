@@ -34,6 +34,21 @@ fn main() {
         )
         .unwrap();
 
+    // insert version into AUR PKGBUILD
+    let mut pkgbuild = String::new();
+    File::open("res/pkgbuild")
+        .unwrap()
+        .read_to_string(&mut pkgbuild)
+        .unwrap();
+    File::create("PKGBUILD")
+        .unwrap()
+        .write_all(
+            pkgbuild
+                .replace("$$VERSION$$", env!("CARGO_PKG_VERSION"))
+                .as_bytes(),
+        )
+        .unwrap();
+
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
         res.set_icon("icon.ico");
