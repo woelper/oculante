@@ -234,7 +234,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Publish AUR package
-        uses: KSXGitHub/github-actions-deploy-aur@<TAG>
+        uses: KSXGitHub/github-actions-deploy-aur@v2.7.0
         with:
           pkgname: oculante
           pkgbuild: ./PKGBUILD
