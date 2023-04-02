@@ -213,18 +213,6 @@ jobs:
         asset_name: oculante.exe
         asset_content_type: application/zip
 
-    # - name: Upload Windows 2019 Release zip
-    #   if: matrix.os == 'windows-2019'
-    #   id: upload-release-asset-windows-classic-zip
-    #   uses: actions/upload-release-asset@v1
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ needs.release_job.outputs.upload_url }}
-    #     asset_path: oculante_windows.zip
-    #     asset_name: oculante_windows.zip
-    #     asset_content_type: application/zip
-
   publish_release:
     name: Publish release
     needs: [build_job, release_job]
@@ -240,3 +228,18 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         release_id: ${{ needs.release_job.outputs.release_id }}
+
+  aur-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Publish AUR package
+        uses: KSXGitHub/github-actions-deploy-aur@<TAG>
+        with:
+          pkgname: oculante
+          pkgbuild: ./PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update AUR package
+          ssh_keyscan_types: rsa,dsa,ecdsa,ed25519
