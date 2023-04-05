@@ -44,7 +44,7 @@ Images may contain color information that is masked by the alpha channel. Althou
 ![Screenshot](res/premult.png "Screenshot")
 
 ## Installation
-Oculante needs no installation, as it is just one executable. Just download it for your system from the releases tab (https://github.com/woelper/oculante/releases). In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 12MB.
+Oculante needs no installation, as it is just one executable. Just download it for your system from the releases tab (https://github.com/woelper/oculante/releases). In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 20MB, as the default is to statically link dependencies. Minimal versions with less image formats are provided for older computers/tiny systems. Packages for Arm linux are also built. Please open an issue if you want your operating system of choice supported.
 
 On NetBSD, a pre-compiled binary is available through the native package manager.
 To install it, simply run
