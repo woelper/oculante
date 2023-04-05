@@ -118,16 +118,19 @@ Extract a signature
 
 ### Privacy pledge
 Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics.
+Oculante is and will remain free and open source.
+There will never be ads.
 There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
 - Updating the application (must be triggered manually from settings)
 - Listening for incoming images on a custom port (must be set on command line)
 
-In addition, the only data saved locally by the application is:
+In addition, oculante saves some settings locally, for example:
 - UI accent color
 - Keybindings
 - Vsync preferences
 - Keep view offset/scale
 - Whether the directory index bar is displayed
+- Recent files
 
 ## Attribution
 Test / benchmark pictures:
@@ -140,7 +143,7 @@ https://unsplash.com/@frstvisuals
 
 Linux:
 
-`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake libssl-dev`
+`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake`
 
 Win:
 Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
