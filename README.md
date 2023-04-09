@@ -44,7 +44,7 @@ Images may contain color information that is masked by the alpha channel. Althou
 ![Screenshot](res/premult.png "Screenshot")
 
 ## Installation
-Oculante needs no installation, as it is just one executable. Just download it for your system from the releases tab (https://github.com/woelper/oculante/releases). In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 12MB.
+Oculante needs no installation, as it is just one executable. Just download it for your system from the releases tab (https://github.com/woelper/oculante/releases). In order to open images you can configure your system to open your desired image formats with oculante, drag them onto the executable or into the window. Right now the executables are roughly 20MB, as the default is to statically link dependencies. Minimal versions with less image formats are provided for older computers/tiny systems. Packages for Arm linux are also built. Please open an issue if you want your operating system of choice supported.
 
 On NetBSD, a pre-compiled binary is available through the native package manager.
 To install it, simply run
@@ -64,7 +64,7 @@ pkgin install oculante
 - pnm
 - tga
 - avif
-- tiff
+- tiff (via `tiff` with additional float/half support)
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
 - farbfeld  
 - DDS (DXT1-5, via `dds-rs`)
@@ -118,16 +118,19 @@ Extract a signature
 
 ### Privacy pledge
 Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics.
+Oculante is and will remain free and open source.
+There will never be ads.
 There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
 - Updating the application (must be triggered manually from settings)
 - Listening for incoming images on a custom port (must be set on command line)
 
-In addition, the only data saved locally by the application is:
+In addition, oculante saves some settings locally, for example:
 - UI accent color
 - Keybindings
 - Vsync preferences
 - Keep view offset/scale
 - Whether the directory index bar is displayed
+- Recent files
 
 ## Attribution
 Test / benchmark pictures:
@@ -140,7 +143,7 @@ https://unsplash.com/@frstvisuals
 
 Linux:
 
-`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake libssl-dev`
+`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake`
 
 Win:
 Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/

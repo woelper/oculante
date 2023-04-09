@@ -19,10 +19,11 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
+use tiff::decoder::Limits;
 use tonemap::filmic::*;
 use usvg::TreeParsing;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use image::Rgba;
 use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
@@ -829,7 +830,123 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
             col.add_still(img);
         }
+        "tif" | "tiff" => {
+
+            debug!("TIFF");
+            let data = File::open(img_location)?;
+
+            let mut decoder = tiff::decoder::Decoder::new(&data)?.with_limits(Limits::unlimited());
+            let dim = decoder.dimensions()?;
+            debug!("Color type: {:?}", decoder.colortype());
+            let result = decoder.read_image()?;
+            // A container for the low dynamic range image
+            let ldr_img: Vec<u8>;
+
+            match result {
+                tiff::decoder::DecodingResult::U8(contents) => {
+                    debug!("TIFF U8");
+                    ldr_img = contents;
+                }
+                tiff::decoder::DecodingResult::U16(contents) => {
+                    debug!("TIFF U16");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, u16::MIN as f32, u16::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::U32(contents) => {
+                    debug!("TIFF U32");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, u32::MIN as f32, u32::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::U64(contents) => {
+                    debug!("TIFF U64");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, u64::MIN as f32, u64::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::F32(contents) => {
+                    debug!("TIFF F32");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p, 0.0, 1.0, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::F64(contents) => {
+                    debug!("TIFF F64");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, 0.0, 1.0, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::I8(contents) => {
+                    debug!("TIFF I8");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, i8::MIN as f32, i8::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::I16(contents) => {
+                    debug!("TIFF I16");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, i16::MIN as f32, i16::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::I32(contents) => {
+                    debug!("TIFF I32");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, i32::MIN as f32, i32::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+                tiff::decoder::DecodingResult::I64(contents) => {
+                    debug!("TIFF I64");
+                    ldr_img = contents
+                        .par_iter()
+                        .map(|p| fit(*p as f32, i64::MIN as f32, i64::MAX as f32, 0., 255.) as u8)
+                        .collect();
+                }
+            }
+
+            match decoder.colortype()? {
+                tiff::ColorType::Gray(_) => {
+                    debug!("Loading gray color");
+                    let i = image::GrayImage::from_raw(dim.0, dim.1, ldr_img)
+                        .context("Can't load gray img")?;
+                    col.add_still(image::DynamicImage::ImageLuma8(i).into_rgba8());
+                }
+                tiff::ColorType::RGB(_) => {
+                    debug!("Loading rgb color");
+                    let i = image::RgbImage::from_raw(dim.0, dim.1, ldr_img)
+                        .context("Can't load RGB img")?;
+                    col.add_still(image::DynamicImage::ImageRgb8(i).into_rgba8());
+                }
+                tiff::ColorType::RGBA(_) => {
+                    debug!("Loading rgba color");
+                    let i = image::RgbaImage::from_raw(dim.0, dim.1, ldr_img)
+                        .context("Can't load RGBA img")?;
+                    col.add_still(i);
+                }
+                tiff::ColorType::GrayA(_) => {
+                    debug!("Loading gray color with alpha");
+                    let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
+                        .context("Can't load gray alpha img")?;
+                    col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+                }
+                _ => {
+                    bail!(
+                        "Error: This TIFF image type is unsupported, please open a ticket! {:?}",
+                        decoder.colortype()
+                    )
+                }
+            }
+        }
         _ => {
+            // All other supported image files are handled by using `image`
             let img = image::open(img_location)?;
             col.add_still(img.to_rgba8());
         }
@@ -1035,4 +1152,8 @@ pub fn compare_next(state: &mut OculanteState) {
             state.persistent_settings.keep_view = true;
         }
     }
+}
+
+fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) -> f32 {
+    (((oldvalue - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
 }

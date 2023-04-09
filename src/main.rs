@@ -116,6 +116,10 @@ fn main() -> Result<(), String> {
 
     if let Ok(settings) = settings::PersistentSettings::load() {
         window_config.vsync = settings.vsync;
+        if settings.window_geometry != Default::default() {
+            window_config.width = settings.window_geometry.1 .0;
+            window_config.height = settings.window_geometry.1 .1;
+        }
         info!("Loaded vsync.");
     }
 
@@ -230,12 +234,9 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     plugins.egui(|ctx| {
         let mut fonts = FontDefinitions::default();
 
-        // this should not be necessary, especially since we don't set it as priority.
-        // but otherwise it panics.
-        // https://github.com/Nazariglez/notan/issues/216
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf"))
+            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf")),
         );
         
         // FIXME: This needs to be a monospace font
@@ -245,7 +246,10 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // );
 
         // Put my font first (highest priority):
-        fonts.families.get_mut(&FontFamily::Proportional).unwrap()
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
             .insert(0, "my_font".to_owned());
             
         // fonts.families.get_mut(&FontFamily::Monospace).unwrap()
@@ -266,13 +270,17 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         );
 
         let accent_color = style.visuals.selection.bg_fill.to_array();
-        info!("Luma {:?}", accent_color);
+        debug!("Luma {:?}", accent_color);
 
-        let accent_color_luma =  (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color [2] as f32 * 0.114).max(0.).min(255.) as u8;
-        info!("Luma {accent_color_luma}");
-        let accent_color_luma = if accent_color_luma <  80 {220} else { 80};
+        let accent_color_luma = (accent_color[0] as f32 * 0.299
+            + accent_color[1] as f32 * 0.587
+            + accent_color[2] as f32 * 0.114)
+            .max(0.)
+            .min(255.) as u8;
+        debug!("Luma {accent_color_luma}");
+        let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
+        // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-        // style.visuals.selection.bg_fill = Color32::from_rgb(200, 240, 200);
         ctx.set_style(style);
         ctx.set_fonts(fonts);
     });
@@ -412,7 +420,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, InfoMode) {
-                state.info_enabled = !state.info_enabled;
+                state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
                 send_extended_info(
                     &state.current_image,
                     &state.current_path,
@@ -421,7 +431,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, EditMode) {
-                state.edit_enabled = !state.edit_enabled
+                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
             }
 
             if key_pressed(app, state, ZoomIn) {
@@ -464,12 +476,21 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
+        Event::WindowResize { width, height } => {
+            //TODO: remove this if save on exit works
+            state.persistent_settings.window_geometry.1 = (width, height);
+            state.persistent_settings.window_geometry.0 = app.backend.window().position();
+            state.persistent_settings.save();
+        }
         _ => (),
     }
 
     match evt {
         Event::Exit => {
             info!("About to exit");
+            // save position
+            state.persistent_settings.window_geometry =
+                (app.window().position(), app.window().size());
             state.persistent_settings.save();
         }
         Event::MouseWheel { delta_y, .. } => {
@@ -547,7 +568,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
-    if state.info_enabled || state.edit_state.painting {
+    if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.image_geometry.offset,
             state.cursor,
@@ -567,12 +588,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // make sure that in edit mode, RGBA is set.
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
-    if state.edit_enabled {
+    if state.persistent_settings.edit_enabled {
         state.current_channel = ColorChannel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
-    if state.info_enabled && state.image_info.is_none() {
+    if state.persistent_settings.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
     }
 
@@ -593,6 +614,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // check if a new texture has been sent
     if let Ok(msg) = state.message_channel.1.try_recv() {
         debug!("Received message");
+        if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
+            state.current_path = None;
+            // state.is_loaded
+        }
         state.message = Some(msg);
     }
 }
@@ -653,7 +678,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 state.message =
                                     Some("Edits have been loaded for this image.".into());
                                 state.edit_state = edit_state;
-                                state.edit_enabled = true;
+                                state.persistent_settings.edit_enabled = true;
                                 state.reset_image = true;
                             }
                         }
@@ -668,7 +693,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                         "Directory edits have been loaded for this image.".into(),
                                     );
                                     state.edit_state = edit_state;
-                                    state.edit_enabled = true;
+                                    state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
                                 }
                             }
@@ -710,7 +735,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         state.current_image = Some(img);
-        if state.info_enabled {
+        if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(
                 &state.current_image,
@@ -828,11 +853,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
-        if state.info_enabled {
+        if state.persistent_settings.info_enabled {
             info_ui(ctx, state, gfx);
         }
 
-        if state.edit_enabled {
+        if state.persistent_settings.edit_enabled {
             edit_ui(ctx, state, gfx);
         }
 

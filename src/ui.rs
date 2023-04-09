@@ -1110,7 +1110,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
             });
 
-            if pixels_changed && state.info_enabled {
+            if pixels_changed && state.persistent_settings.info_enabled {
                 state.image_info = None;
                 send_extended_info(
                     &Some(state.edit_state.result_pixel_op.clone()),
@@ -1609,7 +1609,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             changed_channels = true;
         }
 
-        ui.add_enabled_ui(!state.edit_enabled, |ui| {
+        ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
 
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
@@ -1677,14 +1677,16 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                ui.selectable_label(state.info_enabled, "ℹ Info"),
+                ui.selectable_label(state.persistent_settings.info_enabled, "ℹ Info"),
                 "Show image info",
                 &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                 ui,
             )
             .clicked()
             {
-                state.info_enabled = !state.info_enabled;
+                state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
                 send_extended_info(
                     &state.current_image,
                     &state.current_path,
@@ -1693,14 +1695,16 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
 
             if tooltip(
-                ui.selectable_label(state.edit_enabled, "✏ Edit"),
+                ui.selectable_label(state.persistent_settings.edit_enabled, "✏ Edit"),
                 "Edit the image",
                 &lookup(&state.persistent_settings.shortcuts, &EditMode),
                 ui,
             )
             .clicked()
             {
-                state.edit_enabled = !state.edit_enabled;
+                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                // TODO: Remove if save on exit
+                state.persistent_settings.save();
             }
         }
 
@@ -1746,12 +1750,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             ui.style_mut().visuals.button_frame = false;
             ui.style_mut().visuals.widgets.inactive.expansion = 20.;
 
-
             // FIXME: Needs submenu not to be out of bounds
             // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-             
-            
-            
+
             ui.menu_button("☰", |ui| {
                 if ui.button("Reset view").clicked() {
                     state.reset_image = true;
@@ -1839,8 +1840,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 // });
             });
 
-        // });
-
+            // });
         });
     });
 }
