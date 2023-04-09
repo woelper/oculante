@@ -2,6 +2,7 @@ use clap::Arg;
 use fruitbasket::FruitApp;
 use fruitbasket::FruitCallbackKey;
 use fruitbasket::RunPeriod;
+use lazy_static::lazy_static;
 use log::debug;
 use log::info;
 use std::path::PathBuf;
@@ -10,7 +11,9 @@ use std::{
     error::Error,
     sync::{Arc, Mutex},
 };
-
+lazy_static! {
+    static ref FRUITAPP: FruitApp<'static> = FruitApp::new();
+}
 pub fn launch() -> Result<(), Box<dyn Error>> {
     info!("Starting MacOS integration");
 
