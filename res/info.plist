@@ -28,7 +28,7 @@
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
-  <key>LSUIPresentationMode</key><integer>3</integer>
+  <!-- <key>LSUIPresentationMode</key><integer>3</integer> -->
   <key>CFBundleDocumentTypes</key>
 		<array>
 			<dict>
