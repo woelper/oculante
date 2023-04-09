@@ -60,6 +60,10 @@ jobs:
       run: cargo install cargo-bundle
       if: matrix.os == 'macOS-latest'
 
+    - name: Install cargo universal2
+      run: cargo install universal2
+      if: matrix.os == 'macOS-latest'
+      
     - name: Install cargo deb
       run: cargo install cargo-deb
       if: matrix.os == 'ubuntu-20.04'
