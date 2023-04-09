@@ -236,18 +236,20 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         fonts.font_data.insert(
             "my_font".to_owned(),
             FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf"))
-            // .tweak(
-            //     FontTweak {
-            //         scale: 1.0,
-            //         y_offset_factor: -0.5,
-            //         y_offset: 0.0,
-            //     },
-            // ),
         );
+        
+        // FIXME: This needs to be a monospace font
+        // fonts.font_data.insert(
+        //     "my_font_mono".to_owned(),
+        //     FontData::from_static(include_bytes!("../res/fonts/FiraCode-Regular.ttf"))
+        // );
 
         // Put my font first (highest priority):
         fonts.families.get_mut(&FontFamily::Proportional).unwrap()
             .insert(0, "my_font".to_owned());
+            
+        // fonts.families.get_mut(&FontFamily::Monospace).unwrap()
+        //     .insert(0, "my_font_mono".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
         let font_scale = 0.82;
