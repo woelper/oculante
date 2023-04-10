@@ -48,8 +48,6 @@ pub mod paint;
 
 #[notan_main]
 fn main() -> Result<(), String> {
-    // hack for wayland
-    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
     }
