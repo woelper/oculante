@@ -595,7 +595,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // reload constantly if gif so we keep receiving sub-frames wit no delay
+    // reload constantly if gif so we keep receiving sub-frames with no delay
     if let Some(p) = &state.current_path {
         if p.extension() == Some(OsStr::new("gif")) {
             app.window().request_frame();
