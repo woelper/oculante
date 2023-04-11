@@ -37,6 +37,7 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, OculanteState};
 use crate::cache::Cache;
+use crate::image_editing::{self, ImageOperation};
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -258,8 +259,35 @@ pub fn send_image_threaded(
                     }
                 } else {
                     // single frame. This saves one clone().
+                    let max_texture_size = 16384;
+                    
                     for frame in col.frames {
-                        let _ = texture_sender.send(frame);
+                        let largest_side =
+                            frame.buffer.dimensions().0.max(frame.buffer.dimensions().1);
+
+                        if largest_side > max_texture_size {
+                            let scale_factor = max_texture_size as f32 / largest_side as f32;
+                            let new_dimensions = (
+                                (frame.buffer.dimensions().0 as f32 * scale_factor)
+                                    .min(max_texture_size as f32)
+                                    as u32,
+                                (frame.buffer.dimensions().1 as f32 * scale_factor)
+                                    .min(max_texture_size as f32)
+                                    as u32,
+                            );
+
+                            let mut frame = frame;
+                            let op = ImageOperation::Resize {
+                                dimensions: new_dimensions,
+                                aspect: true,
+                                filter: image_editing::ScaleFilter::Bilinear,
+                            };
+                            _ = op.process_image(&mut frame.buffer);
+                            _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled to {max_texture_size}".to_string());
+                            let _ = texture_sender.send(frame);
+                        } else {
+                            let _ = texture_sender.send(frame);
+                        }
                     }
                 }
             }

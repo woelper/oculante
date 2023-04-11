@@ -15,6 +15,7 @@ use shortcuts::key_pressed;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
+use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
@@ -23,6 +24,7 @@ pub mod settings;
 pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
+use crate::image_editing::ImageOperation;
 use crate::scrubber::find_first_image_in_directory;
 use crate::shortcuts::InputEvent::*;
 mod utils;
@@ -236,7 +238,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             "my_font".to_owned(),
             FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf")),
         );
-        
+
         // FIXME: This needs to be a monospace font
         // fonts.font_data.insert(
         //     "my_font_mono".to_owned(),
@@ -249,7 +251,7 @@ fn init(_gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             .get_mut(&FontFamily::Proportional)
             .unwrap()
             .insert(0, "my_font".to_owned());
-            
+
         // fonts.families.get_mut(&FontFamily::Monospace).unwrap()
         //     .insert(0, "my_font_mono".to_owned());
 
@@ -625,7 +627,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
+        // let max_texture_size = 16384;
         let img = frame.buffer;
+        // let largest_side = img.dimensions().0.max(img.dimensions().1);
+        // let scale_factor = max_texture_size as f32 / largest_side as f32;
+        // let new_dimensions = ((img.dimensions().0 as f32 * scale_factor).min(max_texture_size as f32) as u32, (img.dimensions().1 as f32 * scale_factor).min(max_texture_size as f32) as u32);
+
+        // if largest_side > max_texture_size {
+        //     let op = ImageOperation::Resize {
+        //         dimensions: new_dimensions,
+        //         aspect: true,
+        //         filter: image_editing::ScaleFilter::CatmullRom,
+        //     };
+        //     _ = op.process_image(&mut img);
+        //     state.message = Some("This image exceeded the maximum resolution asd will be be scaled to {max_texture_size}".into());
+        // }
         debug!("Received image buffer: {:?}", img.dimensions());
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
