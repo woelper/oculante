@@ -4,6 +4,7 @@ description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2018"
 exclude = [
   "res/*.gif",
+  "tests/*"
 ]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
