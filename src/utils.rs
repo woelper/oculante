@@ -176,10 +176,11 @@ pub struct Player {
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
     pub cache: Cache,
+    pub max_texture_size: u32,
 }
 
 impl Player {
-    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
         let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
             mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -191,6 +192,7 @@ impl Player {
                 data: Default::default(),
                 cache_size,
             },
+            max_texture_size,
         }
     }
 
@@ -210,6 +212,7 @@ impl Player {
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
+            self.max_texture_size,
         );
     }
 
@@ -223,6 +226,7 @@ pub fn send_image_threaded(
     texture_sender: Sender<Frame>,
     message_sender: Sender<String>,
     stop_receiver: Receiver<()>,
+    max_texture_size: u32,
 ) {
     let loc = img_location.to_owned();
 
@@ -259,8 +263,7 @@ pub fn send_image_threaded(
                     }
                 } else {
                     // single frame. This saves one clone().
-                    let max_texture_size = 16384;
-                    
+
                     for frame in col.frames {
                         let largest_side =
                             frame.buffer.dimensions().0.max(frame.buffer.dimensions().1);
@@ -859,7 +862,6 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             col.add_still(img);
         }
         "tif" | "tiff" => {
-
             debug!("TIFF");
             let data = File::open(img_location)?;
 

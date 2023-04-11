@@ -82,7 +82,7 @@ impl Default for OculanteState {
             cursor_relative: Default::default(),
             image_dimension: (0, 0),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone(), 20),
+            player: Player::new(tx_channel.0.clone(), 20, 16384),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
             extended_info_channel: mpsc::channel(),
