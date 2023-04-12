@@ -20,7 +20,6 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 use tiff::decoder::Limits;
-use tonemap::filmic::*;
 use usvg::TreeParsing;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -528,8 +527,8 @@ fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
 }
 
 fn tonemap_f32(px: f32) -> u8 {
-    // (px.powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8
-    (px.filmic() * 255.) as u8
+    (px.powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8
+    // (px.filmic() * 255.) as u8
 }
 
 fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
