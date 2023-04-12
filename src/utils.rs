@@ -1133,28 +1133,27 @@ pub fn next_image(state: &mut OculanteState) {
 
 /// Set the window title
 pub fn set_title(app: &mut App, state: &mut OculanteState) {
-    if let Some(p) = &state.current_path {
-        app.window().set_title(
-            &state
-                .persistent_settings
-                .title_format
-                .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
-                .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
-                .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
-                .replacen(
-                    "{FILENAME}",
-                    &p.file_name()
-                        .map(|f| f.to_string_lossy().to_string())
-                        .unwrap_or_default(),
-                    10,
-                )
-                .replacen(
-                    "{RES}",
-                    &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
-                    10,
-                ),
-        );
-    }
+    let p = state.current_path.clone().unwrap_or_default();
+    app.window().set_title(
+        &state
+            .persistent_settings
+            .title_format
+            .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
+            .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
+            .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
+            .replacen(
+                "{FILENAME}",
+                &p.file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                10,
+            )
+            .replacen(
+                "{RES}",
+                &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
+                10,
+            ),
+    );
 }
 
 pub fn compare_next(state: &mut OculanteState) {

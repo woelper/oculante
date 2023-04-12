@@ -615,15 +615,16 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // check if a new texture has been sent
-    if let Ok(msg) = state.message_channel.1.try_recv() {
-        debug!("Received message");
-        if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
-            state.current_path = None;
-            // state.is_loaded
-        }
-        state.message = Some(msg);
-    }
+    // // check if a new message has been sent
+    // if let Ok(msg) = state.message_channel.1.try_recv() {
+    //     debug!("Received message");
+    //     if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
+    //         if state.current_image.is_none() {
+    //             state.current_path = None;
+    //         }
+    //     }
+    //     state.message = Some(msg);
+    // }
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -789,7 +790,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.persistent_settings.show_minimap {
-            let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
+            // let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
             let offset_x = 0.0;
 
             let scale = 200. / app.window().size().0 as f32;
@@ -852,6 +853,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
+        let mut msg_present = false;
+        let mut msg_string = String::new();
+
+        if let Ok(msg) = state.message_channel.1.try_recv() {
+            msg_present = true;
+            msg_string = msg;
+        }
+
+        egui::TopBottomPanel::bottom("message").show_animated(ctx, msg_present, |ui| {
+            ui.label(msg_string);
+        });
+
         if let Some(message) = &state.message.clone() {
             let max_anim_len = 2.8;
 
@@ -885,7 +898,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.persistent_settings.edit_enabled {
-            edit_ui(ctx, state, gfx);
+            edit_ui(app, ctx, state, gfx);
         }
 
         if !state.is_loaded {

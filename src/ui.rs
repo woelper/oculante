@@ -388,6 +388,11 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
             .default_width(600.)
             .show(ctx, |ui| {
 
+                #[cfg(debug_assertions)]
+                if ui.button("send test msg").clicked() {
+                    _ = state.message_channel.0.send("yoooooo".into());
+                }
+
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         if ui
@@ -610,7 +615,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 /// Everything related to image editing
-pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show(ctx, |ui| {
@@ -1054,9 +1059,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
                 }
 
+                #[cfg(not(feature = "file_open"))]
                 ui.horizontal(|ui| {
                     ui.label("File:");
-
                     if let Some(p) = &mut state.current_path {
                         if let Some(pstem) = p.file_stem() {
                             let mut stem = pstem.to_string_lossy().to_string();
@@ -1086,27 +1091,47 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 #[cfg(feature = "turbo")]
                 jpg_lossless_ui(state, ui);
 
-                if state.current_path.is_none() {
+
+                if state.current_path.is_none() && state.current_image.is_some() {
+                    #[cfg(not(feature = "file_open"))]
+                    {
+                        if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
+                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            state.current_path = Some(dest);
+                            set_title(app, state);
+                        }
+                    }
+                }
+
+                #[cfg(feature = "file_open")]
+                if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
                         let start_directory = &state.persistent_settings.last_open_directory;
-
                         let file_dialog_result = rfd::FileDialog::new()
                             .set_directory(start_directory)
                             .save_file();
                         if let Some(file_path) = file_dialog_result {
                             debug!("Selected File Path = {:?}", file_path);
-                            _ = state
-                                                .edit_state
-                                                .result_pixel_op
-                                                .save(file_path.with_extension(&state.edit_state.export_extension));
-                            state.current_path = Some(file_path);
+                            match state
+                                .edit_state
+                                .result_pixel_op
+                                .save(&file_path) {
+                                    Ok(_) => {
+                                        _ = state.message_channel.0.send(format!("Saved"));
+                                        state.current_path = Some(file_path);
+                                        set_title(app, state);
+                                    }
+                                    Err(e) => {
+                                        _ = state.message_channel.0.send(format!("Error: Could not save: {e}"));
+                                    }
+                                }
                         }
                     }
                 }
 
                 if let Some(p) = &state.current_path {
                     let text = if p
-                        .with_extension(&state.edit_state.export_extension)
+                        // .with_extension(&state.edit_state.export_extension)
                         .exists()
                     {
                         "💾 Overwrite"
@@ -1115,10 +1140,19 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     };
 
                     if ui.button(text).on_hover_text("Save the image. This will create a new file or overwrite.").clicked() {
-                        _ = state
-                            .edit_state
-                            .result_pixel_op
-                            .save(p.with_extension(&state.edit_state.export_extension));
+                        match state
+                        .edit_state
+                        .result_pixel_op
+                        .save(p) {
+                            Ok(_) => {
+                                state.message = Some("Saved".into());
+                                // state.current_path = Some(p.clone());
+                                // set_title(app, state);
+                            }
+                            Err(e) => {
+                                state.message = Some(format!("Could not save: {e}"));
+                            }
+                        }
                     }
 
                     if ui.button("💾 Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
@@ -1826,6 +1860,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 imagedata.height as u32,
                                 (imagedata.bytes).to_vec(),
                             ) {
+                                state.current_path = None;
                                 // Stop in the even that an animation is running
                                 state.player.stop();
                                 _ = state
@@ -1833,7 +1868,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                     .image_sender
                                     .send(crate::utils::Frame::new_still(image));
                                 // Since pasted data has no path, make sure it's not set
-                                state.current_path = None;
+                                state.message = Some("Image pasted".into());
                             }
                         }
                     }
