@@ -390,7 +390,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                 #[cfg(debug_assertions)]
                 if ui.button("send test msg").clicked() {
-                    _ = state.message_channel.0.send("yoooooo".into());
+                    state.send_message("Test");
+
                 }
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
@@ -524,7 +525,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                     #[cfg(feature = "update")]
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
-                        state.message = Some("Checking for updates...".into());
+                        state.send_message("Checking for updates...");
                         crate::update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
                     }
@@ -1117,14 +1118,16 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 .result_pixel_op
                                 .save(&file_path) {
                                     Ok(_) => {
-                                        _ = state.message_channel.0.send(format!("Saved"));
+                                        state.send_message("Saved");
                                         state.current_path = Some(file_path);
                                         set_title(app, state);
                                     }
                                     Err(e) => {
-                                        _ = state.message_channel.0.send(format!("Error: Could not save: {e}"));
+                                        state.send_message(&format!("Error: Could not save: {e}"));
                                     }
                                 }
+                                state.toast_cooldown = 0.0;
+                                ui.ctx().request_repaint();
                         }
                     }
                 }
@@ -1145,12 +1148,10 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         .result_pixel_op
                         .save(p) {
                             Ok(_) => {
-                                state.message = Some("Saved".into());
-                                // state.current_path = Some(p.clone());
-                                // set_title(app, state);
+                                state.send_message("Saved");
                             }
                             Err(e) => {
-                                state.message = Some(format!("Could not save: {e}"));
+                                state.send_message(&format!("Could not save: {e}"));
                             }
                         }
                     }
@@ -1868,7 +1869,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                     .image_sender
                                     .send(crate::utils::Frame::new_still(image));
                                 // Since pasted data has no path, make sure it's not set
-                                state.message = Some("Image pasted".into());
+                                state.send_message("Image pasted");
                             }
                         }
                     }

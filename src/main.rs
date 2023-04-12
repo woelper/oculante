@@ -201,11 +201,13 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
                 start_img_location = Some(location.clone());
             } else {
                 // Unsupported extension
-                state.message = Some(format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
+                state.send_message(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
+
+
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
-            state.message = Some(format!("ERROR: Can't open file: {}", location.display()));
+            state.send_message(&format!("ERROR: Can't open file: {}", location.display()));
         }
 
         // Assign image path if we have a valid one here
@@ -239,7 +241,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf")),
         );
 
-        // FIXME: This needs to be a monospace font
+        // TODO: This needs to be a monospace font
         // fonts.font_data.insert(
         //     "my_font_mono".to_owned(),
         //     FontData::from_static(include_bytes!("../res/fonts/FiraCode-Regular.ttf"))
@@ -615,16 +617,23 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // // check if a new message has been sent
-    // if let Ok(msg) = state.message_channel.1.try_recv() {
-    //     debug!("Received message");
-    //     if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
-    //         if state.current_image.is_none() {
-    //             state.current_path = None;
-    //         }
-    //     }
-    //     state.message = Some(msg);
-    // }
+    // Only receive messages if current one is cleared
+    // debug!("cooldown {}", state.toast_cooldown);
+
+    if state.message.is_none() {
+        state.toast_cooldown = 0.;
+
+        // check if a new message has been sent
+        if let Ok(msg) = state.message_channel.1.try_recv() {
+            debug!("Received message: {msg}");
+            if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
+                if state.current_image.is_none() {
+                    state.current_path = None;
+                }
+            }
+            state.message = Some(msg);
+        }
+    }
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -680,8 +689,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if p.with_extension("oculante").is_file() {
                         if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
                             if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                state.message =
-                                    Some("Edits have been loaded for this image.".into());
+                                state.send_message("Edits have been loaded for this image.");
                                 state.edit_state = edit_state;
                                 state.persistent_settings.edit_enabled = true;
                                 state.reset_image = true;
@@ -694,9 +702,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                    state.message = Some(
-                                        "Directory edits have been loaded for this image.".into(),
-                                    );
+                                    state.send_message("Directory edits have been loaded for this image.");
                                     state.edit_state = edit_state;
                                     state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
@@ -853,43 +859,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-        let mut msg_present = false;
-        let mut msg_string = String::new();
+  
 
-        if let Ok(msg) = state.message_channel.1.try_recv() {
-            msg_present = true;
-            msg_string = msg;
-        }
+        
+        if let Some(message) = &state.message {
+            // debug!("Message is set, showing");
+            egui::TopBottomPanel::bottom("message").show_animated(ctx, state.message.is_some(), |ui| {
+                ui.label(format!("💬 {message}"));
+                ui.ctx().request_repaint();
+            });
+            let max_anim_len = if state.persistent_settings.vsync {3.5} else {70.};
 
-        egui::TopBottomPanel::bottom("message").show_animated(ctx, msg_present, |ui| {
-            ui.label(msg_string);
-        });
+            // using delta does not work with rfd
+            // state.toast_cooldown += app.timer.delta_f32();
+            state.toast_cooldown += 0.01;
+            // debug!("cooldown {}", state.toast_cooldown);
 
-        if let Some(message) = &state.message.clone() {
-            let max_anim_len = 2.8;
-
-            state.toast_cooldown += app.timer.delta_f32();
             if state.toast_cooldown > max_anim_len {
-                state.toast_cooldown = 0.;
+                debug!("Setting message to none, timer reached.");
                 state.message = None;
-            } else {
-                let toast_height = ((max_anim_len - state.toast_cooldown) * 30.).min(25.);
-
-                egui::TopBottomPanel::bottom("toast")
-                    .max_height(toast_height)
-                    .min_height(toast_height)
-                    .show(ctx, |ui| {
-                        ui.ctx().request_repaint();
-                        ui.horizontal(|ui| {
-                            ui.label(message);
-                            ui.spacing();
-
-                            if unframed_button("❌", ui).clicked() {
-                                state.message = None;
-                                state.toast_cooldown = 0.;
-                            }
-                        });
-                    });
             }
         }
 

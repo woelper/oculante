@@ -66,6 +66,12 @@ pub struct OculanteState {
     pub checker_texture: Option<Texture>,
 }
 
+impl OculanteState {
+    pub fn send_message(&self, msg: &str) {
+        _ = self.message_channel.0.send(msg.into());
+    }
+}
+
 impl Default for OculanteState {
     fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
