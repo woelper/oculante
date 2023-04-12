@@ -284,6 +284,11 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ctx.set_fonts(fonts);
     });
 
+    // load checker texture
+    if let Ok(checker_image) = image::load_from_memory(include_bytes!("../res/checker.png")) {
+        state.checker_texture = checker_image.into_rgba8().to_texture(gfx);
+    }
+
     state
 }
 
@@ -760,6 +765,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
+    if state.persistent_settings.show_checker_background {
+        if let Some(texture) = &state.checker_texture {
+            draw.pattern(texture)
+                .size(app.window().width() as f32, app.window().height() as f32);
+        }
+    }
+
     if let Some(texture) = &state.current_texture {
         if state.tiling < 2 {
             draw.image(texture)
@@ -774,6 +786,22 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
                 );
+        }
+
+        if state.persistent_settings.show_minimap {
+            let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
+            let offset_x = 0.0;
+
+            let scale = 200. / app.window().size().0 as f32;
+            let show_minimap = state.image_dimension.0 as f32 * state.image_geometry.scale
+                > app.window().size().0 as f32;
+
+            if show_minimap {
+                draw.image(texture)
+                    .blend_mode(BlendMode::NORMAL)
+                    .translate(offset_x, 100.)
+                    .scale(scale, scale);
+            }
         }
 
         // Draw a brush preview when paint mode is on

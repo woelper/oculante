@@ -63,6 +63,7 @@ pub struct OculanteState {
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
+    pub checker_texture: Option<Texture>,
 }
 
 impl Default for OculanteState {
@@ -106,6 +107,7 @@ impl Default for OculanteState {
             toast_cooldown: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
+            checker_texture: Default::default(),
         }
     }
 }

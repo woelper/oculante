@@ -464,8 +464,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 }
                 });
 
-                    ui.end_row();
-                    if ui
+                ui.end_row();
+                if ui
                     .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
                     .on_hover_text(
                         "When a new image is loaded, keep current zoom and offset",
@@ -475,7 +475,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         state.persistent_settings.save()
                     }
 
-                    if ui
+                if ui
                     .checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
                     .on_hover_text(
                         "When a new image is loaded, keep current edits",
@@ -483,6 +483,16 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                     {
                         state.persistent_settings.save()
+                    }
+                ui.end_row();
+                if ui
+                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background.")
+                    .on_hover_text(
+                        "Show a checker pattern as backdrop.",
+                    )
+                    .changed()
+                    {
+                        state.persistent_settings.save();
                     }
                 });
 
@@ -1075,6 +1085,24 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 #[cfg(feature = "turbo")]
                 jpg_lossless_ui(state, ui);
+
+                if state.current_path.is_none() {
+                    if ui.button("Save as...").clicked() {
+                        let start_directory = &state.persistent_settings.last_open_directory;
+
+                        let file_dialog_result = rfd::FileDialog::new()
+                            .set_directory(start_directory)
+                            .save_file();
+                        if let Some(file_path) = file_dialog_result {
+                            debug!("Selected File Path = {:?}", file_path);
+                            _ = state
+                                                .edit_state
+                                                .result_pixel_op
+                                                .save(file_path.with_extension(&state.edit_state.export_extension));
+                            state.current_path = Some(file_path);
+                        }
+                    }
+                }
 
                 if let Some(p) = &state.current_path {
                     let text = if p
