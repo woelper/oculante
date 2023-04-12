@@ -1753,6 +1753,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             // FIXME: Needs submenu not to be out of bounds
             // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 
+            ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
+
             ui.menu_button("☰", |ui| {
                 if ui.button("Reset view").clicked() {
                     state.reset_image = true;

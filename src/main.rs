@@ -78,6 +78,7 @@ fn main() -> Result<(), String> {
         .min_size(600, 400);
 
     // Set icon if present
+    // TODO: load from bytes
     if let Some(p) = &icon_path {
         if p.exists() {
             info!("Loading icon from {}", p.display());
@@ -255,8 +256,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         //     .insert(0, "my_font_mono".to_owned());
 
         let mut style: egui::Style = (*ctx.style()).clone();
-        let font_scale = 0.82;
-        // let font_scale = 0.78;
+        let font_scale = 0.80;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
