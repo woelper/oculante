@@ -1871,6 +1871,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 // Since pasted data has no path, make sure it's not set
                                 state.send_message("Image pasted");
                             }
+                        } else {
+                            state.send_message("Clipboard did not contain image")
                         }
                     }
                     ui.close_menu();
