@@ -29,6 +29,7 @@ pub struct PersistentSettings {
     pub edit_enabled: bool,
     // pos.x, pos.y, width, height
     pub window_geometry: ((i32, i32), (i32, i32)),
+    pub last_open_directory: PathBuf,
 }
 
 impl Default for PersistentSettings {
@@ -49,6 +50,7 @@ impl Default for PersistentSettings {
             info_enabled: Default::default(),
             edit_enabled: Default::default(),
             window_geometry: Default::default(),
+            last_open_directory: std::env::current_dir().unwrap_or_default(),
         }
     }
 }

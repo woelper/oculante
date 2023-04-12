@@ -914,11 +914,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = if let Some(img_path) = &state.current_path {
-        img_path.clone()
-    } else {
-        std::env::current_dir().unwrap_or_default()
-    };
+    let start_directory = &state.persistent_settings.last_open_directory;
 
     let file_dialog_result = rfd::FileDialog::new()
         .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
@@ -933,6 +929,10 @@ fn browse_for_image_path(state: &mut OculanteState) {
         state
             .player
             .load(&file_path, state.message_channel.0.clone());
+        if let Some(dir) = file_path.parent() {
+            state.persistent_settings.last_open_directory = dir.to_path_buf();
+            state.persistent_settings.save();
+        }
         state.current_path = Some(file_path);
     }
 }
