@@ -175,6 +175,9 @@ impl EguiExt for Ui {
 }
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+    if state.settings_enabled {
+        return
+    }
     if let Some(img) = &state.current_image {
         if let Some(p) = img.get_pixel_checked(
             state.cursor_relative.x as u32,
@@ -380,19 +383,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
     let mut settings_enabled = state.settings_enabled;
-
     egui::Window::new("Preferences")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable(false)
+            .resizable(true)
             .default_width(600.)
             .show(ctx, |ui| {
 
                 #[cfg(debug_assertions)]
                 if ui.button("send test msg").clicked() {
                     state.send_message("Test");
-
                 }
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
@@ -618,6 +619,9 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 
 /// Everything related to image editing
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+    if state.settings_enabled {
+        return
+    }
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show(ctx, |ui| {
