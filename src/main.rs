@@ -775,6 +775,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if state.persistent_settings.show_checker_background {
         if let Some(texture) = &state.checker_texture {
             draw.pattern(texture)
+                .blend_mode(BlendMode::ADD)
                 .size(app.window().width() as f32, app.window().height() as f32);
         }
     }
