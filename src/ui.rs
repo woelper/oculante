@@ -187,13 +187,14 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::left("side_panel").show(ctx, |ui| {
 
 
-        egui::ScrollArea::vertical().auto_shrink([false,true]).always_show_scroll(true).show(ui, |ui| {
+        egui::ScrollArea::vertical().auto_shrink([false,true])
+            .show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
                 // texture.
                 let tex_id = gfx.egui_register_texture(texture);
 
                 // width of image widget
-                let desired_width = ui.available_width() - ui.spacing().button_padding.x*4.;
+                let desired_width = ui.available_width() - ui.spacing().button_padding.x*4. - 16.;
 
                 let scale = (desired_width / 8.) / texture.size().0;
                 let img_size = egui::Vec2::new(desired_width, desired_width);
