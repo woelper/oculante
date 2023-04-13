@@ -170,12 +170,14 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ..Default::default()
     };
 
-    if let Ok(settings) = settings::PersistentSettings::load() {
-        state.persistent_settings = settings;
-    } else {
-        warn!("Settings failed to load. This may happen after application updates. Generating a fresh file.");
-        state.persistent_settings = Default::default();
-        state.persistent_settings.save();
+
+    match settings::PersistentSettings::load() {
+        Ok(settings) => state.persistent_settings = settings,
+        Err(e) => {
+            warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
+            state.persistent_settings = Default::default();
+            state.persistent_settings.save();
+        }
     }
 
     state.player = Player::new(
