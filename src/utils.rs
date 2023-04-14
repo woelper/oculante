@@ -4,7 +4,7 @@ use dds::DDS;
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, RgbImage, RgbaImage};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, RgbImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -115,7 +115,9 @@ impl ExtendedImageInfo {
         Ok(())
     }
 
-    pub fn from_image(img: &RgbaImage) -> Self {
+    pub fn from_image(dyn_img: &DynamicImage) -> Self {
+        // TODO: Is it really crucial to do this in float?
+        let img = dyn_img.to_rgba8();
         let mut colors: HashSet<Rgba<u8>> = Default::default();
         let mut red_histogram: HashMap<u8, usize> = Default::default();
         let mut green_histogram: HashMap<u8, usize> = Default::default();
@@ -314,14 +316,14 @@ pub enum FrameSource {
 /// A single frame
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pub buffer: RgbaImage,
+    pub buffer: DynamicImage,
     /// How long to pause until the next frame
     pub delay: u16,
     pub source: FrameSource,
 }
 
 impl Frame {
-    fn new(buffer: RgbaImage, delay: u16, source: FrameSource) -> Frame {
+    fn new(buffer: DynamicImage, delay: u16, source: FrameSource) -> Frame {
         Frame {
             buffer,
             delay,
@@ -329,7 +331,7 @@ impl Frame {
         }
     }
 
-    fn new_reset(buffer: RgbaImage) -> Frame {
+    fn new_reset(buffer: DynamicImage) -> Frame {
         Frame {
             buffer,
             delay: 0,
@@ -337,16 +339,7 @@ impl Frame {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn new_edit(buffer: RgbaImage) -> Frame {
-        Frame {
-            buffer,
-            delay: 0,
-            source: FrameSource::EditResult,
-        }
-    }
-
-    pub fn new_still(buffer: RgbaImage) -> Frame {
+    pub fn new_still(buffer: DynamicImage) -> Frame {
         Frame {
             buffer,
             delay: 0,
@@ -362,11 +355,11 @@ pub struct FrameCollection {
 }
 
 impl FrameCollection {
-    fn add_anim_frame(&mut self, buffer: RgbaImage, delay: u16) {
+    fn add_anim_frame(&mut self, buffer: DynamicImage, delay: u16) {
         self.frames
             .push(Frame::new(buffer, delay, FrameSource::Animation))
     }
-    fn add_still(&mut self, buffer: RgbaImage) {
+    fn add_still(&mut self, buffer: DynamicImage) {
         self.frames.push(Frame::new(buffer, 0, FrameSource::Still))
     }
 }
@@ -474,47 +467,102 @@ pub fn is_ext_compatible(fname: &Path) -> bool {
     )
 }
 
-pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
+pub fn solo_channel(img: &DynamicImage, channel: usize) -> DynamicImage {
     let mut updated_img = img.clone();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        pixel[0] = pixel[channel];
-        pixel[1] = pixel[channel];
-        pixel[2] = pixel[channel];
-        pixel[3] = 255;
-    });
-    updated_img
+    match updated_img {
+        DynamicImage::ImageRgba8(mut img) => {
+            img.par_chunks_mut(4).for_each(|pixel| {
+                pixel[0] = pixel[channel];
+                pixel[1] = pixel[channel];
+                pixel[2] = pixel[channel];
+                pixel[3] = 255;
+            });
+            image::DynamicImage::ImageRgba8(img)
+        }
+        DynamicImage::ImageRgba32F(mut img) => {
+            img.par_chunks_mut(4).for_each(|pixel| {
+                pixel[0] = pixel[channel];
+                pixel[1] = pixel[channel];
+                pixel[2] = pixel[channel];
+                pixel[3] = 1.;
+            });
+            image::DynamicImage::ImageRgba32F(img)
+        }
+        _ => img.clone(),
+    }
 }
 
-pub fn unpremult(img: &RgbaImage) -> RgbaImage {
+pub fn unpremult(img: &DynamicImage) -> DynamicImage {
     let mut updated_img = img.clone();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        pixel[3] = 255;
-    });
-    updated_img
+    match updated_img {
+        DynamicImage::ImageRgba8(mut img) => {
+            img.par_chunks_mut(4).for_each(|pixel| {
+                pixel[3] = 255;
+            });
+            image::DynamicImage::ImageRgba8(img)
+        }
+        DynamicImage::ImageRgba32F(mut img) => {
+            img.par_chunks_mut(4).for_each(|pixel| {
+                pixel[3] = 1.0;
+            });
+            image::DynamicImage::ImageRgba32F(img)
+        }
+        _ => img.clone(),
+    }
 }
 
 /// Mark pixels with no alpha but color info
-pub fn highlight_bleed(img: &RgbaImage) -> RgbaImage {
-    let mut updated_img = img.clone();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        if pixel[3] == 0 && (pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
-            pixel[1] = pixel[1].saturating_add(100);
-            pixel[3] = 255;
+pub fn highlight_bleed(img: &DynamicImage) -> DynamicImage {
+    match img {
+        DynamicImage::ImageRgba8(img) => {
+            let mut updated_img = img.clone();
+            updated_img.par_chunks_mut(4).for_each(|pixel| {
+                if pixel[3] == 0 && (pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
+                    pixel[1] = pixel[1].saturating_add(100);
+                    pixel[3] = 255;
+                }
+            });
+            DynamicImage::ImageRgba8(updated_img)
         }
-    });
-    updated_img
+        DynamicImage::ImageRgba32F(img) => {
+            let mut updated_img = img.clone();
+            updated_img.par_chunks_mut(4).for_each(|pixel| {
+                if pixel[3] == 0.0 && (pixel[0] != 0.0 || pixel[1] != 0.0 || pixel[2] != 0.0) {
+                    pixel[1] += 0.3;
+                    pixel[3] = 1.0;
+                }
+            });
+            DynamicImage::ImageRgba32F(updated_img)
+        }
+        _ => img.clone(),
+    }
 }
 
 /// Mark pixels with transparency
-pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
-    let mut updated_img = img.clone();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        if pixel[3] != 0 && pixel[3] != 255 {
-            pixel[1] = pixel[1].saturating_add(100);
-            pixel[3] = pixel[1].saturating_add(100);
+pub fn highlight_semitrans(img: &DynamicImage) -> DynamicImage {
+    match img {
+        DynamicImage::ImageRgba8(img) => {
+            let mut updated_img = img.clone();
+            updated_img.par_chunks_mut(4).for_each(|pixel| {
+                if pixel[3] != 0 && pixel[3] != 255 {
+                    pixel[1] = pixel[1].saturating_add(100);
+                    pixel[3] = pixel[1].saturating_add(100);
+                }
+            });
+            DynamicImage::ImageRgba8(updated_img)
         }
-    });
-    updated_img
+        DynamicImage::ImageRgba32F(img) => {
+            let mut updated_img = img.clone();
+            updated_img.par_chunks_mut(4).for_each(|pixel| {
+                if pixel[3] != 0.0 && pixel[3] != 1.0 {
+                    pixel[1] += 0.3;
+                    pixel[3] += 0.3;
+                }
+            });
+            DynamicImage::ImageRgba32F(updated_img)
+        }
+        _ => img.clone(),
+    }
 }
 
 fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
@@ -559,7 +607,7 @@ pub fn pos_from_coord(
 }
 
 pub fn send_extended_info(
-    current_image: &Option<RgbaImage>,
+    current_image: &Option<DynamicImage>,
     current_path: &Option<PathBuf>,
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
 ) {
@@ -599,7 +647,8 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
                         .context("Can't create DDS ImageBuffer with given res")?;
-                col.add_still(buf);
+
+                col.add_still(DynamicImage::ImageRgba8(buf));
             }
         }
         #[cfg(feature = "dav1d")]
@@ -628,7 +677,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    col.add_still(buf);
+                    col.add_still(DynamicImage::ImageRgba8(buf));
                 }
                 avif_decode::Image::Rgba8(img) => {
                     let mut img_buffer = vec![];
@@ -642,7 +691,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    col.add_still(buf);
+                    col.add_still(DynamicImage::ImageRgba8(buf));
                 }
                 _ => {
                     anyhow::bail!("This avif is not yet supported.")
@@ -678,7 +727,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                         pixmap.data().to_vec(),
                     );
                     if let Some(valid_buf) = buf {
-                        col.add_still(valid_buf);
+                        col.add_still(DynamicImage::ImageRgba8(valid_buf));
                     }
                 }
             }
@@ -717,7 +766,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             match maybe_image {
                 Ok(image) => {
                     let png_buffer = image.layer_data.channel_data.pixels;
-                    col.add_still(png_buffer);
+                    col.add_still(DynamicImage::ImageRgba8(png_buffer));
                 }
                 Err(e) => error!("{} from {:?}", e, img_location),
             }
@@ -749,7 +798,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 .context("can't decode raw output as image")?;
             // make it a Dynamic image
             let d = DynamicImage::ImageRgb8(x);
-            col.add_still(d.to_rgba8());
+            col.add_still(d);
         }
         #[cfg(feature = "jpgxl")]
         "jxl" => {
@@ -760,7 +809,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let img = decoder
                 .decode_to_image(&sample)?
                 .context("Can't decode image from jpgxl")?;
-            col.add_still(img.into_rgba8());
+            col.add_still(img);
         }
         "hdr" => {
             let f = File::open(img_location)?;
@@ -783,7 +832,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
             let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
                 .context("Failed to create RgbaImage with given dimensions")?;
-            col.add_still(tonemapped_buffer);
+            col.add_still(DynamicImage::ImageRgba8(tonemapped_buffer));
         }
         "psd" => {
             let mut file = File::open(img_location)?;
@@ -793,7 +842,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 if let Some(buf) =
                     image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 {
-                    col.add_still(buf);
+                    col.add_still(DynamicImage::ImageRgba8(buf));
                 }
             }
         }
@@ -802,7 +851,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let mut contents = vec![];
             if file.read_to_end(&mut contents).is_ok() {
                 match decode_webp(&contents) {
-                    Some(webp_buf) => col.add_still(webp_buf),
+                    Some(webp_buf) => col.add_still(DynamicImage::ImageRgba8(webp_buf)),
                     None => println!("Error decoding data from {img_location:?}"),
                 }
             }
@@ -812,7 +861,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let bufread = BufReader::new(file);
             let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
             reader.no_limits();
-            col.add_still(reader.decode()?.into_rgba8());
+            col.add_still(reader.decode()?);
         }
         "gif" => {
             let file = File::open(img_location)?;
@@ -833,7 +882,10 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                             dim.1,
                             screen.pixels.buf().as_bytes().to_vec(),
                         );
-                        col.add_anim_frame(buf.context("Can't read gif frame")?, frame.delay * 10);
+                        col.add_anim_frame(
+                            DynamicImage::ImageRgba8(buf.context("Can't read gif frame")?),
+                            frame.delay * 10,
+                        );
                         col.repeat = true;
                     } else {
                         break;
@@ -858,7 +910,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         "jpg" | "jpeg" => {
             let jpeg_data = std::fs::read(img_location)?;
             let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
-            col.add_still(img);
+            col.add_still(DynamicImage::ImageRgba8(img));
         }
         "tif" | "tiff" => {
             debug!("TIFF");
@@ -946,25 +998,25 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     debug!("Loading gray color");
                     let i = image::GrayImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray img")?;
-                    col.add_still(image::DynamicImage::ImageLuma8(i).into_rgba8());
+                    col.add_still(image::DynamicImage::ImageLuma8(i));
                 }
                 tiff::ColorType::RGB(_) => {
                     debug!("Loading rgb color");
                     let i = image::RgbImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGB img")?;
-                    col.add_still(image::DynamicImage::ImageRgb8(i).into_rgba8());
+                    col.add_still(image::DynamicImage::ImageRgb8(i));
                 }
                 tiff::ColorType::RGBA(_) => {
                     debug!("Loading rgba color");
                     let i = image::RgbaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGBA img")?;
-                    col.add_still(i);
+                    col.add_still(DynamicImage::ImageRgba8(i));
                 }
                 tiff::ColorType::GrayA(_) => {
                     debug!("Loading gray color with alpha");
                     let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray alpha img")?;
-                    col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+                    col.add_still(image::DynamicImage::ImageLumaA8(i));
                 }
                 _ => {
                     bail!(
@@ -977,7 +1029,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         _ => {
             // All other supported image files are handled by using `image`
             let img = image::open(img_location)?;
-            col.add_still(img.to_rgba8());
+            col.add_still(img);
         }
     }
 
@@ -1003,6 +1055,30 @@ pub trait ImageExt {
 
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
+    }
+}
+
+impl ImageExt for DynamicImage {
+    fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.create_texture()
+            .from_bytes(&self.to_rgba8(), self.width() as i32, self.height() as i32)
+            .with_mipmaps(true)
+            .with_format(notan::prelude::TextureFormat::SRgba8)
+            // .with_premultiplied_alpha()
+            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+            .build()
+            .ok()
+    }
+
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.width() as f32, self.height() as f32)
+    }
+
+    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
+        if let Err(e) = gfx.update_texture(texture).with_data(&self.to_rgba8()).update() {
+            error!("{e}");
+        }
     }
 }
 

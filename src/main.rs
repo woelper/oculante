@@ -170,7 +170,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ..Default::default()
     };
 
-
     match settings::PersistentSettings::load() {
         Ok(settings) => state.persistent_settings = settings,
         Err(e) => {
@@ -204,8 +203,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             } else {
                 // Unsupported extension
                 state.send_message(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
-
-
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
@@ -644,8 +641,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer: {:?}", img.dimensions());
-        state.image_dimension = img.dimensions();
+        debug!("Received image buffer: {:?}", (img.width(), img.height()));
+        state.image_dimension = (img.width(), img.height());
         // state.current_texture = img.to_texture(gfx);
 
         debug!("Frame source: {:?}", frame.source);
@@ -704,7 +701,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                    state.send_message("Directory edits have been loaded for this image.");
+                                    state.send_message(
+                                        "Directory edits have been loaded for this image.",
+                                    );
                                     state.edit_state = edit_state;
                                     state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
@@ -862,16 +861,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-  
-
-        
         if let Some(message) = &state.message {
             // debug!("Message is set, showing");
-            egui::TopBottomPanel::bottom("message").show_animated(ctx, state.message.is_some(), |ui| {
-                ui.label(format!("💬 {message}"));
-                ui.ctx().request_repaint();
-            });
-            let max_anim_len = if state.persistent_settings.vsync {3.5} else {70.};
+            egui::TopBottomPanel::bottom("message").show_animated(
+                ctx,
+                state.message.is_some(),
+                |ui| {
+                    ui.label(format!("💬 {message}"));
+                    ui.ctx().request_repaint();
+                },
+            );
+            let max_anim_len = if state.persistent_settings.vsync {
+                3.5
+            } else {
+                70.
+            };
 
             // using delta does not work with rfd
             // state.toast_cooldown += app.timer.delta_f32();

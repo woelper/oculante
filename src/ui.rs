@@ -15,7 +15,7 @@ use crate::{
 
 use arboard::Clipboard;
 use egui::plot::Plot;
-use image::RgbaImage;
+use image::{GenericImage, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 use notan::{
     egui::{
@@ -176,14 +176,28 @@ impl EguiExt for Ui {
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if state.settings_enabled {
-        return
+        return;
     }
+
     if let Some(img) = &state.current_image {
-        if let Some(p) = img.get_pixel_checked(
-            state.cursor_relative.x as u32,
-            state.cursor_relative.y as u32,
-        ) {
-            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+        match img {
+            image::DynamicImage::ImageRgba8(img) => {
+                if let Some(p) = img.get_pixel_checked(
+                    state.cursor_relative.x as u32,
+                    state.cursor_relative.y as u32,
+                ) {
+                    state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+                }
+            }
+            image::DynamicImage::ImageRgba32F(img) => {
+                if let Some(p) = img.get_pixel_checked(
+                    state.cursor_relative.x as u32,
+                    state.cursor_relative.y as u32,
+                ) {
+                    state.sampled_color = [p[0], p[1], p[2], p[3]];
+                }
+            }
+            _ => {}
         }
     }
 
@@ -620,7 +634,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 /// Everything related to image editing
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if state.settings_enabled {
-        return
+        return;
     }
     egui::SidePanel::right("editing")
         .min_width(100.)
@@ -751,19 +765,39 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.edit_state.painting {
                     if ctx.input().pointer.secondary_down() {
                         if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
-                                state.cursor_relative.x as u32,
-                                state.cursor_relative.y as u32,
-                            ) {
-                                info!("{:?}", p);
-                                stroke.color = [
-                                    p[0] as f32 / 255.,
-                                    p[1] as f32 / 255.,
-                                    p[2] as f32 / 255.,
-                                    p[3] as f32 / 255.,
-                                ];
-                                // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+
+                            match &state.edit_state.result_pixel_op {
+                                image::DynamicImage::ImageRgba8(img) => {
+                                    if let Some(p) = img.get_pixel_checked(
+                                        state.cursor_relative.x as u32,
+                                        state.cursor_relative.y as u32,
+                                    ) {
+                                        info!("{:?}", p);
+                                        stroke.color = [
+                                            p[0] as f32 / 255.,
+                                            p[1] as f32 / 255.,
+                                            p[2] as f32 / 255.,
+                                            p[3] as f32 / 255.,
+                                        ];
+                                    }
+                                },
+                                image::DynamicImage::ImageRgba32F(img) => {
+                                    if let Some(p) = img.get_pixel_checked(
+                                        state.cursor_relative.x as u32,
+                                        state.cursor_relative.y as u32,
+                                    ) {
+                                        info!("{:?}", p);
+                                        stroke.color = [
+                                            p[0],
+                                            p[1],
+                                            p[2],
+                                            p[3],
+                                        ];
+                                    }
+                                },
+                                _ => {},
                             }
+
                         }
                     }
 
@@ -1848,7 +1882,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .clicked()
                         || copy_pressed
                     {
-                        clipboard_copy(img);
+                        clipboard_copy(&img.to_rgba8());
                         ui.close_menu();
                     }
                 }
@@ -1872,7 +1906,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 _ = state
                                     .player
                                     .image_sender
-                                    .send(crate::utils::Frame::new_still(image));
+                                    .send(crate::utils::Frame::new_still(
+                                        image::DynamicImage::ImageRgba8(image),
+                                    ));
                                 // Since pasted data has no path, make sure it's not set
                                 state.send_message("Image pasted");
                             }

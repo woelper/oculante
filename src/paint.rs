@@ -1,4 +1,4 @@
-use image::{Pixel, Rgba, RgbaImage};
+use image::{Pixel, Rgba, RgbaImage, DynamicImage};
 use notan::egui::{Color32, Pos2};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
@@ -39,7 +39,7 @@ impl PaintStroke {
     }
 
     // render brush stroke
-    pub fn render(&self, img: &mut RgbaImage, brushes: &[RgbaImage]) {
+    pub fn render(&self, img: &mut DynamicImage, brushes: &[RgbaImage]) {
         // Calculate the brush: use a fraction of the smallest image size
         let max_brush_size = img.width().min(img.height());
 
@@ -101,10 +101,12 @@ impl PaintStroke {
     }
 }
 
-pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
+pub fn paint_at(dyn_img: &mut DynamicImage, brush: &RgbaImage, pos: &Pos2, color: [f32; 4]) {
     // To test
     // img.put_pixel(pos.x as u32, pos.y as u32, color_to_pixel(color));
     // return;
+
+    let mut img = dyn_img.to_rgba8();
 
     let brush_offset = Pos2::new(brush.width() as f32 / 2., brush.height() as f32 / 2.);
 
@@ -124,4 +126,5 @@ pub fn paint_at(img: &mut RgbaImage, brush: &RgbaImage, pos: &Pos2, color: [f32;
             p.blend(&colored_pixel);
         }
     }
+    //FIXME: return correct type by assigning
 }

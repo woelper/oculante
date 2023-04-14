@@ -7,7 +7,7 @@ use crate::ui::EguiExt;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, RgbaImage};
+use image::{imageops, RgbaImage, DynamicImage};
 use log::{debug, error};
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
     #[serde(skip)]
-    pub result_pixel_op: RgbaImage,
+    pub result_pixel_op: DynamicImage,
     #[serde(skip)]
-    pub result_image_op: RgbaImage,
+    pub result_image_op: DynamicImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
@@ -37,8 +37,8 @@ pub struct EditState {
 impl Default for EditState {
     fn default() -> Self {
         Self {
-            result_pixel_op: RgbaImage::default(),
-            result_image_op: RgbaImage::default(),
+            result_pixel_op: DynamicImage::default(),
+            result_image_op: DynamicImage::default(),
             painting: Default::default(),
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
@@ -464,19 +464,20 @@ impl ImageOperation {
     }
 
     /// Process all image operators (All things that modify the image and are not "per pixel")
-    pub fn process_image(&self, img: &mut RgbaImage) -> Result<()> {
+    pub fn process_image(&self, dyn_img: &mut DynamicImage) -> Result<()> {
+        let mut img = dyn_img.to_rgba32f();
         match self {
             Self::Blur(amt) => {
                 if *amt != 0 {
-                    *img = imageops::blur(img, *amt as f32);
+                    img = imageops::blur(&img, *amt as f32);
                 }
             }
             Self::Crop(dim) => {
                 if *dim != [0, 0, 0, 0] {
                     let window = cropped_range(dim, &(img.width(), img.height()));
                     let sub_img =
-                        image::imageops::crop_imm(img, window[0], window[1], window[2], window[3]);
-                    *img = sub_img.to_image();
+                        image::imageops::crop_imm(&img, window[0], window[1], window[2], window[3]);
+                    img = sub_img.to_image();
                 }
             }
             Self::Resize {
@@ -503,7 +504,7 @@ impl ImageOperation {
                     let mut src_image = fr::Image::from_vec_u8(
                         width,
                         height,
-                        img.clone().into_raw(),
+                        dyn_img.to_rgba8().into_raw(),
                         fr::PixelType::U8x4,
                     )?;
 
@@ -526,31 +527,32 @@ impl ImageOperation {
 
                     mapper.backward_map_inplace(&mut dst_image.view_mut())?;
 
-                    *img = anyhow::Context::context(
-                        image::RgbaImage::from_raw(
-                            dimensions.0,
-                            dimensions.1,
-                            dst_image.into_vec(),
-                        ),
-                        "Can't create RgbaImage",
-                    )?;
+                    // img = anyhow::Context::context(
+                    //     image::RgbaImage::from_raw(
+                    //         dimensions.0,
+                    //         dimensions.1,
+                    //         dst_image.into_vec(),
+                    //     ),
+                    //     "Can't create RgbaImage",
+                    // )?;
+                    // FIXME use slow resize for float
                 }
             }
             Self::Rotate(angle) => {
                 match angle {
-                    90 => *img = image::imageops::rotate90(img),
-                    -90 => *img = image::imageops::rotate270(img),
-                    270 => *img = image::imageops::rotate270(img),
-                    180 => *img = image::imageops::rotate180(img),
+                    90 => img = image::imageops::rotate90(&img),
+                    -90 => img = image::imageops::rotate270(&img),
+                    270 => img = image::imageops::rotate270(&img),
+                    180 => img = image::imageops::rotate180(&img),
                     // 270 => *img = image::imageops::rotate270(img),
                     _ => (),
                 }
             }
             Self::Flip(vert) => {
                 if *vert {
-                    *img = image::imageops::flip_vertical(img);
+                    img = image::imageops::flip_vertical(&img);
                 }
-                *img = image::imageops::flip_horizontal(img);
+                img = image::imageops::flip_horizontal(&img);
             }
             Self::ChromaticAberration(amt) => {
                 let center = (img.width() as i32 / 2, img.height() as i32 / 2);
@@ -729,26 +731,14 @@ pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     p[2] = egui::lerp(p[2]..=val, factor);
 }
 
-pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
-    // use pulp::Arch;
-    // let arch = Arch::new();
-
-    // arch.dispatch(|| {
-    //         for x in &mut buffer.into_vec() {
-    //             *x = 12 as u8;
-    //         }
-    //     });
+pub fn process_pixels(dyn_buffer: &mut DynamicImage, operators: &Vec<ImageOperation>) {
+  
+    let mut buffer = dyn_buffer.to_rgba32f(); 
 
     buffer
-        // .chunks_mut(4)
         .par_chunks_mut(4)
         .for_each(|px| {
-            // let mut float_pixel = image::Rgba([
-            //     px[0] as f32 / 255.,
-            //     px[1] as f32 / 255.,
-            //     px[2] as f32 / 255.,
-            //     px[3] as f32 / 255.,
-            // ]);
+    
 
             let mut float_pixel =
                 Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
@@ -760,13 +750,16 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
                 }
             }
 
-            float_pixel *= 255.;
+            // float_pixel *= 255.;
 
-            px[0] = (float_pixel[0]) as u8;
-            px[1] = (float_pixel[1]) as u8;
-            px[2] = (float_pixel[2]) as u8;
-            px[3] = (float_pixel[3]) as u8;
+            px[0] = float_pixel[0];
+            px[1] = float_pixel[1];
+            px[2] = float_pixel[2];
+            px[3] = float_pixel[3];
         });
+        *dyn_buffer = DynamicImage::ImageRgba32F(buffer);
+        // FIXME return correct type
+    
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.

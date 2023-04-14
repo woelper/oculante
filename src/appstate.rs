@@ -4,7 +4,7 @@ use crate::{
     settings::PersistentSettings,
     utils::{ColorChannel, ExtendedImageInfo, Frame, Player},
 };
-use image::RgbaImage;
+use image::{RgbaImage, DynamicImage};
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
@@ -44,7 +44,7 @@ pub struct OculanteState {
     pub player: Player,
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
-    pub current_image: Option<RgbaImage>,
+    pub current_image: Option<DynamicImage>,
     pub current_channel: ColorChannel,
     pub settings_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
