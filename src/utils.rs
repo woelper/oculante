@@ -287,7 +287,7 @@ pub fn send_image_threaded(
                                 filter: image_editing::ScaleFilter::Bilinear,
                             };
                             _ = op.process_image(&mut frame.buffer);
-                            _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled to {max_texture_size}".to_string());
+                            _ = message_sender.send(format!("This image exceeded the maximum resolution and will be be scaled to {max_texture_size}"));
                             let _ = texture_sender.send(frame);
                         } else {
                             let _ = texture_sender.send(frame);
@@ -819,7 +819,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
 
             let hdr_img = hdr_decoder.read_image_hdr()?;
-            for pixel in hdr_img {
+            for pixel in &hdr_img {
                 let tp = image::Rgba(tonemap_rgb(pixel.0));
                 ldr_img.push(tp);
             }
@@ -830,9 +830,19 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 s.append(&mut x);
             }
 
+            let mut h: Vec<f32> = vec![];
+            let l = hdr_img.clone();
+            for p in l {
+                let mut x = vec![p.0[0], p.0[1], p.0[2], 1.0];
+                h.append(&mut x);
+            }
+
             let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
                 .context("Failed to create RgbaImage with given dimensions")?;
-            col.add_still(DynamicImage::ImageRgba8(tonemapped_buffer));
+            let hdr_buffer = image::Rgba32FImage::from_raw(meta.width, meta.height, h)
+            .context("Failed to create Rgba32Image with given dimensions")?;
+            // col.add_still(DynamicImage::ImageRgba8(tonemapped_buffer));
+            col.add_still(DynamicImage::ImageRgba32F(hdr_buffer));
         }
         "psd" => {
             let mut file = File::open(img_location)?;
@@ -1060,15 +1070,33 @@ pub trait ImageExt {
 
 impl ImageExt for DynamicImage {
     fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
-        gfx.create_texture()
-            .from_bytes(&self.to_rgba8(), self.width() as i32, self.height() as i32)
-            .with_mipmaps(true)
-            .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
+        match self {
+            DynamicImage::ImageRgba8(img) => {
+                gfx.create_texture()
+                .from_bytes(img, self.width() as i32, self.height() as i32)
+                .with_mipmaps(true)
+                .with_format(notan::prelude::TextureFormat::SRgba8)
+                .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+                .with_mipmap_filter(TextureFilter::Nearest)
+                .build()
+                .ok()
+            }
+            DynamicImage::ImageRgba32F(_img) => {
+                gfx.create_texture()
+                // TODO: Create proper float texture
+                .from_bytes(&self.to_rgba8(), self.width() as i32, self.height() as i32)
+                .with_mipmaps(true)
+                .with_mipmap_filter(TextureFilter::Nearest)
+
+                // .with_format(notan::prelude::TextureFormat::Rgba32Float)
+                .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+                .build()
+                .ok()
+            }
+            _ => None
+        }
+
+
     }
 
     fn size_vec(&self) -> Vector2<f32> {
@@ -1076,7 +1104,11 @@ impl ImageExt for DynamicImage {
     }
 
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
-        if let Err(e) = gfx.update_texture(texture).with_data(&self.to_rgba8()).update() {
+        if let Err(e) = gfx
+            .update_texture(texture)
+            .with_data(&self.to_rgba8())
+            .update()
+        {
             error!("{e}");
         }
     }

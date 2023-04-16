@@ -15,7 +15,7 @@ use crate::{
 
 use arboard::Clipboard;
 use egui::plot::Plot;
-use image::{GenericImage, GenericImageView, RgbaImage};
+use image::{GenericImage, GenericImageView, RgbaImage, DynamicImage};
 use log::{debug, error, info};
 use notan::{
     egui::{
@@ -1013,10 +1013,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if !state.edit_state.pixel_op_stack.is_empty() {
                     let ops = &state.edit_state.pixel_op_stack;
                     process_pixels(&mut state.edit_state.result_pixel_op, ops);
-
+                    // let buffer = state.edit_state.result_pixel_op.to_rgba32f();
+                    // let dyn_8 = image::DynamicImage::ImageRgba32F(buffer).to_rgba8();
+                    // state.edit_state.result_pixel_op = image::DynamicImage::ImageRgba8(dyn_8);
                 }
 
-                                info!(
+                info!(
                     "Finished Pixel op stack in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
@@ -1680,6 +1682,15 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
+
+        if let Some(img) = &state.current_image {
+            if let DynamicImage::ImageRgba32F(_i) = img {
+                ui.label("Float image");
+            } else {
+                ui.label("8-bit");
+            }
+
+        }
 
         ui.label("Channels");
 

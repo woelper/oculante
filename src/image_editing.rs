@@ -7,8 +7,8 @@ use crate::ui::EguiExt;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, RgbaImage, DynamicImage};
-use log::{debug, error};
+use image::{imageops, DynamicImage, RgbaImage};
+use log::{debug, error, info};
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
@@ -577,6 +577,15 @@ impl ImageOperation {
 
             _ => (),
         }
+        match dyn_img {
+            DynamicImage::ImageRgba8(i) => {
+                *i = DynamicImage::ImageRgba32F(img).to_rgba8();
+            }
+            DynamicImage::ImageRgba32F(i) => {
+                *i = img;
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -732,34 +741,46 @@ pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
 }
 
 pub fn process_pixels(dyn_buffer: &mut DynamicImage, operators: &Vec<ImageOperation>) {
-  
-    let mut buffer = dyn_buffer.to_rgba32f(); 
+    let mut buffer = dyn_buffer.to_rgba32f();
 
-    buffer
-        .par_chunks_mut(4)
-        .for_each(|px| {
-    
+    // info!("{:?}", dyn_buffer);
+    buffer.par_chunks_mut(4).for_each(|px| {
 
-            let mut float_pixel =
-                Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
+        // info!("{:?}", px);
+        
+        let mut float_pixel =
+            Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32);
 
-            // run pixel operations
-            for operation in operators {
-                if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                    error!("{e}")
-                }
+        // run pixel operations
+        for operation in operators {
+            if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                error!("{e}")
             }
+        }
 
-            // float_pixel *= 255.;
+        px[0] = float_pixel[0];
+        px[1] = float_pixel[1];
+        px[2] = float_pixel[2];
+        px[3] = float_pixel[3];
 
-            px[0] = float_pixel[0];
-            px[1] = float_pixel[1];
-            px[2] = float_pixel[2];
-            px[3] = float_pixel[3];
-        });
-        *dyn_buffer = DynamicImage::ImageRgba32F(buffer);
-        // FIXME return correct type
-    
+    });
+
+    // let dyn_8 = DynamicImage::ImageRgba32F(buffer).into_rgba8();
+    // *dyn_buffer = DynamicImage::ImageRgba8(dyn_8);
+
+    // return;
+    // *dyn_buffer = DynamicImage::ImageRgba32F(buffer);
+    match dyn_buffer {
+        DynamicImage::ImageRgba8(i) => {
+            debug!("processing rgba8");
+            *i = DynamicImage::ImageRgba32F(buffer).to_rgba8();
+        }
+        DynamicImage::ImageRgba32F(_) => {
+            *dyn_buffer = DynamicImage::ImageRgba32F(buffer);
+        }
+        _ => {}
+    }
+    // FIXME return correct type
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
