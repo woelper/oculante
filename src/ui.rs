@@ -516,7 +516,20 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     {
                         state.persistent_settings.save();
                     }
-                });
+                
+                    if ui
+                    .checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
+                    .on_hover_text(
+                        "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
+                    )
+                    .changed()
+                    {
+                        state.persistent_settings.save();
+                    }
+                }
+            
+            
+            );
 
                 ui.horizontal(|ui| {
                     ui.label("Configure window title");

@@ -287,7 +287,15 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     // load checker texture
     if let Ok(checker_image) = image::load_from_memory(include_bytes!("../res/checker.png")) {
-        state.checker_texture = checker_image.into_rgba8().to_texture(gfx);
+        // state.checker_texture = checker_image.into_rgba8().to_texture(gfx);
+        // No mipmaps for the checker pattern!
+        let img = checker_image.into_rgba8();
+        state.checker_texture = gfx.create_texture()
+        .from_bytes(&img, img.width() as i32, img.height() as i32)
+        .with_mipmaps(false)
+        .with_format(notan::prelude::TextureFormat::SRgba8)
+        .build()
+        .ok();
     }
 
     state
@@ -773,15 +781,27 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
-    if state.persistent_settings.show_checker_background {
-        if let Some(texture) = &state.checker_texture {
-            draw.pattern(texture)
-                .blend_mode(BlendMode::ADD)
-                .size(app.window().width() as f32, app.window().height() as f32);
-        }
-    }
+    // TODO: Do we need/want a "global" checker?
+    // if state.persistent_settings.show_checker_background {
+    //     if let Some(checker) = &state.checker_texture {
+    //         draw.pattern(checker)
+    //             .blend_mode(BlendMode::ADD)
+    //             .size(app.window().width() as f32, app.window().height() as f32);
+    //     }
+    // }
 
     if let Some(texture) = &state.current_texture {
+        if state.persistent_settings.show_checker_background {
+            if let Some(checker) = &state.checker_texture {
+                draw.pattern(checker)
+                    // .size(texture.width() as f32, texture.height() as f32)
+                    .size(texture.width() as f32 * state.image_geometry.scale, texture.height() as f32 * state.image_geometry.scale)
+                    .blend_mode(BlendMode::ADD)
+                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
+                    ;
+            }
+        }
         if state.tiling < 2 {
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
@@ -795,6 +815,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
                 );
+        }
+
+        if state.persistent_settings.show_frame {
+            draw.rect((0.0,0.0), texture.size())
+            .stroke(1.0)
+            .color(Color { r: 0.5, g: 0.5, b: 0.5, a: 0.5 })
+            .blend_mode(BlendMode::ADD)
+            .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+            .scale(state.image_geometry.scale, state.image_geometry.scale);
         }
 
         if state.persistent_settings.show_minimap {

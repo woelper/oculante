@@ -32,6 +32,7 @@ pub struct PersistentSettings {
     pub last_open_directory: PathBuf,
     pub show_checker_background: bool,
     pub show_minimap: bool,
+    pub show_frame: bool,
 }
 
 impl Default for PersistentSettings {
@@ -55,6 +56,7 @@ impl Default for PersistentSettings {
             last_open_directory: std::env::current_dir().unwrap_or_default(),
             show_checker_background: Default::default(),
             show_minimap: Default::default(),
+            show_frame: Default::default(),
         }
     }
 }
