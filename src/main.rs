@@ -796,7 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
                     // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale, texture.height() as f32 * state.image_geometry.scale)
+                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
                     .blend_mode(BlendMode::ADD)
                     .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
                     // .scale(state.image_geometry.scale, state.image_geometry.scale)
