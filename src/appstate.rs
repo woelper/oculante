@@ -2,7 +2,7 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::PersistentSettings,
-    utils::{ColorChannel, ExtendedImageInfo, Frame, Player},
+    utils::{ExtendedImageInfo, Frame, Player},
 };
 use image::RgbaImage;
 use nalgebra::Vector2;
@@ -45,7 +45,6 @@ pub struct OculanteState {
     pub current_texture: Option<Texture>,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
-    pub current_channel: ColorChannel,
     pub settings_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
     pub tiling: usize,
@@ -98,7 +97,6 @@ impl Default for OculanteState {
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
-            current_channel: ColorChannel::Rgba,
             settings_enabled: Default::default(),
             image_info: Default::default(),
             tiling: 1,

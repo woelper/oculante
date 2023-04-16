@@ -1,4 +1,4 @@
-use crate::shortcuts::*;
+use crate::{shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs::File, path::PathBuf};
@@ -33,6 +33,7 @@ pub struct PersistentSettings {
     pub show_checker_background: bool,
     pub show_minimap: bool,
     pub show_frame: bool,
+    pub current_channel:ColorChannel,
 }
 
 impl Default for PersistentSettings {
@@ -57,6 +58,7 @@ impl Default for PersistentSettings {
             show_checker_background: Default::default(),
             show_minimap: Default::default(),
             show_frame: Default::default(),
+            current_channel: ColorChannel::Rgba,
         }
     }
 }

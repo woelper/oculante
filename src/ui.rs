@@ -1665,28 +1665,28 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         let mut changed_channels = false;
 
         if key_pressed(app, state, RedChannel) {
-            state.current_channel = ColorChannel::Red;
+            state.persistent_settings.current_channel = ColorChannel::Red;
             changed_channels = true;
         }
         if key_pressed(app, state, GreenChannel) {
-            state.current_channel = ColorChannel::Green;
+            state.persistent_settings.current_channel = ColorChannel::Green;
             changed_channels = true;
         }
         if key_pressed(app, state, BlueChannel) {
-            state.current_channel = ColorChannel::Blue;
+            state.persistent_settings.current_channel = ColorChannel::Blue;
             changed_channels = true;
         }
         if key_pressed(app, state, AlphaChannel) {
-            state.current_channel = ColorChannel::Alpha;
+            state.persistent_settings.current_channel = ColorChannel::Alpha;
             changed_channels = true;
         }
 
         if key_pressed(app, state, RGBChannel) {
-            state.current_channel = ColorChannel::Rgb;
+            state.persistent_settings.current_channel = ColorChannel::Rgb;
             changed_channels = true;
         }
         if key_pressed(app, state, RGBAChannel) {
-            state.current_channel = ColorChannel::Rgba;
+            state.persistent_settings.current_channel = ColorChannel::Rgba;
             changed_channels = true;
         }
 
@@ -1695,11 +1695,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
             egui::ComboBox::from_id_source("channels")
-                .selected_text(format!("{:?}", state.current_channel))
+                .selected_text(format!("{:?}", state.persistent_settings.current_channel))
                 .show_ui(ui, |ui| {
                     for channel in ColorChannel::iter() {
                         let r = ui.selectable_value(
-                            &mut state.current_channel,
+                            &mut state.persistent_settings.current_channel,
                             channel,
                             channel.to_string(),
                         );
@@ -1713,6 +1713,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .clicked()
                         {
                             changed_channels = true;
+                            state.persistent_settings.save();
                         }
                     }
                 });
@@ -1721,12 +1722,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         // TODO: remove redundancy
         if changed_channels {
             if let Some(img) = &state.current_image {
-                match &state.current_channel {
+                match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => state.current_texture = unpremult(img).to_texture(gfx),
                     ColorChannel::Rgba => state.current_texture = img.to_texture(gfx),
                     _ => {
                         state.current_texture =
-                            solo_channel(img, state.current_channel as usize).to_texture(gfx)
+                            solo_channel(img, state.persistent_settings.current_channel as usize).to_texture(gfx)
                     }
                 }
             }

@@ -12,6 +12,7 @@ use notan::prelude::{App, Graphics, TextureFilter};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
+use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
@@ -371,7 +372,7 @@ impl FrameCollection {
     }
 }
 
-#[derive(Debug, PartialEq, EnumIter, Display, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, EnumIter, Display, Clone, Copy)]
 pub enum ColorChannel {
     Red,
     Green,

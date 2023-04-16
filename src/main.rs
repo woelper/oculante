@@ -605,7 +605,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
     if state.persistent_settings.edit_enabled {
-        state.current_channel = ColorChannel::Rgba;
+        state.persistent_settings.current_channel = ColorChannel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
@@ -744,7 +744,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         state.is_loaded = true;
 
-        match &state.current_channel {
+        match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => state.current_texture = unpremult(&img).to_texture(gfx),
             // Do nuttin'
@@ -752,7 +752,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // Display the channel
             _ => {
                 state.current_texture =
-                    solo_channel(&img, state.current_channel as usize).to_texture(gfx)
+                    solo_channel(&img, state.persistent_settings.current_channel as usize).to_texture(gfx)
             }
         }
         state.current_image = Some(img);
