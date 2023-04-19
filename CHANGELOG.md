@@ -1,3 +1,14 @@
+# 0.6.61 (2023-04-19)
+
+### :beetle: Bug Fixes
+
+* Prevent info panel flickering while auto-hiding scrollbar (696d8818)
+
+### :sparkles: Features
+
+* Simplified file saving - now with file picker (aa410cc6)
+* Add optional checker background (f09d012e)
+
 # 0.6.60 (2023-04-02)
 
 # 0.6.59 (2023-04-02)
