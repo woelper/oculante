@@ -90,13 +90,20 @@ fn main() -> Result<(), String> {
         let _ = mac::launch();
     }
 
-    if let Ok(settings) = settings::PersistentSettings::load() {
-        window_config.vsync = settings.vsync;
-        if settings.window_geometry != Default::default() {
-            window_config.width = settings.window_geometry.1 .0;
-            window_config.height = settings.window_geometry.1 .1;
+    // Unfortunately we need to load the persistent settings here, too - the window settings need
+    // to be set before window creation
+    match settings::PersistentSettings::load() {
+        Ok(settings) => {
+            window_config.vsync = settings.vsync;
+            if settings.window_geometry != Default::default() {
+                window_config.width = settings.window_geometry.1 .0;
+                window_config.height = settings.window_geometry.1 .1;
+            }
+            debug!("Loaded vsync.");
         }
-        info!("Loaded vsync.");
+        Err(e) => {
+            error!("Could not load settings: {e}");
+        }
     }
 
     info!("Starting oculante.");
@@ -147,9 +154,11 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         ..Default::default()
     };
 
-
     match settings::PersistentSettings::load() {
-        Ok(settings) => state.persistent_settings = settings,
+        Ok(settings) => {
+            state.persistent_settings = settings;
+            info!("Successfully loaded previous settings.")
+        }
         Err(e) => {
             warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
             state.persistent_settings = Default::default();
@@ -181,8 +190,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             } else {
                 // Unsupported extension
                 state.send_message(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
-
-
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
@@ -270,12 +277,13 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // state.checker_texture = checker_image.into_rgba8().to_texture(gfx);
         // No mipmaps for the checker pattern!
         let img = checker_image.into_rgba8();
-        state.checker_texture = gfx.create_texture()
-        .from_bytes(&img, img.width() as i32, img.height() as i32)
-        .with_mipmaps(false)
-        .with_format(notan::prelude::TextureFormat::SRgba8)
-        .build()
-        .ok();
+        state.checker_texture = gfx
+            .create_texture()
+            .from_bytes(&img, img.width() as i32, img.height() as i32)
+            .with_mipmaps(false)
+            .with_format(notan::prelude::TextureFormat::SRgba8)
+            .build()
+            .ok();
     }
 
     state
@@ -683,7 +691,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                    state.send_message("Directory edits have been loaded for this image.");
+                                    state.send_message(
+                                        "Directory edits have been loaded for this image.",
+                                    );
                                     state.edit_state = edit_state;
                                     state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
@@ -723,7 +733,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // Display the channel
             _ => {
                 state.current_texture =
-                    solo_channel(&img, state.persistent_settings.current_channel as usize).to_texture(gfx)
+                    solo_channel(&img, state.persistent_settings.current_channel as usize)
+                        .to_texture(gfx)
             }
         }
         state.current_image = Some(img);
@@ -790,12 +801,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.persistent_settings.show_frame {
-            draw.rect((0.0,0.0), texture.size())
-            .stroke(1.0)
-            .color(Color { r: 0.5, g: 0.5, b: 0.5, a: 0.5 })
-            .blend_mode(BlendMode::ADD)
-            .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-            .scale(state.image_geometry.scale, state.image_geometry.scale);
+            draw.rect((0.0, 0.0), texture.size())
+                .stroke(1.0)
+                .color(Color {
+                    r: 0.5,
+                    g: 0.5,
+                    b: 0.5,
+                    a: 0.5,
+                })
+                .blend_mode(BlendMode::ADD)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .scale(state.image_geometry.scale, state.image_geometry.scale);
         }
 
         if state.persistent_settings.show_minimap {
@@ -862,16 +878,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-  
-
-        
         if let Some(message) = &state.message {
             // debug!("Message is set, showing");
-            egui::TopBottomPanel::bottom("message").show_animated(ctx, state.message.is_some(), |ui| {
-                ui.label(format!("💬 {message}"));
-                ui.ctx().request_repaint();
-            });
-            let max_anim_len = if state.persistent_settings.vsync {3.5} else {70.};
+            egui::TopBottomPanel::bottom("message").show_animated(
+                ctx,
+                state.message.is_some(),
+                |ui| {
+                    ui.label(format!("💬 {message}"));
+                    ui.ctx().request_repaint();
+                },
+            );
+            let max_anim_len = if state.persistent_settings.vsync {
+                3.5
+            } else {
+                70.
+            };
 
             // using delta does not work with rfd
             // state.toast_cooldown += app.timer.delta_f32();
@@ -965,6 +986,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(file_path);
+        _ = state.persistent_settings.save();
     }
 }
 
