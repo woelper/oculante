@@ -882,14 +882,22 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-        if let Some(message) = &state.message {
+        if let Some(message) = &state.message.clone() {
             // debug!("Message is set, showing");
             egui::TopBottomPanel::bottom("message").show_animated(
                 ctx,
                 state.message.is_some(),
                 |ui| {
-                    ui.label(format!("💬 {message}"));
                     ui.ctx().request_repaint();
+
+                    ui.horizontal(|ui| {
+                        ui.label(format!("💬 {message}"));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                            if ui.small_button("🗙").clicked() {
+                                state.message = None
+                            }
+                        });
+                    });
                 },
             );
             let max_anim_len = if state.persistent_settings.vsync {
