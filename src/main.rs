@@ -502,7 +502,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 } else {
                     // Normal scaling
                     debug!("{delta_y}");
-                    let delta = zoomratio((delta_y/10.).max(-5.0).min(5.0), state.image_geometry.scale);
+                    let delta = zoomratio(
+                        (delta_y / 10.).max(-5.0).min(5.0),
+                        state.image_geometry.scale,
+                    );
                     let new_scale = state.image_geometry.scale + delta;
                     // limit scale
                     if new_scale > 0.01 && new_scale < 40. {
