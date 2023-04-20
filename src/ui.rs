@@ -27,6 +27,8 @@ use notan::{
 };
 use std::{collections::HashSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
+const PANEL_WIDTH: f32 = 240.0;
+const PANEL_WIDGET_OFFSET: f32 = 10.0;
 
 #[cfg(feature = "turbo")]
 use crate::image_editing::{cropped_range, lossless_tx};
@@ -176,7 +178,7 @@ impl EguiExt for Ui {
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if state.settings_enabled {
-        return
+        return;
     }
     if let Some(img) = &state.current_image {
         if let Some(p) = img.get_pixel_checked(
@@ -187,7 +189,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         }
     }
 
-    egui::SidePanel::left("side_panel").show(ctx, |ui| {
+    egui::SidePanel::left("side_panel")
+    .max_width(PANEL_WIDTH)
+    .min_width(PANEL_WIDTH/2.)
+    .show(ctx, |ui| {
 
 
         egui::ScrollArea::vertical().auto_shrink([false,true])
@@ -197,10 +202,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let tex_id = gfx.egui_register_texture(texture);
 
                 // width of image widget
-                let desired_width = ui.available_width() - ui.spacing().button_padding.x*4. - 16.;
+                // let desired_width = ui.available_width() - ui.spacing().indent;
+                let desired_width = PANEL_WIDTH - PANEL_WIDGET_OFFSET;
 
                 let scale = (desired_width / 8.) / texture.size().0;
-                let img_size = egui::Vec2::new(desired_width, desired_width);
 
                 let uv_center = (
                     state.cursor_relative.x / state.image_dimension.0 as f32,
@@ -277,14 +282,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio);
+
+
                 let preview_rect = ui
                     .add(
-                        egui::Image::new(tex_id, img_size).uv(egui::Rect::from_x_y_ranges(
+                        egui::Image::new(tex_id, egui::Vec2::splat(desired_width)).uv(egui::Rect::from_x_y_ranges(
                             uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
                             uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                        )), // .bg_fill(egui::Color32::RED),
+                        )),
                     )
                     .rect;
+
+
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
@@ -304,7 +313,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     [preview_rect.left_center(), preview_rect.right_center()],
                     Stroke::new(1., stroke_color),
                 );
-                // ui.image(tex_id, img_size);
             }
             ui.collapsing("Compare", |ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -367,8 +375,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             // ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
 
             ui.horizontal(|ui| {
+                ui.label("Tiling");
                 ui.slider_styled(&mut state.tiling, 1..=10);
-                ui.label("Image tiling");
             });
             advanced_ui(ui, state);
 
@@ -473,15 +481,15 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .on_hover_text(
                         "Show a checker pattern as backdrop.",
                     );
-                
+
                     ui
                     .checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
                     .on_hover_text(
                         "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
                     );
                 }
-            
-            
+
+
             );
 
                 ui.horizontal(|ui| {
@@ -586,6 +594,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         Plot::new("histogram")
             .allow_zoom(false)
             .allow_drag(false)
+            .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
             .show(ui, |plot_ui| {
                 // plot_ui.line(grey_vals);
                 plot_ui.points(red_vals);
@@ -598,7 +607,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 /// Everything related to image editing
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if state.settings_enabled {
-        return
+        return;
     }
     egui::SidePanel::right("editing")
         .min_width(100.)
@@ -1685,7 +1694,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ColorChannel::Rgba => state.current_texture = img.to_texture(gfx),
                     _ => {
                         state.current_texture =
-                            solo_channel(img, state.persistent_settings.current_channel as usize).to_texture(gfx)
+                            solo_channel(img, state.persistent_settings.current_channel as usize)
+                                .to_texture(gfx)
                     }
                 }
             }
