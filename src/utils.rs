@@ -269,6 +269,7 @@ pub fn send_image_threaded(
                             frame.buffer.dimensions().0.max(frame.buffer.dimensions().1);
 
                         if largest_side > max_texture_size {
+                            _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled down.".to_string());
                             let scale_factor = max_texture_size as f32 / largest_side as f32;
                             let new_dimensions = (
                                 (frame.buffer.dimensions().0 as f32 * scale_factor)
@@ -286,7 +287,6 @@ pub fn send_image_threaded(
                                 filter: image_editing::ScaleFilter::Bilinear,
                             };
                             _ = op.process_image(&mut frame.buffer);
-                            _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled to {max_texture_size}".to_string());
                             let _ = texture_sender.send(frame);
                         } else {
                             let _ = texture_sender.send(frame);
