@@ -1,6 +1,6 @@
 # Maintainer: Johann Woelper <woelper@gmail.com>
 pkgname=oculante
-pkgver=0.6.62
+pkgver=0.6.63
 pkgrel=1
 depends=('aom' 'libwebp' 'expat' 'freetype2' 'gtk3' 'cairo')
 makedepends=('rust' 'cargo' 'tar' 'nasm')
