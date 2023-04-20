@@ -12,7 +12,7 @@ use notan::prelude::{App, Graphics, TextureFilter};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs::File;
