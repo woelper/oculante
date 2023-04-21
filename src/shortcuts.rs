@@ -267,7 +267,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 .persistent_settings
                 .shortcuts
                 .insert(command, default_shortcut.clone());
-            _ = state.persistent_settings.save();
         }
     }
     false

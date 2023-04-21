@@ -13,8 +13,6 @@ use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
 use std::ffi::OsStr;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
@@ -416,8 +414,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
             if key_pressed(app, state, InfoMode) {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
-                // TODO: Remove if save on exit
-                state.persistent_settings.save();
                 send_extended_info(
                     &state.current_image,
                     &state.current_path,
@@ -427,8 +423,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
-                // TODO: Remove if save on exit
-                state.persistent_settings.save();
             }
 
             if key_pressed(app, state, ZoomIn) {
@@ -475,7 +469,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             //TODO: remove this if save on exit works
             state.persistent_settings.window_geometry.1 = (width, height);
             state.persistent_settings.window_geometry.0 = app.backend.window().position();
-            state.persistent_settings.save();
         }
         _ => (),
     }
@@ -648,7 +641,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if !state.persistent_settings.recent_images.contains(p) {
                 state.persistent_settings.recent_images.insert(0, p.clone());
                 state.persistent_settings.recent_images.truncate(10);
-                state.persistent_settings.save();
             }
         }
 
@@ -971,7 +963,6 @@ fn browse_for_image_path(state: &mut OculanteState) {
             .load(&file_path, state.message_channel.0.clone());
         if let Some(dir) = file_path.parent() {
             state.persistent_settings.last_open_directory = dir.to_path_buf();
-            state.persistent_settings.save();
         }
         state.current_path = Some(file_path);
     }

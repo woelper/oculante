@@ -409,42 +409,27 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                                 state.persistent_settings.accent_color[2],
                             );
                             ctx.set_style(style);
-
-                            state.persistent_settings.save()
                         }
                         ui.label("Accent color");
                     });
 
                     ui.horizontal(|ui| {
-                        if ui
-                            .color_edit_button_srgb(&mut state.persistent_settings.background_color)
-                            .changed()
-                        {
-                            state.persistent_settings.save()
-                        }
+                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
                         ui.label("Background color");
                     });
 
                     ui.end_row();
 
-                    if ui
+                    ui
                     .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
                     .on_hover_text(
                         "Vsync reduces tearing and saves CPU. Toggling it off will make some operations such as panning/zooming more snappy. This needs a restart to take effect.",
-                    )
-                    .changed()
-                {
-                    state.persistent_settings.save()
-                }
-                if ui
+                    );
+                ui
                 .checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
                 .on_hover_text(
                     "Enable an index slider to quickly scrub through lots of images",
-                )
-                .changed()
-                {
-                    state.persistent_settings.save()
-                }
+                );
                     ui.end_row();
 
                     if ui
@@ -454,7 +439,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     )
                     .changed()
                 {
-                    state.persistent_settings.save();
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
                 }
                 ui.horizontal(|ui| {
@@ -468,50 +452,33 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                 {
                     state.player.cache.cache_size = state.persistent_settings.max_cache;
-                    state.persistent_settings.save()
                 }
                 });
 
                 ui.end_row();
-                if ui
+                ui
                     .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
                     .on_hover_text(
                         "When a new image is loaded, keep current zoom and offset",
-                    )
-                    .changed()
-                    {
-                        state.persistent_settings.save()
-                    }
+                    );
 
-                if ui
+                ui
                     .checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
                     .on_hover_text(
                         "When a new image is loaded, keep current edits",
-                    )
-                    .changed()
-                    {
-                        state.persistent_settings.save()
-                    }
+                    );
                 ui.end_row();
-                if ui
+                ui
                     .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background")
                     .on_hover_text(
                         "Show a checker pattern as backdrop.",
-                    )
-                    .changed()
-                    {
-                        state.persistent_settings.save();
-                    }
+                    );
                 
-                    if ui
+                    ui
                     .checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
                     .on_hover_text(
                         "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
-                    )
-                    .changed()
-                    {
-                        state.persistent_settings.save();
-                    }
+                    );
                 }
             
             
@@ -527,7 +494,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                     {
                         set_title(app, state);
-                        state.persistent_settings.save()
                     }
                 });
 
@@ -547,7 +513,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
 
                     if ui.button("Reset all settings").clicked() {
                         state.persistent_settings = Default::default();
-                    state.persistent_settings.save();
                     }
                 });
 
@@ -1608,8 +1573,6 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .map(|k| format!("{:?}", k.0))
         .collect::<HashSet<String>>();
 
-    let mut changed = false;
-
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
         .show(ui, |ui| {
@@ -1638,7 +1601,6 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
                                 .iter()
                                 .map(|(k, _)| format!("{k:?}"))
                                 .collect();
-                            changed = true;
                         }
                     } else {
                         ui.add_enabled(false, egui::Button::new("Press key(s)..."));
@@ -1647,9 +1609,6 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
                 }
             });
         });
-    if changed {
-        state.persistent_settings.save();
-    }
 }
 
 // fn keystrokes(ui: &mut Ui) {
@@ -1713,7 +1672,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .clicked()
                         {
                             changed_channels = true;
-                            state.persistent_settings.save();
                         }
                     }
                 });
@@ -1767,8 +1725,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
             {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
-                // TODO: Remove if save on exit
-                state.persistent_settings.save();
                 send_extended_info(
                     &state.current_image,
                     &state.current_path,
@@ -1785,8 +1741,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
             {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
-                // TODO: Remove if save on exit
-                state.persistent_settings.save();
             }
         }
 
