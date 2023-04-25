@@ -58,6 +58,23 @@ fn bench_load_large() {
         info!("Loaded image in {}", d);
     }
     info!("{} ms mean", total / iters);
+
+
+    info!("Benching this with {iters} iterations...");
+    let mut total = 0;
+
+    for _i in 0..iters {
+        let start = Instant::now();
+        open_image(&PathBuf::from(
+            "tests/large.png",
+        ))
+        .unwrap();
+        let elapsed = start.elapsed();
+        let d = elapsed.as_millis();
+        total += d;
+        info!("Loaded image in {}", d);
+    }
+    info!("{} ms mean", total / iters);
 }
 
 #[test]
