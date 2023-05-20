@@ -735,7 +735,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                         let i = render.image();
 
                         // JXL with alpha
-                        if render.extra_channels().len() == 1 {
+                        if renderer.pixel_format().has_alpha() {
                             let float_image = Rgba32FImage::from_raw(
                                 i.width() as u32,
                                 i.height() as u32,
