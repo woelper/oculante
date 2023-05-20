@@ -166,6 +166,7 @@ impl Player {
     }
 
     pub fn load(&mut self, img_location: &Path, message_sender: Sender<String>) {
+        debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
@@ -223,7 +224,8 @@ pub fn send_image_threaded(
                             }
                             let _ = texture_sender.send(frame.clone());
                             if frame.delay > 0 {
-                                thread::sleep(Duration::from_millis(frame.delay as u64));
+                                //                                                  cap at 60fps
+                                thread::sleep(Duration::from_millis(frame.delay.max(17) as u64));
                             } else {
                                 thread::sleep(Duration::from_millis(40_u64));
                             }
@@ -723,8 +725,24 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         }
         "jxl" => {
             let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
-            info!("{:?}", image.image_header());
             let mut renderer = image.renderer();
+
+            debug!("{:?}", renderer.image_header().metadata);
+            let is_anim = renderer.image_header().metadata.animation.is_some();
+            let delay = renderer
+                .image_header()
+                .metadata
+                .animation
+                .as_ref()
+                .map(|hdr| (hdr.tps_numerator as f32 / hdr.tps_denominator as f32) / 10.)
+                .map(|x| x as u16)
+                .unwrap_or(40);
+            debug!("Frame delay: {delay}");
+
+            if is_anim {
+                col.repeat = true;
+            }
+
             loop {
                 let result = renderer
                     .render_next_frame()
@@ -732,37 +750,98 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     .context("Can't render JXL")?;
                 match result {
                     RenderResult::Done(render) => {
-                        let i = render.image();
+                        let framebuffer = render.image();
+                        match render.color_channels().len() {
+                            1 => {
+                                debug!("Greyscale");
+                                if renderer.pixel_format().has_alpha() {
+                                    debug!("Alpha");
 
-                        // JXL with alpha
-                        if renderer.pixel_format().has_alpha() {
-                            let float_image = Rgba32FImage::from_raw(
-                                i.width() as u32,
-                                i.height() as u32,
-                                i.buf().to_vec(),
-                            )
-                            .context("Can't decode buffer")?;
-                            let d = DynamicImage::ImageRgba32F(float_image);
-                            col.add_still(d.to_rgba8());
-                        }
-                        // JXL without alpha
-                        if render.extra_channels().len() == 0 {
-                            let float_image = Rgb32FImage::from_raw(
-                                i.width() as u32,
-                                i.height() as u32,
-                                i.buf().to_vec(),
-                            )
-                            .context("Can't decode buffer")?;
-                            let d = DynamicImage::ImageRgb32F(float_image);
-                            col.add_still(d.to_rgba8());
+                                    let float_image = image::GrayAlphaImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer.buf()
+                                            .par_iter()
+                                            .map(|x| x * 255.)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>()
+                                            .to_vec(),
+                                    )
+                                    .context("Can't decode buffer for grey alpha")?;
+                                    let d = DynamicImage::ImageLumaA8(float_image);
+                                    if is_anim {
+                                        col.add_anim_frame(d.to_rgba8(), delay);
+                                    } else {
+                                        col.add_still(d.to_rgba8());
+                                    }
+                                }
+                                // JXL without alpha
+                                else {
+                                    let float_image = image::GrayImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer.buf()
+                                            .par_iter()
+                                            .map(|x| x * 255.)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>()
+                                            .to_vec(),
+                                    )
+                                    .context("Can't decode buffer for grey w/o alpha")?;
+                                    let d = DynamicImage::ImageLuma8(float_image);
+                                    if is_anim {
+                                        col.add_anim_frame(d.to_rgba8(), delay);
+                                    } else {
+                                        col.add_still(d.to_rgba8());
+                                    }
+                                }
+                            }
+
+                            3 => {
+                                debug!("RGB");
+                                if renderer.pixel_format().has_alpha() {
+                                    let float_image = Rgba32FImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer.buf().to_vec(),
+                                    )
+                                    .context("Can't decode rgba buffer")?;
+                                    let d = DynamicImage::ImageRgba32F(float_image);
+                                    if is_anim {
+                                        col.add_anim_frame(d.to_rgba8(), delay);
+                                    } else {
+                                        col.add_still(d.to_rgba8());
+                                    }
+                                }
+                                // JXL without alpha
+                                else {
+                                    let float_image = Rgb32FImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer.buf().to_vec(),
+                                    )
+                                    .context("Can't decode rgb buffer")?;
+                                    let d = DynamicImage::ImageRgb32F(float_image);
+                                    if is_anim {
+                                        col.add_anim_frame(d.to_rgba8(), delay);
+                                    } else {
+                                        col.add_still(d.to_rgba8());
+                                    }
+                                }
+                            }
+
+                            _ => {
+                                bail!("JXL: Unsupported number of color channels")
+                            }
                         }
                     }
                     RenderResult::NeedMoreData => {
-                        // wait_for_da/ta();
+                        info!("Need more data in JXL");
                     }
                     RenderResult::NoMoreFrames => break,
                 }
             }
+            debug!("Done decoding JXL");
         }
         "hdr" => {
             let f = File::open(img_location)?;
