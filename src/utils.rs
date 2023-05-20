@@ -1,10 +1,11 @@
 use arboard::Clipboard;
 use dds::DDS;
+use jxl_oxide::{JxlImage, RenderResult};
 
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, RgbImage, RgbaImage};
+use image::{DynamicImage, EncodableLayout, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -41,41 +42,9 @@ use crate::image_editing::{self, ImageOperation};
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "bmp",
-    "dds",
-    "exr",
-    "ff",
-    "gif",
-    "hdr",
-    "ico",
-    "jpeg",
-    "jpg",
-    "png",
-    "pnm",
-    "psd",
-    "svg",
-    "tga",
-    "tif",
-    "tiff",
-    "webp",
-    "nef",
-    "cr2",
-    "dng",
-    "mos",
-    "erf",
-    "raf",
-    "arw",
-    "3fr",
-    "ari",
-    "srf",
-    "sr2",
-    "braw",
-    "r3d",
-    "nrw",
-    "raw",
-    "avif",
-    #[cfg(feature = "jpgxl")]
-    "jxl",
+    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
+    "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
+    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -752,16 +721,48 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let d = DynamicImage::ImageRgb8(x);
             col.add_still(d.to_rgba8());
         }
-        #[cfg(feature = "jpgxl")]
         "jxl" => {
-            use jpegxl_rs::decoder_builder;
-            use jpegxl_rs::image::ToDynamic;
-            let sample = std::fs::read(&img_location)?;
-            let decoder = decoder_builder().build()?;
-            let img = decoder
-                .decode_to_image(&sample)?
-                .context("Can't decode image from jpgxl")?;
-            col.add_still(img.into_rgba8());
+            let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
+            info!("{:?}", image.image_header());
+            let mut renderer = image.renderer();
+            loop {
+                let result = renderer
+                    .render_next_frame()
+                    .map_err(|e| anyhow!("{e}"))
+                    .context("Can't render JXL")?;
+                match result {
+                    RenderResult::Done(render) => {
+                        let i = render.image();
+
+                        // JXL with alpha
+                        if render.extra_channels().len() == 1 {
+                            let float_image = Rgba32FImage::from_raw(
+                                i.width() as u32,
+                                i.height() as u32,
+                                i.buf().to_vec(),
+                            )
+                            .context("Can't decode buffer")?;
+                            let d = DynamicImage::ImageRgba32F(float_image);
+                            col.add_still(d.to_rgba8());
+                        }
+                        // JXL without alpha
+                        if render.extra_channels().len() == 0 {
+                            let float_image = Rgb32FImage::from_raw(
+                                i.width() as u32,
+                                i.height() as u32,
+                                i.buf().to_vec(),
+                            )
+                            .context("Can't decode buffer")?;
+                            let d = DynamicImage::ImageRgb32F(float_image);
+                            col.add_still(d.to_rgba8());
+                        }
+                    }
+                    RenderResult::NeedMoreData => {
+                        // wait_for_da/ta();
+                    }
+                    RenderResult::NoMoreFrames => break,
+                }
+            }
         }
         "hdr" => {
             let f = File::open(img_location)?;
