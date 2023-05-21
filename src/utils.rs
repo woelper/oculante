@@ -729,17 +729,19 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
             let mut renderer = image.renderer();
 
-            debug!("{:?}", renderer.image_header().metadata);
+            debug!("{:#?}", renderer.image_header().metadata);
             let is_jxl_anim = renderer.image_header().metadata.animation.is_some();
-            let delay = renderer
+            let ticks_ms = renderer
                 .image_header()
                 .metadata
                 .animation
                 .as_ref()
-                .map(|hdr| (hdr.tps_numerator as f32 / hdr.tps_denominator as f32) / 10.)
+                .map(|hdr| hdr.tps_numerator as f32 / hdr.tps_denominator as f32)
+                // map this into milliseconds
+                .map(|x| 1000. / x)
                 .map(|x| x as u16)
                 .unwrap_or(40);
-            debug!("Frame delay: {delay}");
+            debug!("TPS: {ticks_ms}");
 
             if is_jxl_anim {
                 col.repeat = true;
@@ -754,6 +756,8 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     .context("Can't render JXL")?;
                 match result {
                     RenderResult::Done(render) => {
+                        let frame_duration = render.duration() as u16 * ticks_ms;
+                        debug!("duration {frame_duration} ms");
                         let framebuffer = render.image();
                         match renderer.pixel_format() {
                             PixelFormat::Graya => {
@@ -813,7 +817,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
                         // Dispatch to still or animation
                         if is_jxl_anim {
-                            col.add_anim_frame(image_result.to_rgba8(), delay);
+                            col.add_anim_frame(image_result.to_rgba8(), frame_duration);
                         } else {
                             col.add_still(image_result.to_rgba8());
                         }
