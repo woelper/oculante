@@ -1,6 +1,6 @@
 use arboard::Clipboard;
 use dds::DDS;
-use jxl_oxide::{JxlImage, RenderResult};
+use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
@@ -755,72 +755,63 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 match result {
                     RenderResult::Done(render) => {
                         let framebuffer = render.image();
-                        match render.color_channels().len() {
-                            1 => {
-                                debug!("Greyscale");
-                                if renderer.pixel_format().has_alpha() {
-                                    debug!("Alpha");
-
-                                    let float_image = GrayAlphaImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255.)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>()
-                                            .to_vec(),
-                                    )
-                                    .context("Can't decode grey alpha buffer")?;
-                                    image_result = DynamicImage::ImageLumaA8(float_image);
-                                }
-                                // JXL without alpha
-                                else {
-                                    let float_image = image::GrayImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255.)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>()
-                                            .to_vec(),
-                                    )
-                                    .context("Can't decode grey buffer")?;
-                                    image_result = DynamicImage::ImageLuma8(float_image);
-                                }
+                        match renderer.pixel_format() {
+                            PixelFormat::Graya => {
+                                let float_image = GrayAlphaImage::from_raw(
+                                    framebuffer.width() as u32,
+                                    framebuffer.height() as u32,
+                                    framebuffer
+                                        .buf()
+                                        .par_iter()
+                                        .map(|x| x * 255.)
+                                        .map(|x| x as u8)
+                                        .collect::<Vec<_>>()
+                                        .to_vec(),
+                                )
+                                .context("Can't decode gray alpha buffer")?;
+                                image_result = DynamicImage::ImageLumaA8(float_image);
+                            }
+                            PixelFormat::Gray => {
+                                let float_image = image::GrayImage::from_raw(
+                                    framebuffer.width() as u32,
+                                    framebuffer.height() as u32,
+                                    framebuffer
+                                        .buf()
+                                        .par_iter()
+                                        .map(|x| x * 255.)
+                                        .map(|x| x as u8)
+                                        .collect::<Vec<_>>()
+                                        .to_vec(),
+                                )
+                                .context("Can't decode gray buffer")?;
+                                image_result = DynamicImage::ImageLuma8(float_image);
                             }
 
-                            3 => {
-                                debug!("RGB");
-                                if renderer.pixel_format().has_alpha() {
-                                    let float_image = Rgba32FImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer.buf().to_vec(),
-                                    )
-                                    .context("Can't decode rgba buffer")?;
-                                    image_result = DynamicImage::ImageRgba32F(float_image);
-                                }
+                            PixelFormat::Rgba => {
+                                let float_image = Rgba32FImage::from_raw(
+                                    framebuffer.width() as u32,
+                                    framebuffer.height() as u32,
+                                    framebuffer.buf().to_vec(),
+                                )
+                                .context("Can't decode rgba buffer")?;
+                                image_result = DynamicImage::ImageRgba32F(float_image);
                                 // JXL without alpha
-                                else {
-                                    let float_image = Rgb32FImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer.buf().to_vec(),
-                                    )
-                                    .context("Can't decode rgb buffer")?;
-                                    image_result = DynamicImage::ImageRgb32F(float_image);
-                                }
                             }
-
+                            PixelFormat::Rgb => {
+                                let float_image = Rgb32FImage::from_raw(
+                                    framebuffer.width() as u32,
+                                    framebuffer.height() as u32,
+                                    framebuffer.buf().to_vec(),
+                                )
+                                .context("Can't decode rgb buffer")?;
+                                image_result = DynamicImage::ImageRgb32F(float_image);
+                            }
                             _ => {
-                                bail!("JXL: Unsupported number of color channels")
+                                bail!("JXL: Pixel format: {:?}", renderer.pixel_format())
                             }
                         }
 
+                        // Dispatch to still or animation
                         if is_jxl_anim {
                             col.add_anim_frame(image_result.to_rgba8(), delay);
                         } else {
