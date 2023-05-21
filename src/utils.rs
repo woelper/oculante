@@ -5,7 +5,9 @@ use jxl_oxide::{JxlImage, RenderResult};
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage};
+use image::{
+    DynamicImage, EncodableLayout, GrayAlphaImage, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage,
+};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -728,7 +730,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let mut renderer = image.renderer();
 
             debug!("{:?}", renderer.image_header().metadata);
-            let is_anim = renderer.image_header().metadata.animation.is_some();
+            let is_jxl_anim = renderer.image_header().metadata.animation.is_some();
             let delay = renderer
                 .image_header()
                 .metadata
@@ -739,11 +741,13 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 .unwrap_or(40);
             debug!("Frame delay: {delay}");
 
-            if is_anim {
+            if is_jxl_anim {
                 col.repeat = true;
             }
 
             loop {
+                // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
+                let image_result: DynamicImage;
                 let result = renderer
                     .render_next_frame()
                     .map_err(|e| anyhow!("{e}"))
@@ -757,43 +761,35 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                 if renderer.pixel_format().has_alpha() {
                                     debug!("Alpha");
 
-                                    let float_image = image::GrayAlphaImage::from_raw(
+                                    let float_image = GrayAlphaImage::from_raw(
                                         framebuffer.width() as u32,
                                         framebuffer.height() as u32,
-                                        framebuffer.buf()
+                                        framebuffer
+                                            .buf()
                                             .par_iter()
                                             .map(|x| x * 255.)
                                             .map(|x| x as u8)
                                             .collect::<Vec<_>>()
                                             .to_vec(),
                                     )
-                                    .context("Can't decode buffer for grey alpha")?;
-                                    let d = DynamicImage::ImageLumaA8(float_image);
-                                    if is_anim {
-                                        col.add_anim_frame(d.to_rgba8(), delay);
-                                    } else {
-                                        col.add_still(d.to_rgba8());
-                                    }
+                                    .context("Can't decode grey alpha buffer")?;
+                                    image_result = DynamicImage::ImageLumaA8(float_image);
                                 }
                                 // JXL without alpha
                                 else {
                                     let float_image = image::GrayImage::from_raw(
                                         framebuffer.width() as u32,
                                         framebuffer.height() as u32,
-                                        framebuffer.buf()
+                                        framebuffer
+                                            .buf()
                                             .par_iter()
                                             .map(|x| x * 255.)
                                             .map(|x| x as u8)
                                             .collect::<Vec<_>>()
                                             .to_vec(),
                                     )
-                                    .context("Can't decode buffer for grey w/o alpha")?;
-                                    let d = DynamicImage::ImageLuma8(float_image);
-                                    if is_anim {
-                                        col.add_anim_frame(d.to_rgba8(), delay);
-                                    } else {
-                                        col.add_still(d.to_rgba8());
-                                    }
+                                    .context("Can't decode grey buffer")?;
+                                    image_result = DynamicImage::ImageLuma8(float_image);
                                 }
                             }
 
@@ -806,12 +802,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                         framebuffer.buf().to_vec(),
                                     )
                                     .context("Can't decode rgba buffer")?;
-                                    let d = DynamicImage::ImageRgba32F(float_image);
-                                    if is_anim {
-                                        col.add_anim_frame(d.to_rgba8(), delay);
-                                    } else {
-                                        col.add_still(d.to_rgba8());
-                                    }
+                                    image_result = DynamicImage::ImageRgba32F(float_image);
                                 }
                                 // JXL without alpha
                                 else {
@@ -821,18 +812,19 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                         framebuffer.buf().to_vec(),
                                     )
                                     .context("Can't decode rgb buffer")?;
-                                    let d = DynamicImage::ImageRgb32F(float_image);
-                                    if is_anim {
-                                        col.add_anim_frame(d.to_rgba8(), delay);
-                                    } else {
-                                        col.add_still(d.to_rgba8());
-                                    }
+                                    image_result = DynamicImage::ImageRgb32F(float_image);
                                 }
                             }
 
                             _ => {
                                 bail!("JXL: Unsupported number of color channels")
                             }
+                        }
+
+                        if is_jxl_anim {
+                            col.add_anim_frame(image_result.to_rgba8(), delay);
+                        } else {
+                            col.add_still(image_result.to_rgba8());
                         }
                     }
                     RenderResult::NeedMoreData => {

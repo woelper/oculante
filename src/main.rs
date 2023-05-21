@@ -12,7 +12,6 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
