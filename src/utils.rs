@@ -759,6 +759,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                         let frame_duration = render.duration() as u16 * ticks_ms;
                         debug!("duration {frame_duration} ms");
                         let framebuffer = render.image();
+                        debug!("{:?}", renderer.pixel_format());
                         match renderer.pixel_format() {
                             PixelFormat::Graya => {
                                 let float_image = GrayAlphaImage::from_raw(
@@ -769,8 +770,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                         .par_iter()
                                         .map(|x| x * 255.)
                                         .map(|x| x as u8)
-                                        .collect::<Vec<_>>()
-                                        .to_vec(),
+                                        .collect::<Vec<_>>(),
                                 )
                                 .context("Can't decode gray alpha buffer")?;
                                 image_result = DynamicImage::ImageLumaA8(float_image);
@@ -784,31 +784,38 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                         .par_iter()
                                         .map(|x| x * 255.)
                                         .map(|x| x as u8)
-                                        .collect::<Vec<_>>()
-                                        .to_vec(),
+                                        .collect::<Vec<_>>(),
                                 )
                                 .context("Can't decode gray buffer")?;
                                 image_result = DynamicImage::ImageLuma8(float_image);
                             }
-
                             PixelFormat::Rgba => {
-                                let float_image = Rgba32FImage::from_raw(
+                                let float_image = RgbaImage::from_raw(
                                     framebuffer.width() as u32,
                                     framebuffer.height() as u32,
-                                    framebuffer.buf().to_vec(),
+                                    framebuffer
+                                        .buf()
+                                        .par_iter()
+                                        .map(|x| x * 255.)
+                                        .map(|x| x as u8)
+                                        .collect::<Vec<_>>(),
                                 )
                                 .context("Can't decode rgba buffer")?;
-                                image_result = DynamicImage::ImageRgba32F(float_image);
-                                // JXL without alpha
+                                image_result = DynamicImage::ImageRgba8(float_image);
                             }
                             PixelFormat::Rgb => {
-                                let float_image = Rgb32FImage::from_raw(
+                                let float_image = RgbImage::from_raw(
                                     framebuffer.width() as u32,
                                     framebuffer.height() as u32,
-                                    framebuffer.buf().to_vec(),
+                                    framebuffer
+                                        .buf()
+                                        .par_iter()
+                                        .map(|x| x * 255.)
+                                        .map(|x| x as u8)
+                                        .collect::<Vec<_>>(),
                                 )
                                 .context("Can't decode rgb buffer")?;
-                                image_result = DynamicImage::ImageRgb32F(float_image);
+                                image_result = DynamicImage::ImageRgb8(float_image);
                             }
                             _ => {
                                 bail!("JXL: Pixel format: {:?}", renderer.pixel_format())
