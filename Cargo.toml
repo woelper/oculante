@@ -32,7 +32,6 @@ fast_image_resize = "2.7"
 gif = "0.12"
 gif-dispose = "4"
 image = "0.24"
-jpegxl-rs = {version = "0.8", optional = true, default-features = false, features = ["vendored", "image"]}
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = {version = "0.10", optional = true}
@@ -59,13 +58,14 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.31"
 webbrowser = "0.8"
 tiff = "0.9"
+jxl-oxide = "0.1.0"
+
 
 [features]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 default = ["turbo", "file_open", "avif_native", "update"]
 file_open = ["rfd"]
-jpgxl = ["jpegxl-rs"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
 

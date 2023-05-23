@@ -12,7 +12,6 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
@@ -501,7 +500,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 } else {
                     // Normal scaling
-                    debug!("{delta_y}");
                     let delta = zoomratio(
                         (delta_y / 10.).max(-5.0).min(5.0),
                         state.image_geometry.scale,
@@ -597,13 +595,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // reload constantly if gif so we keep receiving sub-frames with no delay
-    if let Some(p) = &state.current_path {
-        if p.extension() == Some(OsStr::new("gif")) {
-            app.window().request_frame();
-        }
-    }
-
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
         debug!("Received extended image info for {}", info.name);
@@ -636,11 +627,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer: {:?}", img.dimensions());
+        // debug!("Received image buffer: {:?}", img.dimensions());
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
-        debug!("Frame source: {:?}", frame.source);
+        // debug!("Frame source: {:?}", frame.source);
 
         set_title(app, state);
 
@@ -706,7 +697,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
                 }
-
+                state.animation_mode = false;
                 state.image_info = None;
             }
             FrameSource::EditResult => {
@@ -714,7 +705,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // state.edit_state.is_processing = false;
             }
             FrameSource::Reset => state.reset_image = true,
-            _ => (),
+            FrameSource::Animation => {
+                state.animation_mode = true;
+            }
         }
 
         if let Some(tex) = &mut state.current_texture {
@@ -752,7 +745,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
+    if state.animation_mode {
+        app.window().request_frame();
+    }
+
     if state.reset_image {
+        state.animation_mode = false;
         let window_size = app.window().size().size_vec();
         if let Some(current_image) = &state.current_image {
             let img_size = current_image.size_vec();
@@ -766,6 +764,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             debug!("Image has been reset.");
             state.reset_image = false;
         }
+        app.window().request_frame();
     }
 
     // TODO: Do we need/want a "global" checker?
