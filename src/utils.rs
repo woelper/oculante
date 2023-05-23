@@ -5,9 +5,7 @@ use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, Rgb32FImage, RgbImage, Rgba32FImage, RgbaImage,
-};
+use image::{DynamicImage, EncodableLayout, GrayAlphaImage, RgbImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -768,7 +766,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                     framebuffer
                                         .buf()
                                         .par_iter()
-                                        .map(|x| x * 255.)
+                                        .map(|x| x * 255. + 0.5)
                                         .map(|x| x as u8)
                                         .collect::<Vec<_>>(),
                                 )
@@ -782,7 +780,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                     framebuffer
                                         .buf()
                                         .par_iter()
-                                        .map(|x| x * 255.)
+                                        .map(|x| x * 255. + 0.5)
                                         .map(|x| x as u8)
                                         .collect::<Vec<_>>(),
                                 )
@@ -796,7 +794,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                     framebuffer
                                         .buf()
                                         .par_iter()
-                                        .map(|x| x * 255.)
+                                        .map(|x| x * 255. + 0.5)
                                         .map(|x| x as u8)
                                         .collect::<Vec<_>>(),
                                 )
@@ -810,7 +808,7 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                                     framebuffer
                                         .buf()
                                         .par_iter()
-                                        .map(|x| x * 255.)
+                                        .map(|x| x * 255. + 0.5)
                                         .map(|x| x as u8)
                                         .collect::<Vec<_>>(),
                                 )
