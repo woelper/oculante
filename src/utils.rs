@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 use tiff::decoder::Limits;
-use usvg::TreeParsing;
+use usvg::{TreeParsing, TreeTextToPath};
 
 use anyhow::{anyhow, bail, Context, Result};
 use image::Rgba;
@@ -36,6 +36,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
+use crate::FONT;
 use crate::appstate::{ImageGeometry, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
@@ -625,11 +626,14 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             // TODO: Should the svg be scaled? if so by what number?
             // This should be specified in a smarter way, maybe resolution * x?
 
-            let render_scale = 1.;
-            let opt = usvg::Options::default();
+            let render_scale = 2.;
+            let mut opt = usvg::Options::default();
+            opt.font_family = "Inter".into();
+            opt.font_size = 6.;
+
             let svg_data = std::fs::read(img_location)?;
-            if let Ok(rtree) = usvg::Tree::from_data(&svg_data, &opt) {
-                let pixmap_size = rtree.size.to_screen_size();
+            if let Ok(mut tree) = usvg::Tree::from_data(&svg_data, &opt) {
+                let pixmap_size = resvg::IntSize::from_usvg(tree.size);
 
                 let scaled_size = (
                     (pixmap_size.width() as f32 * render_scale) as u32,
@@ -637,13 +641,25 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 );
 
                 if let Some(mut pixmap) = tiny_skia::Pixmap::new(scaled_size.0, scaled_size.1) {
-                    resvg::render(
-                        &rtree,
-                        resvg::FitTo::Size(scaled_size.0, scaled_size.1),
-                        tiny_skia::Transform::identity(),
-                        pixmap.as_mut(),
-                    )
-                    .context("Can't render SVG")?;
+                    let mut fontdb = usvg::fontdb::Database::new();
+                    fontdb.load_system_fonts();
+                    fontdb.load_font_data(FONT.to_vec());
+                    // for f in fontdb.faces() {
+                    //     info!("{:?}",f.post_script_name);
+                    // }
+                    fontdb.set_cursive_family("Inter");
+                    fontdb.set_sans_serif_family("Inter");
+                    fontdb.set_serif_family("Inter");
+                   
+
+                    tree.convert_text(&fontdb);
+
+                    let rtree = resvg::Tree::from_usvg(&tree);
+
+                    rtree.render(
+                        tiny_skia::Transform::from_scale(render_scale, render_scale),
+                        &mut pixmap.as_mut(),
+                    );
                     let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
                         scaled_size.0,
                         scaled_size.1,

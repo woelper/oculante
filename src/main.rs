@@ -43,6 +43,8 @@ use crate::image_editing::EditState;
 mod image_editing;
 pub mod paint;
 
+pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
+
 #[notan_main]
 fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
@@ -223,7 +225,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
         fonts.font_data.insert(
             "my_font".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/Inter-Regular.ttf")),
+            FontData::from_static(FONT),
         );
 
         // TODO: This needs to be a monospace font
