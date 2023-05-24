@@ -12,7 +12,7 @@ use log::{debug, error};
 use nalgebra::Vector4;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
-use palette::Pixel;
+use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
@@ -679,8 +679,7 @@ impl ImageOperation {
                 *p += amt;
             }
             Self::HSV(amt) => {
-                use palette::{rgb::Rgb, Hsl, IntoColor};
-                let rgb: Rgb = *Rgb::from_raw(p.as_slice());
+                let rgb: Rgb = Rgb::from_components((p.x, p.y, p.z));
 
                 let mut hsv: Hsl = rgb.into_color();
                 hsv.hue += amt.0 as f32;
