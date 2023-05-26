@@ -248,9 +248,9 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.21.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f1e31e207a6b8fb791a38ea3105e6cb541f55e4d029902d3039a4ad07cc4105"
+checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
 name = "bincode"
@@ -363,7 +363,7 @@ checksum = "fdde5c9cd29ebd706ce1b35600920a33550e402fc998a2e53ad3b42c3c47a192"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -1230,7 +1230,7 @@ checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -1360,7 +1360,7 @@ checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -2046,27 +2046,27 @@ dependencies = [
 
 [[package]]
 name = "jxl-bitstream"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a769998e9e214c391a5cbc05b39f3cb2e71cd43f99eafda60a9ccca2e9d3758"
+checksum = "8c1c6b3f6f293055624e91577ecbfc816f7135dc16c868bab405e32fa4e05d86"
 dependencies = [
  "tracing",
 ]
 
 [[package]]
 name = "jxl-coding"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7deb2c2c52fcb38fe596d361de09ddb45e78251c29b3aa31509663818fec50e0"
+checksum = "58c072032b4dec60c537d7b615868eee248af8ec7bd5436ac8b59a60d8d14a54"
 dependencies = [
  "jxl-bitstream",
 ]
 
 [[package]]
 name = "jxl-color"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5beba067c2389b56e87aae935e982d053a95811cfcffbf1d895d32a1913ad02b"
+checksum = "50275156f286c2b87146768fd2fe4868aabc91ada09827f09a1f776ef0fa85fa"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2075,9 +2075,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-frame"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aadf78240d34efb0a968b949f2c7034810266c78b2e1416f5e41feb7c92ae877"
+checksum = "da9034f97e7b712d5d419a32d7241585fa340f1d98054e977578eb426ac9549a"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2096,9 +2096,9 @@ checksum = "48800b21ed6bb3bbc2f818ae9cd40530bdfb1a211f57d5a7a49b8b10f62145e8"
 
 [[package]]
 name = "jxl-image"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cd03280a4a0453782425862e85e4e63984107e3cae48ac183ece0c425d15389"
+checksum = "7352bbc72930805d280cc3ce79c4f85a9d4eb83058391a6fbf4b5667ca4991e3"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2108,9 +2108,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-modular"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a79c63f7dc54cc9b78ce47cbff19a1f6359046ca0aa7eba3c53aa979c493f9d"
+checksum = "c6107154c3322b465ee2b089a569fd97cd6b70dd6fe188737ec51eb2e2be5650"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2120,9 +2120,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-oxide"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09fa7ff7a26288ed186b5bb4f3f35e39ca927d935a30f1ef66d437c3b7e3c793"
+checksum = "2105ac815e8059eaeb20a64db3f88a6dd2b977b31494684b03628688bdbe18ad"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2135,9 +2135,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-render"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84a825bae2ab451fd436efd7d15dd4f6b26dfabe102b406f517bdda915df3b4a"
+checksum = "0a842ba0143d6a36576c72c1f3a84fc965b6f9a3ef35f86c191added3cb96f43"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -3241,7 +3241,7 @@ checksum = "3c02bfa6b3ba8af5434fa0531bf5701f750d983d4260acd6867faca51cdc4484"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -3406,7 +3406,7 @@ checksum = "39407670928234ebc5e6e580247dd567ad73a3578460c5990f9503df207e8f07"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -3531,9 +3531,9 @@ checksum = "dc375e1527247fe1a97d8b7156678dfe7c1af2fc075c9a4db3690ecd2a148068"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.58"
+version = "1.0.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa1fb82fc0c281dd9671101b66b771ebbe1eaf967b96ac8740dcba4b70005ca8"
+checksum = "6aeca18b86b413c660b781aa319e4e2648a3e6f9eadc9b47e9038e6fe9f3451b"
 dependencies = [
  "unicode-ident",
 ]
@@ -3595,9 +3595,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.27"
+version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f4f29d145265ec1c483c7c654450edde0bfe043d3938d6972630663356d9500"
+checksum = "1b9ab9c7eadfd8df19006f1cf1a4aed13540ed5cbc047010ece5826e10825488"
 dependencies = [
  "proc-macro2",
 ]
@@ -3750,9 +3750,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.8.2"
+version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1a59b5d8e97dee33696bf13c5ba8ab85341c002922fba050069326b9c498974"
+checksum = "81ca098a9821bd52d6b24fd8b10bd081f47d39c22778cafaa75a2857a62c6390"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -4114,7 +4114,7 @@ checksum = "8c805777e3930c8883389c602315a24224bcc738b63905ef87cd1420353ea93e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -4392,9 +4392,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.16"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6f671d4b5ffdb8eadec19c0ae67fe2639df8684bd7bc4b83d986b8db549cf01"
+checksum = "32d41677bcbe24c20c52e7c70b0d8db04134c5d1066bf98662e2871ad200ea3e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4465,7 +4465,7 @@ checksum = "f9456a42c5b0d803c8cd86e73dd7cc9edd429499f37a3550d286d5e86720569f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -4975,7 +4975,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
  "wasm-bindgen-shared",
 ]
 
@@ -5009,7 +5009,7 @@ checksum = "e128beba882dd1eb6200e1dc92ae6c5dbaa4311aa7bb211ca035779e5efc39f8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.18",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
