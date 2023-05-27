@@ -551,8 +551,12 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         });
 
         if !info.exif.is_empty() {
+
+            
+            
             ui.collapsing("EXIF", |ui| {
-                egui::Grid::new("extended_exif")
+                egui::ScrollArea::new([true,false]).show(ui, |ui| {
+                    egui::Grid::new("extended_exif")
                     .striped(true)
                     .show(ui, |ui| {
                         for (key, val) in &info.exif {
@@ -561,6 +565,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                             ui.end_row();
                         }
                     });
+                });
             });
         }
 
