@@ -1,3 +1,14 @@
+# 0.6.64 (2023-05-27)
+
+### :beetle: Bug Fixes
+
+* EXIF data is horizontally scrollable (fixes #184) (85cd7618)
+
+### :sparkles: Features
+
+* svg update with faster performance and text rendering support (0278fe97)
+* Native rust JXL support (16f73800)
+
 # 0.6.63 (2023-04-20)
 
 # 0.6.62 (2023-04-19)
