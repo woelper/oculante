@@ -63,6 +63,7 @@ pkgin install oculante
 - png
 - pnm
 - tga
+- jxl (JPEG XL, via `jxl-oxide`)
 - avif
 - tiff (via `tiff` with additional float/half support)
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
