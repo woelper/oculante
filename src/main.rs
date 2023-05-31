@@ -57,12 +57,15 @@ fn main() -> Result<(), String> {
         let _ = env_logger::try_init();
     }
 
+    let icon_data = include_bytes!("../icon.ico");
+
     let mut window_config = WindowConfig::new()
         .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
         .size(1026, 600) // window's size
         .resizable(true) // window can be resized
-        .set_window_icon_data(Some(include_bytes!("../icon.ico")))
-        .set_taskbar_icon_data(Some(include_bytes!("../icon.ico")))
+        .set_window_icon_data(Some(icon_data))
+        .set_taskbar_icon_data(Some(icon_data))
+        .multisampling(0)
         .min_size(600, 400);
 
     #[cfg(target_os = "windows")]
