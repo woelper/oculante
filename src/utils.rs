@@ -142,7 +142,6 @@ impl ExtendedImageInfo {
 
 #[derive(Debug)]
 pub struct Player {
-    pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
     pub cache: Cache,
@@ -151,11 +150,8 @@ pub struct Player {
 
 impl Player {
     pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
-        let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
-            mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
-            frame_sender,
             image_sender,
             stop_sender,
             cache: Cache {
@@ -345,22 +341,6 @@ impl Frame {
             delay: 0,
             source: FrameSource::Still,
         }
-    }
-}
-/// A collection of frames that can loop/repeat
-#[derive(Debug, Default, Clone)]
-pub struct FrameCollection {
-    pub frames: Vec<Frame>,
-    pub repeat: bool,
-}
-
-impl FrameCollection {
-    fn add_anim_frame(&mut self, buffer: RgbaImage, delay: u16) {
-        self.frames
-            .push(Frame::new(buffer, delay, FrameSource::Animation))
-    }
-    fn add_still(&mut self, buffer: RgbaImage) {
-        self.frames.push(Frame::new(buffer, 0, FrameSource::Still))
     }
 }
 
