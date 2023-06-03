@@ -653,6 +653,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match frame.source {
             FrameSource::Still => {
+                state.edit_state.result_image_op = Default::default();
+                state.edit_state.result_pixel_op = Default::default();
+
                 if !state.persistent_settings.keep_view {
                     state.reset_image = true;
 
