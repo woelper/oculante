@@ -71,7 +71,7 @@ fn bench_load_large() {
         info!("Loaded image in {}", d);
     }
     info!("{} ms mean", total / iters);
-    let mut f = File::create("load_large.bench").unwrap();
+    let mut f = File::create("benches/load_large.bench").unwrap();
     f.write_fmt(format_args!("Large file load in {} ms mean", total / iters)).unwrap();
 }
 
