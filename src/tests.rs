@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::*;
-use std::{fs::File, path::PathBuf, time::Instant};
+use std::{fs::File, path::PathBuf, time::Instant, io::Write};
 
 #[test]
 fn load() {
@@ -71,6 +71,8 @@ fn bench_load_large() {
         info!("Loaded image in {}", d);
     }
     info!("{} ms mean", total / iters);
+    let mut f = File::create("load_large.bench").unwrap();
+    f.write_fmt(format_args!("Large file load in {} ms mean", total / iters)).unwrap();
 }
 
 #[test]
