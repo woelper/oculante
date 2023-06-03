@@ -293,10 +293,12 @@ pub fn send_image_threaded(
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameSource {
+    ///Part of an animation
     Animation,
+    ///First frame of animation. This is necessary to reset the image and stop the player.
+    AnimationStart,
     Still,
     EditResult,
-    Reset,
     // AnimationEnd,
 }
 
@@ -322,7 +324,7 @@ impl Frame {
         Frame {
             buffer,
             delay: 0,
-            source: FrameSource::Reset,
+            source: FrameSource::AnimationStart,
         }
     }
 
