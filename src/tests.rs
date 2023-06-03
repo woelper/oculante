@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::*;
-use std::{fs::File, path::PathBuf, time::Instant};
+use std::{fs::File, io::Write, path::PathBuf, time::Instant};
 
 #[test]
 fn load() {
@@ -71,6 +71,9 @@ fn bench_load_large() {
         info!("Loaded image in {}", d);
     }
     info!("{} ms mean", total / iters);
+    let mut f = File::create("benches/load_large.bench").unwrap();
+    f.write_fmt(format_args!("Large file load in {} ms mean", total / iters))
+        .unwrap();
 }
 
 #[test]
@@ -97,7 +100,7 @@ fn bench_process_pxl() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
         let elapsed = start.elapsed();
@@ -124,7 +127,7 @@ fn bench_process_bright() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
         let elapsed = start.elapsed();
@@ -177,7 +180,7 @@ fn bench_process_all() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
 

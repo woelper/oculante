@@ -31,16 +31,16 @@ use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
 use std::io::Read;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, channel};
 use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::FONT;
 use crate::appstate::{ImageGeometry, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::FONT;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
@@ -142,7 +142,6 @@ impl ExtendedImageInfo {
 
 #[derive(Debug)]
 pub struct Player {
-    pub frame_sender: Sender<FrameCollection>,
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
     pub cache: Cache,
@@ -151,11 +150,8 @@ pub struct Player {
 
 impl Player {
     pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
-        let (frame_sender, _): (Sender<FrameCollection>, Receiver<FrameCollection>) =
-            mpsc::channel();
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
-            frame_sender,
             image_sender,
             stop_sender,
             cache: Cache {
@@ -202,57 +198,39 @@ pub fn send_image_threaded(
     let loc = img_location.to_owned();
 
     thread::spawn(move || {
+        let mut framecache = vec![];
+        let mut timer = std::time::Instant::now();
+
         match open_image(&loc) {
-            Ok(col) => {
-                let cycles = if col.repeat { 200 } else { 1 };
+            Ok(frame_receiver) => {
+                // _ = texture_sender
+                // .clone()
+                // .send(Frame::new_reset(f.buffer.clone()));
 
-                if col.repeat && col.frames.len() > 1 {
-                    let mut i = 0;
-
-                    // Send reset frame
-                    if let Some(f) = col.frames.first() {
-                        _ = texture_sender
-                            .clone()
-                            .send(Frame::new_reset(f.buffer.clone()));
+                let mut first = true;
+                for f in frame_receiver.iter() {
+                    if stop_receiver.try_recv().is_ok() {
+                        info!("Stopped from receiver.");
+                        return;
                     }
+                    // a "normal image (no animation)"
+                    if f.source == FrameSource::Still {
+                        let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
-                    while i < cycles {
-                        // let frames = col.frames.clone();
-                        for frame in &col.frames {
-                            if stop_receiver.try_recv().is_ok() {
-                                info!("Stopped from receiver.");
-                                return;
-                            }
-                            let _ = texture_sender.send(frame.clone());
-                            if frame.delay > 0 {
-                                //                                                  cap at 60fps
-                                thread::sleep(Duration::from_millis(frame.delay.max(17) as u64));
-                            } else {
-                                thread::sleep(Duration::from_millis(40_u64));
-                            }
-                        }
-                        i += 1;
-                    }
-                } else {
-                    // single frame. This saves one clone().
-
-                    for frame in col.frames {
-                        let largest_side =
-                            frame.buffer.dimensions().0.max(frame.buffer.dimensions().1);
-
+                        // Check if texture is too large to fit on the texture
                         if largest_side > max_texture_size {
                             _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled down.".to_string());
                             let scale_factor = max_texture_size as f32 / largest_side as f32;
                             let new_dimensions = (
-                                (frame.buffer.dimensions().0 as f32 * scale_factor)
+                                (f.buffer.dimensions().0 as f32 * scale_factor)
                                     .min(max_texture_size as f32)
                                     as u32,
-                                (frame.buffer.dimensions().1 as f32 * scale_factor)
+                                (f.buffer.dimensions().1 as f32 * scale_factor)
                                     .min(max_texture_size as f32)
                                     as u32,
                             );
 
-                            let mut frame = frame;
+                            let mut frame = f;
                             let op = ImageOperation::Resize {
                                 dimensions: new_dimensions,
                                 aspect: true,
@@ -261,7 +239,44 @@ pub fn send_image_threaded(
                             _ = op.process_image(&mut frame.buffer);
                             let _ = texture_sender.send(frame);
                         } else {
-                            let _ = texture_sender.send(frame);
+                            let _ = texture_sender.send(f);
+                        }
+
+                        return;
+                    }
+                    if f.source == FrameSource::Animation {
+                        framecache.push(f.clone());
+                        if first {
+                            _ = texture_sender
+                                .clone()
+                                .send(Frame::new_reset(f.buffer.clone()));
+                        } else {
+                            let _ = texture_sender.send(f.clone());
+                        }
+                        let elapsed = timer.elapsed().as_millis();
+                        let wait_time_after_loading = f.delay.saturating_sub(elapsed as u16);
+                        debug!("elapsed {elapsed}, wait {wait_time_after_loading}");
+                        std::thread::sleep(Duration::from_millis(wait_time_after_loading as u64));
+                        timer = std::time::Instant::now();
+                    }
+
+                    first = false;
+                }
+
+                // loop over the image. For sanity, stop at a limit of iterations.
+                for _ in 0..500 {
+                    // let frames = col.frames.clone();
+                    for frame in &framecache {
+                        if stop_receiver.try_recv().is_ok() {
+                            info!("Stopped from receiver.");
+                            return;
+                        }
+                        let _ = texture_sender.send(frame.clone());
+                        if frame.delay > 0 {
+                            //                                                  cap at 60fps
+                            thread::sleep(Duration::from_millis(frame.delay.max(17) as u64));
+                        } else {
+                            thread::sleep(Duration::from_millis(40_u64));
                         }
                     }
                 }
@@ -278,10 +293,13 @@ pub fn send_image_threaded(
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameSource {
+    ///Part of an animation
     Animation,
+    ///First frame of animation. This is necessary to reset the image and stop the player.
+    AnimationStart,
     Still,
     EditResult,
-    Reset,
+    // AnimationEnd,
 }
 
 /// A single frame
@@ -306,7 +324,7 @@ impl Frame {
         Frame {
             buffer,
             delay: 0,
-            source: FrameSource::Reset,
+            source: FrameSource::AnimationStart,
         }
     }
 
@@ -325,22 +343,6 @@ impl Frame {
             delay: 0,
             source: FrameSource::Still,
         }
-    }
-}
-/// A collection of frames that can loop/repeat
-#[derive(Debug, Default, Clone)]
-pub struct FrameCollection {
-    pub frames: Vec<Frame>,
-    pub repeat: bool,
-}
-
-impl FrameCollection {
-    fn add_anim_frame(&mut self, buffer: RgbaImage, delay: u16) {
-        self.frames
-            .push(Frame::new(buffer, delay, FrameSource::Animation))
-    }
-    fn add_still(&mut self, buffer: RgbaImage) {
-        self.frames.push(Frame::new(buffer, 0, FrameSource::Still))
     }
 }
 
@@ -551,9 +553,11 @@ pub fn send_extended_info(
 }
 
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
-    let img_location = &(*img_location).to_owned();
-    let mut col = FrameCollection::default();
+pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
+    let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
+
+    let img_location = (*img_location).to_owned();
+    // let mut col = FrameCollection::default();
 
     match img_location
         .extension()
@@ -572,7 +576,8 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
                         .context("Can't create DDS ImageBuffer with given res")?;
-                col.add_still(buf);
+                _ = sender.send(Frame::new_still(buf));
+                return Ok(receiver);
             }
         }
         #[cfg(feature = "dav1d")]
@@ -581,7 +586,10 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
             let i = libavif_image::read(buf.as_slice())?;
-            col.add_still(i.to_rgba8());
+            _ = sender.send(Frame::new_still(i.to_rgba8()));
+            return Ok(receiver);
+
+            // col.add_still(i.to_rgba8());
         }
         #[cfg(feature = "avif_native")]
         #[cfg(not(feature = "dav1d"))]
@@ -601,7 +609,10 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    col.add_still(buf);
+                    _ = sender.send(Frame::new_still(buf));
+                    return Ok(receiver);
+
+                    // col.add_still(buf);
                 }
                 avif_decode::Image::Rgba8(img) => {
                     let mut img_buffer = vec![];
@@ -615,7 +626,10 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
 
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    col.add_still(buf);
+                    _ = sender.send(Frame::new_still(buf));
+                    return Ok(receiver);
+
+                    // col.add_still(buf);
                 }
                 _ => {
                     anyhow::bail!("This avif is not yet supported.")
@@ -650,8 +664,6 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     fontdb.set_cursive_family("Inter");
                     fontdb.set_sans_serif_family("Inter");
                     fontdb.set_serif_family("Inter");
-                   
-
                     tree.convert_text(&fontdb);
 
                     let rtree = resvg::Tree::from_usvg(&tree);
@@ -660,14 +672,15 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                         tiny_skia::Transform::from_scale(render_scale, render_scale),
                         &mut pixmap.as_mut(),
                     );
-                    let buf: Option<RgbaImage> = image::ImageBuffer::from_raw(
+                    let buf: RgbaImage = image::ImageBuffer::from_raw(
                         scaled_size.0,
                         scaled_size.1,
                         pixmap.data().to_vec(),
-                    );
-                    if let Some(valid_buf) = buf {
-                        col.add_still(valid_buf);
-                    }
+                    )
+                    .context("Can't create image buffer from SVG render")?;
+
+                    _ = sender.send(Frame::new_still(buf));
+                    return Ok(receiver);
                 }
             }
         }
@@ -700,12 +713,16 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let maybe_image: Result<
                 Image<Layer<SpecificChannels<RgbaImage, RgbaChannels>>>,
                 exrs::Error,
-            > = reader.from_file(img_location);
+            > = reader.from_file(&img_location);
 
             match maybe_image {
                 Ok(image) => {
-                    let png_buffer = image.layer_data.channel_data.pixels;
-                    col.add_still(png_buffer);
+                    let buf = image.layer_data.channel_data.pixels;
+                    _ = sender.send(Frame::new_still(buf));
+                    return Ok(receiver);
+                    // return Ok(OpenResult::still(buf));
+
+                    // col.add_still(png_buffer);
                 }
                 Err(e) => error!("{} from {:?}", e, img_location),
             }
@@ -736,120 +753,138 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             let x = RgbImage::from_raw(width as u32, height as u32, image)
                 .context("can't decode raw output as image")?;
             // make it a Dynamic image
-            let d = DynamicImage::ImageRgb8(x);
-            col.add_still(d.to_rgba8());
+            let buf = DynamicImage::ImageRgb8(x).to_rgba8();
+            // return Ok(OpenResult::still(d.to_rgba8()));
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
+
+            // col.add_still(d.to_rgba8());
         }
         "jxl" => {
-            let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
-            let mut renderer = image.renderer();
+            //TODO this needs to be a thread
 
-            debug!("{:#?}", renderer.image_header().metadata);
-            let is_jxl_anim = renderer.image_header().metadata.animation.is_some();
-            let ticks_ms = renderer
-                .image_header()
-                .metadata
-                .animation
-                .as_ref()
-                .map(|hdr| hdr.tps_numerator as f32 / hdr.tps_denominator as f32)
-                // map this into milliseconds
-                .map(|x| 1000. / x)
-                .map(|x| x as u16)
-                .unwrap_or(40);
-            debug!("TPS: {ticks_ms}");
+            fn foo(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
+                let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
+                let mut renderer = image.renderer();
 
-            if is_jxl_anim {
-                col.repeat = true;
-            }
+                debug!("{:#?}", renderer.image_header().metadata);
+                let is_jxl_anim = renderer.image_header().metadata.animation.is_some();
+                let ticks_ms = renderer
+                    .image_header()
+                    .metadata
+                    .animation
+                    .as_ref()
+                    .map(|hdr| hdr.tps_numerator as f32 / hdr.tps_denominator as f32)
+                    // map this into milliseconds
+                    .map(|x| 1000. / x)
+                    .map(|x| x as u16)
+                    .unwrap_or(40);
+                debug!("TPS: {ticks_ms}");
+                loop {
+                    // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
+                    let image_result: DynamicImage;
+                    let result = renderer
+                        .render_next_frame()
+                        .map_err(|e| anyhow!("{e}"))
+                        .context("Can't render JXL")?;
+                    match result {
+                        RenderResult::Done(render) => {
+                            let frame_duration = render.duration() as u16 * ticks_ms;
+                            debug!("duration {frame_duration} ms");
+                            let framebuffer = render.image();
+                            debug!("{:?}", renderer.pixel_format());
+                            match renderer.pixel_format() {
+                                PixelFormat::Graya => {
+                                    let float_image = GrayAlphaImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer
+                                            .buf()
+                                            .par_iter()
+                                            .map(|x| x * 255. + 0.5)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>(),
+                                    )
+                                    .context("Can't decode gray alpha buffer")?;
+                                    image_result = DynamicImage::ImageLumaA8(float_image);
+                                }
+                                PixelFormat::Gray => {
+                                    let float_image = image::GrayImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer
+                                            .buf()
+                                            .par_iter()
+                                            .map(|x| x * 255. + 0.5)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>(),
+                                    )
+                                    .context("Can't decode gray buffer")?;
+                                    image_result = DynamicImage::ImageLuma8(float_image);
+                                }
+                                PixelFormat::Rgba => {
+                                    let float_image = RgbaImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer
+                                            .buf()
+                                            .par_iter()
+                                            .map(|x| x * 255. + 0.5)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>(),
+                                    )
+                                    .context("Can't decode rgba buffer")?;
+                                    image_result = DynamicImage::ImageRgba8(float_image);
+                                }
+                                PixelFormat::Rgb => {
+                                    let float_image = RgbImage::from_raw(
+                                        framebuffer.width() as u32,
+                                        framebuffer.height() as u32,
+                                        framebuffer
+                                            .buf()
+                                            .par_iter()
+                                            .map(|x| x * 255. + 0.5)
+                                            .map(|x| x as u8)
+                                            .collect::<Vec<_>>(),
+                                    )
+                                    .context("Can't decode rgb buffer")?;
+                                    image_result = DynamicImage::ImageRgb8(float_image);
+                                }
+                                _ => {
+                                    bail!("JXL: Pixel format: {:?}", renderer.pixel_format())
+                                }
+                            }
 
-            loop {
-                // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
-                let image_result: DynamicImage;
-                let result = renderer
-                    .render_next_frame()
-                    .map_err(|e| anyhow!("{e}"))
-                    .context("Can't render JXL")?;
-                match result {
-                    RenderResult::Done(render) => {
-                        let frame_duration = render.duration() as u16 * ticks_ms;
-                        debug!("duration {frame_duration} ms");
-                        let framebuffer = render.image();
-                        debug!("{:?}", renderer.pixel_format());
-                        match renderer.pixel_format() {
-                            PixelFormat::Graya => {
-                                let float_image = GrayAlphaImage::from_raw(
-                                    framebuffer.width() as u32,
-                                    framebuffer.height() as u32,
-                                    framebuffer
-                                        .buf()
-                                        .par_iter()
-                                        .map(|x| x * 255. + 0.5)
-                                        .map(|x| x as u8)
-                                        .collect::<Vec<_>>(),
-                                )
-                                .context("Can't decode gray alpha buffer")?;
-                                image_result = DynamicImage::ImageLumaA8(float_image);
-                            }
-                            PixelFormat::Gray => {
-                                let float_image = image::GrayImage::from_raw(
-                                    framebuffer.width() as u32,
-                                    framebuffer.height() as u32,
-                                    framebuffer
-                                        .buf()
-                                        .par_iter()
-                                        .map(|x| x * 255. + 0.5)
-                                        .map(|x| x as u8)
-                                        .collect::<Vec<_>>(),
-                                )
-                                .context("Can't decode gray buffer")?;
-                                image_result = DynamicImage::ImageLuma8(float_image);
-                            }
-                            PixelFormat::Rgba => {
-                                let float_image = RgbaImage::from_raw(
-                                    framebuffer.width() as u32,
-                                    framebuffer.height() as u32,
-                                    framebuffer
-                                        .buf()
-                                        .par_iter()
-                                        .map(|x| x * 255. + 0.5)
-                                        .map(|x| x as u8)
-                                        .collect::<Vec<_>>(),
-                                )
-                                .context("Can't decode rgba buffer")?;
-                                image_result = DynamicImage::ImageRgba8(float_image);
-                            }
-                            PixelFormat::Rgb => {
-                                let float_image = RgbImage::from_raw(
-                                    framebuffer.width() as u32,
-                                    framebuffer.height() as u32,
-                                    framebuffer
-                                        .buf()
-                                        .par_iter()
-                                        .map(|x| x * 255. + 0.5)
-                                        .map(|x| x as u8)
-                                        .collect::<Vec<_>>(),
-                                )
-                                .context("Can't decode rgb buffer")?;
-                                image_result = DynamicImage::ImageRgb8(float_image);
-                            }
-                            _ => {
-                                bail!("JXL: Pixel format: {:?}", renderer.pixel_format())
+                            // Dispatch to still or animation
+                            if is_jxl_anim {
+                                // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
+                                _ = frame_sender.send(Frame::new(
+                                    image_result.to_rgba8(),
+                                    frame_duration,
+                                    FrameSource::Animation,
+                                ));
+                            } else {
+                                // col.add_still(image_result.to_rgba8());
+                                _ = frame_sender.send(Frame::new_still(image_result.to_rgba8()));
                             }
                         }
-
-                        // Dispatch to still or animation
-                        if is_jxl_anim {
-                            col.add_anim_frame(image_result.to_rgba8(), frame_duration);
-                        } else {
-                            col.add_still(image_result.to_rgba8());
+                        RenderResult::NeedMoreData => {
+                            info!("Need more data in JXL");
                         }
+                        RenderResult::NoMoreFrames => break,
                     }
-                    RenderResult::NeedMoreData => {
-                        info!("Need more data in JXL");
-                    }
-                    RenderResult::NoMoreFrames => break,
                 }
+                debug!("Done decoding JXL");
+
+                Ok(())
             }
-            debug!("Done decoding JXL");
+
+            std::thread::spawn(move || {
+                if let Err(e) = foo(&img_location, sender) {
+                    error!("{e}");
+                }
+            });
+            return Ok(receiver);
         }
         "hdr" => {
             let f = File::open(img_location)?;
@@ -870,38 +905,40 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                 s.append(&mut x);
             }
 
-            let tonemapped_buffer = RgbaImage::from_raw(meta.width, meta.height, s)
+            let buf = RgbaImage::from_raw(meta.width, meta.height, s)
                 .context("Failed to create RgbaImage with given dimensions")?;
-            col.add_still(tonemapped_buffer);
+            // col.add_still(buf);
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
         }
         "psd" => {
             let mut file = File::open(img_location)?;
             let mut contents = vec![];
-            if file.read_to_end(&mut contents).is_ok() {
-                let psd = Psd::from_bytes(&contents).map_err(|e| anyhow!("{:?}", e))?;
-                if let Some(buf) =
-                    image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
-                {
-                    col.add_still(buf);
-                }
-            }
+            file.read_to_end(&mut contents)?;
+
+            let psd = Psd::from_bytes(&contents).map_err(|e| anyhow!("{:?}", e))?;
+            let buf = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
+                .context("Can't create imagebuffer from PSD")?;
+
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
         }
         "webp" => {
             let mut file = File::open(img_location)?;
             let mut contents = vec![];
-            if file.read_to_end(&mut contents).is_ok() {
-                match decode_webp(&contents) {
-                    Some(webp_buf) => col.add_still(webp_buf),
-                    None => println!("Error decoding data from {img_location:?}"),
-                }
-            }
+            file.read_to_end(&mut contents)?;
+            let buf = decode_webp(&contents).context("Can't decode webp")?;
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
         }
         "png" => {
             let file = File::open(img_location)?;
             let bufread = BufReader::new(file);
             let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
             reader.no_limits();
-            col.add_still(reader.decode()?.into_rgba8());
+            _ = sender.send(Frame::new_still(reader.decode()?.into_rgba8()));
+            return Ok(receiver);
+            // col.add_still(reader.decode()?.into_rgba8());
         }
         "gif" => {
             let file = File::open(img_location)?;
@@ -922,8 +959,11 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                             dim.1,
                             screen.pixels.buf().as_bytes().to_vec(),
                         );
-                        col.add_anim_frame(buf.context("Can't read gif frame")?, frame.delay * 10);
-                        col.repeat = true;
+                        _ = sender.send(Frame::new(
+                            buf.context("Can't read gif frame")?,
+                            frame.delay * 10,
+                            FrameSource::Animation,
+                        ));
                     } else {
                         break;
                     }
@@ -931,6 +971,9 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     break;
                 }
             }
+            debug!("Done decoding Gif!");
+
+            return Ok(receiver);
 
             // TODO: Re-enable if https://github.com/image-rs/image/issues/1818 is resolved
 
@@ -941,13 +984,14 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
             //     col.add_anim_frame(f.into_buffer(), delay);
             //     col.repeat = true;
             // }
-            debug!("Done decoding Gif!");
         }
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
             let jpeg_data = std::fs::read(img_location)?;
-            let img: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
-            col.add_still(img);
+            let buf: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
+            // col.add_still(img);
         }
         "tif" | "tiff" => {
             debug!("TIFF");
@@ -1035,25 +1079,35 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
                     debug!("Loading gray color");
                     let i = image::GrayImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray img")?;
-                    col.add_still(image::DynamicImage::ImageLuma8(i).into_rgba8());
+                    // col.add_still(DynamicImage::ImageLuma8(i).into_rgba8());
+                    _ = sender.send(Frame::new_still(DynamicImage::ImageLuma8(i).into_rgba8()));
+                    return Ok(receiver);
                 }
                 tiff::ColorType::RGB(_) => {
                     debug!("Loading rgb color");
                     let i = image::RgbImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGB img")?;
-                    col.add_still(image::DynamicImage::ImageRgb8(i).into_rgba8());
+                    // col.add_still(DynamicImage::ImageRgb8(i).into_rgba8());
+                    _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).into_rgba8()));
+                    return Ok(receiver);
                 }
                 tiff::ColorType::RGBA(_) => {
                     debug!("Loading rgba color");
                     let i = image::RgbaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load RGBA img")?;
-                    col.add_still(i);
+                    // col.add_still(i);
+                    _ = sender.send(Frame::new_still(i));
+                    return Ok(receiver);
                 }
                 tiff::ColorType::GrayA(_) => {
                     debug!("Loading gray color with alpha");
                     let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                         .context("Can't load gray alpha img")?;
-                    col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+                    // col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+                    _ = sender.send(Frame::new_still(
+                        image::DynamicImage::ImageLumaA8(i).into_rgba8(),
+                    ));
+                    return Ok(receiver);
                 }
                 _ => {
                     bail!(
@@ -1066,11 +1120,13 @@ pub fn open_image(img_location: &Path) -> Result<FrameCollection> {
         _ => {
             // All other supported image files are handled by using `image`
             let img = image::open(img_location)?;
-            col.add_still(img.to_rgba8());
+            // col.add_still(img.to_rgba8());
+            _ = sender.send(Frame::new_still(img.to_rgba8()));
+            return Ok(receiver);
         }
     }
 
-    Ok(col)
+    Ok(receiver)
 }
 
 pub trait ImageExt {

@@ -11,3 +11,4 @@ perf.*
 flamegraph.svg
 .notes
 TODO
+benches/*
