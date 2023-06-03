@@ -551,20 +551,17 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         });
 
         if !info.exif.is_empty() {
-
-            
-            
             ui.collapsing("EXIF", |ui| {
-                egui::ScrollArea::new([true,false]).show(ui, |ui| {
+                egui::ScrollArea::new([true, false]).show(ui, |ui| {
                     egui::Grid::new("extended_exif")
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for (key, val) in &info.exif {
-                            ui.label(key);
-                            ui.label(val);
-                            ui.end_row();
-                        }
-                    });
+                        .striped(true)
+                        .show(ui, |ui| {
+                            for (key, val) in &info.exif {
+                                ui.label(key);
+                                ui.label(val);
+                                ui.end_row();
+                            }
+                        });
                 });
             });
         }

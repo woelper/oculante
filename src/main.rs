@@ -223,10 +223,9 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     plugins.egui(|ctx| {
         let mut fonts = FontDefinitions::default();
 
-        fonts.font_data.insert(
-            "my_font".to_owned(),
-            FontData::from_static(FONT),
-        );
+        fonts
+            .font_data
+            .insert("my_font".to_owned(), FontData::from_static(FONT));
 
         // TODO: This needs to be a monospace font
         // fonts.font_data.insert(

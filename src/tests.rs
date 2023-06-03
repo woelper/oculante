@@ -97,7 +97,7 @@ fn bench_process_pxl() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
         let elapsed = start.elapsed();
@@ -124,7 +124,7 @@ fn bench_process_bright() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
         let elapsed = start.elapsed();
@@ -177,7 +177,7 @@ fn bench_process_all() {
             "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
         ))
         .unwrap();
-        let mut buffer = f.frames[0].clone().buffer;
+        let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
         process_pixels(&mut buffer, &ops);
 
