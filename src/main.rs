@@ -654,7 +654,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     state.reset_image = true;
 
                     if let Some(p) = state.current_path.clone() {
-                        state.player.cache.insert(&p, img.clone());
+                        if state.persistent_settings.max_cache != 0 {
+                            state.player.cache.insert(&p, img.clone());
+                        }
                     }
                 }
                 // always reset if first image
@@ -705,7 +707,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // debug!("EditResult");
                 // state.edit_state.is_processing = false;
             }
-            FrameSource::Reset => state.reset_image = true,
+            FrameSource::AnimationStart => {
+                state.animation_mode = true;
+                state.reset_image = true
+            }
             FrameSource::Animation => {
                 state.animation_mode = true;
             }
@@ -751,7 +756,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     if state.reset_image {
-        state.animation_mode = false;
         let window_size = app.window().size().size_vec();
         if let Some(current_image) = &state.current_image {
             let img_size = current_image.size_vec();

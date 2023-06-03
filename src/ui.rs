@@ -460,6 +460,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     .changed()
                 {
                     state.player.cache.cache_size = state.persistent_settings.max_cache;
+                    state.player.cache.clear();
                 }
                 });
 
