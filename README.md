@@ -1,4 +1,4 @@
-# <img src="res/oculante.png" align="top" width="45">Oculante 
+# <img src="res/oculante.png" align="top" width="45">Oculante
 
 
 _A no-nonsense hardware-accelerated image viewer_
@@ -67,12 +67,13 @@ pkgin install oculante
 - avif
 - tiff (via `tiff` with additional float/half support)
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
-- farbfeld  
+- farbfeld
 - DDS (DXT1-5, via `dds-rs`)
 - psd (via `psd`)
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
+- ppm
 
 ### Platform support:
 - Linux
