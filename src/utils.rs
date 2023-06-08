@@ -45,7 +45,7 @@ use crate::FONT;
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
     "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
-    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl",
+    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl", "ppm",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
