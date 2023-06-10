@@ -177,9 +177,6 @@ impl EguiExt for Ui {
 }
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if state.settings_enabled {
-        return;
-    }
     if let Some(img) = &state.current_image {
         if let Some(p) = img.get_pixel_checked(
             state.cursor_relative.x as u32,
@@ -483,11 +480,17 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         "Show a checker pattern as backdrop.",
                     );
 
-                    ui
+                ui
                     .checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
                     .on_hover_text(
                         "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
                     );
+                    ui.end_row();
+                if ui.checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
+                    set_title(app, state);
+                }
+
+
                 }
 
 
@@ -609,9 +612,6 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 
 /// Everything related to image editing
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if state.settings_enabled {
-        return;
-    }
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show(ctx, |ui| {

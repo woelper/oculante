@@ -42,6 +42,7 @@ pub enum InputEvent {
     Paste,
     Browse,
     Quit,
+    ZenMode,
 }
 
 pub type Shortcuts = HashMap<InputEvent, SimultaneousKeypresses>;
@@ -127,6 +128,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::ZoomFive, "Key5")
             .add_key(InputEvent::LosslessRotateLeft, "LBracket")
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
+            .add_key(InputEvent::ZenMode, "Z")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])

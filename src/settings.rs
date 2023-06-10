@@ -36,6 +36,7 @@ pub struct PersistentSettings {
     pub current_channel: ColorChannel,
     /// How much to scale SVG images when rendering
     pub svg_scale: f32,
+    pub zen_mode: bool,
 }
 
 impl Default for PersistentSettings {
@@ -62,6 +63,7 @@ impl Default for PersistentSettings {
             show_frame: Default::default(),
             current_channel: ColorChannel::Rgba,
             svg_scale: 1.0,
+            zen_mode: false,
         }
     }
 }

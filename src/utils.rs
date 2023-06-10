@@ -1279,26 +1279,34 @@ pub fn next_image(state: &mut OculanteState) {
 /// Set the window title
 pub fn set_title(app: &mut App, state: &mut OculanteState) {
     let p = state.current_path.clone().unwrap_or_default();
-    app.window().set_title(
-        &state
-            .persistent_settings
-            .title_format
-            .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
-            .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
-            .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
-            .replacen(
-                "{FILENAME}",
-                &p.file_name()
-                    .map(|f| f.to_string_lossy().to_string())
-                    .unwrap_or_default(),
-                10,
-            )
-            .replacen(
-                "{RES}",
-                &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
-                10,
-            ),
-    );
+
+    let mut title_string = state
+        .persistent_settings
+        .title_format
+        .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
+        .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
+        .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
+        .replacen(
+            "{FILENAME}",
+            &p.file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default(),
+            10,
+        )
+        .replacen(
+            "{RES}",
+            &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
+            10,
+        );
+
+    if state.persistent_settings.zen_mode {
+        title_string.push_str(&format!(
+            "          '{}' to disable zen mode",
+            lookup(&state.persistent_settings.shortcuts, &InputEvent::ZenMode)
+        ));
+    }
+
+    app.window().set_title(&title_string);
 }
 
 pub fn compare_next(state: &mut OculanteState) {
@@ -1329,4 +1337,15 @@ pub fn compare_next(state: &mut OculanteState) {
 
 fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) -> f32 {
     (((oldvalue - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
+}
+
+pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
+    state.persistent_settings.zen_mode = !state.persistent_settings.zen_mode;
+    if state.persistent_settings.zen_mode {
+        _ = state.message_channel.0.send(format!(
+            "Zen mode on. Press '{}' to toggle.",
+            lookup(&state.persistent_settings.shortcuts, &InputEvent::ZenMode)
+        ));
+    }
+    set_title(app, state);
 }

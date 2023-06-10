@@ -328,7 +328,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ResetView) {
                 state.reset_image = true
             }
-
+            if key_pressed(app, state, ZenMode) {
+                toggle_zen_mode(state, app);
+            }
             if key_pressed(app, state, ZoomActualSize) {
                 set_zoom(1.0, None, state);
             }
@@ -480,6 +482,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             //TODO: remove this if save on exit works
             state.persistent_settings.window_geometry.1 = (width, height);
             state.persistent_settings.window_geometry.0 = app.backend.window().position();
+            // By resetting the image, we make it fill the window on resize
+            if state.persistent_settings.zen_mode {
+                state.reset_image = true;
+            }
         }
         _ => (),
     }
@@ -876,12 +882,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
-        egui::TopBottomPanel::top("menu")
-            .min_height(30.)
-            .default_height(30.)
-            .show(ctx, |ui| {
-                main_menu(ui, state, app, gfx);
-            });
+
+        if !state.persistent_settings.zen_mode {
+            egui::TopBottomPanel::top("menu")
+                .min_height(30.)
+                .default_height(30.)
+                .show(ctx, |ui| {
+                    main_menu(ui, state, app, gfx);
+                });
+        }
 
         if state.persistent_settings.show_scrub_bar {
             egui::TopBottomPanel::bottom("scrubber")
@@ -927,11 +936,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
-        if state.persistent_settings.info_enabled {
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
             info_ui(ctx, state, gfx);
         }
 
-        if state.persistent_settings.edit_enabled {
+        if state.persistent_settings.edit_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
             edit_ui(app, ctx, state, gfx);
         }
 
