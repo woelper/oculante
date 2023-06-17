@@ -48,7 +48,7 @@ rayon = "1.7"
 resvg = "0.33.0"
 rfd = {version = "0.11", optional = true}
 rgb = "0.8"
-self_update = {version = "0.36", default-features = false, features = ["rustls"], optional = true}
+self_update = {version = "0.37", default-features = false, features = ["rustls"], optional = true}
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 strum = {version = "0.24", features = ["derive"]}
@@ -58,7 +58,7 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
-jxl-oxide = "0.2.0"
+jxl-oxide = "0.3.0"
 
 
 [features]
