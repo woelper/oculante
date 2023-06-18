@@ -233,3 +233,5 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 
 <kbd>Q</kbd> = Quit
 
+<kbd>Z</kbd> = ZenMode
+
