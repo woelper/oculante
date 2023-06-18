@@ -66,7 +66,7 @@ fn main() -> Result<(), String> {
         .set_window_icon_data(Some(icon_data))
         .set_taskbar_icon_data(Some(icon_data))
         .multisampling(0)
-        .min_size(600, 400);
+        .min_size(200, 200);
 
     #[cfg(target_os = "windows")]
     {
@@ -103,7 +103,15 @@ fn main() -> Result<(), String> {
                 window_config.width = settings.window_geometry.1 .0;
                 window_config.height = settings.window_geometry.1 .1;
             }
-            debug!("Loaded vsync.");
+            debug!("Loaded settings.");
+            if settings.zen_mode {
+                let mut title_string = window_config.title.clone();
+                title_string.push_str(&format!(
+                    "          '{}' to disable zen mode",
+                    shortcuts::lookup(&settings.shortcuts, &shortcuts::InputEvent::ZenMode)
+                ));
+                window_config = window_config.title(&title_string);
+            }
         }
         Err(e) => {
             error!("Could not load settings: {e}");
