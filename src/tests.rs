@@ -55,9 +55,12 @@ fn bench_load_large() {
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
-        info!("Loaded image in {}", d);
+        info!("Loaded jpg image in {}", d);
     }
     info!("{} ms mean", total / iters);
+    let mut f = File::create("benches/load_large_jpg.bench").unwrap();
+    f.write_fmt(format_args!("Large file load in {} ms mean", total / iters))
+        .unwrap();
 
     info!("Benching this with {iters} iterations...");
     let mut total = 0;
@@ -68,10 +71,10 @@ fn bench_load_large() {
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
-        info!("Loaded image in {}", d);
+        info!("Loaded png image in {}", d);
     }
     info!("{} ms mean", total / iters);
-    let mut f = File::create("benches/load_large.bench").unwrap();
+    let mut f = File::create("benches/load_large_png.bench").unwrap();
     f.write_fmt(format_args!("Large file load in {} ms mean", total / iters))
         .unwrap();
 }
