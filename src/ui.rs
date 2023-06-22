@@ -739,7 +739,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
-                    if ctx.input().pointer.secondary_down() {
+                    if ctx.input(|i| i.pointer.secondary_down()) {
                         if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
                             if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
                                 state.cursor_relative.x as u32,
@@ -892,7 +892,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 if let Some(current_stroke) = state.edit_state.paint_strokes.last_mut() {
                     // if state.mouse_delta.x > 0.0 {
-                    if ctx.input().pointer.primary_down() && !state.pointer_over_ui {
+                    if ctx.input(|i| i.pointer.primary_down()) && !state.pointer_over_ui {
                         debug!("PAINT");
                         // get pos in image
                         // let p = state.cursor_relative;
