@@ -268,14 +268,12 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         );
 
         let accent_color = style.visuals.selection.bg_fill.to_array();
-        debug!("Luma {:?}", accent_color);
 
         let accent_color_luma = (accent_color[0] as f32 * 0.299
             + accent_color[1] as f32 * 0.587
             + accent_color[2] as f32 * 0.114)
             .max(0.)
             .min(255.) as u8;
-        debug!("Luma {accent_color_luma}");
         let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
@@ -354,13 +352,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
             }
-
             if key_pressed(app, state, Quit) {
-                // std::process::exit(0)
                 state.persistent_settings.save_blocking();
                 app.backend.exit();
             }
-
             #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateRight) {
                 debug!("Lossless rotate right");
@@ -382,7 +377,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-
             #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
@@ -405,12 +399,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
-
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
                     next_image(state)
@@ -427,12 +419,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, LastImage) {
                 last_image(state)
             }
-
             if key_pressed(app, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
                 app.window().set_always_on_top(state.always_on_top);
             }
-
             if key_pressed(app, state, InfoMode) {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
                 send_extended_info(
@@ -441,11 +431,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     &state.extended_info_channel,
                 );
             }
-
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -465,7 +453,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.image_geometry.scale += delta;
                 }
             }
-
             if key_pressed(app, state, ZoomOut) {
                 let delta = zoomratio(-3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;

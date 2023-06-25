@@ -553,9 +553,7 @@ pub fn send_extended_info(
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
-
     let img_location = (*img_location).to_owned();
-    // let mut col = FrameCollection::default();
 
     match img_location
         .extension()
@@ -1059,7 +1057,6 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // col.add_still(img);
         }
         "tif" | "tiff" => {
-            debug!("TIFF");
             let data = File::open(img_location)?;
 
             let mut decoder = tiff::decoder::Decoder::new(&data)?.with_limits(Limits::unlimited());
