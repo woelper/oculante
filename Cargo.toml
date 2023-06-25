@@ -59,7 +59,7 @@ usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
 jxl-oxide = "0.3.0"
-
+zune-png = "0.2"
 
 [features]
 avif_native = ["avif-decode"]

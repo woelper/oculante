@@ -5,7 +5,7 @@ use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 // use image::codecs::gif::GifDecoder;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, GrayAlphaImage, RgbImage, RgbaImage};
+use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -23,6 +23,8 @@ use std::thread;
 use std::time::Duration;
 use tiff::decoder::Limits;
 use usvg::{TreeParsing, TreeTextToPath};
+use zune_png::zune_core::result::DecodingResult;
+use zune_png::PngDecoder;
 
 use anyhow::{anyhow, bail, Context, Result};
 use image::Rgba;
@@ -30,7 +32,6 @@ use image::{self};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use psd::Psd;
 use rgb::*;
-use std::io::Read;
 use std::sync::mpsc::{self, channel};
 use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
@@ -76,8 +77,6 @@ impl ExtendedImageInfo {
         let exifreader = exif::Reader::new();
         let exif = exifreader.read_from_container(&mut bufreader)?;
         for f in exif.fields() {
-            //     let s = format!("{} {} {}",
-            //              f.tag, f.ifd_num, f.display_value().with_unit(&exif));
             self.exif.insert(
                 f.tag.to_string(),
                 f.display_value().with_unit(&exif).to_string(),
@@ -92,7 +91,7 @@ impl ExtendedImageInfo {
         let mut green_histogram: HashMap<u8, usize> = Default::default();
         let mut blue_histogram: HashMap<u8, usize> = Default::default();
 
-        let mut num_pixels = 0;
+        let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
@@ -106,26 +105,25 @@ impl ExtendedImageInfo {
             let mut p = *p;
             p.0[3] = 255;
             colors.insert(p);
-            num_pixels += 1;
         }
 
         let mut green_histogram: Vec<(i32, i32)> = green_histogram
             .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
-        green_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+        green_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut red_histogram: Vec<(i32, i32)> = red_histogram
             .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
-        red_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+        red_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut blue_histogram: Vec<(i32, i32)> = blue_histogram
             .par_iter()
             .map(|(k, v)| (*k as i32, *v as i32))
             .collect();
-        blue_histogram.sort_by(|a, b| a.0.cmp(&b.0));
+        blue_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
 
         Self {
             num_pixels,
@@ -912,10 +910,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "psd" => {
-            let mut file = File::open(img_location)?;
-            let mut contents = vec![];
-            file.read_to_end(&mut contents)?;
-
+            let contents = std::fs::read(img_location)?;
             let psd = Psd::from_bytes(&contents).map_err(|e| anyhow!("{:?}", e))?;
             let buf = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 .context("Can't create imagebuffer from PSD")?;
@@ -924,21 +919,91 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "webp" => {
-            let mut file = File::open(img_location)?;
-            let mut contents = vec![];
-            file.read_to_end(&mut contents)?;
+            let contents = std::fs::read(img_location)?;
             let buf = decode_webp(&contents).context("Can't decode webp")?;
             _ = sender.send(Frame::new_still(buf));
             return Ok(receiver);
         }
         "png" => {
-            let file = File::open(img_location)?;
-            let bufread = BufReader::new(file);
-            let mut reader = image::io::Reader::new(bufread).with_guessed_format()?;
-            reader.no_limits();
-            _ = sender.send(Frame::new_still(reader.decode()?.into_rgba8()));
-            return Ok(receiver);
-            // col.add_still(reader.decode()?.into_rgba8());
+            let contents = std::fs::read(&img_location)?;
+            let mut decoder = PngDecoder::new(&contents);
+            match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
+                // 16 bpp data
+                DecodingResult::U16(imgdata) => {
+                    //convert to 8bpp
+                    let imgdata_8bpp = imgdata
+                        .par_iter()
+                        .map(|x| *x as f32 / u16::MAX as f32)
+                        .map(|p| p.powf(2.2))
+                        .map(|p| tonemap_f32(p))
+                        // .map(|x| x as u8)
+                        .collect::<Vec<_>>();
+
+                    let (width, height) = decoder
+                        .get_dimensions()
+                        .context("Can't get png dimensions")?;
+                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+
+                    if colorspace.is_grayscale() {
+                        let buf: GrayImage =
+                            image::ImageBuffer::from_raw(width as u32, height as u32, imgdata_8bpp)
+                                .context("Can't interpret image as grayscale")?;
+                        let image_result = DynamicImage::ImageLuma8(buf);
+                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        return Ok(receiver);
+                    }
+
+                    if colorspace.has_alpha() {
+                        let float_image =
+                            RgbaImage::from_raw(width as u32, height as u32, imgdata_8bpp)
+                                .context("Can't decode rgba buffer")?;
+                        _ = sender.send(Frame::new_still(
+                            DynamicImage::ImageRgba8(float_image).to_rgba8(),
+                        ));
+                        return Ok(receiver);
+                    } else {
+                        let float_image =
+                            RgbImage::from_raw(width as u32, height as u32, imgdata_8bpp)
+                                .context("Can't decode rgba buffer")?;
+                        _ = sender.send(Frame::new_still(
+                            DynamicImage::ImageRgb8(float_image).to_rgba8(),
+                        ));
+                        return Ok(receiver);
+                    }
+                }
+                // 8bpp
+                DecodingResult::U8(value) => {
+                    let (width, height) = decoder
+                        .get_dimensions()
+                        .context("Can't get png dimensions")?;
+
+                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    if colorspace.is_grayscale() {
+                        let buf: GrayImage =
+                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
+                                .context("Can't interpret image as grayscale")?;
+                        let image_result = DynamicImage::ImageLuma8(buf);
+                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        return Ok(receiver);
+                    }
+
+                    if colorspace.has_alpha() {
+                        let buf: RgbaImage =
+                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
+                                .context("Can't interpret image as rgba")?;
+                        _ = sender.send(Frame::new_still(buf));
+                        return Ok(receiver);
+                    } else {
+                        let buf: RgbImage =
+                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
+                                .context("Can't interpret image as rgb")?;
+                        let image_result = DynamicImage::ImageRgb8(buf);
+                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        return Ok(receiver);
+                    }
+                }
+                _ => {}
+            }
         }
         "gif" => {
             let file = File::open(img_location)?;
