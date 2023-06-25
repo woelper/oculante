@@ -234,7 +234,7 @@ pub fn send_image_threaded(
                             let op = ImageOperation::Resize {
                                 dimensions: new_dimensions,
                                 aspect: true,
-                                filter: image_editing::ScaleFilter::Bilinear,
+                                filter: image_editing::ScaleFilter::Box,
                             };
                             _ = op.process_image(&mut frame.buffer);
                             let _ = texture_sender.send(frame);
