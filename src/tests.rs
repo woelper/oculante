@@ -40,10 +40,13 @@ fn net() {
 
 #[test]
 fn bench_load_large() {
+    #[cfg(debug_assertions)]
+    panic!("This test needs release mode to pass.");
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
     let iters = 5;
-    info!("Benching this with {iters} iterations...");
+
+    info!("Benching JPEG with {iters} iterations...");
     let mut total = 0;
 
     for _i in 0..iters {
@@ -59,10 +62,9 @@ fn bench_load_large() {
     }
     info!("{} ms mean", total / iters);
     let mut f = File::create("benches/load_large_jpg.bench").unwrap();
-    f.write_fmt(format_args!("{}ms", total / iters))
-        .unwrap();
+    f.write_fmt(format_args!("{}ms", total / iters)).unwrap();
 
-    info!("Benching this with {iters} iterations...");
+    info!("Benching PNG with {iters} iterations...");
     let mut total = 0;
 
     for _i in 0..iters {
@@ -75,8 +77,7 @@ fn bench_load_large() {
     }
     info!("{} ms mean", total / iters);
     let mut f = File::create("benches/load_large_png.bench").unwrap();
-    f.write_fmt(format_args!("{}ms", total / iters))
-        .unwrap();
+    f.write_fmt(format_args!("{}ms", total / iters)).unwrap();
 }
 
 #[test]
