@@ -527,10 +527,17 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
         Event::Drop(file) => {
             if let Some(p) = file.path {
-                state.is_loaded = false;
-                state.current_image = None;
-                state.player.load(&p, state.message_channel.0.clone());
-                state.current_path = Some(p);
+                if let Some(ext) = p.extension() {
+                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().as_str()) {
+                        state.is_loaded = false;
+                        state.current_image = None;
+                        state.player.load(&p, state.message_channel.0.clone());
+                        state.current_path = Some(p);
+
+                    } else {
+                        state.message = Some("Unsupported image".into());
+                    }
+                }
             }
         }
         Event::MouseDown { button, .. } => {
@@ -584,10 +591,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
-    // redraw constantly until the image is fully loaded or it is reset on canvas
-    if !state.is_loaded || state.reset_image {
-        app.window().request_frame();
-    }
+
 
     // make sure that in edit mode, RGBA is set.
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
@@ -777,7 +781,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             debug!("Image has been reset.");
             state.reset_image = false;
         }
-        app.window().request_frame();
+        // app.window().request_frame();
     }
 
     // TODO: Do we need/want a "global" checker?
@@ -957,9 +961,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             ui.label(format!("Loading {}", p.display()));
                         });
                     }
+                    app.window().request_frame();
                 },
             );
-            app.window().request_frame();
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -989,7 +993,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     app.window().request_frame();
     // }
     let c = state.persistent_settings.background_color;
-    draw.clear(Color::from_bytes(c[0], c[1], c[2], 255));
+    // draw.clear(Color:: from_bytes(c[0], c[1], c[2], 255));
+    draw.clear(Color::from_rgb(c[0] as f32 / 255., c[1] as f32 / 255., c[1] as f32 / 255.));
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
