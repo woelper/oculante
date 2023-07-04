@@ -25,6 +25,7 @@ use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
 mod appstate;
+mod image_loader;
 use appstate::*;
 // mod events;
 #[cfg(target_os = "macos")]

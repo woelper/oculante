@@ -1,3 +1,4 @@
+use crate::image_loader::*;
 use cmd_lib::run_cmd;
 
 use crate::{
