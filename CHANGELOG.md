@@ -1,3 +1,9 @@
+# 0.6.67 (2023-07-05)
+
+### :green_apple: Chore
+
+* update dependencies (7e9f87c7)
+
 # 0.6.66 (2023-06-25)
 
 ### :green_apple: Chore
