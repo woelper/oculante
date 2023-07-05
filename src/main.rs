@@ -118,6 +118,7 @@ fn main() -> Result<(), String> {
             error!("Could not load settings: {e}");
         }
     }
+    window_config.always_on_top = true;
 
     info!("Starting oculante.");
     notan::init_with(init)
@@ -534,7 +535,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.player.load(&p, state.message_channel.0.clone());
                         state.current_path = Some(p);
                     } else {
-                        state.message = Some(Message::warn("Unsupported image!"));
+                        state.message = Some(Message::warn("Unsupported file!"));
                     }
                 }
             }
@@ -564,6 +565,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 }
 
 fn update(app: &mut App, state: &mut OculanteState) {
+    if state.first_start {
+        app.window().set_always_on_top(false);
+    }
+
+
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
@@ -619,19 +625,19 @@ fn update(app: &mut App, state: &mut OculanteState) {
         if let Ok(msg) = state.message_channel.1.try_recv() {
             debug!("Received message: {:?}", msg);
             match msg {
-                Message::Info(_) => {}
-                Message::Warning(_) => {}
-                Message::Error(_) => {
-                    if state.current_image.is_none() {
-                        state.current_path = None;
-                        state.is_loaded = false;
-                    }
-                }
+                Message::LoadError(_) => {
+                    state.current_image = None;
+                    state.is_loaded = true;
+                    state.current_texture = None;
+                },
+                _ => (),
             }
 
             state.message = Some(msg);
         }
     }
+    state.first_start = false;
+
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -918,8 +924,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             Message::Warning(txt) => {
                                 ui.colored_label(Color32::GOLD, format!("⚠ {txt}"));
                             }
-                            Message::Error(txt) => {
-                                ui.colored_label(Color32::DARK_RED, format!("🕱 {txt}"));
+                            Message::Error(txt) | Message::LoadError(txt) => {
+                                ui.colored_label(Color32::RED, format!("🕱 {txt}"));
                             }
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {

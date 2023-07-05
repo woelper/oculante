@@ -1704,29 +1704,33 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_image.is_some() {
-            if state.current_path.is_some() {
-                if tooltip(
-                    unframed_button("◀", ui),
-                    "Previous image",
-                    &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
-                    ui,
-                )
-                .clicked()
-                {
-                    prev_image(state)
-                }
-                if tooltip(
-                    unframed_button("▶", ui),
-                    "Next image",
-                    &lookup(&state.persistent_settings.shortcuts, &NextImage),
-                    ui,
-                )
-                .clicked()
-                {
-                    next_image(state)
-                }
+
+
+        if state.current_path.is_some() {
+            if tooltip(
+                unframed_button("◀", ui),
+                "Previous image",
+                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
+                ui,
+            )
+            .clicked()
+            {
+                prev_image(state)
             }
+            if tooltip(
+                unframed_button("▶", ui),
+                "Next image",
+                &lookup(&state.persistent_settings.shortcuts, &NextImage),
+                ui,
+            )
+            .clicked()
+            {
+                next_image(state)
+            }
+        }
+
+        if state.current_image.is_some() {
+       
 
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
