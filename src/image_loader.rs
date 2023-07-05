@@ -13,6 +13,7 @@ use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
+use zune_png::zune_core::options::DecoderOptions;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -397,6 +398,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         "png" => {
             let contents = std::fs::read(&img_location)?;
             let mut decoder = PngDecoder::new(&contents);
+            decoder.set_options(DecoderOptions::new_fast().set_max_height(50000).set_max_width(50000));
             match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
                 // 16 bpp data
                 DecodingResult::U16(imgdata) => {
