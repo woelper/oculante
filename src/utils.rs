@@ -24,7 +24,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::appstate::{ImageGeometry, OculanteState};
+use crate::appstate::{ImageGeometry, OculanteState, Message};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
@@ -147,7 +147,7 @@ impl Player {
         }
     }
 
-    pub fn load(&mut self, img_location: &Path, message_sender: Sender<String>) {
+    pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
         debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -176,7 +176,7 @@ impl Player {
 pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
-    message_sender: Sender<String>,
+    message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
     max_texture_size: u32,
 ) {
@@ -204,7 +204,7 @@ pub fn send_image_threaded(
 
                         // Check if texture is too large to fit on the texture
                         if largest_side > max_texture_size {
-                            _ = message_sender.send("This image exceeded the maximum resolution and will be be scaled down.".to_string());
+                            _ = message_sender.send(Message::warn("This image exceeded the maximum resolution and will be be scaled down."));
                             let scale_factor = max_texture_size as f32 / largest_side as f32;
                             let new_dimensions = (
                                 (f.buffer.dimensions().0 as f32 * scale_factor)
@@ -268,7 +268,7 @@ pub fn send_image_threaded(
             }
             Err(e) => {
                 error!("{e}");
-                _ = message_sender.send(e.to_string());
+                _ = message_sender.send(Message::Error(e.to_string()));
             }
         }
     });
@@ -715,10 +715,10 @@ pub fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) ->
 pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
     state.persistent_settings.zen_mode = !state.persistent_settings.zen_mode;
     if state.persistent_settings.zen_mode {
-        _ = state.message_channel.0.send(format!(
+        _ = state.message_channel.0.send(Message::Info(format!(
             "Zen mode on. Press '{}' to toggle.",
             lookup(&state.persistent_settings.shortcuts, &InputEvent::ZenMode)
-        ));
+        )));
     }
     set_title(app, state);
 }

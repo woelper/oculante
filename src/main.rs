@@ -222,7 +222,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                state.message = Some(format!("Listening on {p}"));
+                state.message = Some(Message::info(&format!("Listening on {p}")));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
@@ -533,9 +533,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.current_image = None;
                         state.player.load(&p, state.message_channel.0.clone());
                         state.current_path = Some(p);
-
                     } else {
-                        state.message = Some("Unsupported image".into());
+                        state.message = Some(Message::warn("Unsupported image!"));
                     }
                 }
             }
@@ -591,8 +590,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
-
-
     // make sure that in edit mode, RGBA is set.
     // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
     // let's disable it here.
@@ -620,12 +617,18 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
         // check if a new message has been sent
         if let Ok(msg) = state.message_channel.1.try_recv() {
-            debug!("Received message: {msg}");
-            if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
-                if state.current_image.is_none() {
-                    state.current_path = None;
+            debug!("Received message: {:?}", msg);
+            match msg {
+                Message::Info(_) => {}
+                Message::Warning(_) => {}
+                Message::Error(_) => {
+                    if state.current_image.is_none() {
+                        state.current_path = None;
+                        state.is_loaded = false;
+                    }
                 }
             }
+
             state.message = Some(msg);
         }
     }
@@ -907,22 +910,32 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 ctx,
                 state.message.is_some(),
                 |ui| {
-                    ui.ctx().request_repaint();
-
                     ui.horizontal(|ui| {
-                        ui.label(format!("💬 {message}"));
+                        match message {
+                            Message::Info(txt) => {
+                                ui.label(format!("💬 {txt}"));
+                            }
+                            Message::Warning(txt) => {
+                                ui.colored_label(Color32::GOLD, format!("⚠ {txt}"));
+                            }
+                            Message::Error(txt) => {
+                                ui.colored_label(Color32::DARK_RED, format!("🕱 {txt}"));
+                            }
+                        }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             if ui.small_button("🗙").clicked() {
                                 state.message = None
                             }
                         });
                     });
+
+                    ui.ctx().request_repaint();
                 },
             );
             let max_anim_len = if state.persistent_settings.vsync {
-                3.5
+                2.5
             } else {
-                70.
+                50.
             };
 
             // using delta does not work with rfd
@@ -994,7 +1007,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let c = state.persistent_settings.background_color;
     // draw.clear(Color:: from_bytes(c[0], c[1], c[2], 255));
-    draw.clear(Color::from_rgb(c[0] as f32 / 255., c[1] as f32 / 255., c[1] as f32 / 255.));
+    draw.clear(Color::from_rgb(
+        c[0] as f32 / 255.,
+        c[1] as f32 / 255.,
+        c[1] as f32 / 255.,
+    ));
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
