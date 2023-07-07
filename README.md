@@ -225,11 +225,11 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 
 <kbd>LBracket</kbd> = LosslessRotateLeft
 
-<kbd>LControl</kbd> + <kbd>C</kbd> = Copy
+<kbd>LWin</kbd> + <kbd>C</kbd> = Copy
 
-<kbd>LControl</kbd> + <kbd>V</kbd> = Paste
+<kbd>LWin</kbd> + <kbd>V</kbd> = Paste
 
-<kbd>LControl</kbd> + <kbd>O</kbd> = Browse
+<kbd>LWin</kbd> + <kbd>O</kbd> = Browse
 
 <kbd>Q</kbd> = Quit
 
