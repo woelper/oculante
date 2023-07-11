@@ -403,7 +403,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
-                browse_for_image_path(state)
+                state.redraw = true;
+                browse_for_image_path(state);
             }
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
@@ -569,7 +570,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
-
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
@@ -629,7 +629,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                     state.current_image = None;
                     state.is_loaded = true;
                     state.current_texture = None;
-                },
+                }
                 _ => (),
             }
 
@@ -637,11 +637,21 @@ fn update(app: &mut App, state: &mut OculanteState) {
         }
     }
     state.first_start = false;
-
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
+
+    if let Ok(p) = state.load_channel.1.try_recv() {
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load(&p, state.message_channel.0.clone());
+        if let Some(dir) = p.parent() {
+            state.persistent_settings.last_open_directory = dir.to_path_buf();
+        }
+        state.current_path = Some(p);
+        _ = state.persistent_settings.save();
+    }
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
@@ -721,7 +731,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
                 }
-                state.animation_mode = false;
+                state.redraw = false;
                 state.image_info = None;
             }
             FrameSource::EditResult => {
@@ -729,11 +739,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // state.edit_state.is_processing = false;
             }
             FrameSource::AnimationStart => {
-                state.animation_mode = true;
+                state.redraw = true;
                 state.reset_image = true
             }
             FrameSource::Animation => {
-                state.animation_mode = true;
+                state.redraw = true;
             }
         }
 
@@ -772,7 +782,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
-    if state.animation_mode {
+    if state.redraw {
+        debug!("Force redraw");
         app.window().request_frame();
     }
 
@@ -938,15 +949,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.ctx().request_repaint();
                 },
             );
-            let max_anim_len = if state.persistent_settings.vsync {
-                2.5
-            } else {
-                50.
-            };
+            let max_anim_len = 2.5;
 
             // using delta does not work with rfd
-            // state.toast_cooldown += app.timer.delta_f32();
-            state.toast_cooldown += 0.01;
+            state.toast_cooldown += app.timer.delta_f32();
+            // state.toast_cooldown += 0.01;
             // debug!("cooldown {}", state.toast_cooldown);
 
             if state.toast_cooldown > max_anim_len {
@@ -1028,27 +1035,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = &state.persistent_settings.last_open_directory;
-
-    let file_dialog_result = rfd::FileDialog::new()
-        .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
-        .add_filter("All File Types", &["*"])
-        .set_directory(start_directory)
-        .pick_file();
-
-    if let Some(file_path) = file_dialog_result {
-        debug!("Selected File Path = {:?}", file_path);
-        state.is_loaded = false;
-        state.current_image = None;
-        state
-            .player
-            .load(&file_path, state.message_channel.0.clone());
-        if let Some(dir) = file_path.parent() {
-            state.persistent_settings.last_open_directory = dir.to_path_buf();
+    let start_directory = state.persistent_settings.last_open_directory.clone();
+    let sender = state.load_channel.0.clone();
+    state.redraw = true;
+    std::thread::spawn(move || {
+        let file_dialog_result = rfd::FileDialog::new()
+            .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
+            .add_filter("All File Types", &["*"])
+            .set_directory(start_directory)
+            .pick_file();
+        if let Some(file_path) = file_dialog_result {
+            let _ = sender.send(file_path);
         }
-        state.current_path = Some(file_path);
-        _ = state.persistent_settings.save();
-    }
+    });
 }
 
 // Make sure offset is restricted to window size so we don't offset to infinity
