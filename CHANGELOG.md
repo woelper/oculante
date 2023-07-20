@@ -1,3 +1,9 @@
+# 0.6.69 (2023-07-20)
+
+### :green_apple: Chore
+
+* update deps (872704cb)
+
 # 0.6.67 (2023-07-05)
 
 ### :green_apple: Chore
