@@ -2,7 +2,7 @@
 use crate::browse_for_image_path;
 use crate::{
     appstate::{ImageGeometry, OculanteState},
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter, FRAGMENT, ShaderState},
     paint::PaintStroke,
     set_zoom,
     shortcuts::{key_pressed, keypresses_as_string, lookup},
@@ -13,17 +13,41 @@ use crate::{
     },
 };
 
+//language=glsl
+const IMAGE_VERTEX: ShaderSource = vertex_shader! {
+    r#"
+    #version 450
+    layout(location = 0) in vec2 a_pos;
+    layout(location = 1) in vec2 a_uvs;
+    layout(location = 2) in vec4 a_color;
+
+    layout(location = 0) out vec4 v_color;
+    layout(location = 1) out vec2 v_uvs;
+    layout(set = 0, binding = 0) uniform Locals {
+        mat4 u_projection;
+    };
+
+    void main() {
+        v_color = a_color;
+        v_uvs = a_uvs;
+        gl_Position = u_projection * vec4(a_pos, 0.0, 1.0);
+    }
+    "#
+};
+
+
 use arboard::Clipboard;
 use egui::plot::Plot;
 use image::RgbaImage;
 use log::{debug, error, info};
 use notan::{
+    draw::create_image_pipeline,
     egui::{
         self,
         plot::{PlotPoints, Points},
         *,
     },
-    prelude::{App, Graphics},
+    prelude::{App, Graphics, ShaderSource}, vertex_shader,
 };
 use std::{collections::HashSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
@@ -916,6 +940,42 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             }
             ui.end_row();
 
+
+            ui.group(|ui| {
+                if ui.button("Add Pipeline").clicked() {
+                    // let pipeline = create_image_pipeline(gfx, Some(&FRAGMENT)).unwrap();
+
+                    // let uniforms = gfx
+                    // .create_uniform_buffer(1, "TextureInfo")
+                    // .with_data(&[5.0])
+                    // .build()
+                    // .unwrap();
+
+                    // state.edit_state.pipeline = Some(pipeline);
+                    // state.edit_state.uniforms = Some(uniforms);
+
+                    state.edit_state.shader = Some(ShaderState::new(gfx));
+
+                    if let Some(shader) = state.edit_state.shader.as_mut() {
+                        if ui.text_edit_multiline(&mut shader.fragment).changed() {
+                            //    vertex_shader!(shader.fragment);
+                            // let spirv = spirv_from(&shader.fragment, ShaderType::Vertex, None).unwrap();
+                            // gfx.create_pipeline()
+                            // .from(&IMAGE_VERTEX, fragment)
+                        }
+                    }
+
+                }
+
+                // let spirv = shaders::spirv_from(&content, shaders::ShaderType::Fragment, None).unwrap();
+
+                // shaders::source_from_spirv(spirv).unwrap()
+
+
+            });
+
+
+
             ui.vertical_centered_justified(|ui| {
                 if ui
                     .button("⤵ Apply all edits")
@@ -1704,8 +1764,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-
-
         if state.current_path.is_some() {
             if tooltip(
                 unframed_button("◀", ui),
@@ -1730,8 +1788,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_image.is_some() {
-       
-
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                 ui.selectable_label(state.persistent_settings.info_enabled, "ℹ Info"),

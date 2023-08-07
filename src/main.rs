@@ -825,6 +825,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ;
             }
         }
+
+        if let Some(shader) = &state.edit_state.shader {
+            info!("buffer and pipeline available");
+
+            draw.image_pipeline()
+                .pipeline(&shader.pipeline_unsafe())
+                .uniform_buffer(&shader.uniforms_unsafe());
+        }
+
         if state.tiling < 2 {
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
@@ -839,6 +848,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     texture.height() * state.tiling as f32,
                 );
         }
+
+        draw.image_pipeline().remove();
 
         if state.persistent_settings.show_frame {
             draw.rect((0.0, 0.0), texture.size())
@@ -1029,6 +1040,36 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
         app.window().request_frame();
+    }
+
+    if state.edit_state.shader.is_none() {
+        return;
+    }
+    return;
+
+    if let Some(texture) = &mut state.current_texture {
+        if let Some(shader) = &state.edit_state.shader {
+            let pixel_size = 5.0;
+            gfx.set_buffer_data(&shader.uniforms_unsafe(), &[pixel_size]);
+            let mut draw = gfx.create_draw();
+            // draw.clear(Color::BLACK);
+            // Image without a custom shader
+            draw.image(&texture).scale(0.2, 0.2).position(0.0, 200.0);
+            // Set the custom pipeline for image
+
+            // let pipeline = &shader.pipeline_unsafe();
+            // let uniforms = &shader.uniforms_unsafe();
+            draw.image_pipeline()
+                .pipeline(shader.pipeline_unsafe())
+                .uniform_buffer(shader.uniforms_unsafe());
+
+            draw.image(&texture)
+                .position(texture.width(), 200.0)
+                .scale(0.2, 0.2);
+
+            draw.image_pipeline().remove();
+            gfx.render(&draw);
+        }
     }
 }
 

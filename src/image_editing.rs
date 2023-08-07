@@ -10,12 +10,103 @@ use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
 use log::{debug, error};
 use nalgebra::Vector4;
+use notan::draw::create_image_pipeline;
 use notan::egui::{self, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
+
+use notan::prelude::*;
+
+//language=glsl
+pub const FRAGMENT: ShaderSource = notan::fragment_shader! {
+    r#"
+    #version 450
+    precision mediump float;
+
+    layout(location = 0) in vec2 v_uvs;
+    layout(location = 1) in vec4 v_color;
+
+    layout(binding = 0) uniform sampler2D u_texture;
+    layout(set = 0, binding = 1) uniform TextureInfo {
+        float u_size;
+    };
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+        vec2 tex_size = textureSize(u_texture, 0);
+        vec2 p_size = vec2(u_size);
+        vec2 coord = fract(v_uvs) * tex_size;
+        //coord = floor(coord/p_size) * p_size;
+        color = texture(u_texture, coord / tex_size) * vec4(0.1,0.6,0.2, 0.9);
+        //color = vec4(1.0, 0.0, 1.0,1.0);
+    }
+"#
+};
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+
+pub struct ShaderState {
+    #[serde(skip)]
+    pub pipeline: Option<Pipeline>,
+    #[serde(skip)]
+    pub uniforms: Option<Buffer>,
+    pub fragment: String,
+}
+
+impl ShaderState {
+    pub fn new(gfx: &mut Graphics) -> Self {
+        let pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT)).unwrap());
+
+        let uniforms = Some(
+            gfx.create_uniform_buffer(1, "TextureInfo")
+                .with_data(&[5.0])
+                .build()
+                .unwrap(),
+        );
+
+        let frag = r#"
+    #version 450
+    precision mediump float;
+
+    layout(location = 0) in vec2 v_uvs;
+    layout(location = 1) in vec4 v_color;
+
+    layout(binding = 0) uniform sampler2D u_texture;
+    layout(set = 0, binding = 1) uniform TextureInfo {
+        float u_size;
+    };
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+        vec2 tex_size = textureSize(u_texture, 0);
+        vec2 p_size = vec2(u_size);
+        vec2 coord = fract(v_uvs) * tex_size;
+        //coord = floor(coord/p_size) * p_size;
+        color = texture(u_texture, coord / tex_size) * 0.2;
+        //color = vec4(1.0, 0.0, 1.0,1.0);
+    }
+"#;
+
+        Self {
+            pipeline,
+            uniforms,
+            fragment: frag.into(),
+        }
+    }
+
+    pub fn uniforms_unsafe(&self) -> &Buffer {
+        self.uniforms.as_ref().unwrap()
+    }
+
+    pub fn pipeline_unsafe(&self) -> &Pipeline {
+        self.pipeline.as_ref().unwrap()
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -32,6 +123,7 @@ pub struct EditState {
     pub pixel_op_stack: Vec<ImageOperation>,
     pub image_op_stack: Vec<ImageOperation>,
     pub export_extension: String,
+    pub shader: Option<ShaderState>, // TODO: shader as string
 }
 
 impl Default for EditState {
@@ -47,6 +139,7 @@ impl Default for EditState {
             pixel_op_stack: vec![],
             image_op_stack: vec![],
             export_extension: "png".into(),
+            shader: None,
         }
     }
 }
@@ -123,6 +216,9 @@ pub enum ImageOperation {
     // x,y (top left corner of crop), width, height
     // 1.0 equals 10000
     Crop([u32; 4]),
+    PixelShader {
+        val: u32,
+    },
 }
 
 impl fmt::Display for ImageOperation {
@@ -150,6 +246,7 @@ impl fmt::Display for ImageOperation {
             Self::Expression(_) => write!(f, "📄 Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
+            Self::PixelShader { .. } => write!(f, "Shader"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -172,6 +269,7 @@ impl ImageOperation {
     pub fn ui(&mut self, ui: &mut Ui) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
+            Self::PixelShader { val } => ui.slider_styled(val, 0..=255),
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
