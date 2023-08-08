@@ -10,12 +10,13 @@ use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
 use log::{debug, error};
 use nalgebra::Vector4;
-use notan::egui::{self, DragValue, Sense, Vec2};
+use notan::egui::{self, lerp, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
+use splines::Spline;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -95,6 +96,7 @@ pub enum ImageOperation {
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
+    GradientMap(Vec<(u8, [u8; 3])>),
     Exposure(i32),
     Equalize((i32, i32)),
     Mult([u8; 3]),
@@ -147,6 +149,7 @@ impl fmt::Display for ImageOperation {
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
+            Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
             Self::Expression(_) => write!(f, "📄 Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
@@ -160,6 +163,7 @@ impl ImageOperation {
         match self {
             Self::Blur(_) => false,
             Self::Resize { .. } => false,
+            // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
@@ -238,6 +242,113 @@ impl ImageOperation {
                     r.changed = true
                 }
                 r
+            }
+
+            Self::GradientMap(pts) => {
+                ui.vertical(|ui| {
+                    //     let texture = gfx
+                    //     .create_texture()
+                    //     .from_image(include_bytes!("../res/oculante.png"))
+                    //     .with_premultiplied_alpha()
+                    //     .build()
+                    //     .unwrap();
+
+                    // let img_size: egui::Vec2 = texture.size().into();
+                    // let tex_id = gfx.egui_register_texture(&texture);
+
+                    pts.sort_by(|a, b| a.0.cmp(&b.0));
+
+                    use egui::epaint::*;
+                    let (rect, mut response) =
+                        ui.allocate_at_least(vec2(256., 50.), Sense::hover());
+                    // if bg_fill != Default::default() {
+                    //     let mut mesh = Mesh::default();
+                    //     mesh.add_colored_rect(rect, bg_fill);
+                    //     ui.painter().add(Shape::mesh(mesh));
+                    // }
+                    let mut n = pts.len();
+                    let len = pts.len();
+                    assert!(n >= 2);
+                    let mut mesh = Mesh::default();
+
+                    let mut i: usize = 0;
+
+                    for &color in pts.iter() {
+                        let t = color.0 as f32 / u8::MAX as f32;
+                        let x = lerp(rect.x_range(), t);
+                        let egui_color =
+                            // Color32::from_rgb(color.1[0], color.1[1], color.1[2]).additive();
+                            Color32::from_rgb(color.1[0], color.1[1], color.1[2]);
+
+                        // first point is shifted, so we clamp
+                        if i == 0 && color.0 > 0 {
+                            let x = rect.left();
+                            mesh.colored_vertex(pos2(x, rect.top()), egui_color);
+                            mesh.colored_vertex(pos2(x, rect.bottom()), egui_color);
+                            mesh.add_triangle(2 * i as u32, 2 * i as u32 + 1, 2 * i as u32 + 2);
+                            mesh.add_triangle(2 * i as u32 + 1, 2 * i as u32 + 2, 2 * i as u32 + 3);
+                            i += 1;
+                            n += 1;
+                        }
+                        if i == pts.len() - 1 {
+                            // x = rect.right();
+                        }
+                        mesh.colored_vertex(pos2(x, rect.top()), egui_color);
+                        mesh.colored_vertex(pos2(x, rect.bottom()), egui_color);
+                        if i < n - 1 {
+                            let i = i as u32;
+                            mesh.add_triangle(2 * i, 2 * i + 1, 2 * i + 2);
+                            mesh.add_triangle(2 * i + 1, 2 * i + 2, 2 * i + 3);
+                        }
+                        i += 1;
+                    }
+
+                    ui.painter().add(Shape::mesh(mesh));
+
+                    let mut delete = None;
+                    for (i, p) in pts.iter_mut().enumerate() {
+                        ui.horizontal(|ui| {
+                            if ui.color_edit_button_srgb(&mut p.1).changed() {
+                                response.mark_changed();
+                            }
+
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut p.0)
+                                        .speed(0.1)
+                                        .clamp_range(0..=255)
+                                        .custom_formatter(|n, _| {
+                                            let n = n / 256.;
+                                            format!("{n:.2}")
+                                        })
+                                        .suffix(" pos"),
+                                )
+                                .changed()
+                            {
+                                response.mark_changed();
+                            }
+
+                            //❌🗑
+                            if len > 2 {
+                                if ui.button("🗑").clicked() {
+                                    delete = Some(i);
+                                }
+                            }
+                        });
+                    }
+
+                    if ui.button("+").clicked() {
+                        pts.push((128, [0, 0, 0]));
+                        response.mark_changed();
+                    }
+                    if let Some(del) = delete {
+                        pts.remove(del);
+                        response.mark_changed();
+                    }
+
+                    response
+                })
+                .inner
             }
             Self::Flip(horizontal) => {
                 let mut r = ui.radio_value(horizontal, true, "V");
@@ -603,6 +714,35 @@ impl ImageOperation {
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
                 p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
             }
+
+            Self::GradientMap(col) => {
+                let brightness = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+
+                // let res = interpolate(col, (brightness * 255.)as u8);
+                let res = interpolate_spline(col, brightness);
+
+                // p[0] = res[0] as f32 / 255.;
+                // p[1] = res[1] as f32 / 255.;
+                // p[2] = res[2] as f32 / 255.;
+                p[0] = res[0];
+                p[1] = res[1];
+                p[2] = res[2];
+
+                // let grad = colorgrad::rainbow();
+
+                // let col = grad.at(brightness as f64);
+
+                // *p = lerp_col(Vector4::splat(bounds.0), Vector4::splat(bounds.1), *p);
+                // 0, 0.2, 1.0
+
+                // p[0] = col.r as f32;
+                // p[1] = col.g as f32;
+                // p[2] = col.b as f32;
+
+                // p[0] = egui::lerp(bounds.0..=bounds.1, p[0]);
+                // p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
+                // p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
+            }
             Self::Expression(expr) => {
                 let mut context = context_map! {
                     "r" => p[0] as f64,
@@ -830,4 +970,79 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
     // write the changed JPEG back to disk
     std::fs::write(p, &transformed_data)?;
     Ok(())
+}
+
+type Gradient = Vec<(u8, [u8; 3])>;
+
+fn interpolate(data: &Vec<(u8, [u8; 3])>, pt: u8) -> [u8; 3] {
+    for (i, current) in data.iter().enumerate() {
+        if let Some(next) = data.get(i + 1) {
+            //find nearest points
+            if pt > current.0 && pt < next.0 {
+                //now interpolate
+
+                let res = [
+                    lerp(current.1[0] as f32..=next.1[0] as f32, pt as f32 / 255.) as u8,
+                    lerp(current.1[1] as f32..=next.1[1] as f32, pt as f32 / 255.) as u8,
+                    lerp(current.1[2] as f32..=next.1[2] as f32, pt as f32 / 255.) as u8,
+                    // current.1[0].lerp
+                ];
+                return res;
+            }
+        }
+    }
+
+    // use splines::{Interpolation, Key, Spline};
+
+    // let mut pts = vec![];
+
+    // for d in data {
+    //     pts.push(Key::new(d.0, d.1[0] as f32, Interpolation::default()));
+    // }
+    // let spline = Spline::from_vec(pts);
+    // spline.clamped_sample(pt).unwrap_or_default();
+
+    [255, 0, 00]
+    // res
+}
+
+/// pt: 0-1
+fn interpolate_spline(data: &Vec<(u8, [u8; 3])>, pt: f32) -> [f32; 3] {
+    let data = data
+        .iter()
+        .map(|d| {
+            (
+                d.0 as f32 / 255.,
+                [
+                    d.1[0] as f32 / 255.,
+                    d.1[1] as f32 / 255.,
+                    d.1[2] as f32 / 255.,
+                ],
+            )
+        })
+        .collect::<Vec<_>>();
+
+    use splines::{Interpolation, Key};
+
+    let mut r_pts = vec![];
+    let mut g_pts = vec![];
+    let mut b_pts = vec![];
+
+    for d in data {
+        r_pts.push(Key::new(d.0, d.1[0] as f32, Interpolation::default()));
+        g_pts.push(Key::new(d.0, d.1[1] as f32, Interpolation::default()));
+        b_pts.push(Key::new(d.0, d.1[2] as f32, Interpolation::default()));
+    }
+
+    let r_spline = Spline::from_vec(r_pts);
+    let g_spline = Spline::from_vec(g_pts);
+    let b_spline = Spline::from_vec(b_pts);
+
+    [
+        r_spline.clamped_sample(pt).unwrap_or_default(),
+        g_spline.clamped_sample(pt).unwrap_or_default(),
+        b_spline.clamped_sample(pt).unwrap_or_default(),
+    ]
+
+    // res
 }

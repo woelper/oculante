@@ -651,6 +651,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
+                        ImageOperation::GradientMap(vec![(0, [10,0,50]), (128, [20,0,150]),(255, [40,0,250])]),
                         ImageOperation::MMult,
                         ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
@@ -1704,8 +1705,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-
-
         if state.current_path.is_some() {
             if tooltip(
                 unframed_button("◀", ui),
@@ -1730,8 +1729,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_image.is_some() {
-       
-
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                 ui.selectable_label(state.persistent_settings.info_enabled, "ℹ Info"),
