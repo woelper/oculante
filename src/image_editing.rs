@@ -250,7 +250,6 @@ impl ImageOperation {
                     // Make sure points are monotonic ascending
 
                     use egui::epaint::*;
-                    let mut needs_sort = false;
 
                     let (rect, mut response) =
                         ui.allocate_at_least(vec2(256., 50.), Sense::click_and_drag());
@@ -311,8 +310,6 @@ impl ImageOperation {
 
                             // check which point is closest
 
-                            // Check if a point is in range
-
                             if closest_pt(&pts_cpy, mouse_pos_in_gradient as u8) as usize == ptnum {
                                 is_hovered = true;
 
@@ -327,14 +324,14 @@ impl ImageOperation {
                                 {
                                     ui.ctx()
                                         .data()
-                                        .insert_temp::<usize>("gradient".into(), ptnum);
+                                        .insert_temp::<usize>("gradient".into(), gradient_stop.id);
                                     debug!("insert");
                                 }
                             }
 
                             if ui.ctx().input().pointer.any_down()
                                 && ui.ctx().data().get_temp::<usize>("gradient".into())
-                                    == Some(ptnum)
+                                    == Some(gradient_stop.id)
                             {
                                 // let id = ui.ctx().data().
                                 gradient_stop.pos = mouse_pos_in_gradient as u8;
@@ -346,7 +343,6 @@ impl ImageOperation {
                             ui.ctx().data().remove::<usize>("gradient".into());
                             // ui.ctx().data().clear();
                             debug!("clear dta");
-                            needs_sort = true;
                         }
 
                         ui.painter().vline(
@@ -401,17 +397,13 @@ impl ImageOperation {
                     if ui.button("+").clicked() {
                         pts.push(GradientStop::new(128, [0,0,0]));
                         response.mark_changed();
-                        needs_sort = true;
                     }
                     if let Some(del) = delete {
                         pts.remove(del);
                         response.mark_changed();
-                        needs_sort = true;
                     }
 
-                    if needs_sort {
                         pts.sort_by(|a, b| a.pos.cmp(&b.pos));
-                    }
 
                     response
                 })
