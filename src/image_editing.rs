@@ -8,7 +8,7 @@ use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
-use log::{debug, error};
+use log::{debug, error, info};
 use nalgebra::Vector4;
 use notan::egui::{self, lerp, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
@@ -17,6 +17,7 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use splines::Spline;
+use splines::{Interpolation, Key};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -96,7 +97,7 @@ pub enum ImageOperation {
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
-    GradientMap(Vec<(u8, [u8; 3])>),
+    GradientMap(Vec<GradientStop>),
     Exposure(i32),
     Equalize((i32, i32)),
     Mult([u8; 3]),
@@ -246,26 +247,14 @@ impl ImageOperation {
 
             Self::GradientMap(pts) => {
                 ui.vertical(|ui| {
-                    //     let texture = gfx
-                    //     .create_texture()
-                    //     .from_image(include_bytes!("../res/oculante.png"))
-                    //     .with_premultiplied_alpha()
-                    //     .build()
-                    //     .unwrap();
-
-                    // let img_size: egui::Vec2 = texture.size().into();
-                    // let tex_id = gfx.egui_register_texture(&texture);
-
-                    pts.sort_by(|a, b| a.0.cmp(&b.0));
+                    // Make sure points are monotonic ascending
 
                     use egui::epaint::*;
+                    let mut needs_sort = false;
+
                     let (rect, mut response) =
-                        ui.allocate_at_least(vec2(256., 50.), Sense::hover());
-                    // if bg_fill != Default::default() {
-                    //     let mut mesh = Mesh::default();
-                    //     mesh.add_colored_rect(rect, bg_fill);
-                    //     ui.painter().add(Shape::mesh(mesh));
-                    // }
+                        ui.allocate_at_least(vec2(256., 50.), Sense::click_and_drag());
+
                     let mut n = pts.len();
                     let len = pts.len();
                     assert!(n >= 2);
@@ -273,15 +262,16 @@ impl ImageOperation {
 
                     let mut i: usize = 0;
 
+                    // paint gradient
                     for &color in pts.iter() {
-                        let t = color.0 as f32 / u8::MAX as f32;
+                        let t = color.pos as f32 / u8::MAX as f32;
                         let x = lerp(rect.x_range(), t);
                         let egui_color =
                             // Color32::from_rgb(color.1[0], color.1[1], color.1[2]).additive();
-                            Color32::from_rgb(color.1[0], color.1[1], color.1[2]);
+                            Color32::from_rgb(color.r(), color.g(), color.b());
 
                         // first point is shifted, so we clamp
-                        if i == 0 && color.0 > 0 {
+                        if i == 0 && color.pos > 0 {
                             let x = rect.left();
                             mesh.colored_vertex(pos2(x, rect.top()), egui_color);
                             mesh.colored_vertex(pos2(x, rect.bottom()), egui_color);
@@ -305,16 +295,87 @@ impl ImageOperation {
 
                     ui.painter().add(Shape::mesh(mesh));
 
+                    // gradient stop ui
+
+                    ui.ctx().request_repaint();
+
+                    let pts_cpy = pts.clone();
+
+                    for (ptnum, gradient_stop) in pts.iter_mut().enumerate() {
+                        let mut is_hovered = false;
+
+                        if let Some(hover) = response.hover_pos() {
+                            // let rel_pos = (hover.x - rect.left()).clamp(0.0, 255.)/255.;
+                            let mouse_pos_in_gradient =
+                                (hover.x - rect.left()).clamp(0.0, 255.) as i32;
+
+                            // check which point is closest
+
+                            // Check if a point is in range
+
+                            if closest_pt(&pts_cpy, mouse_pos_in_gradient as u8) as usize == ptnum {
+                                is_hovered = true;
+
+                                // on click, set the id
+
+                                if ui.ctx().input().pointer.any_down()
+                                    && ui
+                                        .ctx()
+                                        .data()
+                                        .get_temp::<usize>("gradient".into())
+                                        .is_none()
+                                {
+                                    ui.ctx()
+                                        .data()
+                                        .insert_temp::<usize>("gradient".into(), ptnum);
+                                    debug!("insert");
+                                }
+                            }
+
+                            if ui.ctx().input().pointer.any_down()
+                                && ui.ctx().data().get_temp::<usize>("gradient".into())
+                                    == Some(ptnum)
+                            {
+                                // let id = ui.ctx().data().
+                                gradient_stop.pos = mouse_pos_in_gradient as u8;
+                                response.mark_changed();
+                            }
+                        }
+
+                        if ui.ctx().input().pointer.any_released() {
+                            ui.ctx().data().remove::<usize>("gradient".into());
+                            // ui.ctx().data().clear();
+                            debug!("clear dta");
+                            needs_sort = true;
+                        }
+
+                        ui.painter().vline(
+                            rect.left() + gradient_stop.pos as f32,
+                            rect.bottom()..=(rect.top() + 25.),
+                            Stroke::new(
+                                if is_hovered { 4. } else { 1. },
+                                Color32::from_rgb(
+                                    255 - gradient_stop.r(),
+                                    255 - gradient_stop.r(),
+                                    255 - gradient_stop.r(),
+                                ), // Color32::from_gray(200).linear_multiply(0.5),
+                            ),
+                        );
+
+                        // ui.painter().arrow(Pos2::new(rect.left()+ color.0 as f32, rect.bottom()), Vec2::new(0.0, 20.), Stroke::new(4., Color32::RED));
+                        // ui.painter().rect(Rect::from_two_pos(Pos2::new(rect.left() + color.0, rect.bottom()), Pos2::new(0,1 , ));
+                    }
+
                     let mut delete = None;
                     for (i, p) in pts.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
-                            if ui.color_edit_button_srgb(&mut p.1).changed() {
+                            if ui.color_edit_button_srgb(&mut p.col).changed() {
                                 response.mark_changed();
                             }
 
                             if ui
                                 .add(
-                                    egui::DragValue::new(&mut p.0)
+                                    egui::DragValue::new(&mut p.pos)
                                         .speed(0.1)
                                         .clamp_range(0..=255)
                                         .custom_formatter(|n, _| {
@@ -338,12 +399,18 @@ impl ImageOperation {
                     }
 
                     if ui.button("+").clicked() {
-                        pts.push((128, [0, 0, 0]));
+                        pts.push(GradientStop::new(128, [0,0,0]));
                         response.mark_changed();
+                        needs_sort = true;
                     }
                     if let Some(del) = delete {
                         pts.remove(del);
                         response.mark_changed();
+                        needs_sort = true;
+                    }
+
+                    if needs_sort {
+                        pts.sort_by(|a, b| a.pos.cmp(&b.pos));
                     }
 
                     response
@@ -717,31 +784,10 @@ impl ImageOperation {
 
             Self::GradientMap(col) => {
                 let brightness = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
-
-                // let res = interpolate(col, (brightness * 255.)as u8);
                 let res = interpolate_spline(col, brightness);
-
-                // p[0] = res[0] as f32 / 255.;
-                // p[1] = res[1] as f32 / 255.;
-                // p[2] = res[2] as f32 / 255.;
                 p[0] = res[0];
                 p[1] = res[1];
                 p[2] = res[2];
-
-                // let grad = colorgrad::rainbow();
-
-                // let col = grad.at(brightness as f64);
-
-                // *p = lerp_col(Vector4::splat(bounds.0), Vector4::splat(bounds.1), *p);
-                // 0, 0.2, 1.0
-
-                // p[0] = col.r as f32;
-                // p[1] = col.g as f32;
-                // p[2] = col.b as f32;
-
-                // p[0] = egui::lerp(bounds.0..=bounds.1, p[0]);
-                // p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
-                // p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
             }
             Self::Expression(expr) => {
                 let mut context = context_map! {
@@ -972,8 +1018,6 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
     Ok(())
 }
 
-type Gradient = Vec<(u8, [u8; 3])>;
-
 fn interpolate(data: &Vec<(u8, [u8; 3])>, pt: u8) -> [u8; 3] {
     for (i, current) in data.iter().enumerate() {
         if let Some(next) = data.get(i + 1) {
@@ -1007,22 +1051,20 @@ fn interpolate(data: &Vec<(u8, [u8; 3])>, pt: u8) -> [u8; 3] {
 }
 
 /// pt: 0-1
-fn interpolate_spline(data: &Vec<(u8, [u8; 3])>, pt: f32) -> [f32; 3] {
+fn interpolate_spline(data: &Vec<GradientStop>, pt: f32) -> [f32; 3] {
     let data = data
         .iter()
         .map(|d| {
             (
-                d.0 as f32 / 255.,
+                d.pos as f32 / 255.,
                 [
-                    d.1[0] as f32 / 255.,
-                    d.1[1] as f32 / 255.,
-                    d.1[2] as f32 / 255.,
+                    d.r() as f32 / 255.,
+                    d.g() as f32 / 255.,
+                    d.b() as f32 / 255.,
                 ],
             )
         })
         .collect::<Vec<_>>();
-
-    use splines::{Interpolation, Key};
 
     let mut r_pts = vec![];
     let mut g_pts = vec![];
@@ -1045,4 +1087,60 @@ fn interpolate_spline(data: &Vec<(u8, [u8; 3])>, pt: f32) -> [f32; 3] {
     ]
 
     // res
+}
+
+fn closest_pt(data: &Vec<GradientStop>, value: u8) -> usize {
+    // go thru all points of gradient
+    for (i, current) in data.iter().enumerate() {
+        // make sure there is a next point
+        if let Some(next) = data.get(i + 1) {
+            // clamped left: special case
+            if value <= current.pos && i == 0 {
+                return 0;
+            }
+
+            //is this value between these?
+            if current.pos <= value && next.pos >= value {
+                let l_dist = (value as i32 - current.pos as i32).abs();
+                let r_dist = (next.pos as i32 - value as i32).abs();
+                dbg!(i, value, l_dist, r_dist,);
+                if l_dist <= r_dist {
+                    return i;
+                } else {
+                    return i + 1;
+                }
+            }
+        } else {
+            return i;
+        }
+    }
+    0
+    // res
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+pub struct GradientStop {
+    pub id: usize,
+    pub pos: u8,
+    pub col: [u8; 3],
+}
+
+impl GradientStop {
+    fn r(&self) -> u8 {
+        self.col[0]
+    }
+    fn g(&self) -> u8 {
+        self.col[1]
+    }
+    fn b(&self) -> u8 {
+        self.col[2]
+    }
+
+    pub fn new(pos: u8, rgb: [u8; 3]) -> Self {
+        GradientStop {
+            id: rand::thread_rng().gen(),
+            pos,
+            col: rgb,
+        }
+    }
 }

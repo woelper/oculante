@@ -2,7 +2,7 @@
 use crate::browse_for_image_path;
 use crate::{
     appstate::{ImageGeometry, OculanteState},
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter, GradientStop},
     paint::PaintStroke,
     set_zoom,
     shortcuts::{key_pressed, keypresses_as_string, lookup},
@@ -651,7 +651,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
-                        ImageOperation::GradientMap(vec![(0, [10,0,50]), (128, [20,0,150]),(255, [40,0,250])]),
+                        ImageOperation::GradientMap(vec![GradientStop::new(0, [120,12,140]), GradientStop::new(128, [0,12,140]),GradientStop::new(255, [120,12,0])]),
                         ImageOperation::MMult,
                         ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
