@@ -24,7 +24,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::appstate::{ImageGeometry, OculanteState, Message};
+use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;

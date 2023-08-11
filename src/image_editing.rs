@@ -247,16 +247,18 @@ impl ImageOperation {
 
             Self::GradientMap(pts) => {
                 ui.vertical(|ui| {
-                    // Make sure points are monotonic ascending
-
                     use egui::epaint::*;
 
-                    let (rect, mut response) =
-                        ui.allocate_at_least(vec2(256., 50.), Sense::click_and_drag());
+                    const RECT_WIDTH: usize = 255;
 
-                    let mut n = pts.len();
+                    let (gradient_rect, mut response) =
+                        ui.allocate_at_least(vec2(RECT_WIDTH as f32, 50.), Sense::click_and_drag());
+
+                    let mut len_with_extra_pts = pts.len();
                     let len = pts.len();
-                    assert!(n >= 2);
+                    if len < 2 {
+                        error!("You need at least two points in your gradient");
+                    }
                     let mut mesh = Mesh::default();
 
                     let mut i: usize = 0;
@@ -264,39 +266,45 @@ impl ImageOperation {
                     // paint gradient
                     for &color in pts.iter() {
                         let t = color.pos as f32 / u8::MAX as f32;
-                        let x = lerp(rect.x_range(), t);
+                        let x = lerp(gradient_rect.x_range(), t);
                         let egui_color =
                             // Color32::from_rgb(color.1[0], color.1[1], color.1[2]).additive();
                             Color32::from_rgb(color.r(), color.g(), color.b());
 
-                        // first point is shifted, so we clamp
+                        // if first point is shifted, so we clamp and insert first
                         if i == 0 && color.pos > 0 {
-                            let x = rect.left();
-                            mesh.colored_vertex(pos2(x, rect.top()), egui_color);
-                            mesh.colored_vertex(pos2(x, rect.bottom()), egui_color);
+                            let x = gradient_rect.left();
+                            mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                            mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
                             mesh.add_triangle(2 * i as u32, 2 * i as u32 + 1, 2 * i as u32 + 2);
                             mesh.add_triangle(2 * i as u32 + 1, 2 * i as u32 + 2, 2 * i as u32 + 3);
                             i += 1;
-                            n += 1;
+                            len_with_extra_pts += 1;
                         }
-                        if i == pts.len() - 1 {
-                            // x = rect.right();
-                        }
-                        mesh.colored_vertex(pos2(x, rect.top()), egui_color);
-                        mesh.colored_vertex(pos2(x, rect.bottom()), egui_color);
-                        if i < n - 1 {
+
+                        // draw regular point
+                        mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                        mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
+                        if i < len_with_extra_pts - 1 {
                             let i = i as u32;
                             mesh.add_triangle(2 * i, 2 * i + 1, 2 * i + 2);
                             mesh.add_triangle(2 * i + 1, 2 * i + 2, 2 * i + 3);
+                        }
+
+                        // if last point is shifted, insert extra one at end
+                        if i == len_with_extra_pts - 1 && color.pos < RECT_WIDTH as u8 {
+                            let x = gradient_rect.right();
+                            mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                            mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
+                            mesh.add_triangle(2 * i as u32, 2 * i as u32 + 1, 2 * i as u32 + 2);
+                            mesh.add_triangle(2 * i as u32 + 1, 2 * i as u32 + 2, 2 * i as u32 + 3);
+                            i += 1;
+                            len_with_extra_pts += 1;
                         }
                         i += 1;
                     }
 
                     ui.painter().add(Shape::mesh(mesh));
-
-                    // gradient stop ui
-
-                    ui.ctx().request_repaint();
 
                     let pts_cpy = pts.clone();
 
@@ -306,7 +314,7 @@ impl ImageOperation {
                         if let Some(hover) = response.hover_pos() {
                             // let rel_pos = (hover.x - rect.left()).clamp(0.0, 255.)/255.;
                             let mouse_pos_in_gradient =
-                                (hover.x - rect.left()).clamp(0.0, 255.) as i32;
+                                (hover.x - gradient_rect.left()).clamp(0.0, 255.) as i32;
 
                             // check which point is closest
 
@@ -329,11 +337,11 @@ impl ImageOperation {
                                 }
                             }
 
+                            // Button down: move point with matching id
                             if ui.ctx().input().pointer.any_down()
                                 && ui.ctx().data().get_temp::<usize>("gradient".into())
                                     == Some(gradient_stop.id)
                             {
-                                // let id = ui.ctx().data().
                                 gradient_stop.pos = mouse_pos_in_gradient as u8;
                                 response.mark_changed();
                             }
@@ -341,25 +349,21 @@ impl ImageOperation {
 
                         if ui.ctx().input().pointer.any_released() {
                             ui.ctx().data().remove::<usize>("gradient".into());
-                            // ui.ctx().data().clear();
                             debug!("clear dta");
                         }
 
                         ui.painter().vline(
-                            rect.left() + gradient_stop.pos as f32,
-                            rect.bottom()..=(rect.top() + 25.),
+                            gradient_rect.left() + gradient_stop.pos as f32,
+                            gradient_rect.bottom()..=(gradient_rect.top() + 25.),
                             Stroke::new(
                                 if is_hovered { 4. } else { 1. },
                                 Color32::from_rgb(
                                     255 - gradient_stop.r(),
                                     255 - gradient_stop.r(),
                                     255 - gradient_stop.r(),
-                                ), // Color32::from_gray(200).linear_multiply(0.5),
+                                ),
                             ),
                         );
-
-                        // ui.painter().arrow(Pos2::new(rect.left()+ color.0 as f32, rect.bottom()), Vec2::new(0.0, 20.), Stroke::new(4., Color32::RED));
-                        // ui.painter().rect(Rect::from_two_pos(Pos2::new(rect.left() + color.0, rect.bottom()), Pos2::new(0,1 , ));
                     }
 
                     let mut delete = None;
@@ -385,7 +389,7 @@ impl ImageOperation {
                                 response.mark_changed();
                             }
 
-                            //❌🗑
+                            // make sure we have at least two points
                             if len > 2 {
                                 if ui.button("🗑").clicked() {
                                     delete = Some(i);
@@ -394,8 +398,8 @@ impl ImageOperation {
                         });
                     }
 
-                    if ui.button("+").clicked() {
-                        pts.push(GradientStop::new(128, [0,0,0]));
+                    if ui.button("Add point").clicked() {
+                        pts.push(GradientStop::new(128, [0, 0, 0]));
                         response.mark_changed();
                     }
                     if let Some(del) = delete {
@@ -403,7 +407,9 @@ impl ImageOperation {
                         response.mark_changed();
                     }
 
-                        pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+                    // Make sure points are monotonic ascending by position
+
+                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
 
                     response
                 })
@@ -1095,7 +1101,6 @@ fn closest_pt(data: &Vec<GradientStop>, value: u8) -> usize {
             if current.pos <= value && next.pos >= value {
                 let l_dist = (value as i32 - current.pos as i32).abs();
                 let r_dist = (next.pos as i32 - value as i32).abs();
-                dbg!(i, value, l_dist, r_dist,);
                 if l_dist <= r_dist {
                     return i;
                 } else {

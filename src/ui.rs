@@ -2,7 +2,7 @@
 use crate::browse_for_image_path;
 use crate::{
     appstate::{ImageGeometry, OculanteState},
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter, GradientStop},
+    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
     shortcuts::{key_pressed, keypresses_as_string, lookup},
