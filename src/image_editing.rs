@@ -8,7 +8,7 @@ use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
-use log::{debug, error, info};
+use log::{debug, error};
 use nalgebra::Vector4;
 use notan::egui::{self, lerp, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
@@ -16,8 +16,6 @@ use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
-use splines::Spline;
-use splines::{Interpolation, Key};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -312,7 +310,6 @@ impl ImageOperation {
                         let mut is_hovered = false;
 
                         if let Some(hover) = response.hover_pos() {
-                            // let rel_pos = (hover.x - rect.left()).clamp(0.0, 255.)/255.;
                             let mouse_pos_in_gradient =
                                 (hover.x - gradient_rect.left()).clamp(0.0, 255.) as i32;
 
@@ -322,8 +319,11 @@ impl ImageOperation {
                                 is_hovered = true;
 
                                 // on click, set the id
-
-                                if ui.ctx().input().pointer.any_down()
+                                if ui
+                                    .ctx()
+                                    .input()
+                                    .pointer
+                                    .button_down(egui::PointerButton::Primary)
                                     && ui
                                         .ctx()
                                         .data()
@@ -338,7 +338,11 @@ impl ImageOperation {
                             }
 
                             // Button down: move point with matching id
-                            if ui.ctx().input().pointer.any_down()
+                            if ui
+                                .ctx()
+                                .input()
+                                .pointer
+                                .button_down(egui::PointerButton::Primary)
                                 && ui.ctx().data().get_temp::<usize>("gradient".into())
                                     == Some(gradient_stop.id)
                             {
@@ -782,10 +786,12 @@ impl ImageOperation {
 
             Self::GradientMap(col) => {
                 let brightness = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
-                let res = interpolate_spline(col, brightness);
-                p[0] = res[0];
-                p[1] = res[1];
-                p[2] = res[2];
+                // let res = interpolate_spline(col, brightness);
+                // let res = interpolate(col, brightness);
+                let res = interpolate_u8(col, (brightness * 255.) as u8);
+                p[0] = res[0] as f32 / 255.;
+                p[1] = res[1] as f32 / 255.;
+                p[2] = res[2] as f32 / 255.;
             }
             Self::Expression(expr) => {
                 let mut context = context_map! {
@@ -1016,75 +1022,41 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
     Ok(())
 }
 
-fn interpolate(data: &Vec<(u8, [u8; 3])>, pt: u8) -> [u8; 3] {
-    for (i, current) in data.iter().enumerate() {
-        if let Some(next) = data.get(i + 1) {
-            //find nearest points
-            if pt > current.0 && pt < next.0 {
-                //now interpolate
+fn interpolate_u8(data: &Vec<GradientStop>, pt: u8) -> [u8; 3] {
+    // debug!("Pt is {pt}");
 
-                let res = [
-                    lerp(current.1[0] as f32..=next.1[0] as f32, pt as f32 / 255.) as u8,
-                    lerp(current.1[1] as f32..=next.1[1] as f32, pt as f32 / 255.) as u8,
-                    lerp(current.1[2] as f32..=next.1[2] as f32, pt as f32 / 255.) as u8,
-                    // current.1[0].lerp
-                ];
-                return res;
+    for i in 0..data.len() {
+        let current = data[i];
+
+        // return direct hit
+        if current.pos == pt {
+            return current.col;
+        }
+
+        // pt is below first stop
+        if i == 0 && current.pos > pt {
+            return current.col;
+        }
+
+        if let Some(next) = data.get(i + 1) {
+            if current.pos < pt && next.pos > pt {
+                let range = next.pos - current.pos;
+                let pos_in_range = pt - current.pos;
+                let rel = pos_in_range as f32 / range as f32;
+
+                let r = lerp(current.r() as f32..=next.r() as f32, rel) as u8;
+                let g = lerp(current.g() as f32..=next.g() as f32, rel) as u8;
+                let b = lerp(current.b() as f32..=next.b() as f32, rel) as u8;
+
+                return [r, g, b];
             }
+        } else {
+            return current.col;
+            //this was the last point
         }
     }
 
-    // use splines::{Interpolation, Key, Spline};
-
-    // let mut pts = vec![];
-
-    // for d in data {
-    //     pts.push(Key::new(d.0, d.1[0] as f32, Interpolation::default()));
-    // }
-    // let spline = Spline::from_vec(pts);
-    // spline.clamped_sample(pt).unwrap_or_default();
-
-    [255, 0, 00]
-    // res
-}
-
-/// pt: 0-1
-fn interpolate_spline(data: &Vec<GradientStop>, pt: f32) -> [f32; 3] {
-    let data = data
-        .iter()
-        .map(|d| {
-            (
-                d.pos as f32 / 255.,
-                [
-                    d.r() as f32 / 255.,
-                    d.g() as f32 / 255.,
-                    d.b() as f32 / 255.,
-                ],
-            )
-        })
-        .collect::<Vec<_>>();
-
-    let mut r_pts = vec![];
-    let mut g_pts = vec![];
-    let mut b_pts = vec![];
-
-    for d in data {
-        r_pts.push(Key::new(d.0, d.1[0] as f32, Interpolation::default()));
-        g_pts.push(Key::new(d.0, d.1[1] as f32, Interpolation::default()));
-        b_pts.push(Key::new(d.0, d.1[2] as f32, Interpolation::default()));
-    }
-
-    let r_spline = Spline::from_vec(r_pts);
-    let g_spline = Spline::from_vec(g_pts);
-    let b_spline = Spline::from_vec(b_pts);
-
-    [
-        r_spline.clamped_sample(pt).unwrap_or_default(),
-        g_spline.clamped_sample(pt).unwrap_or_default(),
-        b_spline.clamped_sample(pt).unwrap_or_default(),
-    ]
-
-    // res
+    [0, 255, 0]
 }
 
 fn closest_pt(data: &Vec<GradientStop>, value: u8) -> usize {
@@ -1140,4 +1112,27 @@ impl GradientStop {
             col: rgb,
         }
     }
+}
+
+#[test]
+fn range_test() {
+    // for i in [0.0, 0.25,0.5, 0.75, 1.0] {
+    //     let r = map_range(i, 0.0, 1.0,0.5, 1.0,);
+    //     dbg!(r);
+    //     let r1 = map_between_ranges(r, 0.5, 1.0,0., 1.0,);
+    //     // let r = map_range(r, 0.5, 1.0,0.0, 1.0,);
+    //     dbg!(r1);
+
+    // }
+
+    let map = vec![
+        GradientStop::new(0, [155, 33, 180]),
+        GradientStop::new(128, [255, 83, 0]),
+        GradientStop::new(255, [224, 255, 0]),
+    ];
+    std::env::set_var("RUST_LOG", "debug");
+    let _ = env_logger::try_init();
+    let res = interpolate_u8(&map, 5);
+
+    debug!("result: {:?}", res);
 }

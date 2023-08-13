@@ -60,7 +60,6 @@ webbrowser = "0.8"
 tiff = "0.9"
 jxl-oxide = "0.3.0"
 zune-png = "0.2"
-splines = "4.2.0"
 
 [features]
 avif_native = ["avif-decode"]
