@@ -454,8 +454,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;
-                            let image_result = DynamicImage::ImageLuma8(buf);
-
+                        let image_result = DynamicImage::ImageLuma8(buf);
                         _ = sender.send(Frame::new_still(image_result.to_rgba8()));
                         return Ok(receiver);
                     }
