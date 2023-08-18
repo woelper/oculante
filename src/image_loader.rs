@@ -13,13 +13,13 @@ use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
-use zune_png::zune_core::options::DecoderOptions;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
 use usvg::{TreeParsing, TreeTextToPath};
+use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
 use zune_png::PngDecoder;
 
@@ -398,7 +398,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         "png" => {
             let contents = std::fs::read(&img_location)?;
             let mut decoder = PngDecoder::new(&contents);
-            decoder.set_options(DecoderOptions::new_fast().set_max_height(50000).set_max_width(50000));
+            decoder.set_options(
+                DecoderOptions::new_fast()
+                    .set_max_height(50000)
+                    .set_max_width(50000),
+            );
             match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
                 // 16 bpp data
                 DecodingResult::U16(imgdata) => {
@@ -450,7 +454,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         .context("Can't get png dimensions")?;
 
                     let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
-                    if colorspace.is_grayscale() && !colorspace.has_alpha() { 
+                    if colorspace.is_grayscale() && !colorspace.has_alpha() {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;

@@ -1,0 +1,5 @@
+[build]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[profile.dev]
+lto = "off"

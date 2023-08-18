@@ -395,7 +395,7 @@ impl ImageOperation {
                     }
 
                     if ui.button("+").clicked() {
-                        pts.push(GradientStop::new(128, [0,0,0]));
+                        pts.push(GradientStop::new(128, [0, 0, 0]));
                         response.mark_changed();
                     }
                     if let Some(del) = delete {
@@ -403,7 +403,7 @@ impl ImageOperation {
                         response.mark_changed();
                     }
 
-                        pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
 
                     response
                 })
