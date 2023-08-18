@@ -450,7 +450,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         .context("Can't get png dimensions")?;
 
                     let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
-                    if colorspace.is_grayscale() {
+                    if colorspace.is_grayscale() && !colorspace.has_alpha() { 
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;
@@ -459,7 +459,16 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         return Ok(receiver);
                     }
 
-                    if colorspace.has_alpha() {
+                    if colorspace.is_grayscale() && colorspace.has_alpha() {
+                        let buf: GrayAlphaImage =
+                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
+                                .context("Can't interpret image as grayscale")?;
+                        let image_result = DynamicImage::ImageLumaA8(buf);
+                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        return Ok(receiver);
+                    }
+
+                    if colorspace.has_alpha() && !colorspace.is_grayscale() {
                         let buf: RgbaImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as rgba")?;
