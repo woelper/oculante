@@ -454,7 +454,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         .context("Can't get png dimensions")?;
 
                     let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
-                    if colorspace.is_grayscale() && !colorspace.has_alpha() { 
+                    if colorspace.is_grayscale() && !colorspace.has_alpha() {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;

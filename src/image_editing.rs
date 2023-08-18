@@ -20,8 +20,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
     #[serde(skip)]
+    /// The final result of image modifications 
     pub result_pixel_op: RgbaImage,
     #[serde(skip)]
+    /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: RgbaImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
