@@ -179,6 +179,13 @@ impl EguiExt for Ui {
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
+        let mut img = img;
+        
+        // prefer edit result if present
+        if state.edit_state.result_pixel_op.width() > 0 {
+            img = &state.edit_state.result_pixel_op;
+        }
+
         if let Some(p) = img.get_pixel_checked(
             state.cursor_relative.x as u32,
             state.cursor_relative.y as u32,
