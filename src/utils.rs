@@ -42,7 +42,7 @@ fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
@@ -62,22 +62,14 @@ impl ExtendedImageInfo {
             return Ok(());
         }
 
-        // use img_parts::jpeg::Jpeg;
-        use img_parts::ImageEXIF;
-
         let input = std::fs::read(image_path)?;
-        // let output = File::create("out.jpg")?;
 
+        // Store original EXIF to write in in case of save event
         if let Some(d) = DynImage::from_bytes(input.clone().into())? {
             self.raw_exif = d.exif()
         }
 
-        // let mut jpeg = Jpeg::from_bytes(input.into())?;
-        // let icc_profile = jpeg.icc_profile();
-        // let exif_metadata = jpeg.exif().context("Can't read exif")?;
-
-        // let file = std::fs::File::open(image_path)?;
-        // let mut bufreader = std::io::BufReader::new(&input);
+        // User-friendly Exif in key/value form
         let mut c = Cursor::new(input);
         let exifreader = exif::Reader::new();
         let exif = exifreader.read_from_container(&mut c)?;
@@ -303,7 +295,6 @@ pub enum FrameSource {
     AnimationStart,
     Still,
     EditResult,
-    // AnimationEnd,
 }
 
 /// A single frame

@@ -938,6 +938,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             Message::Error(txt) | Message::LoadError(txt) => {
                                 ui.colored_label(Color32::RED, format!("🕱 {txt}"));
                             }
+                            Message::Saved(path) => {
+                                ui.colored_label(Color32::RED, format!("Saved!"));
+                                state.current_path = Some(path.clone());
+                                set_title(app, state);
+                            }
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             if ui.small_button("🗙").clicked() {
@@ -951,10 +956,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             );
             let max_anim_len = 2.5;
 
-            // using delta does not work with rfd
             state.toast_cooldown += app.timer.delta_f32();
-            // state.toast_cooldown += 0.01;
-            // debug!("cooldown {}", state.toast_cooldown);
 
             if state.toast_cooldown > max_anim_len {
                 debug!("Setting message to none, timer reached.");
@@ -1036,7 +1038,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 #[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
     let start_directory = state.persistent_settings.last_open_directory.clone();
-    let sender = state.load_channel.0.clone();
+    let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {
         let file_dialog_result = rfd::FileDialog::new()
@@ -1045,7 +1047,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
             .set_directory(start_directory)
             .pick_file();
         if let Some(file_path) = file_dialog_result {
-            let _ = sender.send(file_path);
+            let _ = load_sender.send(file_path);
         }
     });
 }

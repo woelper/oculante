@@ -1,7 +1,7 @@
 #[cfg(feature = "file_open")]
 use crate::browse_for_image_path;
 use crate::{
-    appstate::{ImageGeometry, OculanteState},
+    appstate::{ImageGeometry, OculanteState, Message},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -16,7 +16,6 @@ use crate::{
 use arboard::Clipboard;
 use egui::plot::Plot;
 use image::RgbaImage;
-use img_parts::{DynImage, ImageEXIF};
 use log::{debug, error, info};
 use notan::{
     egui::{
@@ -109,7 +108,7 @@ impl EguiExt for Ui {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
             let available_width = ui.available_width() * 0.6;
-            let mut style = ui.style_mut();
+            let style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
 
@@ -143,7 +142,7 @@ impl EguiExt for Ui {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
             let available_width = ui.available_width() * 1. - 60.;
-            let mut style = ui.style_mut();
+            let style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
 
@@ -619,7 +618,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 /// Everything related to image editing
-pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn edit_ui(_app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show(ctx, |ui| {
@@ -1112,42 +1111,57 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 #[cfg(feature = "file_open")]
                 if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
-                        let start_directory = &state.persistent_settings.last_open_directory;
-                        let file_dialog_result = rfd::FileDialog::new()
-                            .set_directory(start_directory)
-                            .save_file();
-                        if let Some(file_path) = file_dialog_result {
-                            debug!("Selected File Path = {:?}", file_path);
+
+                        let start_directory = state.persistent_settings.last_open_directory.clone();
+
+                        let image_to_save = state.edit_state.result_pixel_op.clone();
+                        let msg_sender = state.message_channel.0.clone();
+                        let err_sender = state.message_channel.0.clone();
+                        let image_info = state.image_info.clone();
+
+                        std::thread::spawn(move || {
+                            let file_dialog_result = rfd::FileDialog::new()
+                                .set_directory(start_directory)
+                                .save_file();
+                        
+                                if let Some(file_path) = file_dialog_result {
 
 
-                            match state
-                                .edit_state
-                                .result_pixel_op
-                                .save(&file_path) {
-                                    Ok(_) => {
-                                        state.send_message("Saved");
-                                        debug!("Saved to {}", file_path.display());
-                                        // Re-apply exif
-                                        if let Some(info) = &state.image_info {
-                                            // before doing anything, make sure we have raw exif data
-                                            if info.raw_exif.is_some() {
-                                                if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
-                                                    error!("{e}");
-                                                } else {
-                                                    info!("Saved EXIF.")
+                                    debug!("Selected File Path = {:?}", file_path);
+        
+        
+                                    match image_to_save
+                                        .save(&file_path) {
+                                            Ok(_) => {
+                                                _ = msg_sender.send(Message::Saved(file_path.clone()));
+                                                debug!("Saved to {}", file_path.display());
+                                                // Re-apply exif
+                                                if let Some(info) = &image_info {
+                                                    // before doing anything, make sure we have raw exif data
+                                                    if info.raw_exif.is_some() {
+                                                        if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
+                                                            error!("{e}");
+                                                        } else {
+                                                            info!("Saved EXIF.")
+                                                        }
+                                                    }
                                                 }
                                             }
+                                            Err(e) => {
+                                                _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                            }
                                         }
-                                        state.current_path = Some(file_path);
-                                        set_title(app, state);
+                                        // state.toast_cooldown = 0.0;
                                     }
-                                    Err(e) => {
-                                        state.send_message_err(&format!("Error: Could not save: {e}"));
-                                    }
-                                }
-                                state.toast_cooldown = 0.0;
-                                ui.ctx().request_repaint();
-                        }
+                        
+                        });
+
+                                    ui.ctx().request_repaint();
+
+                        
+
+
+
                     }
                 }
 
