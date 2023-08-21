@@ -570,6 +570,16 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
+    // Save every 1.5 secs
+    let t = app.timer.time_since_init()  % 1.5;
+    if t <= 0.01 {
+        state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
+        state.persistent_settings.save_blocking();
+        debug!("Save {t}");
+    }
+
+   
+
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
