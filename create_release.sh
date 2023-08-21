@@ -8,14 +8,14 @@ then
     exit
 fi
 
-VERSION=`cargo pkgid | cut -d# -f2 | cut -d: -f2`
-echo "You are on $branch, releasing! $VERSION"
+echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
 cargo check --no-default-features
 cargo test shortcuts
 cargo bump patch
 cargo build
+VERSION=`cargo pkgid | cut -d# -f2 | cut -d: -f2`
 git add README.md
 git add Cargo.toml
 git add Cargo.lock
