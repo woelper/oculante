@@ -618,7 +618,8 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 /// Everything related to image editing
-pub fn edit_ui(_app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+#[allow(unused_variables)]
+pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show(ctx, |ui| {
