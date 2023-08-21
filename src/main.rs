@@ -1035,7 +1035,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     draw.clear(Color::from_rgb(
         c[0] as f32 / 255.,
         c[1] as f32 / 255.,
-        c[1] as f32 / 255.,
+        c[2] as f32 / 255.,
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
