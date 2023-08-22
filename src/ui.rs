@@ -25,7 +25,7 @@ use notan::{
     },
     prelude::{App, Graphics},
 };
-use std::{collections::HashSet, ops::RangeInclusive, path::PathBuf, time::Instant};
+use std::{collections::{BTreeSet}, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 10.0;
@@ -1635,7 +1635,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .down
         .iter()
         .map(|k| format!("{:?}", k.0))
-        .collect::<HashSet<String>>();
+        .collect::<BTreeSet<String>>();
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
