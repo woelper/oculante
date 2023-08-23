@@ -1,4 +1,4 @@
-use std::collections::{HashSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 // use hashbrown::{HashMap, HashSet};
 use log::{debug, error};
 // use std::collections::HashMap;
@@ -47,7 +47,7 @@ pub enum InputEvent {
 
 pub type Shortcuts = BTreeMap<InputEvent, SimultaneousKeypresses>;
 
-pub type SimultaneousKeypresses = HashSet<String>;
+pub type SimultaneousKeypresses = BTreeSet<String>;
 
 pub trait ShortcutExt {
     fn default_keys() -> Self
