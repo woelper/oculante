@@ -1,7 +1,18 @@
 use crate::{shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
+use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs::File, path::PathBuf};
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum ColorTheme {
+    /// Light Theme
+    Light,
+    /// Dark Theme
+    Dark,
+    /// Same as system
+    System,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
@@ -37,6 +48,7 @@ pub struct PersistentSettings {
     /// How much to scale SVG images when rendering
     pub svg_scale: f32,
     pub zen_mode: bool,
+    pub theme: ColorTheme,
 }
 
 impl Default for PersistentSettings {
@@ -64,6 +76,7 @@ impl Default for PersistentSettings {
             current_channel: ColorChannel::Rgba,
             svg_scale: 1.0,
             zen_mode: false,
+            theme: ColorTheme::Dark,
         }
     }
 }
@@ -92,4 +105,12 @@ fn save(s: &PersistentSettings) -> Result<()> {
     let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
     let f = File::create(local_dir.join(".oculante"))?;
     Ok(serde_json::to_writer_pretty(f, s)?)
+}
+
+pub fn set_system_theme(ctx: &Context) {
+    match dark_light::detect() {
+        dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
+        dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
+        dark_light::Mode::Default => ctx.set_visuals(Visuals::dark()),
+    }
 }

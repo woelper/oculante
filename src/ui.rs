@@ -1,10 +1,11 @@
 #[cfg(feature = "file_open")]
 use crate::browse_for_image_path;
 use crate::{
-    appstate::{ImageGeometry, OculanteState, Message},
+    appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
+    settings::{set_system_theme, ColorTheme},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
@@ -25,7 +26,7 @@ use notan::{
     },
     prelude::{App, Graphics},
 };
-use std::{collections::{BTreeSet}, ops::RangeInclusive, path::PathBuf, time::Instant};
+use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 10.0;
@@ -179,7 +180,7 @@ impl EguiExt for Ui {
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
         let mut img = img;
-        
+
         // prefer edit result if present
         if state.edit_state.result_pixel_op.width() > 0 {
             img = &state.edit_state.result_pixel_op;
@@ -407,6 +408,34 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 if ui.button("send test msg").clicked() {
                     state.send_message("Test");
                 }
+
+                egui::ComboBox::from_label("Color theme")
+                .selected_text(format!("{:?}", state.persistent_settings.theme))
+                .show_ui(ui, |ui| {
+                    let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
+                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
+                        r.mark_changed();
+                    }
+                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
+                        r.mark_changed();
+
+                    }
+
+                    if r.changed() {
+                        match state.persistent_settings.theme {
+                            ColorTheme::Light =>
+                                ctx.set_visuals(Visuals::light()),
+                            ColorTheme::Dark =>
+                                ctx.set_visuals(Visuals::dark()),
+                            ColorTheme::System =>
+                                set_system_theme(ctx),
+                        }
+                    }
+                }
+                );
+
+
+
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -1124,13 +1153,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             let file_dialog_result = rfd::FileDialog::new()
                                 .set_directory(start_directory)
                                 .save_file();
-                        
+
                                 if let Some(file_path) = file_dialog_result {
 
 
                                     debug!("Selected File Path = {:?}", file_path);
-        
-        
+
+
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
@@ -1154,12 +1183,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                         }
                                         // state.toast_cooldown = 0.0;
                                     }
-                        
+
                         });
 
                                     ui.ctx().request_repaint();
 
-                        
+
 
 
 

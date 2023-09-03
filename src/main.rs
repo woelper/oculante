@@ -21,6 +21,8 @@ pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
+use crate::settings::set_system_theme;
+use crate::settings::ColorTheme;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
@@ -281,6 +283,12 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
         ctx.set_style(style);
         ctx.set_fonts(fonts);
+
+        match state.persistent_settings.theme {
+            ColorTheme::Light => ctx.set_visuals(Visuals::light()),
+            ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+            ColorTheme::System => set_system_theme(ctx),
+        }
     });
 
     // load checker texture
@@ -571,14 +579,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
 
     // Save every 1.5 secs
-    let t = app.timer.time_since_init()  % 1.5;
+    let t = app.timer.time_since_init() % 1.5;
     if t <= 0.01 {
         state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
         state.persistent_settings.save_blocking();
         debug!("Save {t}");
     }
-
-   
 
     let mouse_pos = app.mouse.position();
 

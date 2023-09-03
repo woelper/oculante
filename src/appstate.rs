@@ -26,7 +26,7 @@ pub enum Message {
     Warning(String),
     Error(String),
     LoadError(String),
-    Saved(PathBuf)
+    Saved(PathBuf),
 }
 
 impl Message {

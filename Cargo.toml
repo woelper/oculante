@@ -61,6 +61,7 @@ tiff = "0.9"
 jxl-oxide = "0.3.0"
 zune-png = "0.2"
 img-parts = "0.3.0"
+dark-light = "1.0.0"
 
 [features]
 avif_native = ["avif-decode"]
