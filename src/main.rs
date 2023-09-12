@@ -73,17 +73,17 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        window_config = window_config.vsync(true).high_dpi(true);
+        window_config = window_config.set_vsync(true).set_high_dpi(true);
     }
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config.set_lazy_loop(true).set_vsync(true).set_high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true);
+        window_config = window_config.set_lazy_loop(true).set_vsync(true);
     }
 
     #[cfg(target_os = "macos")]
