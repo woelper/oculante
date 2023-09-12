@@ -63,13 +63,13 @@ fn main() -> Result<(), String> {
     let icon_data = include_bytes!("../icon.ico");
 
     let mut window_config = WindowConfig::new()
-        .title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
-        .size(1026, 600) // window's size
-        .resizable(true) // window can be resized
+        .set_title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
+        .set_size(1026, 600) // window's size
+        .set_resizable(true) // window can be resized
         .set_window_icon_data(Some(icon_data))
         .set_taskbar_icon_data(Some(icon_data))
-        .multisampling(0)
-        .min_size(200, 200);
+        .set_multisampling(0)
+        .set_min_size(200, 200);
 
     #[cfg(target_os = "windows")]
     {
@@ -88,7 +88,10 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config
+            .set_lazy_loop(true)
+            .set_vsync(true)
+            .set_high_dpi(true);
     }
 
     #[cfg(target_os = "macos")]
@@ -103,8 +106,8 @@ fn main() -> Result<(), String> {
         Ok(settings) => {
             window_config.vsync = settings.vsync;
             if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1 .0;
-                window_config.height = settings.window_geometry.1 .1;
+                window_config.width = settings.window_geometry.1 .0 as u32;
+                window_config.height = settings.window_geometry.1 .1 as u32;
             }
             debug!("Loaded settings.");
             if settings.zen_mode {
@@ -113,7 +116,7 @@ fn main() -> Result<(), String> {
                     "          '{}' to disable zen mode",
                     shortcuts::lookup(&settings.shortcuts, &shortcuts::InputEvent::ZenMode)
                 ));
-                window_config = window_config.title(&title_string);
+                window_config = window_config.set_title(&title_string);
             }
         }
         Err(e) => {
@@ -298,7 +301,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         let img = checker_image.into_rgba8();
         state.checker_texture = gfx
             .create_texture()
-            .from_bytes(&img, img.width() as i32, img.height() as i32)
+            .from_bytes(&img, img.width(), img.height())
             .with_mipmaps(false)
             .with_format(notan::prelude::TextureFormat::SRgba8)
             .build()
@@ -487,7 +490,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
             state.persistent_settings.window_geometry.1 = (width, height);
-            state.persistent_settings.window_geometry.0 = app.backend.window().position();
+            state.persistent_settings.window_geometry.0 = (
+                app.backend.window().position().0 as u32,
+                app.backend.window().position().1 as u32,
+            );
             // By resetting the image, we make it fill the window on resize
             if state.persistent_settings.zen_mode {
                 state.reset_image = true;
@@ -500,8 +506,13 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Exit => {
             info!("About to exit");
             // save position
-            state.persistent_settings.window_geometry =
-                (app.window().position(), app.window().size());
+            state.persistent_settings.window_geometry = (
+                (
+                    app.window().position().0 as u32,
+                    app.window().position().1 as u32,
+                ),
+                app.window().size(),
+            );
             state.persistent_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
@@ -517,7 +528,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 } else {
                     // Normal scaling
                     let delta = zoomratio(
-                        (delta_y / 10.).max(-5.0).min(5.0),
+                        (delta_y / 2.)
+                        .max(-5.0).min(5.0)
+                        ,
                         state.image_geometry.scale,
                     );
                     let new_scale = state.image_geometry.scale + delta;
@@ -579,9 +592,15 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
 
     // Save every 1.5 secs
-    let t = app.timer.time_since_init() % 1.5;
+    let t = app.timer.elapsed_f32() % 1.5;
     if t <= 0.01 {
-        state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
+        state.persistent_settings.window_geometry = (
+            (
+                app.window().position().0 as u32,
+                app.window().position().1 as u32,
+            ),
+            app.window().size(),
+        );
         state.persistent_settings.save_blocking();
         debug!("Save {t}");
     }
@@ -844,12 +863,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.tiling < 2 {
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                .scale(state.image_geometry.scale, state.image_geometry.scale);
+                ;
         } else {
             draw.pattern(texture)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
                 .size(
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
@@ -866,8 +886,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     a: 0.5,
                 })
                 .blend_mode(BlendMode::ADD)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                .scale(state.image_geometry.scale, state.image_geometry.scale);
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
         }
 
         if state.persistent_settings.show_minimap {
