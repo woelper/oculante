@@ -526,7 +526,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(macos) {0.1} else {7.};
+                    let divisor = if cfg!(macos) {0.1} else {10.};
                     // Normal scaling
                     let delta = zoomratio(
                         (delta_y / divisor)
@@ -534,7 +534,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         ,
                         state.image_geometry.scale,
                     );
-                    info!("Delta {delta}");
+                    info!("Delta {delta}, raw {delta_y}");
                     let new_scale = state.image_geometry.scale + delta;
                     // limit scale
                     if new_scale > 0.01 && new_scale < 40. {
