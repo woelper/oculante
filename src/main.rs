@@ -528,8 +528,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 } else {
                     // Normal scaling
                     let delta = zoomratio(
-                        (delta_y / 2.)
-                        .max(-5.0).min(5.0)
+                        (delta_y / 8.)
+                        .max(-5.8).min(5.8)
                         ,
                         state.image_geometry.scale,
                     );
