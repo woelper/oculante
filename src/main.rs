@@ -914,11 +914,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 let dim = texture.width().min(texture.height()) / 50.;
                 draw.circle(20.)
                     // .translate(state.cursor_relative.x, state.cursor_relative.y)
-                    .translate(state.cursor.x, state.cursor.y)
                     .alpha(0.5)
                     .stroke(1.5)
                     .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    .scale(stroke.width * dim, stroke.width * dim);
+                    .scale(stroke.width * dim, stroke.width * dim)
+                    .translate(state.cursor.x, state.cursor.y);
 
                 // For later: Maybe paint the actual brush? Maybe overkill.
 
