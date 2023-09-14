@@ -39,7 +39,7 @@ pub struct PersistentSettings {
     pub info_enabled: bool,
     pub edit_enabled: bool,
     // pos.x, pos.y, width, height
-    pub window_geometry: ((i32, i32), (i32, i32)),
+    pub window_geometry: ((u32, u32), (u32, u32)),
     pub last_open_directory: PathBuf,
     pub show_checker_background: bool,
     pub show_minimap: bool,

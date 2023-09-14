@@ -323,18 +323,16 @@ impl ImageOperation {
                                 // on click, set the id
                                 if ui
                                     .ctx()
-                                    .input()
-                                    .pointer
-                                    .button_down(egui::PointerButton::Primary)
+                                    .input(|i|i.pointer.primary_down())
+                                    
                                     && ui
                                         .ctx()
-                                        .data()
-                                        .get_temp::<usize>("gradient".into())
-                                        .is_none()
+                                        .data(|d| d.get_temp::<usize>("gradient".into()).is_none())
+                                        
                                 {
                                     ui.ctx()
-                                        .data()
-                                        .insert_temp::<usize>("gradient".into(), gradient_stop.id);
+                                        .data_mut(|d| d
+                                        .insert_temp::<usize>("gradient".into(), gradient_stop.id));
                                     debug!("insert");
                                 }
                             }
@@ -342,10 +340,10 @@ impl ImageOperation {
                             // Button down: move point with matching id
                             if ui
                                 .ctx()
-                                .input()
+                                .input(|i| i
                                 .pointer
-                                .button_down(egui::PointerButton::Primary)
-                                && ui.ctx().data().get_temp::<usize>("gradient".into())
+                                .primary_down())
+                                && ui.ctx().data(|d| d.get_temp::<usize>("gradient".into()))
                                     == Some(gradient_stop.id)
                             {
                                 gradient_stop.pos = mouse_pos_in_gradient as u8;
@@ -353,8 +351,8 @@ impl ImageOperation {
                             }
                         }
 
-                        if ui.ctx().input().pointer.any_released() {
-                            ui.ctx().data().remove::<usize>("gradient".into());
+                        if ui.ctx().input(|i| i.pointer.any_released()) {
+                            ui.ctx().data_mut(|d| d.remove::<usize>("gradient".into()));
                             debug!("clear dta");
                         }
 
