@@ -11,7 +11,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.7.4"
+version = "0.7.5"
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
