@@ -448,6 +448,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
+            if key_pressed(app, state, DeleteFile) {
+                if let Some(p) = &state.current_path {
+                    _ = trash::delete(p);
+                    state.send_message("Deleted image");
+                }
+            }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;

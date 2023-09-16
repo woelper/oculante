@@ -1713,7 +1713,15 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
 
-        ui.label("Channels");
+        // ui.label("Channels");
+
+        #[cfg(feature = "file_open")]
+        if unframed_button("🗁", ui)
+            .on_hover_text("Browse for image")
+            .clicked()
+        {
+            browse_for_image_path(state)
+        }
 
         let mut changed_channels = false;
 
@@ -1745,6 +1753,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
+
+
 
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
             egui::ComboBox::from_id_source("channels")
@@ -1867,13 +1877,25 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().set_always_on_top(state.always_on_top);
         }
 
-        #[cfg(feature = "file_open")]
-        if unframed_button("🗁", ui)
-            .on_hover_text("Browse for image")
+
+
+
+        if let Some(p) = &state.current_path {
+            if tooltip(
+                unframed_button_colored("🗑", state.always_on_top, ui),
+                "Move file to trash",
+                &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
+                ui,
+            )
             .clicked()
-        {
-            browse_for_image_path(state)
+            {
+                _ = trash::delete(p);
+                state.send_message("Deleted image");
+            }
         }
+
+        ui.add_space(ui.available_width() - 32.);
+
 
         ui.scope(|ui| {
             // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);

@@ -36,6 +36,7 @@ pub enum InputEvent {
     PanRight,
     PanUp,
     PanDown,
+    DeleteFile,
     LosslessRotateRight,
     LosslessRotateLeft,
     Copy,
@@ -129,6 +130,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LosslessRotateLeft, "LBracket")
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
             .add_key(InputEvent::ZenMode, "Z")
+            .add_key(InputEvent::DeleteFile, "Delete")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
