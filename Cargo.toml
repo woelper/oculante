@@ -62,7 +62,6 @@ jxl-oxide = "0.3.0"
 zune-png = "0.2"
 img-parts = "0.3.0"
 dark-light = "1.0.0"
-trash = {version = "3", optional = true}
 
 [features]
 avif_native = ["avif-decode"]
@@ -71,11 +70,13 @@ default = ["turbo", "file_open", "avif_native", "update"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
-# Enables safe deletion of files. Not available on NetBSD
-system_trash = ["trash"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
+
+[target.'cfg(not(target_os = "netbsd"))'.dependencies]
+trash = {version = "3"}
+
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved

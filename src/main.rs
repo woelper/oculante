@@ -454,7 +454,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(feature = "system_trash")]
+            #[cfg(not(target_os = "netbsd"))]
             if key_pressed(app, state, DeleteFile) {
                 if let Some(p) = &state.current_path {
                     _ = trash::delete(p);
