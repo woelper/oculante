@@ -73,12 +73,18 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        window_config = window_config.set_lazy_loop(true).set_vsync(true).set_high_dpi(true);
+        window_config = window_config
+            .set_lazy_loop(true)
+            .set_vsync(true)
+            .set_high_dpi(true);
     }
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.set_lazy_loop(true).set_vsync(true).set_high_dpi(true);
+        window_config = window_config
+            .set_lazy_loop(true)
+            .set_vsync(true)
+            .set_high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
@@ -448,6 +454,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
+            #[cfg(feature = "system_trash")]
             if key_pressed(app, state, DeleteFile) {
                 if let Some(p) = &state.current_path {
                     _ = trash::delete(p);
@@ -532,12 +539,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(macos) {0.1} else {10.};
+                    let divisor = if cfg!(macos) { 0.1 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
-                        (delta_y / divisor)
-                        .max(-5.0).min(5.0)
-                        ,
+                        (delta_y / divisor).max(-5.0).min(5.0),
                         state.image_geometry.scale,
                     );
                     info!("Delta {delta}, raw {delta_y}");
@@ -872,8 +877,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                ;
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
         } else {
             draw.pattern(texture)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
