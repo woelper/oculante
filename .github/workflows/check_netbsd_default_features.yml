@@ -5,7 +5,7 @@ on: [push]
 jobs:
   test:
     runs-on: macos-12
-    name: Build in NetBSD
+    name: Build in NetBSD with default features
     steps:
     - uses: actions/checkout@v2
     - name: Build in NetBSD

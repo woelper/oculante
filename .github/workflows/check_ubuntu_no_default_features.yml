@@ -1,6 +1,6 @@
 on: [push]
 
-name: Ubuntu
+name: Ubuntu check no default features
 jobs:
   check:
     strategy:
