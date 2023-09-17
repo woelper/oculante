@@ -234,11 +234,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
             fn foo(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
                 let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
-                let mut renderer = image.renderer();
 
-                debug!("{:#?}", renderer.image_header().metadata);
-                let is_jxl_anim = renderer.image_header().metadata.animation.is_some();
-                let ticks_ms = renderer
+                debug!("{:#?}", image.image_header().metadata);
+                let is_jxl_anim = image.image_header().metadata.animation.is_some();
+                let ticks_ms = image
                     .image_header()
                     .metadata
                     .animation
@@ -252,7 +251,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 loop {
                     // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
                     let image_result: DynamicImage;
-                    let result = renderer
+                    let result = image
                         .render_next_frame()
                         .map_err(|e| anyhow!("{e}"))
                         .context("Can't render JXL")?;
@@ -261,8 +260,8 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                             let frame_duration = render.duration() as u16 * ticks_ms;
                             debug!("duration {frame_duration} ms");
                             let framebuffer = render.image();
-                            debug!("{:?}", renderer.pixel_format());
-                            match renderer.pixel_format() {
+                            debug!("{:?}", image.pixel_format());
+                            match image.pixel_format() {
                                 PixelFormat::Graya => {
                                     let float_image = GrayAlphaImage::from_raw(
                                         framebuffer.width() as u32,
@@ -320,7 +319,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                                     image_result = DynamicImage::ImageRgb8(float_image);
                                 }
                                 _ => {
-                                    bail!("JXL: Pixel format: {:?}", renderer.pixel_format())
+                                    bail!("JXL: Pixel format: {:?}", image.pixel_format())
                                 }
                             }
 

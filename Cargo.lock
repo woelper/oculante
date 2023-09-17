@@ -2295,9 +2295,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-frame"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2c4e276ea56d8bc4961f13501d565cc6b665f0da76e0e5f90aa44a1475eb409"
+checksum = "8d63bdd104e3746669a123de86f940aa5d59fdc9c5a65f16a4f867dde75e45e1"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2316,9 +2316,9 @@ checksum = "48800b21ed6bb3bbc2f818ae9cd40530bdfb1a211f57d5a7a49b8b10f62145e8"
 
 [[package]]
 name = "jxl-image"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d10c717baa0dd19c25b37b6baebb5f07d7efdaa6225a65aa98dcaf1d40a3e5"
+checksum = "ef86f7f74acc9c9e66604c8d030e00cdef5a0c455ea3d7d26bd9ddbb9160be59"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2328,9 +2328,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-modular"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4fea731da48d358a60d6185c58ac897f22895ea0e3380df04c106c87e192a7d"
+checksum = "504e6b55db362568592be81993c772fc6786c56fb67ae769ff62dc514c3e6748"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2340,9 +2340,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-oxide"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d90d7ccb9a843e69563abdab2cd362702668f23e39e7fa3dcdf2594b1d29042"
+checksum = "57e3b7e459d823979c4ca0c9584f391581db154437f34596ea443b082e9b6064"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2355,9 +2355,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-render"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "774684715db3b6e60a13059ad746829c9f9b39b7865ba0dc7ea9fd93469d9297"
+checksum = "7157d1c6c4896ddc800cb0cc8ba545ba7417ab9afc51f39e69484e6607c8707e"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2372,9 +2372,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-vardct"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1abaffccbc217e48cb45b9aca639c18a873b66200fc5a3695fb98333e0b1fead"
+checksum = "eb4a2d9ba8c48a52f6143ba01c38aac67d1309c9b939a9f84cd60f650d15053e"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
