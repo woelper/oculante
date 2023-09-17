@@ -1,4 +1,4 @@
-name: Rust Release
+name: Oculante release job
 
 on:
   push:

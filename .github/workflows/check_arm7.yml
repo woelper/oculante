@@ -1,6 +1,6 @@
 on: [push]
 
-name: ARM v7
+name: ARM v7 check
 jobs:
   check:
     strategy:

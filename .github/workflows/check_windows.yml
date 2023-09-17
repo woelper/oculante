@@ -1,6 +1,6 @@
 on: [push]
 
-name: Windows Check
+name: Windows Check no default features
 jobs:
   check:
     strategy:

@@ -1,4 +1,4 @@
-name: NetBSD
+name: NetBSD check no default features
 
 on: [push]
 
