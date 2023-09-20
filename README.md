@@ -222,6 +222,8 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 
 <kbd>LShift</kbd> + <kbd>Down</kbd> = PanDown
 
+<kbd>Delete</kbd> = DeleteFile
+
 <kbd>RBracket</kbd> = LosslessRotateRight
 
 <kbd>LBracket</kbd> = LosslessRotateLeft
