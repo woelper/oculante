@@ -10,6 +10,7 @@ url="https://github.com/woelper/oculante"
 source=("$pkgname-$pkgver.tar.gz::https://github.com/woelper/${pkgname}/archive/refs/tags/${pkgver}.tar.gz")
 sha512sums=('SKIP')
 license=('MIT')
+options=('!lto')
 
 build() {
     cd "$srcdir/$pkgname-$pkgver"
