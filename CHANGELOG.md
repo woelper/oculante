@@ -1,7 +1,11 @@
 # 0.7.6 (2023-09-20)
-
+- Update smithay-client-toolkit
+- Update JXL
+- Remove LTO from pkgbuild
+- Add file deletion option (They are moved to system trash)
 # 0.7.5 (2023-09-15)
-
+- Better Windows performance (Lazy_loop enabled)
+- Notan and Egui update
 # 0.7.4 (2023-09-03)
 
 # 0.7.3 (2023-08-22)
