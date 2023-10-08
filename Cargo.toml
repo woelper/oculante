@@ -62,6 +62,7 @@ jxl-oxide = "0.4"
 zune-png = "0.2"
 img-parts = "0.3.0"
 dark-light = "1.0.0"
+trash = "3.1"
 
 [features]
 avif_native = ["avif-decode"]
@@ -74,8 +75,6 @@ update = ["self_update"]
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
 
-[target.'cfg(not(target_os = "netbsd"))'.dependencies]
-trash = {version = "3"}
 
 
 [target.'cfg(windows)'.build-dependencies]

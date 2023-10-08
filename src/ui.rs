@@ -1879,7 +1879,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
 
 
-        #[cfg(not(target_os = "netbsd"))]
         if let Some(p) = &state.current_path {
             if tooltip(
                 unframed_button_colored("🗑", state.always_on_top, ui),
