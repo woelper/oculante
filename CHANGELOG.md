@@ -1,3 +1,5 @@
+# 0.7.7 (2023-10-08)
+
 # 0.7.6 (2023-09-20)
 - Update smithay-client-toolkit
 - Update JXL
