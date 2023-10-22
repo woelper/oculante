@@ -679,6 +679,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Contrast(0),
                         ImageOperation::Exposure(20),
                         ImageOperation::Desaturate(0),
+                        ImageOperation::LUT("Lomography Redscale 100".into()),
                         ImageOperation::Equalize((0, 255)),
                         ImageOperation::Posterize(8),
                         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
