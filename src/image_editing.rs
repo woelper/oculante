@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU32;
+use std::path::{Path, PathBuf};
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
@@ -7,10 +9,10 @@ use crate::ui::EguiExt;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, RgbaImage};
+use image::{imageops, DynamicImage, GenericImage, RgbaImage};
 use log::{debug, error};
 use nalgebra::Vector4;
-use notan::egui::{self, lerp, DragValue, Sense, Vec2};
+use notan::egui::{self, lerp, vec2, DragValue, Id, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
@@ -126,6 +128,7 @@ pub enum ImageOperation {
     // x,y (top left corner of crop), width, height
     // 1.0 equals 10000
     Crop([u32; 4]),
+    LUT(String),
 }
 
 impl fmt::Display for ImageOperation {
@@ -154,6 +157,7 @@ impl fmt::Display for ImageOperation {
             Self::Expression(_) => write!(f, "📄 Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
+            Self::LUT(_) => write!(f, "Apply Color LUT"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -169,6 +173,7 @@ impl ImageOperation {
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
+            Self::LUT(_) => false,
             _ => true,
         }
     }
@@ -182,6 +187,76 @@ impl ImageOperation {
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
             Self::Posterize(val) => ui.slider_styled(val, 1..=255),
             Self::Expression(expr) => ui.text_edit_singleline(expr),
+            Self::LUT(lut_name) => {
+                ui.scope(|ui| {
+                    // let last_folder: &mut PathBuf = ui.ctx().data_mut(|w| w.get_temp_mut_or_default::<PathBuf>(Id::new("lutsrc")));
+                    let last_folder: Option<PathBuf> = ui
+                        .ctx()
+                        .data_mut(|w| w.get_persisted::<PathBuf>(Id::new("lutsrc")));
+
+                    let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+                    ui.vertical(|ui| {
+                        let lut_fname = Path::new(lut_name)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy();
+
+                        egui::ComboBox::from_label("")
+                            .selected_text(lut_fname)
+                            .show_ui(ui, |ui| {
+                                let lut_names = builtin_luts();
+                                let mut lut_names = lut_names.keys().collect::<Vec<_>>();
+                                lut_names.sort();
+                                for lut in lut_names {
+                                    if ui
+                                        .selectable_value(
+                                            lut_name,
+                                            lut.clone(),
+                                            Path::new(lut)
+                                                .file_name()
+                                                .unwrap_or_default()
+                                                .to_string_lossy(),
+                                        )
+                                        .clicked()
+                                    {
+                                        x.mark_changed();
+                                    }
+                                }
+                            });
+
+                        #[cfg(feature = "file_open")]
+                        if ui
+                            .button("Load from disk")
+                            .on_hover_ui(|ui| {
+                                ui.label("Load Hald CLUT");
+                            })
+                            .clicked()
+                        {
+                            if let Some(lut_file) = rfd::FileDialog::new()
+                                .set_directory(last_folder.unwrap_or_default())
+                                .pick_file()
+                            {
+                                *lut_name = lut_file.to_string_lossy().to_string();
+                                let parent = lut_file
+                                    .parent()
+                                    .map(|p| p.to_path_buf())
+                                    .unwrap_or_default();
+                                ui.ctx()
+                                    .data_mut(|w| w.insert_persisted(Id::new("lutsrc"), parent));
+                            }
+                            x.mark_changed();
+                        }
+                        ui.label("Find more LUTs here:");
+
+                        ui.hyperlink_to(
+                            "Cédric Eberhardt's collection",
+                            "https://github.com/cedeber/hald-clut",
+                        );
+                    });
+                    x
+                })
+                .inner
+            }
             Self::ChannelSwap(val) => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click());
                 let combo_width = 50.;
@@ -321,28 +396,20 @@ impl ImageOperation {
                                 is_hovered = true;
 
                                 // on click, set the id
-                                if ui
-                                    .ctx()
-                                    .input(|i|i.pointer.primary_down())
-                                    
+                                if ui.ctx().input(|i| i.pointer.primary_down())
                                     && ui
                                         .ctx()
                                         .data(|d| d.get_temp::<usize>("gradient".into()).is_none())
-                                        
                                 {
-                                    ui.ctx()
-                                        .data_mut(|d| d
-                                        .insert_temp::<usize>("gradient".into(), gradient_stop.id));
+                                    ui.ctx().data_mut(|d| {
+                                        d.insert_temp::<usize>("gradient".into(), gradient_stop.id)
+                                    });
                                     debug!("insert");
                                 }
                             }
 
                             // Button down: move point with matching id
-                            if ui
-                                .ctx()
-                                .input(|i| i
-                                .pointer
-                                .primary_down())
+                            if ui.ctx().input(|i| i.pointer.primary_down())
                                 && ui.ctx().data(|d| d.get_temp::<usize>("gradient".into()))
                                     == Some(gradient_stop.id)
                             {
@@ -651,6 +718,19 @@ impl ImageOperation {
                     *img = imageops::blur(img, *amt as f32);
                 }
             }
+            Self::LUT(lut_name) => {
+                use lutgen::identity::correct_image;
+                let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
+                if let Some(lut_data) = builtin_luts().get(lut_name) {
+                    let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
+                    correct_image(&mut external_image, &lut_img);
+                } else {
+                    if let Ok(lut_img) = image::open(&lut_name) {
+                        correct_image(&mut external_image, &lut_img.to_rgb8());
+                    }
+                }
+                *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
+            }
             Self::Crop(dim) => {
                 if *dim != [0, 0, 0, 0] {
                     let window = cropped_range(dim, &(img.width(), img.height()));
@@ -917,7 +997,26 @@ pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     p[1] = egui::lerp(p[1]..=val, factor);
     p[2] = egui::lerp(p[2]..=val, factor);
 }
-
+pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
+    let mut luts = HashMap::new();
+    luts.insert(
+        "Fuji Superia 1600 2".to_string(),
+        include_bytes!("../res/LUT/Fuji Superia 1600 2.png").to_vec(),
+    );
+    luts.insert(
+        "Lomography Redscale 100".to_string(),
+        include_bytes!("../res/LUT/Lomography Redscale 100.png").to_vec(),
+    );
+    luts.insert(
+        "Lomography X-Pro Slide 200".to_string(),
+        include_bytes!("../res/LUT/Lomography X-Pro Slide 200.png").to_vec(),
+    );
+    luts.insert(
+        "Polaroid Polachrome".to_string(),
+        include_bytes!("../res/LUT/Polaroid Polachrome.png").to_vec(),
+    );
+    luts
+}
 pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
     // use pulp::Arch;
     // let arch = Arch::new();
