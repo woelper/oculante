@@ -142,6 +142,10 @@ https://unsplash.com/@mohsen_karimi
 
 https://unsplash.com/@frstvisuals
 
+## License
+This project is MIT licensed.
+This project contains GPL-licensed code, such as the LUTs in res/LUT. As a result, the source code of this project is publically available to comply with the GPL. Authors who wish to use this project without publishing source code are responsible of removing any code and its references that require source code access.
+
 ## Building
 
 Linux:
