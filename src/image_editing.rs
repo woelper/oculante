@@ -9,7 +9,7 @@ use crate::ui::EguiExt;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, DynamicImage, GenericImage, RgbaImage};
+use image::{imageops, DynamicImage, RgbaImage};
 use log::{debug, error};
 use nalgebra::Vector4;
 use notan::egui::{self, lerp, vec2, DragValue, Id, Sense, Vec2};

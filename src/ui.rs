@@ -15,15 +15,11 @@ use crate::{
 };
 
 use arboard::Clipboard;
-use egui::plot::Plot;
+use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
 use log::{debug, error, info};
 use notan::{
-    egui::{
-        self,
-        plot::{PlotPoints, Points},
-        *,
-    },
+    egui::{self, *},
     prelude::{App, Graphics},
 };
 use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
@@ -291,7 +287,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                 let preview_rect = ui
                     .add(
-                        egui::Image::new(tex_id, egui::Vec2::splat(desired_width)).uv(egui::Rect::from_x_y_ranges(
+                        egui::Image::new(tex_id)
+                        .maintain_aspect_ratio(false)
+                        .fit_to_exact_size(egui::Vec2::splat(desired_width))
+                        .uv(egui::Rect::from_x_y_ranges(
                             uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
                             uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
                         )),
@@ -1345,7 +1344,10 @@ pub fn stroke_ui(
     ui.horizontal(|ui| {
         if let Some(notan_texture) = brushes[stroke.brush_index].to_texture_premult(gfx) {
             let texture_id = gfx.egui_register_texture(&notan_texture);
-            ui.image(texture_id, egui::Vec2::splat(ui.available_height()));
+            ui.add(
+                egui::Image::new(texture_id)
+                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+            );
         }
 
         let r = egui::ComboBox::from_id_source(format!("s {:?}", stroke.points))
@@ -1355,7 +1357,10 @@ pub fn stroke_ui(
                     ui.horizontal(|ui| {
                         if let Some(notan_texture) = b.to_texture_premult(gfx) {
                             let texture_id = gfx.egui_register_texture(&notan_texture);
-                            ui.image(texture_id, egui::Vec2::splat(32.));
+                            ui.add(
+                                egui::Image::new(texture_id)
+                                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+                            );
                         }
 
                         if ui
@@ -1755,8 +1760,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
 
-
-
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
             egui::ComboBox::from_id_source("channels")
                 .selected_text(format!("{:?}", state.persistent_settings.current_channel))
@@ -1878,8 +1881,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().set_always_on_top(state.always_on_top);
         }
 
-
-
         if let Some(p) = &state.current_path {
             if tooltip(
                 unframed_button_colored("🗑", state.always_on_top, ui),
@@ -1895,7 +1896,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         ui.add_space(ui.available_width() - 32.);
-
 
         ui.scope(|ui| {
             // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
