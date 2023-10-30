@@ -75,13 +75,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         img_buffer.push(b.b);
                         img_buffer.push(255);
                     }
-
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
                     _ = sender.send(Frame::new_still(buf));
                     return Ok(receiver);
-
-                    // col.add_still(buf);
                 }
                 avif_decode::Image::Rgba8(img) => {
                     let mut img_buffer = vec![];
@@ -92,16 +89,33 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         img_buffer.push(b.b);
                         img_buffer.push(b.a);
                     }
-
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
                     _ = sender.send(Frame::new_still(buf));
                     return Ok(receiver);
-
-                    // col.add_still(buf);
                 }
-                _ => {
-                    anyhow::bail!("This avif is not yet supported.")
+                avif_decode::Image::Rgb16(img) => {
+                    let mut img_buffer = vec![];
+                    let (buf, width, height) = img.into_contiguous_buf();
+                    for b in buf {
+                        img_buffer.push(u16_to_u8(b.r));
+                        img_buffer.push(u16_to_u8(b.g));
+                        img_buffer.push(u16_to_u8(b.b));
+                        img_buffer.push(255);
+                    }
+                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
+                        .context("Can't create avif ImageBuffer with given res")?;
+                    _ = sender.send(Frame::new_still(buf));
+                    return Ok(receiver);
+                }
+                avif_decode::Image::Rgba16(_) => {
+                    anyhow::bail!("This avif is not yet supported (Rgba16).")
+                }
+                avif_decode::Image::Gray8(_) => {
+                    anyhow::bail!("This avif is not yet supported (Gray8).")
+                }
+                avif_decode::Image::Gray16(_) => {
+                    anyhow::bail!("This avif is not yet supported (Gray16).")
                 }
             }
         }
@@ -710,4 +724,8 @@ fn decode_webp(buf: &[u8]) -> Option<RgbaImage> {
         webp_buffer = Vec::from_raw_parts(out_buf, len as usize, len as usize);
     }
     image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
+}
+
+fn u16_to_u8(p: u16) -> u8 {
+    ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
 }
