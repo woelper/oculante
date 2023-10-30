@@ -60,6 +60,60 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
             // col.add_still(i.to_rgba8());
         }
+        "heif" | "heic" => {
+            use libheif_rs::{
+                Channel, ColorSpace, HeifContext, ItemId, LibHeif, Result, RgbChroma,
+            };
+
+            let lib_heif = LibHeif::new();
+            let ctx = HeifContext::read_from_file(&img_location.to_string_lossy())?;
+            let handle = ctx.primary_image_handle()?;
+
+            // Get Exif
+            // let mut meta_ids: Vec<ItemId> = vec![0; 1];
+            // let count = handle.metadata_block_ids(&mut meta_ids, b"Exif");
+            // assert_eq!(count, 1);
+            // let exif: Vec<u8> = handle.metadata(meta_ids[0])?;
+
+            // Decode the image
+            let image = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)?;
+            debug!("decoded HEIF/HEIC");
+
+            // Get "pixels"
+            let planes = image.planes();
+            let interleaved_plane = planes.interleaved.unwrap();
+   
+
+            debug!("bpp {}", interleaved_plane.bits_per_pixel);
+            debug!("stride {}", interleaved_plane.stride);
+            debug!("sbpp {}", interleaved_plane.storage_bits_per_pixel);
+            debug!("s {}x{}", interleaved_plane.width, interleaved_plane.height);
+            let mut img_buffer = vec![];
+
+            for p in interleaved_plane.data.as_rgb() {
+                img_buffer.push(p.r);
+                img_buffer.push(p.g);
+                img_buffer.push(p.b);
+                img_buffer.push(255);
+            }
+
+            // for interleaved_plane in buf {
+            //     img_buffer.push(b.r);
+            //     img_buffer.push(b.g);
+            //     img_buffer.push(b.b);
+            //     img_buffer.push(255);
+            // }
+            let buf = image::ImageBuffer::from_vec(interleaved_plane.width as u32, interleaved_plane.height as u32, img_buffer)
+                .context("Can't create HEIC ImageBuffer with given res")?;
+            // debug!("{:?}",buf.);
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
+
+            // let mut file = File::open(img_location)?;
+            // let mut buf = vec![];
+
+            // col.add_still(i.to_rgba8());
+        }
         #[cfg(feature = "avif_native")]
         #[cfg(not(feature = "dav1d"))]
         "avif" => {
