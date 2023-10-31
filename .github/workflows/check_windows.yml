@@ -25,6 +25,9 @@ jobs:
       - name: Install vcpkg
         run: vcpkg integrate install
 
+      - name: Install heif
+        run: cargo vcpkg -v build
+
       - name: Update Rust
         run: rustup update
 
