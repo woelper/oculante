@@ -1,3 +1,4 @@
+# THIS IS DISABLED ON GH
 on: [push]
 
 name: Cross-platform check
