@@ -14,6 +14,10 @@ use crate::{
     },
 };
 
+const ICON_SIZE: f32 = 24.;
+
+use egui_phosphor::regular::*;
+
 use arboard::Clipboard;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
@@ -232,7 +236,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
                         let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
 
-                        ui.label_i("🖻 File");
+                        ui.label_i(&format!("{} File", IMAGE));
                         ui.label(
                             RichText::new(format!(
                                 "{skip_symbol}{}",
@@ -1283,7 +1287,7 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
 
 // TODO redo as impl UI
 pub fn unframed_button(text: impl Into<String>, ui: &mut Ui) -> Response {
-    ui.add(egui::Button::new(RichText::new(text)).frame(false))
+    ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)).frame(false))
 }
 
 pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
@@ -1291,13 +1295,16 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
         ui.add(
             egui::Button::new(
                 RichText::new(text)
-                    .heading()
+                .size(ICON_SIZE)
+                    // .heading()
                     .color(ui.style().visuals.selection.bg_fill),
             )
             .frame(false),
         )
     } else {
-        ui.add(egui::Button::new(RichText::new(text).heading()).frame(false))
+        ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)
+        // .heading()
+    ).frame(false))
     }
 }
 
@@ -1722,7 +1729,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         // ui.label("Channels");
 
         #[cfg(feature = "file_open")]
-        if unframed_button("🗁", ui)
+        if unframed_button(FOLDER, ui)
             .on_hover_text("Browse for image")
             .clicked()
         {
@@ -1761,14 +1768,17 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             // hack to center combo box in Y
 
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
+            let combobox_text_size = 16.;
             egui::ComboBox::from_id_source("channels")
-                .selected_text(format!("{:?}", state.persistent_settings.current_channel))
+                .selected_text(RichText::new(state.persistent_settings.current_channel.to_string())
+                .size(combobox_text_size)
+            )
                 .show_ui(ui, |ui| {
                     for channel in ColorChannel::iter() {
                         let r = ui.selectable_value(
                             &mut state.persistent_settings.current_channel,
                             channel,
-                            channel.to_string(),
+                            RichText::new(channel.to_string()).size(combobox_text_size),
                         );
 
                         if tooltip(
@@ -1802,7 +1812,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         if state.current_path.is_some() {
             if tooltip(
-                unframed_button("◀", ui),
+                unframed_button(CARET_LEFT, ui),
                 "Previous image",
                 &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
                 ui,
@@ -1812,7 +1822,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 prev_image(state)
             }
             if tooltip(
-                unframed_button("▶", ui),
+                unframed_button(CARET_RIGHT, ui),
                 "Next image",
                 &lookup(&state.persistent_settings.shortcuts, &NextImage),
                 ui,
@@ -1826,7 +1836,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if state.current_image.is_some() {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                ui.selectable_label(state.persistent_settings.info_enabled, "ℹ Info"),
+                ui.selectable_label(state.persistent_settings.info_enabled, RichText::new(format!("{}", INFO)).size(ICON_SIZE*0.8)),
                 "Show image info",
                 &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                 ui,
@@ -1842,7 +1852,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
 
             if tooltip(
-                ui.selectable_label(state.persistent_settings.edit_enabled, "✏ Edit"),
+                ui.selectable_label(state.persistent_settings.edit_enabled, RichText::new(format!("{}", PENCIL_SIMPLE_LINE)).size(ICON_SIZE*0.8)),
                 "Edit the image",
                 &lookup(&state.persistent_settings.shortcuts, &EditMode),
                 ui,
@@ -1865,12 +1875,21 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         //     toggle_fullscreen(app, state);
         // }
 
-        if unframed_button("⛶", ui).clicked() {
+
+        if tooltip(
+            unframed_button(FRAME_CORNERS, ui),
+            "Toggle fullscreen",
+            &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
+            ui,
+        )
+        .clicked()
+        {
             toggle_fullscreen(app, state);
+
         }
 
         if tooltip(
-            unframed_button_colored("📌", state.always_on_top, ui),
+            unframed_button_colored(ARROW_LINE_UP, state.always_on_top, ui),
             "Always on top",
             &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
             ui,
@@ -1883,7 +1902,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         if let Some(p) = &state.current_path {
             if tooltip(
-                unframed_button_colored("🗑", state.always_on_top, ui),
+                unframed_button(TRASH, ui),
                 "Move file to trash",
                 &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
                 ui,
@@ -1908,7 +1927,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
             ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
-            ui.menu_button("☰", |ui| {
+            ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
                 if ui.button("Reset view").clicked() {
                     state.reset_image = true;
                     ui.close_menu();
