@@ -60,6 +60,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
             // col.add_still(i.to_rgba8());
         }
+        #[cfg(feature = "heif")]
         "heif" | "heic" => {
             use libheif_rs::{
                 Channel, ColorSpace, HeifContext, ItemId, LibHeif, Result, RgbChroma,

@@ -65,7 +65,7 @@ img-parts = "0.3.0"
 dark-light = "1.0.0"
 trash = "3.1"
 lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
-libheif-rs = { version = "0.22.0", default-features = false }
+libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 
 [features]
 avif_native = ["avif-decode"]
@@ -74,6 +74,7 @@ default = ["turbo", "file_open", "avif_native", "update"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
+heif = ["libheif-rs"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
