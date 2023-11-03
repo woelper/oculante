@@ -805,7 +805,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         } else {
             debug!("Setting texture");
-            _ = img.save("debug.png");
+            #[cfg(debug_assertions)] {
+                _ = img.save("debug.png");
+            }
             state.current_texture = img.to_texture(gfx);
         }
 
