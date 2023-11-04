@@ -24,8 +24,8 @@ jobs:
       - name: build heif
         run: ./build_deps_linux.sh
 
-      - name: exp heif
-        run: export PKG_CONFIG_PATH=`pwd`/libheif/build
+      - name: install heif
+        run: cd libheif/build && make install
 
       # - name: cargo build 
       #   run: cargo build
@@ -34,5 +34,5 @@ jobs:
         run: cargo check --no-default-features
 
       - name: cargo check without build features
-        run: PKG_CONFIG_PATH=libheif cargo check --features heif
+        run: PKG_CONFIG_PATH=libheif/build cargo check --features heif
 
