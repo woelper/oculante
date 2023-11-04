@@ -1,5 +1,5 @@
 rm -rf libheif
-git clone git@github.com:strukturag/libheif.git
+git clone https://github.com/strukturag/libheif.git
 cd libheif
 mkdir build
 cd build

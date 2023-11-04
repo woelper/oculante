@@ -29,7 +29,7 @@ jobs:
         run: cargo install cargo-vcpkg
 
       - name: build heif
-        run: build_deps_win.bat
+        run: ./build_deps_win.bat
 
       # - name: cargo build 
       #   run: cargo build

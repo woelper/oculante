@@ -1,5 +1,5 @@
 rm -rf libheif
-git clone --branch v1.17.3 git@github.com:strukturag/libheif.git
+git clone --branch v1.17.3 https://github.com/strukturag/libheif.git
 cd libheif
 mkdir build
 cd build
