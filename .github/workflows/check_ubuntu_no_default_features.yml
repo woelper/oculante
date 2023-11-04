@@ -25,7 +25,7 @@ jobs:
         run: ./build_deps_linux.sh
 
       - name: install heif
-        run: cd libheif/build && make install
+        run: cd libheif/build && sudo make install
 
       # - name: cargo build 
       #   run: cargo build
