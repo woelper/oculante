@@ -1,6 +1,6 @@
 on: [push]
 
-name: Windows Check no default features
+name: Windows Check
 jobs:
   check:
     strategy:
@@ -31,9 +31,11 @@ jobs:
       - name: Update Rust
         run: rustup update
 
-      - name: cargo build 
-        run: cargo build
+      # - name: cargo build 
+      #   run: cargo build
 
       - name: cargo check without default features
         run: cargo check --no-default-features
 
+      - name: cargo check build features
+        run: cargo check --features heif

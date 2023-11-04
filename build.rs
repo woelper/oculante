@@ -29,6 +29,18 @@ fn setup_heif() {
         Command::new("make").status().unwrap();
         println!("cargo:rustc-link-search=native={}", "libheif");
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("git")
+            .args(["clone", "https://github.com/Microsoft/vcpkg.git"])
+            .status()
+            .unwrap();
+        Command::new("cd").args(["vcpkg"]).status().unwrap();
+        Command::new("./bootstrap-vcpkg.bat").status().unwrap();
+        Command::new("./vcpkg").args(["integrate", "install"]).status().unwrap();
+        Command::new("./vcpkg").args(["install", "libheif"]).status().unwrap();
+    }
 }
 
 fn main() {
