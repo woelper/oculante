@@ -1,12 +1,35 @@
+use std::env;
 use std::fs::read_to_string;
+use std::fs::remove_dir_all;
 use std::fs::remove_file;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 use log::error;
 use log::info;
+
+fn setup_heif() {
+    #[cfg(target_os = "linux")]
+    {
+        _ = remove_dir_all("libheif").unwrap();
+        Command::new("git")
+            .args(["clone", "git@github.com:strukturag/libheif.git"])
+            .status()
+            .unwrap();
+        Command::new("cd").args(["libheif"]).status().unwrap();
+        Command::new("mkdir").args(["build"]).status().unwrap();
+        Command::new("cd").args(["build"]).status().unwrap();
+        Command::new("cmake")
+            .args(["--preset=release", ".."])
+            .status()
+            .unwrap();
+        Command::new("make").status().unwrap();
+        println!("cargo:rustc-link-search=native={}", "libheif");
+    }
+}
 
 fn main() {
     info!("Build script");
@@ -77,5 +100,7 @@ fn main() {
             .unwrap();
 
         remove_file(shortcut_file).unwrap();
+
+        setup_heif();
     }
 }

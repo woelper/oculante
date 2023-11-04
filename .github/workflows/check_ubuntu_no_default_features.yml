@@ -16,7 +16,7 @@ jobs:
         run: sudo apt update
 
       - name: Install linux deps
-        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev libheif-dev libheif1
+        run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
 
       - name: Update Rust
         run: rustup update
@@ -26,4 +26,7 @@ jobs:
 
       - name: cargo check without default features
         run: cargo check --no-default-features
+
+      - name: cargo check without build features
+        run: cargo check --features heif
 
