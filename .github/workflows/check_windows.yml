@@ -31,9 +31,6 @@ jobs:
       - name: build heif
         run: build_deps_win.bat
 
-      - name: Update Rust
-        run: rustup update
-
       # - name: cargo build 
       #   run: cargo build
 

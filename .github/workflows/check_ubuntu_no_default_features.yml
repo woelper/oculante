@@ -24,6 +24,9 @@ jobs:
       - name: build heif
         run: ./build_deps_linux.sh
 
+      - name: exp heif
+        run: export PKG_CONFIG_PATH=`pwd`/libheif/build
+
       # - name: cargo build 
       #   run: cargo build
 
