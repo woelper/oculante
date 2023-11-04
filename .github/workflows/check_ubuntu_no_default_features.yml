@@ -21,6 +21,9 @@ jobs:
       - name: Update Rust
         run: rustup update
 
+      - name: build heif
+        run: ./build_deps_linux.sh
+
       # - name: cargo build 
       #   run: cargo build
 

@@ -1,4 +1,5 @@
 use std::env;
+use std::fs::create_dir_all;
 use std::fs::read_to_string;
 use std::fs::remove_dir_all;
 use std::fs::remove_file;
@@ -8,26 +9,48 @@ use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 
-use log::error;
-use log::info;
-
 fn setup_heif() {
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let heif_path = format!("{out_dir}/libheif");
+    println!("heif is at {heif_path}");
     #[cfg(target_os = "linux")]
     {
-        _ = remove_dir_all("libheif").unwrap();
+        _ = remove_dir_all(&heif_path);
+        // _ = remove_dir_all("libheif");
         Command::new("git")
-            .args(["clone", "git@github.com:strukturag/libheif.git"])
+            .args(["clone", "git@github.com:strukturag/libheif.git", &heif_path])
             .status()
             .unwrap();
-        Command::new("cd").args(["libheif"]).status().unwrap();
-        Command::new("mkdir").args(["build"]).status().unwrap();
-        Command::new("cd").args(["build"]).status().unwrap();
+        println!("Creating heif build dir");
+        create_dir_all(format!("{heif_path}/build")).unwrap();
+        // Command::new("git")
+        // .args(["clone", "git@github.com:strukturag/libheif.git", "libheif"])
+        // .status()
+        // .unwrap();
+        // Command::new("cd").args(["libheif"]).status().unwrap();
+        // Command::new("mkdir").args(["build"]).status().unwrap();
+        // Command::new("cd").args(["build"]).status().unwrap();
+        println!("Running cmake / heif");
+
         Command::new("cmake")
             .args(["--preset=release", ".."])
+            .current_dir(format!("{heif_path}/build"))
             .status()
             .unwrap();
-        Command::new("make").status().unwrap();
-        println!("cargo:rustc-link-search=native={}", "libheif");
+        println!("Running make / heif");
+
+        Command::new("make")
+            .current_dir(format!("{heif_path}/build"))
+            .status()
+            .unwrap();
+        Command::new("export")
+        .args([format!("PKG_CONFIG_PATH={heif_path}/build")])
+
+        .current_dir(format!("{heif_path}/build"))
+        .status()
+        .unwrap();
+        println!("cargo:rustc-link-search=native={}/build", heif_path);
+        // env::set_var("PKG_CONFIG_PATH", format!("{heif_path}/build"));
     }
 
     #[cfg(target_os = "windows")]
@@ -38,20 +61,26 @@ fn setup_heif() {
             .unwrap();
         Command::new("cd").args(["vcpkg"]).status().unwrap();
         Command::new("./bootstrap-vcpkg.bat").status().unwrap();
-        Command::new("./vcpkg").args(["integrate", "install"]).status().unwrap();
-        Command::new("./vcpkg").args(["install", "libheif"]).status().unwrap();
+        Command::new("./vcpkg")
+            .args(["integrate", "install"])
+            .status()
+            .unwrap();
+        Command::new("./vcpkg")
+            .args(["install", "libheif"])
+            .status()
+            .unwrap();
     }
 }
 
 fn main() {
-    info!("Build script");
+    println!("Build script");
     // #[cfg(windows)]
     match std::process::Command::new("convert")
         .args(vec!["res/oculante.png", "icon.ico"])
         .spawn()
     {
-        Ok(_b) => info!("Converted icon"),
-        Err(e) => error!("{:?}", e),
+        Ok(_b) => println!("Converted icon"),
+        Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
     }
 
     // insert version into plist
@@ -112,7 +141,9 @@ fn main() {
             .unwrap();
 
         remove_file(shortcut_file).unwrap();
-
-        setup_heif();
     }
+
+    // #[cfg(feature = "heif")]
+    // setup_heif();
+    // panic!();
 }

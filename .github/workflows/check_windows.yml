@@ -28,6 +28,9 @@ jobs:
       - name: Install cargo vcpkg
         run: cargo install cargo-vcpkg
 
+      - name: build heif
+        run: build_deps_win.bat
+
       - name: Update Rust
         run: rustup update
 
