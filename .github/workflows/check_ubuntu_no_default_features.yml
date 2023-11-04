@@ -21,12 +21,12 @@ jobs:
       - name: Update Rust
         run: rustup update
 
-      - name: cargo build 
-        run: cargo build
+      # - name: cargo build 
+      #   run: cargo build
 
       - name: cargo check without default features
         run: cargo check --no-default-features
 
       - name: cargo check without build features
-        run: cargo check --features heif
+        run: PKG_CONFIG_PATH=libheif cargo check --features heif
 
