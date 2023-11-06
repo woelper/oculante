@@ -216,9 +216,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     state.cursor_relative.x / state.image_dimension.0 as f32,
                     (state.cursor_relative.y / state.image_dimension.1 as f32),
                 );
-
+                
                 egui::Grid::new("info").show(ui, |ui| {
-                    ui.label_i("⬜ Size");
+                    ui.label_i(&format!("{ARROWS_OUT} Size",));
 
                     ui.label(
                         RichText::new(format!(
@@ -236,7 +236,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
                         let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
 
-                        ui.label_i(&format!("{} File", IMAGE));
+                        ui.label_i(&format!("{} File", IMAGE_SQUARE));
                         ui.label(
                             RichText::new(format!(
                                 "{skip_symbol}{}",
@@ -248,7 +248,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ui.end_row();
                     }
 
-                    ui.label_i("🌗 RGBA");
+                    ui.label_i(&format!("{PALETTE} RGBA"));
                     ui.label(
                         RichText::new(disp_col(state.sampled_color))
                             .monospace()
@@ -256,7 +256,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
-                    ui.label_i("🌗 RGBA");
+                    ui.label_i(&format!("{PALETTE} RGBA"));
                     ui.label(
                         RichText::new(disp_col_norm(state.sampled_color, 255.))
                             .monospace()
@@ -741,7 +741,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui,
                     );
 
-                    ui.label_i("🔁 Reset");
+                    ui.label_i(&format!("{RECYCLE} Reset"));
                     ui.centered_and_justified(|ui| {
                         if ui.button("Reset all edits").clicked() {
                             state.edit_state = Default::default();
@@ -750,7 +750,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     });
                     ui.end_row();
 
-                    ui.label_i("❓ Compare");
+                    ui.label_i(&format!("{GIT_DIFF} Compare"));
                     let available_w_single_spacing =
                         ui.available_width() - ui.style().spacing.item_spacing.x;
                     ui.horizontal(|ui| {
@@ -809,7 +809,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     {
                         state.edit_state.painting = false;
                     }
-                } else if ui.button("🖊 Paint mode").clicked() {
+                } else if ui.button(format!("{PAINT_BRUSH_HOUSEHOLD} Paint mode")).clicked() {
                     state.edit_state.painting = true;
                 }
             });
@@ -961,7 +961,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button("⤵ Apply all edits")
+                    .button(format!("{STACK} Apply all edits"))
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                 {
@@ -1089,7 +1089,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
-                        .button("⟳ Reload image")
+                        .button(format!("{RECYCLE} Restore original"))
                         .on_hover_text("Completely reload image, destroying all edits.")
                         .clicked()
                     {
@@ -1145,7 +1145,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(feature = "file_open")]
                 if state.current_image.is_some() {
-                    if ui.button("Save as...").clicked() {
+                    if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
 
                         let start_directory = state.persistent_settings.last_open_directory.clone();
 
@@ -1205,9 +1205,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         // .with_extension(&state.edit_state.export_extension)
                         .exists()
                     {
-                        "💾 Overwrite"
+                        format!("{FLOPPY_DISK} Overwrite")
                     } else {
-                        "💾 Save"
+                        format!("{FLOPPY_DISK} Save")
                     };
 
                     if ui.button(text).on_hover_text("Save the image. This will create a new file or overwrite.").clicked() {
@@ -1237,12 +1237,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         }
                     }
 
-                    if ui.button("💾 Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button(format!("{ARCHIVE_TRAY} Save edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
-                    if ui.button("💾 Save edits for directory").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button(format!("{ARCHIVE_TRAY} Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Some(parent) = p.parent() {
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
@@ -1295,16 +1295,19 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
         ui.add(
             egui::Button::new(
                 RichText::new(text)
-                .size(ICON_SIZE)
+                    .size(ICON_SIZE)
                     // .heading()
                     .color(ui.style().visuals.selection.bg_fill),
             )
             .frame(false),
         )
     } else {
-        ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)
-        // .heading()
-    ).frame(false))
+        ui.add(
+            egui::Button::new(
+                RichText::new(text).size(ICON_SIZE), // .heading()
+            )
+            .frame(false),
+        )
     }
 }
 
@@ -1770,9 +1773,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
             let combobox_text_size = 16.;
             egui::ComboBox::from_id_source("channels")
-                .selected_text(RichText::new(state.persistent_settings.current_channel.to_string())
-                .size(combobox_text_size)
-            )
+                .selected_text(
+                    RichText::new(state.persistent_settings.current_channel.to_string())
+                        .size(combobox_text_size),
+                )
                 .show_ui(ui, |ui| {
                     for channel in ColorChannel::iter() {
                         let r = ui.selectable_value(
@@ -1836,7 +1840,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if state.current_image.is_some() {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                ui.selectable_label(state.persistent_settings.info_enabled, RichText::new(format!("{}", INFO)).size(ICON_SIZE*0.8)),
+                ui.selectable_label(
+                    state.persistent_settings.info_enabled,
+                    RichText::new(format!("{}", INFO)).size(ICON_SIZE * 0.8),
+                ),
                 "Show image info",
                 &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                 ui,
@@ -1852,7 +1859,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
 
             if tooltip(
-                ui.selectable_label(state.persistent_settings.edit_enabled, RichText::new(format!("{}", PENCIL_SIMPLE_LINE)).size(ICON_SIZE*0.8)),
+                ui.selectable_label(
+                    state.persistent_settings.edit_enabled,
+                    RichText::new(format!("{}", PENCIL_SIMPLE_LINE)).size(ICON_SIZE * 0.8),
+                ),
                 "Edit the image",
                 &lookup(&state.persistent_settings.shortcuts, &EditMode),
                 ui,
@@ -1875,7 +1885,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         //     toggle_fullscreen(app, state);
         // }
 
-
         if tooltip(
             unframed_button(FRAME_CORNERS, ui),
             "Toggle fullscreen",
@@ -1885,7 +1894,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         .clicked()
         {
             toggle_fullscreen(app, state);
-
         }
 
         if tooltip(
