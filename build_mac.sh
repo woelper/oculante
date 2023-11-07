@@ -1,5 +1,5 @@
 export MACOSX_DEPLOYMENT_TARGET=10.15
-cargo bundle --release
+cargo bundle --release --features heif
 # build universal binary
 rustup target add aarch64-apple-darwin
 cargo universal2

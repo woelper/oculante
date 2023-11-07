@@ -68,7 +68,7 @@ lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
 libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 
 [env]
-PKG_CONFIG_PATH = "libheif"
+PKG_CONFIG_PATH = "libheif/build"
 
 [features]
 heif = ["libheif-rs"]
