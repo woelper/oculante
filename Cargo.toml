@@ -71,13 +71,13 @@ libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 PKG_CONFIG_PATH = "libheif"
 
 [features]
+heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 default = ["turbo", "file_open", "avif_native", "update"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
-heif = ["libheif-rs"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
