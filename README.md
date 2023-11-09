@@ -74,6 +74,7 @@ pkgin install oculante
 - exr (via `exr-rs`), tonemapped
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
+- qoi
 
 ### Platform support:
 - Linux
