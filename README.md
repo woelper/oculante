@@ -75,6 +75,7 @@ pkgin install oculante
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
 - HEIC/HEIF (via `libheif-rs`). Optional dependency, enabled on MacOS and Linux builds currently through `heif` flag.
+- qoi
 
 ### Platform support:
 - Linux

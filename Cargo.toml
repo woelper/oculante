@@ -69,6 +69,7 @@ libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 
 [env]
 PKG_CONFIG_PATH = "libheif/build"
+egui-phosphor = "0.3.0"
 
 [features]
 heif = ["libheif-rs"]
