@@ -1,15 +1,16 @@
 use std::env;
-use std::fs::create_dir_all;
 use std::fs::read_to_string;
-use std::fs::remove_dir_all;
-use std::fs::remove_file;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::fs::remove_file;
 
+#[allow(dead_code)]
 fn setup_heif() {
+    // use std::fs::create_dir_all;
+    // use std::fs::remove_dir_all;
+    // use std::process::Command;
     let out_dir = env::var("OUT_DIR").unwrap();
     let heif_path = format!("{out_dir}/libheif");
     println!("heif is at {heif_path}");
