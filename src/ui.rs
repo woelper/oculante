@@ -1886,7 +1886,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         // }
 
         if tooltip(
-            unframed_button(FRAME_CORNERS, ui),
+            unframed_button(ARROWS_OUT_SIMPLE, ui),
             "Toggle fullscreen",
             &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
             ui,
