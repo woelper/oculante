@@ -56,6 +56,7 @@ fn setup_heif() {
 
     #[cfg(target_os = "windows")]
     {
+        use std::process::Command;
         Command::new("git")
             .args(["clone", "https://github.com/Microsoft/vcpkg.git"])
             .status()
