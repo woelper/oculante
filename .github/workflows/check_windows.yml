@@ -25,11 +25,14 @@ jobs:
       - name: Install vcpkg
         run: vcpkg integrate install
 
+      - name: Install libheif
+        run: vcpkg install libheif:x64-windows-static-md
+
       # - name: Install cargo vcpkg
       #   run: cargo install cargo-vcpkg
 
-      - name: build heif
-        run: ./build_deps_win.bat
+      # - name: build heif
+        # run: ./build_deps_win.bat
 
       # - name: cargo build 
       #   run: cargo build
