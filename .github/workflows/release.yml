@@ -1,4 +1,4 @@
-name: Oculante release job
+name: Release
 
 on:
   push:

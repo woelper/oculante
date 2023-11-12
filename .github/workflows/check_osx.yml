@@ -1,6 +1,6 @@
 on: [push]
 
-name: OSX Check
+name: Check OSX
 jobs:
   check:
     strategy:

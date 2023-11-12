@@ -1,6 +1,6 @@
 on: [push]
 
-name: Windows Check
+name: Check Windows
 jobs:
   check:
     strategy:
