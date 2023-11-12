@@ -20,6 +20,8 @@ jobs:
       - name: cargo build 
         run: cargo build
 
-      - name: cargo check without default features
+      - name: Check without default features
         run: cargo check --no-default-features
 
+      - name: Check without build features
+        run: cargo check --features heif

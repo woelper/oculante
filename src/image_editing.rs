@@ -19,6 +19,8 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 
+use egui_phosphor::variants::regular::*;
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
     #[serde(skip)]
@@ -134,30 +136,30 @@ pub enum ImageOperation {
 impl fmt::Display for ImageOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::Brightness(_) => write!(f, "☀ Brightness"),
+            Self::Brightness(_) => write!(f, "{SUN} Brightness"),
             Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
             Self::Posterize(_) => write!(f, "🖼 Posterize"),
             Self::Contrast(_) => write!(f, "◑ Contrast"),
-            Self::Exposure(_) => write!(f, "✴ Exposure"),
+            Self::Exposure(_) => write!(f, "{APERTURE} Exposure"),
             Self::Equalize(_) => write!(f, "☯ Equalize"),
             Self::Mult(_) => write!(f, "✖ Mult color"),
             Self::Add(_) => write!(f, "➕ Add color"),
-            Self::Fill(_) => write!(f, "🍺 Fill color"),
-            Self::Blur(_) => write!(f, "💧 Blur"),
-            Self::Crop(_) => write!(f, "✂ Crop"),
-            Self::Flip(_) => write!(f, "⬌ Flip"),
-            Self::Rotate(_) => write!(f, "⟳ Rotate"),
-            Self::Invert => write!(f, "！ Invert"),
-            Self::ChannelSwap(_) => write!(f, "⬌ Channel Copy"),
+            Self::Fill(_) => write!(f, "{PAINT_BUCKET} Fill color"),
+            Self::Blur(_) => write!(f, "{DROP} Blur"),
+            Self::Crop(_) => write!(f, "{CROP} Crop"),
+            Self::Flip(_) => write!(f, "{SWAP} Flip"),
+            Self::Rotate(_) => write!(f, "{ARROW_CLOCKWISE} Rotate"),
+            Self::Invert => write!(f, "{SELECTION_INVERSE} Invert"),
+            Self::ChannelSwap(_) => write!(f, "{FLOW_ARROW} Channel Copy"),
             Self::HSV(_) => write!(f, "◔ HSV"),
-            Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
-            Self::Resize { .. } => write!(f, "⬜ Resize"),
+            Self::ChromaticAberration(_) => write!(f, "{CAMERA} Color Fringe"),
+            Self::Resize { .. } => write!(f, "{ARROWS_IN} Resize"),
             Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
-            Self::Expression(_) => write!(f, "📄 Expression"),
+            Self::Expression(_) => write!(f, "{FUNCTION} Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
-            Self::LUT(_) => write!(f, "Apply Color LUT"),
+            Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
