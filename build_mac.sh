@@ -6,10 +6,10 @@ rustup target add x86_64-apple-darwin
 brew install nasm
 # arch -x86_64 brew install nasm
 
-cargo build --release --target x86_64-apple-darwin
-cargo build --release --target aarch64-apple-darwin
+cargo build --release --target x86_64-apple-darwin --features heif
+cargo build --release --target aarch64-apple-darwin --features heif
 lipo -create -output target/release/bundle/osx/oculante.app/Contents/MacOS/oculante x86_64-apple-darwin/release/oculante aarch64-apple-darwin/release/oculante 
-
+file target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
 
 # build universal binary
 # cargo universal2
