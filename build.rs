@@ -8,14 +8,14 @@ use std::fs::remove_file;
 
 #[allow(dead_code)]
 fn setup_heif() {
-    // use std::fs::create_dir_all;
-    // use std::fs::remove_dir_all;
-    // use std::process::Command;
     let out_dir = env::var("OUT_DIR").unwrap();
     let heif_path = format!("{out_dir}/libheif");
     println!("heif is at {heif_path}");
     #[cfg(target_os = "linux")]
     {
+        use std::fs::create_dir_all;
+        use std::fs::remove_dir_all;
+        use std::process::Command;
         _ = remove_dir_all(&heif_path);
         // _ = remove_dir_all("libheif");
         Command::new("git")
