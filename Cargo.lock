@@ -6661,12 +6661,9 @@ dependencies = [
 
 [[package]]
 name = "zune-core"
-version = "0.2.14"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ca36c2e02af0d8d7ee977542bfe33ed1c516be73d3c1faa4420af46e96ceee"
-dependencies = [
- "bitflags 2.4.1",
-]
+checksum = "167b40ad31b6e3d4be67db10ecab6534f3e78ef9b32348d4efe3187700208944"
 
 [[package]]
 name = "zune-inflate"
@@ -6679,12 +6676,10 @@ dependencies = [
 
 [[package]]
 name = "zune-png"
-version = "0.2.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee5abc36f78f32bf5ffb5f070a69cb7beffa7cb393817d3a30f9fe7c1ea57655"
+checksum = "b5ccace4aec6125c925fdc43551c653a96aaf5f114a4e9964ae201c2d7a1c850"
 dependencies = [
- "bytemuck",
- "log",
  "zune-core",
  "zune-inflate",
 ]
