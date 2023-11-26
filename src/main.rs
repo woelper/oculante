@@ -5,6 +5,7 @@ use clap::Command;
 use log::debug;
 use log::error;
 use log::info;
+use log::trace;
 use log::warn;
 use nalgebra::Vector2;
 use notan::app::Event;
@@ -258,6 +259,11 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
             .insert(0, "my_font".to_owned());
 
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        match state.persistent_settings.theme {
+            ColorTheme::Light => ctx.set_visuals(Visuals::light()),
+            ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+            ColorTheme::System => set_system_theme(ctx),
+        }
 
         let mut style: egui::Style = (*ctx.style()).clone();
         let font_scale = 0.80;
@@ -266,6 +272,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
+        debug!("Accent color: {:?}",state.persistent_settings.accent_color);
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -282,14 +289,10 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-        ctx.set_style(style);
         ctx.set_fonts(fonts);
-
-        match state.persistent_settings.theme {
-            ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-            ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
-            ColorTheme::System => set_system_theme(ctx),
-        }
+        
+  
+        ctx.set_style(style);
     });
 
     // load checker texture
@@ -607,7 +610,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             app.window().size(),
         );
         state.persistent_settings.save_blocking();
-        debug!("Save {t}");
+        trace!("Save {t}");
     }
 
     let mouse_pos = app.mouse.position();
