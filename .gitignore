@@ -11,5 +11,3 @@ perf.*
 flamegraph.svg
 .notes
 TODO
-# for dev profile optimisations
-.cargo/config.toml
