@@ -64,8 +64,8 @@ zune-png = "0.2"
 img-parts = "0.3.0"
 dark-light = "1.0.0"
 trash = "3.1"
-lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
-egui-phosphor = "0.3.0"
+lutgen = {version = "0.9.0", features = ["lutgen-palettes"]}
+egui-phosphor = "=0.3.0"
 
 [features]
 avif_native = ["avif-decode"]
