@@ -10,9 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+        
 
-      # - name: cargo build 
-      #   run: cargo build
+        
+  
+
 
       - name: Check without default features
         run: cargo check --no-default-features
