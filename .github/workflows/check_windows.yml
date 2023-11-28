@@ -18,7 +18,7 @@ jobs:
       - name: Install libheif
         run: vcpkg install libheif:x64-windows-static-md
 
-      - name: Install libheif static!
+      - name: Install libheif static
         run: vcpkg install libheif:x64-windows-static
 
       - name: cargo check without default features

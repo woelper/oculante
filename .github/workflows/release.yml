@@ -89,6 +89,7 @@ jobs:
       run: |
         vcpkg integrate install
         vcpkg install libheif:x64-windows-static-md
+        vcpkg install libheif:x64-windows-static
       if: matrix.os == 'windows-2019'
 
     - name: Build Windows Application
