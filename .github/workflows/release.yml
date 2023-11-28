@@ -100,7 +100,7 @@ jobs:
       run: |
         cargo build --release --no-default-features
         zip -r oculante_linux_minimal.zip target/release/oculante
-        cargo build --release
+        cargo build --release --features heif
         zip -r oculante_linux.zip target/release/oculante
         cargo deb
         cp target/debian/oculante_*.deb oculante.deb
