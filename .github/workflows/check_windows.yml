@@ -1,9 +1,6 @@
 on: [push]
 
-name: Windows Check no default features
-
-
-
+name: Check Windows
 jobs:
   check:
     strategy:
@@ -14,14 +11,18 @@ jobs:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
-        
+      
+      - name: Install vcpkg
+        run: vcpkg integrate install
 
-      # - name: Update Rust
-        # run: rustup update
+      - name: Install libheif
+        run: vcpkg install libheif:x64-windows-static-md
 
-      - name: cargo build 
-        run: cargo build
+      - name: Install libheif static
+        run: vcpkg install libheif:x64-windows-static
 
       - name: cargo check without default features
         run: cargo check --no-default-features
 
+      - name: cargo check build features
+        run: cargo check --features heif

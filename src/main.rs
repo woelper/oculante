@@ -540,7 +540,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         (delta_y / divisor).max(-5.0).min(5.0),
                         state.image_geometry.scale,
                     );
-                    info!("Delta {delta}, raw {delta_y}");
+                    trace!("Delta {delta}, raw {delta_y}");
                     let new_scale = state.image_geometry.scale + delta;
                     // limit scale
                     if new_scale > 0.01 && new_scale < 40. {
@@ -699,7 +699,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        // debug!("Received image buffer: {:?}", img.dimensions());
+        debug!("Received image buffer: {:?}", img.dimensions());
         state.image_dimension = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
@@ -721,6 +721,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match frame.source {
             FrameSource::Still => {
+                debug!("Received still");
                 state.edit_state.result_image_op = Default::default();
                 state.edit_state.result_pixel_op = Default::default();
 
@@ -757,7 +758,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
                     } else if let Some(parent) = p.parent() {
-                        info!("Looking for {}", parent.join(".oculante").display());
+                        debug!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
                             info!("is file {}", parent.join(".oculante").display());
 
@@ -797,6 +798,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.current_texture = img.to_texture(gfx);
             }
         } else {
+            debug!("Setting texture");
+            #[cfg(debug_assertions)] {
+                _ = img.save("debug.png");
+            }
             state.current_texture = img.to_texture(gfx);
         }
 
@@ -826,7 +831,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     if state.redraw {
-        debug!("Force redraw");
+        trace!("Force redraw");
         app.window().request_frame();
     }
 

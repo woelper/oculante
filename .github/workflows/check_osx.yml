@@ -1,6 +1,6 @@
 on: [push]
 
-name: OSX Check
+name: Check OSX
 jobs:
   check:
     strategy:
@@ -14,13 +14,14 @@ jobs:
         
 
         
-      # - name: Install osx deps
-      #   run: brew install nasm
-      #   if: matrix.os == 'macos-latest'
+  
 
-      - name: cargo build 
-        run: cargo build
 
-      - name: cargo check without default features
+      - name: Check without default features
         run: cargo check --no-default-features
 
+      - name: Check without build features
+        run: cargo check --features heif
+
+      - name: Run buildscript
+        run: ./build_mac.sh

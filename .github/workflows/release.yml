@@ -1,4 +1,4 @@
-name: Oculante release job
+name: Release
 
 on:
   push:
@@ -72,6 +72,12 @@ jobs:
       run: sudo apt update
       if: matrix.os == 'ubuntu-20.04'
 
+    - name: Install libheif for ubuntu
+      run: |
+        ./build_deps_linux.sh
+        cd libheif/build && sudo make install
+      if: matrix.os == 'ubuntu-20.04'
+
     - name: Update Rust
       run: rustup update
 
@@ -79,27 +85,28 @@ jobs:
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
       if: matrix.os == 'ubuntu-20.04'
 
-    - name: Build Windows Application
-      run: cargo build --release
+    - name: Install libheif for Windows
+      run: |
+        vcpkg integrate install
+        vcpkg install libheif:x64-windows-static-md
+        vcpkg install libheif:x64-windows-static
       if: matrix.os == 'windows-2019'
 
-    # - name: Zip Windows
-    #   run: zip -r oculante_windows.zip target/release/oculante.exe
-    #   if: matrix.os == 'windows-2019'
+    - name: Build Windows Application
+      run: cargo build --release --features heif
+      if: matrix.os == 'windows-2019'
+
 
     - name: Build Linux classic Application
       run: |
         cargo build --release --no-default-features
         zip -r oculante_linux_minimal.zip target/release/oculante
-        cargo build --release
+        cargo build --release --features heif
         zip -r oculante_linux.zip target/release/oculante
         cargo deb
         cp target/debian/oculante_*.deb oculante.deb
       if: matrix.os == 'ubuntu-20.04'
 
-    # - name: Zip Linux
-    #   run: zip -r oculante_linux.zip target/release/oculante
-    #   if: matrix.os == 'ubuntu-20.04'
 
     - name: Build Mac Bundle
       run: ./build_mac.sh

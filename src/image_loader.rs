@@ -60,6 +60,42 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
             // col.add_still(i.to_rgba8());
         }
+        #[cfg(feature = "heif")]
+        "heif" | "heic" => {
+            // Built on work in https://github.com/rsuu/rmg - thanks!
+            use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
+
+            let lib_heif = LibHeif::new();
+            let ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            let handle = ctx.primary_image_handle()?;
+            let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
+            let planes = img.planes();
+            let interleaved = planes.interleaved.context("Can't create interleaved plane")?;
+
+            let data = interleaved.data;
+            let width = interleaved.width;
+            let height = interleaved.height;
+            let stride = interleaved.stride;
+
+            let mut res: Vec<u8> = Vec::new();
+            for y in 0..height {
+                let mut step = y as usize * stride;
+
+                for _ in 0..width {
+                    res.extend_from_slice(&[
+                        data[step],
+                        data[step + 1],
+                        data[step + 2],
+                        data[step + 3],
+                    ]);
+                    step += 4;
+                }
+            }
+            let buf = image::ImageBuffer::from_vec(width as u32, height as u32, res)
+                .context("Can't create HEIC/HEIF ImageBuffer with given res")?;
+            _ = sender.send(Frame::new_still(buf));
+            return Ok(receiver);
+        }
         #[cfg(feature = "avif_native")]
         #[cfg(not(feature = "dav1d"))]
         "avif" => {

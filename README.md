@@ -74,6 +74,7 @@ pkgin install oculante
 - exr (via `exr-rs`), tonemapped
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
+- HEIC/HEIF (via `libheif-rs`). Optional dependency, enabled on MacOS and Linux builds currently through `heif` flag.
 - qoi
 
 ### Platform support:
@@ -96,6 +97,7 @@ pkgin install oculante
 - Lossless JPEG editing: Crop, rotate, mirror without recompressing data
 - Light/Dark theme and follow system theme mode
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
+- EXIF support: Load metadata if present
 
 ### Misc examples:
 
