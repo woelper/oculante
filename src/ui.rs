@@ -528,7 +528,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 if ui.checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
                     set_title(app, state);
                 }
-
+                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires restart. Turn off optimisations and redraw everything each frame. This will consume more CPU but give you instant feedback, for example if new images come in or modifications are made.").changed(){
+                    app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
+                }
+                
+                // ui.label(format!("lazy {}", app.window().lazy_loop()));
+                ui.end_row();
 
                 }
 

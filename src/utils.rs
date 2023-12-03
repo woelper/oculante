@@ -16,7 +16,7 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use image::{self};
@@ -144,6 +144,7 @@ pub struct Player {
     pub stop_sender: Sender<()>,
     pub cache: Cache,
     pub max_texture_size: u32,
+    watcher: HashMap<PathBuf, SystemTime>
 }
 
 impl Player {
@@ -157,6 +158,28 @@ impl Player {
                 cache_size,
             },
             max_texture_size,
+            watcher: Default::default()
+        }
+    }
+
+    pub fn check_modified(&mut self, path: &Path, message_sender: Sender<Message>) {
+        if let Some(watched_mod) = self.watcher.get(path) {
+        // info!("{:?}", self.watcher);
+
+            if let Ok(meta) = std::fs::metadata(path) {
+                if let Ok(modified) = meta.modified() {
+                    // info!("Read from meta {:?} stored: {:?}", modified, watched_mod);
+
+                    if watched_mod != &modified {
+                        debug!("Modified! read from meta {:?} stored: {:?}", modified, watched_mod);
+
+                        self.cache.data.remove(path);
+                        self.load(path, message_sender);
+                
+                        
+                    }
+                }
+            }
         }
     }
 
@@ -179,6 +202,12 @@ impl Player {
             stop_receiver,
             self.max_texture_size,
         );
+
+        if let Ok(meta) = std::fs::metadata(img_location) {
+            if let Ok(modified) = meta.modified() {
+                self.watcher.insert(img_location.into(), modified);
+            }
+        }
     }
 
     pub fn stop(&self) {

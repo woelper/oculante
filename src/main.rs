@@ -15,6 +15,7 @@ use notan::prelude::*;
 use shortcuts::key_pressed;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::time::Duration;
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -112,6 +113,7 @@ fn main() -> Result<(), String> {
     match settings::PersistentSettings::load() {
         Ok(settings) => {
             window_config.vsync = settings.vsync;
+            window_config.lazy_loop = !settings.force_redraw;
             if settings.window_geometry != Default::default() {
                 window_config.width = settings.window_geometry.1 .0 as u32;
                 window_config.height = settings.window_geometry.1 .1 as u32;
@@ -272,7 +274,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
-        debug!("Accent color: {:?}",state.persistent_settings.accent_color);
+        debug!("Accent color: {:?}", state.persistent_settings.accent_color);
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -290,8 +292,8 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
         ctx.set_fonts(fonts);
-        
-  
+
+
         ctx.set_style(style);
     });
 
@@ -599,6 +601,18 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
+    // dbg!(format!("upg {}", app.timer.elapsed_f32()));
+
+    if let Some(p) = &state.current_path {
+        let t = app.timer.elapsed_f32() % 0.8;
+        if t <= 0.05 {
+            debug!("chk mod {}", t);
+            state
+                .player
+                .check_modified(p, state.message_channel.0.clone());   
+        }
+    }
+
     // Save every 1.5 secs
     let t = app.timer.elapsed_f32() % 1.5;
     if t <= 0.01 {
@@ -799,9 +813,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         } else {
             debug!("Setting texture");
-            #[cfg(debug_assertions)] {
-                _ = img.save("debug.png");
-            }
             state.current_texture = img.to_texture(gfx);
         }
 
@@ -950,6 +961,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
+        ctx.request_repaint_after(Duration::from_secs(1));
 
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")
@@ -1089,8 +1101,19 @@ fn browse_for_image_path(state: &mut OculanteState) {
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {
+        let uppercase_lowercase_ext = [
+            utils::SUPPORTED_EXTENSIONS
+                .into_iter()
+                .map(|e| e.to_ascii_lowercase())
+                .collect::<Vec<_>>(),
+            utils::SUPPORTED_EXTENSIONS
+                .into_iter()
+                .map(|e| e.to_ascii_uppercase())
+                .collect::<Vec<_>>(),
+        ]
+        .concat();
         let file_dialog_result = rfd::FileDialog::new()
-            .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
+            .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
             .add_filter("All File Types", &["*"])
             .set_directory(start_directory)
             .pick_file();

@@ -23,6 +23,7 @@ pub struct PersistentSettings {
     pub background_color: [u8; 3],
     /// Should we sync to monitor rate? This makes the app snappier, but also more resource intensive.
     pub vsync: bool,
+    pub force_redraw: bool,
     /// Keyboard map to actions
     pub shortcuts: Shortcuts,
     /// Do not reset view when receiving a new image
@@ -57,6 +58,7 @@ impl Default for PersistentSettings {
             accent_color: [255, 0, 75],
             background_color: [51, 51, 51],
             vsync: true,
+            force_redraw: false,
             shortcuts: Shortcuts::default_keys(),
             keep_view: Default::default(),
             max_cache: 30,
