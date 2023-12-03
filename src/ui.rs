@@ -216,7 +216,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     state.cursor_relative.x / state.image_dimension.0 as f32,
                     (state.cursor_relative.y / state.image_dimension.1 as f32),
                 );
-                
+
                 egui::Grid::new("info").show(ui, |ui| {
                     ui.label_i(&format!("{ARROWS_OUT} Size",));
 
@@ -362,7 +362,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .on_hover_text("Highlight pixels with zero alpha and color information")
                             .clicked()
                         {
-                            state.current_texture = highlight_bleed(img).to_texture(gfx);
+                            state.current_texture = highlight_bleed(img).to_texture(gfx, state.persistent_settings.linear_mag_filter);
                         }
                         if ui
                             .button("Show semi-transparent pixels")
@@ -371,10 +371,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             )
                             .clicked()
                         {
-                            state.current_texture = highlight_semitrans(img).to_texture(gfx);
+                            state.current_texture = highlight_semitrans(img).to_texture(gfx, state.persistent_settings.linear_mag_filter);
                         }
                         if ui.button("Reset image").clicked() {
-                            state.current_texture = img.to_texture(gfx);
+                            state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
                         }
 
                     }
@@ -397,7 +397,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     });
 }
 
-pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
+pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
@@ -531,9 +531,27 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                 if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires restart. Turn off optimisations and redraw everything each frame. This will consume more CPU but give you instant feedback, for example if new images come in or modifications are made.").changed(){
                     app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
                 }
-                
+
                 // ui.label(format!("lazy {}", app.window().lazy_loop()));
                 ui.end_row();
+                if ui.checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate pixels on zoom").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
+
+                if let Some(img) = &state.current_image {
+
+
+                    if state.edit_state.result_image_op.is_empty() {
+                        state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+
+                    } else {
+                        state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+
+                    }
+
+
+                }
+
+
+                }
 
                 }
 
@@ -768,7 +786,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_dimension = img.dimensions();
-                                state.current_texture = img.to_texture(gfx);
+                                state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
                             }
                         }
                         if ui
@@ -1044,7 +1062,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             state.edit_state.result_pixel_op.update_texture(gfx, tex);
                         } else {
                             state.current_texture =
-                                state.edit_state.result_pixel_op.to_texture(gfx);
+                                state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
                         }
                     }
                 }
@@ -1808,12 +1826,18 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if changed_channels {
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
-                    ColorChannel::Rgb => state.current_texture = unpremult(img).to_texture(gfx),
-                    ColorChannel::Rgba => state.current_texture = img.to_texture(gfx),
+                    ColorChannel::Rgb => {
+                        state.current_texture = unpremult(img)
+                            .to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                    }
+                    ColorChannel::Rgba => {
+                        state.current_texture =
+                            img.to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                    }
                     _ => {
                         state.current_texture =
                             solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx)
+                                .to_texture(gfx, state.persistent_settings.linear_mag_filter)
                     }
                 }
             }

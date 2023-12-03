@@ -293,7 +293,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
         ctx.set_fonts(fonts);
 
-
         ctx.set_style(style);
     });
 
@@ -609,7 +608,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             debug!("chk mod {}", t);
             state
                 .player
-                .check_modified(p, state.message_channel.0.clone());   
+                .check_modified(p, state.message_channel.0.clone());
         }
     }
 
@@ -809,25 +808,30 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture(gfx, tex);
             } else {
-                state.current_texture = img.to_texture(gfx);
+                state.current_texture =
+                    img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
             }
         } else {
             debug!("Setting texture");
-            state.current_texture = img.to_texture(gfx);
+            state.current_texture =
+                img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
         }
 
         state.is_loaded = true;
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
-            ColorChannel::Rgb => state.current_texture = unpremult(&img).to_texture(gfx),
+            ColorChannel::Rgb => {
+                state.current_texture =
+                    unpremult(&img).to_texture(gfx, state.persistent_settings.linear_mag_filter)
+            }
             // Do nuttin'
             ColorChannel::Rgba => (),
             // Display the channel
             _ => {
                 state.current_texture =
                     solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx)
+                        .to_texture(gfx, state.persistent_settings.linear_mag_filter)
             }
         }
         state.current_image = Some(img);
@@ -1071,7 +1075,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.key_grab = false;
         }
         // Settings come last, as they block keyboard grab (for hotkey assigment)
-        settings_ui(app, ctx, state);
+        settings_ui(app, ctx, state, gfx);
     });
 
     if state.network_mode {

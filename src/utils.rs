@@ -33,11 +33,45 @@ use crate::image_loader::open_image;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
-    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "jpg", "png", "pnm", "psd", "svg",
-    "tga", "tif", "tiff", "webp", "nef", "cr2", "dng", "mos", "erf", "raf", "arw", "3fr", "ari",
-    "srf", "sr2", "braw", "r3d", "nrw", "raw", "avif", "jxl", "ppm", "qoi",
+    "bmp",
+    "dds",
+    "exr",
+    "ff",
+    "gif",
+    "hdr",
+    "ico",
+    "jpeg",
+    "jpg",
+    "png",
+    "pnm",
+    "psd",
+    "svg",
+    "tga",
+    "tif",
+    "tiff",
+    "webp",
+    "nef",
+    "cr2",
+    "dng",
+    "mos",
+    "erf",
+    "raf",
+    "arw",
+    "3fr",
+    "ari",
+    "srf",
+    "sr2",
+    "braw",
+    "r3d",
+    "nrw",
+    "raw",
+    "avif",
+    "jxl",
+    "ppm",
+    "qoi",
     #[cfg(feature = "heif")]
-    "heif", "heic",
+    "heif",
+    "heic",
 ];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
@@ -144,7 +178,7 @@ pub struct Player {
     pub stop_sender: Sender<()>,
     pub cache: Cache,
     pub max_texture_size: u32,
-    watcher: HashMap<PathBuf, SystemTime>
+    watcher: HashMap<PathBuf, SystemTime>,
 }
 
 impl Player {
@@ -158,25 +192,26 @@ impl Player {
                 cache_size,
             },
             max_texture_size,
-            watcher: Default::default()
+            watcher: Default::default(),
         }
     }
 
     pub fn check_modified(&mut self, path: &Path, message_sender: Sender<Message>) {
         if let Some(watched_mod) = self.watcher.get(path) {
-        // info!("{:?}", self.watcher);
+            // info!("{:?}", self.watcher);
 
             if let Ok(meta) = std::fs::metadata(path) {
                 if let Ok(modified) = meta.modified() {
                     // info!("Read from meta {:?} stored: {:?}", modified, watched_mod);
 
                     if watched_mod != &modified {
-                        debug!("Modified! read from meta {:?} stored: {:?}", modified, watched_mod);
+                        debug!(
+                            "Modified! read from meta {:?} stored: {:?}",
+                            modified, watched_mod
+                        );
 
                         self.cache.data.remove(path);
                         self.load(path, message_sender);
-                
-                        
                     }
                 }
             }
@@ -548,7 +583,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics) -> Option<Texture> {
+    fn to_texture(&self, _: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
         unimplemented!()
     }
 
@@ -570,13 +605,20 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics) -> Option<Texture> {
+    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
         gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
             .with_mipmaps(true)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            .with_filter(
+                TextureFilter::Linear,
+                if linear_mag_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+            )
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
             .ok()

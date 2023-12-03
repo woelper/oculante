@@ -50,6 +50,7 @@ pub struct PersistentSettings {
     pub svg_scale: f32,
     pub zen_mode: bool,
     pub theme: ColorTheme,
+    pub linear_mag_filter: bool,
 }
 
 impl Default for PersistentSettings {
@@ -79,6 +80,7 @@ impl Default for PersistentSettings {
             svg_scale: 1.0,
             zen_mode: false,
             theme: ColorTheme::Dark,
+            linear_mag_filter: false,
         }
     }
 }

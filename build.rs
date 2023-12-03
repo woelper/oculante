@@ -1,10 +1,10 @@
 use std::env;
 use std::fs::read_to_string;
+use std::fs::remove_file;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use std::fs::remove_file;
 
 #[allow(dead_code)]
 fn setup_heif() {
@@ -45,11 +45,10 @@ fn setup_heif() {
             .status()
             .unwrap();
         Command::new("export")
-        .args([format!("PKG_CONFIG_PATH={heif_path}/build")])
-
-        .current_dir(format!("{heif_path}/build"))
-        .status()
-        .unwrap();
+            .args([format!("PKG_CONFIG_PATH={heif_path}/build")])
+            .current_dir(format!("{heif_path}/build"))
+            .status()
+            .unwrap();
         println!("cargo:rustc-link-search=native={}/build", heif_path);
         // env::set_var("PKG_CONFIG_PATH", format!("{heif_path}/build"));
     }
