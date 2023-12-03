@@ -51,6 +51,8 @@ pub struct PersistentSettings {
     pub zen_mode: bool,
     pub theme: ColorTheme,
     pub linear_mag_filter: bool,
+    pub fit_image_on_window_resize: bool,
+    pub zoom_multiplier: f32,
 }
 
 impl Default for PersistentSettings {
@@ -81,6 +83,8 @@ impl Default for PersistentSettings {
             zen_mode: false,
             theme: ColorTheme::Dark,
             linear_mag_filter: false,
+            fit_image_on_window_resize: false,
+            zoom_multiplier: 1.0,
         }
     }
 }

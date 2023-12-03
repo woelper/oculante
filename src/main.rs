@@ -133,6 +133,8 @@ fn main() -> Result<(), String> {
         }
     }
     window_config.always_on_top = true;
+    window_config.min_size = Some((1, 1));
+    window_config.max_size = None;
 
     info!("Starting oculante.");
     notan::init_with(init)
@@ -504,7 +506,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 app.backend.window().position().1 as u32,
             );
             // By resetting the image, we make it fill the window on resize
-            if state.persistent_settings.zen_mode {
+            if state.persistent_settings.fit_image_on_window_resize {
                 state.reset_image = true;
             }
         }
@@ -549,9 +551,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                             state.image_geometry.offset,
                             state.cursor,
                             state.image_geometry.scale,
-                            delta,
+                            delta * state.persistent_settings.zoom_multiplier,
                         );
-                        state.image_geometry.scale += delta;
+                        state.image_geometry.scale +=
+                            delta * state.persistent_settings.zoom_multiplier;
                     }
                 }
             }

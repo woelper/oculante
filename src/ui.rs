@@ -535,28 +535,20 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 // ui.label(format!("lazy {}", app.window().lazy_loop()));
                 ui.end_row();
                 if ui.checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate pixels on zoom").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
-
-                if let Some(img) = &state.current_image {
-
-
-                    if state.edit_state.result_image_op.is_empty() {
-                        state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
-
-                    } else {
-                        state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
-
+                    if let Some(img) = &state.current_image {
+                        if state.edit_state.result_image_op.is_empty() {
+                            state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                        } else {
+                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                        }
                     }
-
-
                 }
 
+                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, fir the image with it?");
+                ui.end_row();
 
-                }
-
-                }
-
-
-            );
+                ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
+            });
 
                 ui.horizontal(|ui| {
                     ui.label("Configure window title");
