@@ -608,7 +608,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if let Some(p) = &state.current_path {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
-            debug!("chk mod {}", t);
+            trace!("chk mod {}", t);
             state
                 .player
                 .check_modified(p, state.message_channel.0.clone());
