@@ -70,7 +70,9 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let handle = ctx.primary_image_handle()?;
             let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
             let planes = img.planes();
-            let interleaved = planes.interleaved.context("Can't create interleaved plane")?;
+            let interleaved = planes
+                .interleaved
+                .context("Can't create interleaved plane")?;
 
             let data = interleaved.data;
             let width = interleaved.width;
