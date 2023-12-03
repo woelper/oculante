@@ -1,3 +1,28 @@
+# 0.8.1 (2023-12-03)
+
+### :beetle: Bug Fixes
+
+* restore accent color on startup (5fa1c778)
+
+### :sparkles: Features
+
+* Zoom multiplier and min size (ecec7bf2)
+* Allow configuring magnification filter (a513a083)
+* File change detection (03a955f9)
+* Support QOI format (bd32ac32)
+* Add HEIF/HEIC decoding (79ee4f95)
+* support rgb16 avif (6194c639)
+* Add Hald CLUT support (51a88fe4)
+
+### :green_apple: Chore
+
+* update avif (f3b35f43)
+* update zune-png (ca615efc)
+* update deps (cb299669)
+* update self_update (319ccd6a)
+* update dependencies (1e4038ec)
+* update to notan 0.11 (c228b398)
+
 # 0.7.7 (2023-10-08)
 
 # 0.7.6 (2023-09-20)
