@@ -584,7 +584,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
+    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<Texture> {
         unimplemented!()
     }
 
