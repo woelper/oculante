@@ -251,35 +251,8 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
         | "braw" | "r3d" | "nrw" | "raw" => {
             debug!("Loading RAW");
-
-            let export_job = Export::new(
-                Input::ByFile(&img_location.to_string_lossy()),
-                Output::new(
-                    DemosaicingMethod::SuperPixel,
-                    data::XYZ2SRGB,
-                    data::GAMMA_SRGB,
-                    OutputType::Raw16,
-                    true,
-                    true,
-                ),
-            )?;
-
-            let (image, width, height) = export_job.export_16bit_image();
-            let image = image
-                .into_par_iter()
-                .map(|x| tonemap_f32(x as f32 / 65536.))
-                .collect::<Vec<_>>();
-
-            // Construct rgb image
-            let x = RgbImage::from_raw(width as u32, height as u32, image)
-                .context("can't decode raw output as image")?;
-            // make it a Dynamic image
-            let buf = DynamicImage::ImageRgb8(x).to_rgba8();
-            // return Ok(OpenResult::still(d.to_rgba8()));
-            _ = sender.send(Frame::new_still(buf));
+            _ = sender.send(Frame::new_still(load_raw(&img_location)?));
             return Ok(receiver);
-
-            // col.add_still(d.to_rgba8());
         }
         "jxl" => {
             //TODO this needs to be a thread
@@ -595,6 +568,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // col.add_still(img);
         }
         "tif" | "tiff" => {
+            // TODO: Probe if dng
             let data = File::open(img_location)?;
 
             let mut decoder = tiff::decoder::Decoder::new(&data)?.with_limits(Limits::unlimited());
@@ -767,4 +741,32 @@ fn decode_webp(buf: &[u8]) -> Option<RgbaImage> {
 
 fn u16_to_u8(p: u16) -> u8 {
     ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
+}
+
+
+fn load_raw(img_location: &Path) -> Result<RgbaImage> {
+    let export_job = Export::new(
+        Input::ByFile(&img_location.to_string_lossy()),
+        Output::new(
+            DemosaicingMethod::SuperPixel,
+            data::XYZ2SRGB,
+            data::GAMMA_SRGB,
+            OutputType::Raw16,
+            true,
+            true,
+        ),
+    )?;
+
+    let (image, width, height) = export_job.export_16bit_image();
+    let image = image
+        .into_par_iter()
+        .map(|x| tonemap_f32(x as f32 / 65536.))
+        .collect::<Vec<_>>();
+
+    // Construct rgb image
+    let x = RgbImage::from_raw(width as u32, height as u32, image)
+        .context("can't decode raw output as image")?;
+    // make it a Dynamic image
+    Ok(DynamicImage::ImageRgb8(x).to_rgba8())
+    
 }
