@@ -1,3 +1,9 @@
+# 0.8.2 (2023-12-04)
+
+### :beetle: Bug Fixes
+
+* Mac universal binary fixes, enable heif on Apple silicon (5f234fd9)
+
 # 0.8.1 (2023-12-03)
 
 ### :beetle: Bug Fixes
