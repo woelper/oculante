@@ -719,6 +719,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         }
         _ => {
             // All other supported image files are handled by using `image`
+            info!("Loading using image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
             _ = sender.send(Frame::new_still(img.to_rgba8()));

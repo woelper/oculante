@@ -71,6 +71,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "qoi",
     #[cfg(feature = "heif")]
     "heif",
+    #[cfg(feature = "heif")]
     "heic",
 ];
 
