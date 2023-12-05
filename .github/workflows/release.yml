@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macOS-latest, ubuntu-latest]
+        os: [ubuntu-20.04, windows-2019, macos-latest-xlarge, ubuntu-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v2
@@ -58,11 +58,11 @@ jobs:
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
 
     - name: Install cargo universal2
       run: cargo install universal2
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
       
     - name: Install cargo deb
       run: cargo install cargo-deb
@@ -110,11 +110,11 @@ jobs:
 
     - name: Build Mac Bundle
       run: ./build_mac.sh
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
 
     - name: Zip Mac Bundle
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
 
     - name: Upload Linux 20.04 Release
       if: matrix.os == 'ubuntu-20.04'
@@ -189,7 +189,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
       id: upload-release-asset-mac
       uses: actions/upload-release-asset@v1
       env:
@@ -201,7 +201,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Binary
-      if: matrix.os == 'macOS-latest'
+      if: matrix.os == 'macos-latest-xlarge'
       id: upload-release-asset-bin
       uses: actions/upload-release-asset@v1
       env:

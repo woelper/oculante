@@ -5,18 +5,13 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [macos-latest]
+        os: [macos-latest-xlarge]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
         
-
-        
-  
-
-
       - name: Check without default features
         run: cargo check --no-default-features
 
