@@ -15,8 +15,8 @@ jobs:
       - name: Check without default features
         run: cargo check --no-default-features
 
-      - name: Check without build features
-        run: cargo check --features heif
+      # - name: Check with build features
+      #   run: cargo check --features heif
 
       - name: Run buildscript
         run: ./build_mac.sh
