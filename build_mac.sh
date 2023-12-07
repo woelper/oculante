@@ -6,8 +6,28 @@ rustup target add x86_64-apple-darwin
 brew install nasm
 # arch -x86_64 brew install nasm
 
-cargo build --release --target x86_64-apple-darwin
-cargo build --release --target aarch64-apple-darwin --features heif
+# rm -rf libheif
+# git clone https://github.com/strukturag/libheif.git
+# cd libheif
+# mkdir build
+# cd build
+# cmake --preset=release ..
+# make install
+# cd ..
+# cd ..
+
+target=`rustup target list | grep installed | cut -d' ' -f1`
+
+if ["$target" = x86_64-apple-darwin]; then
+    cargo build --release --target x86_64-apple-darwin --features heif
+    cargo build --release --target aarch64-apple-darwin
+else
+    cargo build --release --target x86_64-apple-darwin
+    cargo build --release --target aarch64-apple-darwin --features heif
+fi
+
+# cargo build --release --target x86_64-apple-darwin
+# cargo build --release --target aarch64-apple-darwin --features heif
 lipo -create -output target/release/bundle/osx/oculante.app/Contents/MacOS/oculante target/x86_64-apple-darwin/release/oculante target/aarch64-apple-darwin/release/oculante 
 file target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
 
