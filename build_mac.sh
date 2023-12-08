@@ -6,7 +6,7 @@ cargo install cargo-bundle
 cargo bundle --release
 rustup target add aarch64-apple-darwin
 rustup target add x86_64-apple-darwin
-brew install nasm libheif
+brew install nasm
 # arch -x86_64 brew install nasm
 
 
@@ -22,7 +22,7 @@ brew install nasm libheif
 
 target=`rustup target list | grep installed | cut -d' ' -f1`
 
-if ["$target" = x86_64-apple-darwin]; then
+if [[ $target == "x86_64-apple-darwin" ]]; then
     cargo build --release --target x86_64-apple-darwin --features heif
     cargo build --release --target aarch64-apple-darwin
 else
