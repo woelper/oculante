@@ -20,15 +20,11 @@ brew install nasm
 # cd ..
 # cd ..
 
-target=`rustup target list | grep installed | cut -d' ' -f1`
 
-if [[ $target == "x86_64-apple-darwin" ]]; then
-    cargo build --release --target x86_64-apple-darwin --features heif
-    cargo build --release --target aarch64-apple-darwin
-else
-    cargo build --release --target x86_64-apple-darwin
-    cargo build --release --target aarch64-apple-darwin --features heif
-fi
+cargo build --release --target aarch64-apple-darwin
+cargo build --release --target x86_64-apple-darwin
+cargo build --release --target x86_64-apple-darwin --features heif
+cargo build --release --target aarch64-apple-darwin --features heif
 
 # cargo build --release --target x86_64-apple-darwin
 # cargo build --release --target aarch64-apple-darwin --features heif
