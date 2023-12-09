@@ -1175,11 +1175,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 .save_file();
 
                                 if let Some(file_path) = file_dialog_result {
-
-
                                     debug!("Selected File Path = {:?}", file_path);
-
-
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
@@ -1187,6 +1183,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                 debug!("Saved to {}", file_path.display());
                                                 // Re-apply exif
                                                 if let Some(info) = &image_info {
+                                                    debug!("Extended image info present");
+
                                                     // before doing anything, make sure we have raw exif data
                                                     if info.raw_exif.is_some() {
                                                         if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
@@ -1194,6 +1192,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                         } else {
                                                             info!("Saved EXIF.")
                                                         }
+                                                    } else {
+                                                        debug!("No raw exif");
                                                     }
                                                 }
                                             }
@@ -1202,15 +1202,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                             }
                                         }
                                         // state.toast_cooldown = 0.0;
-                                    }
+                                }
 
                         });
 
-                                    ui.ctx().request_repaint();
-
-
-
-
+                        ui.ctx().request_repaint();
 
                     }
                 }
@@ -1232,9 +1228,10 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         .save(p) {
                             Ok(_) => {
                                 debug!("Saved to {}", p.display());
-                                state.send_message_info("Saved");
-                                //Re-apply exif
+                                state.send_message_info(&format!("Saved to {}", p.display()));
+                                // Re-apply exif
                                 if let Some(info) = &state.image_info {
+                                    debug!("Extended image info present");
                                     // before doing anything, make sure we have raw exif data
                                     if info.raw_exif.is_some() {
                                         if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
@@ -1242,6 +1239,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                         } else {
                                             info!("Saved EXIF.")
                                         }
+                                    } else {
+                                        debug!("No raw exif");
                                     }
                                 }
                             }
@@ -1948,7 +1947,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if !state.is_loaded {
-          
             if let Some(p) = &state.current_path {
                 ui.horizontal(|ui| {
                     ui.add(egui::Spinner::default());
@@ -1956,8 +1954,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 });
             }
             app.window().request_frame();
-            
-            
         }
 
         ui.add_space(ui.available_width() - 32.);

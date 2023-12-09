@@ -110,6 +110,12 @@ impl ExtendedImageInfo {
         let mut c = Cursor::new(input);
         let exifreader = exif::Reader::new();
         let exif = exifreader.read_from_container(&mut c)?;
+        // in case exif could not be set, for example for DNG or other "exotic" formats,
+        // just bang in raw exif and let the writer deal with it later.
+        // The good stuff is that this will be automagically preserved across formats.
+        if self.raw_exif.is_none() {
+            self.raw_exif = Some(exif.buf().to_vec().into());
+        }
         for f in exif.fields() {
             self.exif.insert(
                 f.tag.to_string(),

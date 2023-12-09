@@ -685,7 +685,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.current_texture = None;
             }
             Message::Info(m) => {
-                state.toasts.info(m).set_duration(Some(Duration::from_secs(1)));
+                state
+                    .toasts
+                    .info(m)
+                    .set_duration(Some(Duration::from_secs(1)));
             }
             Message::Warning(m) => {
                 state.toasts.warning(m);
@@ -991,7 +994,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     scrubber_ui(state, ui);
                 });
         }
-
 
         if state.persistent_settings.info_enabled
             && !state.settings_enabled

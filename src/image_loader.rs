@@ -743,7 +743,6 @@ fn u16_to_u8(p: u16) -> u8 {
     ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
 }
 
-
 fn load_raw(img_location: &Path) -> Result<RgbaImage> {
     let export_job = Export::new(
         Input::ByFile(&img_location.to_string_lossy()),
@@ -768,5 +767,4 @@ fn load_raw(img_location: &Path) -> Result<RgbaImage> {
         .context("can't decode raw output as image")?;
     // make it a Dynamic image
     Ok(DynamicImage::ImageRgb8(x).to_rgba8())
-    
 }
