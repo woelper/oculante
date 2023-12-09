@@ -1007,21 +1007,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        if !state.is_loaded {
-            egui::TopBottomPanel::bottom("loader").show_animated(
-                ctx,
-                state.current_path.is_some(),
-                |ui| {
-                    if let Some(p) = &state.current_path {
-                        ui.horizontal(|ui| {
-                            ui.add(egui::Spinner::default());
-                            ui.label(format!("Loading {}", p.display()));
-                        });
-                    }
-                    app.window().request_frame();
-                },
-            );
-        }
+        // if !state.is_loaded {
+        //     egui::TopBottomPanel::bottom("loader").show_animated(
+        //         ctx,
+        //         state.current_path.is_some(),
+        //         |ui| {
+        //             if let Some(p) = &state.current_path {
+        //                 ui.horizontal(|ui| {
+        //                     ui.add(egui::Spinner::default());
+        //                     ui.label(format!("Loading {}", p.display()));
+        //                 });
+        //             }
+        //             app.window().request_frame();
+        //         },
+        //     );
+        // }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
         // info!("using pointer {}", ctx.is_using_pointer());

@@ -146,7 +146,7 @@ impl Default for OculanteState {
             checker_texture: Default::default(),
             redraw: Default::default(),
             first_start: true,
-            toasts: Toasts::default(),
+            toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
         }
     }
 }

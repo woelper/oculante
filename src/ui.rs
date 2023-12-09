@@ -1947,6 +1947,19 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
+        if !state.is_loaded {
+          
+            if let Some(p) = &state.current_path {
+                ui.horizontal(|ui| {
+                    ui.add(egui::Spinner::default());
+                    ui.label(format!("Loading {}", p.display()));
+                });
+            }
+            app.window().request_frame();
+            
+            
+        }
+
         ui.add_space(ui.available_width() - 32.);
 
         ui.scope(|ui| {
