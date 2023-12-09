@@ -1324,6 +1324,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-notify"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc3b10f21c7bb2afaecb8d98677cdb233a8b1f336b9b95abd610a33aeced04fc"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-phosphor"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3829,6 +3838,7 @@ dependencies = [
  "dark-light",
  "dds-rs",
  "dirs 5.0.1",
+ "egui-notify",
  "egui-phosphor",
  "egui_plot",
  "env_logger",

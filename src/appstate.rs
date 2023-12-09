@@ -4,6 +4,7 @@ use crate::{
     settings::PersistentSettings,
     utils::{ExtendedImageInfo, Frame, Player},
 };
+use egui_notify::Toasts;
 use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
@@ -42,13 +43,12 @@ impl Message {
 }
 
 /// The state of the application
-#[derive(Debug, AppState)]
+#[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: HashMap<PathBuf, ImageGeometry>,
     pub drag_enabled: bool,
     pub reset_image: bool,
-    pub message: Option<Message>,
     /// Is the image fully loaded?
     pub is_loaded: bool,
     pub window_size: Vector2<f32>,
@@ -80,7 +80,6 @@ pub struct OculanteState {
     pub always_on_top: bool,
     pub network_mode: bool,
     /// how long the toast message appears
-    pub toast_cooldown: f32,
     /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
@@ -88,15 +87,20 @@ pub struct OculanteState {
     pub checker_texture: Option<Texture>,
     pub redraw: bool,
     pub first_start: bool,
+    pub toasts: Toasts,
 }
 
 impl OculanteState {
-    pub fn send_message(&self, msg: &str) {
+    pub fn send_message_info(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::info(msg));
     }
 
     pub fn send_message_err(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::err(msg));
+    }
+
+    pub fn send_message_warn(&self, msg: &str) {
+        _ = self.message_channel.0.send(Message::warn(msg));
     }
 }
 
@@ -111,7 +115,6 @@ impl Default for OculanteState {
             compare_list: Default::default(),
             drag_enabled: Default::default(),
             reset_image: Default::default(),
-            message: Default::default(),
             is_loaded: Default::default(),
             cursor: Default::default(),
             cursor_relative: Default::default(),
@@ -138,12 +141,12 @@ impl Default for OculanteState {
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),
-            toast_cooldown: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
             checker_texture: Default::default(),
             redraw: Default::default(),
             first_start: true,
+            toasts: Toasts::default(),
         }
     }
 }

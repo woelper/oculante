@@ -219,11 +219,11 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
                 start_img_location = Some(location.clone());
             } else {
                 // Unsupported extension
-                state.send_message(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
+                state.send_message_err(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
-            state.send_message(&format!("ERROR: Can't open file: {}", location.display()));
+            state.send_message_err(&format!("ERROR: Can't open file: {}", location.display()));
         }
 
         // Assign image path if we have a valid one here
@@ -239,7 +239,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                state.message = Some(Message::info(&format!("Listening on {p}")));
+                state.send_message_info(&format!("Listening on {p}"));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
@@ -456,7 +456,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, DeleteFile) {
                 if let Some(p) = &state.current_path {
                     _ = trash::delete(p);
-                    state.send_message("Deleted image");
+                    state.send_message_info("Deleted image");
                 }
             }
             if key_pressed(app, state, ZoomIn) {
@@ -569,7 +569,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         state.player.load(&p, state.message_channel.0.clone());
                         state.current_path = Some(p);
                     } else {
-                        state.message = Some(Message::warn("Unsupported file!"));
+                        state.send_message_warn("Unsupported file!");
                     }
                 }
             }
@@ -674,25 +674,28 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().request_frame();
     }
 
-    // Only receive messages if current one is cleared
-    // debug!("cooldown {}", state.toast_cooldown);
-
-    if state.message.is_none() {
-        state.toast_cooldown = 0.;
-
-        // check if a new message has been sent
-        if let Ok(msg) = state.message_channel.1.try_recv() {
-            debug!("Received message: {:?}", msg);
-            match msg {
-                Message::LoadError(_) => {
-                    state.current_image = None;
-                    state.is_loaded = true;
-                    state.current_texture = None;
-                }
-                _ => (),
+    // check if a new message has been sent
+    if let Ok(msg) = state.message_channel.1.try_recv() {
+        debug!("Received message: {:?}", msg);
+        match msg {
+            Message::LoadError(e) => {
+                state.toasts.error(e);
+                state.current_image = None;
+                state.is_loaded = true;
+                state.current_texture = None;
             }
-
-            state.message = Some(msg);
+            Message::Info(m) => {
+                state.toasts.info(m).set_duration(Some(Duration::from_secs(1)));
+            }
+            Message::Warning(m) => {
+                state.toasts.warning(m);
+            }
+            Message::Error(m) => {
+                state.toasts.error(m);
+            }
+            Message::Saved(_) => {
+                state.toasts.info("Saved");
+            }
         }
     }
     state.first_start = false;
@@ -767,7 +770,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     if p.with_extension("oculante").is_file() {
                         if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
                             if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                state.send_message("Edits have been loaded for this image.");
+                                state.send_message_info("Edits have been loaded for this image.");
                                 state.edit_state = edit_state;
                                 state.persistent_settings.edit_enabled = true;
                                 state.reset_image = true;
@@ -780,7 +783,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                    state.send_message(
+                                    state.send_message_info(
                                         "Directory edits have been loaded for this image.",
                                     );
                                     state.edit_state = edit_state;
@@ -968,7 +971,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
-        ctx.request_repaint_after(Duration::from_secs(1));
+        // ctx.request_repaint_after(Duration::from_secs(1));
+        state.toasts.show(ctx);
 
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")
@@ -988,48 +992,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-        if let Some(message) = &state.message.clone() {
-            // debug!("Message is set, showing");
-            egui::TopBottomPanel::bottom("message").show_animated(
-                ctx,
-                state.message.is_some(),
-                |ui| {
-                    ui.horizontal(|ui| {
-                        match message {
-                            Message::Info(txt) => {
-                                ui.label(format!("💬 {txt}"));
-                            }
-                            Message::Warning(txt) => {
-                                ui.colored_label(Color32::GOLD, format!("⚠ {txt}"));
-                            }
-                            Message::Error(txt) | Message::LoadError(txt) => {
-                                ui.colored_label(Color32::RED, format!("🕱 {txt}"));
-                            }
-                            Message::Saved(path) => {
-                                ui.colored_label(Color32::RED, format!("Saved!"));
-                                state.current_path = Some(path.clone());
-                                set_title(app, state);
-                            }
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                            if ui.small_button("🗙").clicked() {
-                                state.message = None
-                            }
-                        });
-                    });
-
-                    ui.ctx().request_repaint();
-                },
-            );
-            let max_anim_len = 2.5;
-
-            state.toast_cooldown += app.timer.delta_f32();
-
-            if state.toast_cooldown > max_anim_len {
-                debug!("Setting message to none, timer reached.");
-                state.message = None;
-            }
-        }
 
         if state.persistent_settings.info_enabled
             && !state.settings_enabled

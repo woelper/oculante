@@ -409,7 +409,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
                 #[cfg(debug_assertions)]
                 if ui.button("send test msg").clicked() {
-                    state.send_message("Test");
+                    state.send_message_info("Test");
                 }
 
                 egui::ComboBox::from_label("Color theme")
@@ -572,7 +572,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
                     #[cfg(feature = "update")]
                     if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
-                        state.send_message("Checking for updates...");
+                        state.send_message_info("Checking for updates...");
                         crate::update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
                     }
@@ -1232,8 +1232,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         .save(p) {
                             Ok(_) => {
                                 debug!("Saved to {}", p.display());
-
-                                state.send_message("Saved");
+                                state.send_message_info("Saved");
                                 //Re-apply exif
                                 if let Some(info) = &state.image_info {
                                     // before doing anything, make sure we have raw exif data
@@ -1247,7 +1246,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 }
                             }
                             Err(e) => {
-                                state.send_message(&format!("Could not save: {e}"));
+                                state.send_message_err(&format!("Could not save: {e}"));
                             }
                         }
                     }
@@ -1939,7 +1938,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
             {
                 _ = trash::delete(p);
-                state.send_message("Deleted image");
+                state.send_message_info(&format!(
+                    "Deleted {}",
+                    p.file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                ));
             }
         }
 
@@ -2007,7 +2011,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                     .image_sender
                                     .send(crate::utils::Frame::new_still(image));
                                 // Since pasted data has no path, make sure it's not set
-                                state.send_message("Image pasted");
+                                state.send_message_info("Image pasted");
                             }
                         } else {
                             state.send_message_err("Clipboard did not contain image")

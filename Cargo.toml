@@ -67,6 +67,7 @@ trash = "3.1"
 lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
 libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 egui-phosphor = "=0.3.0"
+egui-notify = "0.10.0"
 
 [features]
 heif = ["libheif-rs"]
