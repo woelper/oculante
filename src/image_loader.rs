@@ -567,130 +567,22 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
             // col.add_still(img);
         }
-        "tif" | "tiff" => {
-            // TODO: Probe if dng
-            let data = File::open(img_location)?;
-
-            let mut decoder = tiff::decoder::Decoder::new(&data)?.with_limits(Limits::unlimited());
-            let dim = decoder.dimensions()?;
-            debug!("Color type: {:?}", decoder.colortype());
-            let result = decoder.read_image()?;
-            // A container for the low dynamic range image
-            let ldr_img: Vec<u8>;
-
-            match result {
-                tiff::decoder::DecodingResult::U8(contents) => {
-                    debug!("TIFF U8");
-                    ldr_img = contents;
-                }
-                tiff::decoder::DecodingResult::U16(contents) => {
-                    debug!("TIFF U16");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, u16::MIN as f32, u16::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::U32(contents) => {
-                    debug!("TIFF U32");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, u32::MIN as f32, u32::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::U64(contents) => {
-                    debug!("TIFF U64");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, u64::MIN as f32, u64::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::F32(contents) => {
-                    debug!("TIFF F32");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p, 0.0, 1.0, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::F64(contents) => {
-                    debug!("TIFF F64");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, 0.0, 1.0, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::I8(contents) => {
-                    debug!("TIFF I8");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, i8::MIN as f32, i8::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::I16(contents) => {
-                    debug!("TIFF I16");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, i16::MIN as f32, i16::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::I32(contents) => {
-                    debug!("TIFF I32");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, i32::MIN as f32, i32::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
-                tiff::decoder::DecodingResult::I64(contents) => {
-                    debug!("TIFF I64");
-                    ldr_img = contents
-                        .par_iter()
-                        .map(|p| fit(*p as f32, i64::MIN as f32, i64::MAX as f32, 0., 255.) as u8)
-                        .collect();
-                }
+        "tif" | "tiff" => match load_tiff(&img_location) {
+            Ok(tiff) => {
+                _ = sender.send(Frame::new_still(tiff));
+                return Ok(receiver);
             }
-
-            match decoder.colortype()? {
-                tiff::ColorType::Gray(_) => {
-                    debug!("Loading gray color");
-                    let i = image::GrayImage::from_raw(dim.0, dim.1, ldr_img)
-                        .context("Can't load gray img")?;
-                    // col.add_still(DynamicImage::ImageLuma8(i).into_rgba8());
-                    _ = sender.send(Frame::new_still(DynamicImage::ImageLuma8(i).into_rgba8()));
+            Err(tiff_error) => match load_raw(&img_location) {
+                Ok(raw) => {
+                    info!("This image is a raw image with tiff format.");
+                    _ = sender.send(Frame::new_still(raw));
                     return Ok(receiver);
                 }
-                tiff::ColorType::RGB(_) => {
-                    debug!("Loading rgb color");
-                    let i = image::RgbImage::from_raw(dim.0, dim.1, ldr_img)
-                        .context("Can't load RGB img")?;
-                    // col.add_still(DynamicImage::ImageRgb8(i).into_rgba8());
-                    _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).into_rgba8()));
-                    return Ok(receiver);
+                Err(raw_error) => {
+                    bail!("Could not load tiff: {tiff_error}, tried as raw and still got error: {raw_error}")
                 }
-                tiff::ColorType::RGBA(_) => {
-                    debug!("Loading rgba color");
-                    let i = image::RgbaImage::from_raw(dim.0, dim.1, ldr_img)
-                        .context("Can't load RGBA img")?;
-                    // col.add_still(i);
-                    _ = sender.send(Frame::new_still(i));
-                    return Ok(receiver);
-                }
-                tiff::ColorType::GrayA(_) => {
-                    debug!("Loading gray color with alpha");
-                    let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
-                        .context("Can't load gray alpha img")?;
-                    // col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
-                    _ = sender.send(Frame::new_still(
-                        image::DynamicImage::ImageLumaA8(i).into_rgba8(),
-                    ));
-                    return Ok(receiver);
-                }
-                _ => {
-                    bail!(
-                        "Error: This TIFF image type is unsupported, please open a ticket! {:?}",
-                        decoder.colortype()
-                    )
-                }
-            }
-        }
+            },
+        },
         _ => {
             // All other supported image files are handled by using `image`
             info!("Loading using image library");
@@ -767,4 +659,123 @@ fn load_raw(img_location: &Path) -> Result<RgbaImage> {
         .context("can't decode raw output as image")?;
     // make it a Dynamic image
     Ok(DynamicImage::ImageRgb8(x).to_rgba8())
+}
+
+fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
+    // TODO: Probe if dng
+    let data = File::open(img_location)?;
+
+    let mut decoder = tiff::decoder::Decoder::new(&data)?.with_limits(Limits::unlimited());
+    let dim = decoder.dimensions()?;
+    debug!("Color type: {:?}", decoder.colortype());
+    let result = decoder.read_image()?;
+    // A container for the low dynamic range image
+    let ldr_img: Vec<u8>;
+
+    match result {
+        tiff::decoder::DecodingResult::U8(contents) => {
+            debug!("TIFF U8");
+            ldr_img = contents;
+        }
+        tiff::decoder::DecodingResult::U16(contents) => {
+            debug!("TIFF U16");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, u16::MIN as f32, u16::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::U32(contents) => {
+            debug!("TIFF U32");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, u32::MIN as f32, u32::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::U64(contents) => {
+            debug!("TIFF U64");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, u64::MIN as f32, u64::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::F32(contents) => {
+            debug!("TIFF F32");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p, 0.0, 1.0, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::F64(contents) => {
+            debug!("TIFF F64");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, 0.0, 1.0, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::I8(contents) => {
+            debug!("TIFF I8");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, i8::MIN as f32, i8::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::I16(contents) => {
+            debug!("TIFF I16");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, i16::MIN as f32, i16::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::I32(contents) => {
+            debug!("TIFF I32");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, i32::MIN as f32, i32::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+        tiff::decoder::DecodingResult::I64(contents) => {
+            debug!("TIFF I64");
+            ldr_img = contents
+                .par_iter()
+                .map(|p| fit(*p as f32, i64::MIN as f32, i64::MAX as f32, 0., 255.) as u8)
+                .collect();
+        }
+    }
+
+    match decoder.colortype()? {
+        tiff::ColorType::Gray(_) => {
+            debug!("Loading gray color");
+            let i =
+                image::GrayImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load gray img")?;
+            // col.add_still(DynamicImage::ImageLuma8(i).into_rgba8());
+            return Ok(DynamicImage::ImageLuma8(i).into_rgba8());
+        }
+        tiff::ColorType::RGB(_) => {
+            debug!("Loading rgb color");
+            let i =
+                image::RgbImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGB img")?;
+            // col.add_still(DynamicImage::ImageRgb8(i).into_rgba8());
+            return Ok(DynamicImage::ImageRgb8(i).into_rgba8());
+        }
+        tiff::ColorType::RGBA(_) => {
+            debug!("Loading rgba color");
+            let i =
+                image::RgbaImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGBA img")?;
+            // col.add_still(i);
+            return Ok(i);
+        }
+        tiff::ColorType::GrayA(_) => {
+            debug!("Loading gray color with alpha");
+            let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
+                .context("Can't load gray alpha img")?;
+            // col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+            return Ok(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+        }
+        _ => {
+            bail!(
+                "Error: This TIFF image type is unsupported, please open a ticket! {:?}",
+                decoder.colortype()
+            )
+        }
+    }
 }
