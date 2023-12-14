@@ -17,6 +17,10 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
+    - name: Install kokai
+      run: cargo install kokai
+    - name: Make changelog
+      run: kokai release --ref ${{ github.ref }} > changes
     - name: Create release
       id: create_release
       uses: actions/create-release@v1
@@ -26,6 +30,7 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: true
+        body_path: changes
 
   build_job:
     name: Build release
