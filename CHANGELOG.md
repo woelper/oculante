@@ -1,3 +1,14 @@
+# 0.8.5 (2023-12-14)
+
+### :beetle: Bug Fixes
+
+* Preserve EXIF across formats when saving (ae855690)
+
+### :sparkles: Features
+
+* Support DNG files with tiff extension (b4db9a6d)
+* New toast system to improve UI messages and notifications (9f8c6882)
+
 # 0.8.4 (2023-12-08)
 
 # 0.8.3 (2023-12-08)
