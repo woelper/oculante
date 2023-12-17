@@ -17,6 +17,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
+    - uses: actions/checkout@v2
     - name: Install kokai
       run: cargo install kokai
     - name: Make changelog
