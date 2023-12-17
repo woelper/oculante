@@ -1,3 +1,9 @@
+# 0.8.6 (2023-12-17)
+
+### :beetle: Bug Fixes
+
+* Disable lazy_loop so UI refreshes on windows (workaround) (9324fe2b)
+
 # 0.8.5 (2023-12-14)
 
 ### :beetle: Bug Fixes
