@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU32;
-use std::ops::Index;
 use std::path::{Path, PathBuf};
 
 use crate::paint::PaintStroke;
@@ -21,7 +20,6 @@ use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 
 use egui_phosphor::variants::regular::*;
-use tiff::encoder::TiffValue;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
