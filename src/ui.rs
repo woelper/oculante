@@ -699,6 +699,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Desaturate(0),
                         ImageOperation::LUT("Lomography Redscale 100".into()),
                         ImageOperation::Equalize((0, 255)),
+                        ImageOperation::ScaleImageMinMax,
                         ImageOperation::Posterize(8),
                         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
                         ImageOperation::Rotate(90),
@@ -708,7 +709,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
                         ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
-                        ImageOperation::MMult,
+                        ImageOperation::MMult,                        
                         ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
