@@ -159,7 +159,7 @@ impl fmt::Display for ImageOperation {
             Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
             Self::Expression(_) => write!(f, "{FUNCTION} Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
-            Self::ScaleImageMinMax=> write!(f, "↹ Scale image min max"),
+            Self::ScaleImageMinMax=> write!(f, "\u{2195} Scale image min max"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
             Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
             // _ => write!(f, "Not implemented Display"),
