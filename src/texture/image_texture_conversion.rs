@@ -1,8 +1,12 @@
 use std::convert::TryInto;
 
-use crate::texture::{Image, TextureFormatPixelInfo};
-use anyhow::{Context, bail};
-use image::{DynamicImage, ImageBuffer, Rgba, RgbaImage};
+use crate::{
+    image_loader::tonemap_f32,
+    texture::{Image, TextureFormatPixelInfo},
+};
+use anyhow::{bail, Context};
+use image::{DynamicImage, ImageBuffer, Rgba, Rgba32FImage, RgbaImage};
+use log::info;
 use thiserror::Error;
 use wgpu::{Extent3d, TextureDimension, TextureFormat};
 
@@ -43,29 +47,29 @@ impl Image {
                 .map(DynamicImage::ImageRgba8)
             }
             TextureFormat::Rgba16Float => {
-                use byteorder::{ByteOrder, LittleEndian};
+                info!(
+                    "len {}",
+                    self.data.len() as f32 / 4. / self.width() as f32 / self.height() as f32
+                );
 
-                let d= self.data.chunks_exact(2).map(|c| LittleEndian::read_u16(c))  
-                
-                .map(|x| x as f32 / u16::MAX as f32)
-                .map(|p| p.powf(2.2))
-                // .map(|p| tonemap_f32(p))
-                .map(|x| x as u8)
-                 .collect::<Vec<_>>();
-
-                 RgbaImage::from_raw(self.width() as u32, self.height() as u32, d).map(|i| DynamicImage::ImageRgba8(i))
-                     
-        
-
-            //   LittleEndian::read_u16
-                // let v = LittleEndian::read_u16(&self.data);
-                // let i:ImageBuffer<Rgba<u16>, Vec<u16>> = Default::default();
-                // i.push
-
-                // ImageBuffer::from_raw(self.width(), self.height(), &v)
-                // .map(DynamicImage::ImageRgba8)
-
-            // None
+                use exr::prelude::f16;
+                let d = self
+                    .data
+                    .chunks_exact(16)
+                    .map(|c| {
+                        [
+                            f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32(),
+                            f16::from_le_bytes(c[2..=3].try_into().unwrap()).to_f32(),
+                            f16::from_le_bytes(c[4..=5].try_into().unwrap()).to_f32(),
+                            f16::from_le_bytes(c[6..=7].try_into().unwrap()).to_f32(),
+                        ]
+                    })
+                    .flatten()
+                    // .map(|p| p.powf(2.2))
+                    // .map(|p| (p.powf(1.0 / 2.2).max(0.0).min(1.0)))
+                    .collect::<Vec<_>>();
+                Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
+                    .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
             }
             // Throw and error if conversion isn't supported
             texture_format => return Err(IntoDynamicImageError::UnsupportedFormat(texture_format)),

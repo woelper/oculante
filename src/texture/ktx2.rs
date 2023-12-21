@@ -1,15 +1,12 @@
 use std::io::Read;
-#[cfg(any(feature = "flate2", feature = "ruzstd"))]
-use std::io::Read;
+
 
 // use crate::color::SrgbColorSpace;
 #[cfg(feature = "basis-universal")]
 use basis_universal::{
     DecodeFlags, LowLevelUastcTranscoder, SliceParametersUastc, TranscoderBlockFormat,
 };
-// use bevy_utils::default;
-#[cfg(any(feature = "flate2", feature = "ruzstd"))]
-use ktx2::SupercompressionScheme;
+
 use ktx2::{
     BasicDataFormatDescriptor, ChannelTypeQualifiers, ColorModel, DataFormatDescriptorHeader,
     Header, SampleInformation, SupercompressionScheme,
