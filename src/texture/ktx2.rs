@@ -2,7 +2,7 @@ use std::io::Read;
 
 
 // use crate::color::SrgbColorSpace;
-#[cfg(feature = "basis-universal")]
+// #[cfg(feature = "basis-universal")]
 use basis_universal::{
     DecodeFlags, LowLevelUastcTranscoder, SliceParametersUastc, TranscoderBlockFormat,
 };
@@ -12,7 +12,7 @@ use ktx2::{
     Header, SampleInformation, SupercompressionScheme,
 };
 use wgpu::{
-    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor,
+    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat,
     TextureViewDimension,
 };
 
@@ -148,7 +148,7 @@ pub fn ktx2_buffer_to_image(
                         TextureFormat::Rgba8Unorm
                     }
                 }
-                #[cfg(feature = "basis-universal")]
+                // #[cfg(feature = "basis-universal")]
                 TranscodeFormat::Uastc(data_format) => {
                     let (transcode_block_format, texture_format) =
                         get_transcoded_formats(supported_compressed_formats, data_format, is_srgb);
@@ -217,8 +217,6 @@ pub fn ktx2_buffer_to_image(
                     transcoded = levels.to_vec();
                     texture_format
                 }
-                #[cfg(not(feature = "basis-universal"))]
-                _ => return Err(error),
             };
             levels = transcoded;
             Ok(texture_format)
@@ -308,7 +306,7 @@ pub fn ktx2_buffer_to_image(
     Ok(image)
 }
 
-#[cfg(feature = "basis-universal")]
+// #[cfg(feature = "basis-universal")]
 pub fn get_transcoded_formats(
     supported_compressed_formats: CompressedImageFormats,
     data_format: DataFormat,

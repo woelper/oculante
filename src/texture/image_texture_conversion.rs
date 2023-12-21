@@ -1,14 +1,11 @@
 use std::convert::TryInto;
 
-use crate::{
-    image_loader::tonemap_f32,
-    texture::{Image, TextureFormatPixelInfo},
-};
-use anyhow::{bail, Context};
-use image::{DynamicImage, ImageBuffer, Rgba, Rgba32FImage, RgbaImage};
+use crate::texture::Image;
+
+use image::{DynamicImage, ImageBuffer, Rgba32FImage};
 use log::info;
 use thiserror::Error;
-use wgpu::{Extent3d, TextureDimension, TextureFormat};
+use wgpu::TextureFormat;
 
 impl Image {
     /// Converts a [`DynamicImage`] to an [`Image`].

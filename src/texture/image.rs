@@ -4,16 +4,13 @@ use super::basis::*;
 use super::dds::*;
 #[cfg(feature = "ktx2")]
 use super::ktx2::*;
-use super::ktx2_buffer_to_image;
+use super::{basis::basis_buffer_to_image, ktx2_buffer_to_image};
 
-use crate::{
-
-};
 // use bevy_math::{AspectRatio, UVec2, Vec2};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use thiserror::Error;
-use wgpu::{Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor};
+use wgpu::{Extent3d, TextureDimension, TextureFormat};
 
 pub const TEXTURE_ASSET_INDEX: u64 = 0;
 pub const SAMPLER_ASSET_INDEX: u64 = 1;
@@ -95,7 +92,6 @@ impl ImageFormat {
     }
 }
 
-
 pub struct Image {
     pub data: Vec<u8>,
     // TODO: this nesting makes accessing Image metadata verbose. Either flatten out descriptor or add accessors
@@ -127,7 +123,6 @@ impl ImageSampler {
         ImageSampler::Descriptor(ImageSamplerDescriptor::nearest())
     }
 }
-
 
 /// How edges should be handled in texture addressing.
 ///
@@ -620,7 +615,7 @@ impl Image {
         image_type: ImageType,
         #[allow(unused_variables)] supported_compressed_formats: CompressedImageFormats,
         is_srgb: bool,
-        image_sampler: ImageSampler,
+        _image_sampler: ImageSampler,
     ) -> Result<Image, TextureError> {
         let format = image_type.to_image_format()?;
 
@@ -630,8 +625,7 @@ impl Image {
         // needs to be added, so the image data needs to be converted in those
         // cases.
 
-        let mut image = match format {
-            #[cfg(feature = "basis-universal")]
+        let image = match format {
             ImageFormat::Basis => {
                 basis_buffer_to_image(buffer, supported_compressed_formats, is_srgb)?
             }
@@ -644,7 +638,7 @@ impl Image {
                 todo!()
             }
         };
-        
+
         Ok(image)
     }
 
@@ -760,8 +754,6 @@ impl TextureFormatPixelInfo for TextureFormat {
         }
     }
 }
-
-
 
 bitflags::bitflags! {
     #[derive(Default, Clone, Copy, Eq, PartialEq, Debug)]

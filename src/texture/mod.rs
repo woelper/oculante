@@ -1,4 +1,3 @@
-#[cfg(feature = "basis-universal")]
 mod basis;
 #[cfg(feature = "basis-universal")]
 mod compressed_image_saver;
