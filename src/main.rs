@@ -31,6 +31,9 @@ use utils::*;
 mod appstate;
 mod image_loader;
 use appstate::*;
+
+
+pub mod texture;
 // mod events;
 #[cfg(target_os = "macos")]
 mod mac;
