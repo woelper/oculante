@@ -1,5 +1,6 @@
+use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::FONT;
+use crate::{FONT, ktx2_loader};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use log::{debug, error, info};
 use psd::Psd;
@@ -8,13 +9,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
+use image::{DynamicImage, GrayAlphaImage, GrayImage, RgbImage, RgbaImage, EncodableLayout};
 use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -48,6 +49,20 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 _ = sender.send(Frame::new_still(buf));
                 return Ok(receiver);
             }
+        }
+        "ktx2" => {
+            // let file = File::open(img_location)?;
+            let data = std::fs::read(img_location)?;
+
+            // let c = Cursor::new(file);
+            // let b = BufReader::new(file);
+            // file.re
+            // let mut reader = ktx2::Reader::new(reader.).expect("Can't create reader"); // Crate instance of reader.
+
+            let ktx = ktx2_loader::ktx2_buffer_to_image(data.as_bytes(), CompressedImageFormats::all(), true)?;
+            let d = ktx.try_into_dynamic()?;
+            _ = sender.send(Frame::new_still(d.into_rgba8()));
+            return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
         "avif" => {
@@ -605,7 +620,7 @@ fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
     ]
 }
 
-fn tonemap_f32(px: f32) -> u8 {
+pub fn tonemap_f32(px: f32) -> u8 {
     (px.powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8
     // (px.filmic() * 255.) as u8
 }
