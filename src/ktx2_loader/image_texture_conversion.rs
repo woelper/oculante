@@ -1,7 +1,8 @@
 use std::convert::TryInto;
 
-use crate::texture::Image;
+use crate::ktx2_loader::Image;
 
+use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
 use log::info;
 use thiserror::Error;
@@ -20,6 +21,17 @@ impl Image {
     ///
     /// To convert [`Image`] to a different format see: [`Image::convert`].
     pub fn try_into_dynamic(self) -> Result<DynamicImage, IntoDynamicImageError> {
+        info!(
+            "Attemting to interpret format {:?}",
+            self.texture_descriptor.format
+        );
+        info!("Mip levels: {:?}", self.texture_descriptor.mip_level_count);
+        info!(
+            "Array Layers {:?}",
+            self.texture_descriptor.array_layer_count()
+        );
+        info!("Size {:?}", self.texture_descriptor.size);
+        info!("W x H {}x{}", self.width(), self.height());
         match self.texture_descriptor.format {
             TextureFormat::R8Unorm => ImageBuffer::from_raw(self.width(), self.height(), self.data)
                 .map(DynamicImage::ImageLuma8),
@@ -44,26 +56,23 @@ impl Image {
                 .map(DynamicImage::ImageRgba8)
             }
             TextureFormat::Rgba16Float => {
-                info!(
-                    "len {}",
-                    self.data.len() as f32 / 4. / self.width() as f32 / self.height() as f32
-                );
-
-                use exr::prelude::f16;
                 let d = self
                     .data
-                    .chunks_exact(16)
-                    .map(|c| {
-                        [
-                            f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32(),
-                            f16::from_le_bytes(c[2..=3].try_into().unwrap()).to_f32(),
-                            f16::from_le_bytes(c[4..=5].try_into().unwrap()).to_f32(),
-                            f16::from_le_bytes(c[6..=7].try_into().unwrap()).to_f32(),
-                        ]
-                    })
+                    .chunks_exact(2)
+                    .map(|c| [f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32()])
                     .flatten()
-                    // .map(|p| p.powf(2.2))
-                    // .map(|p| (p.powf(1.0 / 2.2).max(0.0).min(1.0)))
+                    .collect::<Vec<_>>();
+                Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
+                    .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
+            }
+            TextureFormat::Rgba32Float => {
+                let d = self
+                    .data
+                    .chunks_exact(4)
+                    .map(|c| [f32::from_le_bytes(c[0..=3].try_into().unwrap())])
+                    .flatten()
+                    .map(|p| p.powf(2.2))
+                    .map(|p| (p.powf(1.0 / 2.2).max(0.0).min(1.0)))
                     .collect::<Vec<_>>();
                 Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
                     .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
@@ -82,10 +91,10 @@ impl Image {
 #[derive(Error, Debug)]
 pub enum IntoDynamicImageError {
     /// Conversion into dynamic image not supported for source format.
-    #[error("Conversion into dynamic image not supported for {0:?}.")]
+    #[error("KTX2: Unsupported format: {0:?}. Please open a github issue and attach your image.")]
     UnsupportedFormat(TextureFormat),
 
     /// Encountered an unknown error during conversion.
-    #[error("Failed to convert into {0:?}.")]
+    #[error("KTX2: Failed interpret buffer: {0:?}.")]
     UnknownConversionError(TextureFormat),
 }

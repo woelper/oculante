@@ -2,7 +2,6 @@ use std::io::Read;
 
 
 // use crate::color::SrgbColorSpace;
-// #[cfg(feature = "basis-universal")]
 use basis_universal::{
     DecodeFlags, LowLevelUastcTranscoder, SliceParametersUastc, TranscoderBlockFormat,
 };
@@ -148,7 +147,6 @@ pub fn ktx2_buffer_to_image(
                         TextureFormat::Rgba8Unorm
                     }
                 }
-                // #[cfg(feature = "basis-universal")]
                 TranscodeFormat::Uastc(data_format) => {
                     let (transcode_block_format, texture_format) =
                         get_transcoded_formats(supported_compressed_formats, data_format, is_srgb);
@@ -306,7 +304,6 @@ pub fn ktx2_buffer_to_image(
     Ok(image)
 }
 
-// #[cfg(feature = "basis-universal")]
 pub fn get_transcoded_formats(
     supported_compressed_formats: CompressedImageFormats,
     data_format: DataFormat,

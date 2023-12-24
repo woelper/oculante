@@ -33,7 +33,7 @@ mod image_loader;
 use appstate::*;
 
 
-pub mod texture;
+pub mod ktx2_loader;
 // mod events;
 #[cfg(target_os = "macos")]
 mod mac;

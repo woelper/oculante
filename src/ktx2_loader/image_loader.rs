@@ -17,32 +17,9 @@ pub struct ImageLoader {
 }
 
 pub(crate) const IMG_FILE_EXTENSIONS: &[&str] = &[
-    #[cfg(feature = "basis-universal")]
     "basis",
-    #[cfg(feature = "bmp")]
-    "bmp",
-    #[cfg(feature = "png")]
-    "png",
-    #[cfg(feature = "dds")]
     "dds",
-    #[cfg(feature = "tga")]
-    "tga",
-    #[cfg(feature = "jpeg")]
-    "jpg",
-    #[cfg(feature = "jpeg")]
-    "jpeg",
-    #[cfg(feature = "ktx2")]
     "ktx2",
-    #[cfg(feature = "webp")]
-    "webp",
-    #[cfg(feature = "pnm")]
-    "pam",
-    #[cfg(feature = "pnm")]
-    "pbm",
-    #[cfg(feature = "pnm")]
-    "pgm",
-    #[cfg(feature = "pnm")]
-    "ppm",
 ];
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -117,18 +94,6 @@ impl AssetLoader for ImageLoader {
     }
 }
 
-impl FromWorld for ImageLoader {
-    fn from_world(world: &mut World) -> Self {
-        let supported_compressed_formats = match world.get_resource::<RenderDevice>() {
-            Some(render_device) => CompressedImageFormats::from_features(render_device.features()),
-
-            None => CompressedImageFormats::NONE,
-        };
-        Self {
-            supported_compressed_formats,
-        }
-    }
-}
 
 /// An error that occurs when loading a texture from a file.
 #[derive(Error, Debug)]

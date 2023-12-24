@@ -1,6 +1,6 @@
-use crate::texture::CompressedImageFormats;
+use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::{FONT, texture};
+use crate::{FONT, ktx2_loader};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use log::{debug, error, info};
 use psd::Psd;
@@ -59,7 +59,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // file.re
             // let mut reader = ktx2::Reader::new(reader.).expect("Can't create reader"); // Crate instance of reader.
 
-            let ktx = texture::ktx2_buffer_to_image(data.as_bytes(), CompressedImageFormats::all(), true)?;
+            let ktx = ktx2_loader::ktx2_buffer_to_image(data.as_bytes(), CompressedImageFormats::all(), true)?;
             let d = ktx.try_into_dynamic()?;
             _ = sender.send(Frame::new_still(d.into_rgba8()));
             return Ok(receiver);
