@@ -705,6 +705,39 @@ fn update(app: &mut App, state: &mut OculanteState) {
     state.first_start = false;
 }
 
+fn calculate_image_geometry(app: &mut App, state: &mut OculanteState, available_size: Rect){
+    let window_size = app.window().size().size_vec();        
+        if let Some(current_image) = &state.current_image {
+            let img_size = current_image.size_vec();
+            match state.persistent_settings.image_fit_mode{
+                ImageFitMode::Window =>{
+                    let scale_factor = (window_size.x / img_size.x)
+                                            .min(window_size.y / img_size.y)
+                                            .min(1.0);
+                    
+                    let offset =
+                        window_size / 2.0 - (img_size * scale_factor) / 2.0;
+                    state.image_geometry.scale = scale_factor;
+                    state.image_geometry.offset = offset;
+                }
+                ImageFitMode::DrawArea =>{
+                    let img_middle = img_size/2.0;
+                    let area_middle = (
+                        available_size.width()/2.0+available_size.left(),
+                        available_size.height()/2.0+available_size.top()
+                    ).size_vec();
+                    let scale_factor = (available_size.width() / img_size.x)
+                                            .min(available_size.height() / img_size.y)
+                                            .min(1.0);
+                                        
+                    let offset = area_middle-img_middle* scale_factor;
+                    state.image_geometry.scale = scale_factor;
+                    state.image_geometry.offset = offset;
+                }
+            }
+        }
+}
+
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
 
@@ -947,38 +980,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     });
     
     if state.reset_image {
-        let window_size = app.window().size().size_vec();        
-        if let Some(current_image) = &state.current_image {
-            let img_size = current_image.size_vec();
-            match state.persistent_settings.image_fit_mode{
-                ImageFitMode::Window =>{
-                    let scale_factor = (window_size.x / img_size.x)
-                                            .min(window_size.y / img_size.y)
-                                            .min(1.0);
-                    
-                    let offset =
-                        window_size / 2.0 - (img_size * scale_factor) / 2.0;
-                    state.image_geometry.scale = scale_factor;
-                    state.image_geometry.offset = offset;
-                }
-                ImageFitMode::DrawArea =>{
-                    let img_middle = img_size/2.0;
-                    let area_middle = (
-                        available_size.width()/2.0+available_size.left(),
-                        available_size.height()/2.0+available_size.top()
-                    ).size_vec();
-                    let scale_factor = (available_size.width() / img_size.x)
-                                            .min(available_size.height() / img_size.y)
-                                            .min(1.0);
-                                        
-                    let offset = area_middle-img_middle* scale_factor;
-                    state.image_geometry.scale = scale_factor;
-                    state.image_geometry.offset = offset;
-                }
-            }
+        calculate_image_geometry(app, state, available_size);
             debug!("Image has been reset.");
-            state.reset_image = false;
-        }
+            state.reset_image = false;        
     }
 
     // TODO: Do we need/want a "global" checker?

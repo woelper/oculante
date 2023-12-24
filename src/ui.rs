@@ -438,7 +438,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 }
                 );
 
-                egui::ComboBox::from_label("label")
+                egui::ComboBox::from_label("Image fit mode")
                 .selected_text(format!("{:?}", state.persistent_settings.image_fit_mode))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut state.persistent_settings.image_fit_mode, crate::settings::ImageFitMode::Window, "Window");
