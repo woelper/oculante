@@ -14,6 +14,14 @@ pub enum ColorTheme {
     System,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum ImageFitMode {
+    /// Light Theme
+    Window,
+    /// Dark Theme
+    DrawArea
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct PersistentSettings {
@@ -50,6 +58,7 @@ pub struct PersistentSettings {
     pub svg_scale: f32,
     pub zen_mode: bool,
     pub theme: ColorTheme,
+    pub image_fit_mode: ImageFitMode,
     pub linear_mag_filter: bool,
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
@@ -82,6 +91,7 @@ impl Default for PersistentSettings {
             svg_scale: 1.0,
             zen_mode: false,
             theme: ColorTheme::Dark,
+            image_fit_mode: ImageFitMode::Window,
             linear_mag_filter: false,
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,

@@ -23,6 +23,7 @@ pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
+use crate::settings::ImageFitMode;
 use crate::settings::set_system_theme;
 use crate::settings::ColorTheme;
 use crate::shortcuts::InputEvent::*;
@@ -718,6 +719,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         _ = state.persistent_settings.save();
     }
 
+    
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
@@ -859,21 +861,124 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 
+    let window_size = app.window().size().size_vec();
+    let mut available_size = Rect::from_min_size(
+        Pos2::new(0.0,0.0), 
+        Vec2::new(window_size.x, window_size.y));
+    let egui_output = plugins.egui(|ctx| {
+        // the top menu bar
+        // ctx.request_repaint_after(Duration::from_secs(1));
+        state.toasts.show(ctx);
+
+        if !state.persistent_settings.zen_mode {
+            egui::TopBottomPanel::top("menu")
+                .min_height(30.)
+                .default_height(30.)
+                .show(ctx, |ui| {
+                    main_menu(ui, state, app, gfx);
+                });
+        }
+
+        if state.persistent_settings.show_scrub_bar {
+            egui::TopBottomPanel::bottom("scrubber")
+                .max_height(22.)
+                .min_height(22.)
+                .show(ctx, |ui| {
+                    scrubber_ui(state, ui);
+                });
+        }
+
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            info_ui(ctx, state, gfx);
+        }
+       
+
+        if state.persistent_settings.edit_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {            
+            edit_ui(app, ctx, state, gfx);
+        }
+        
+        available_size = ctx.available_rect();
+
+       //if(old_width != state.available_width){
+       //     state.reset_image = true;
+        //}
+
+        // if !state.is_loaded {
+        //     egui::TopBottomPanel::bottom("loader").show_animated(
+        //         ctx,
+        //         state.current_path.is_some(),
+        //         |ui| {
+        //             if let Some(p) = &state.current_path {
+        //                 ui.horizontal(|ui| {
+        //                     ui.add(egui::Spinner::default());
+        //                     ui.label(format!("Loading {}", p.display()));
+        //                 });
+        //             }
+        //             app.window().request_frame();
+        //         },
+        //     );
+        // }
+    
+
+        state.pointer_over_ui = ctx.is_pointer_over_area();
+        // info!("using pointer {}", ctx.is_using_pointer());
+
+        // if there is interaction on the ui (dragging etc)
+        // we don't want zoom & pan to work, so we "grab" the pointer
+        if ctx.is_using_pointer() || state.edit_state.painting || ctx.is_pointer_over_area() {
+            state.mouse_grab = true;
+        } else {
+            state.mouse_grab = false;
+        }
+
+        if ctx.wants_keyboard_input() {
+            state.key_grab = true;
+        } else {
+            state.key_grab = false;
+        }
+        // Settings come last, as they block keyboard grab (for hotkey assigment)
+        settings_ui(app, ctx, state, gfx);
+    });
+    
     if state.reset_image {
-        let window_size = app.window().size().size_vec();
+        let window_size = app.window().size().size_vec();        
         if let Some(current_image) = &state.current_image {
             let img_size = current_image.size_vec();
-            let scale_factor = (window_size.x / img_size.x)
-                .min(window_size.y / img_size.y)
-                .min(1.0);
-            state.image_geometry.scale = scale_factor;
-            state.image_geometry.offset =
-                window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
-
+            match state.persistent_settings.image_fit_mode{
+                ImageFitMode::Window =>{
+                    let scale_factor = (window_size.x / img_size.x)
+                                            .min(window_size.y / img_size.y)
+                                            .min(1.0);
+                    
+                    let offset =
+                        window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
+                    state.image_geometry.scale = scale_factor;
+                    state.image_geometry.offset = offset;
+                }
+                ImageFitMode::DrawArea =>{
+                    let img_middle = img_size/2.0;
+                    let area_middle = (
+                        available_size.width()/2.0+available_size.left(),
+                        available_size.height()/2.0+available_size.top()
+                    ).size_vec();
+                    let scale_factor = (available_size.width() / img_size.x)
+                                            .min(available_size.height() / img_size.y)
+                                            .min(1.0);
+                                        
+                    let offset = area_middle-img_middle* scale_factor;
+                    state.image_geometry.scale = scale_factor;
+                    state.image_geometry.offset = offset;
+                }
+            }
             debug!("Image has been reset.");
             state.reset_image = false;
         }
-        // app.window().request_frame();
     }
 
     // TODO: Do we need/want a "global" checker?
@@ -884,6 +989,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
+
+    
+
+    
 
     if let Some(texture) = &state.current_texture {
         if state.persistent_settings.show_checker_background {
@@ -971,80 +1080,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
     }
-
-    let egui_output = plugins.egui(|ctx| {
-        // the top menu bar
-        // ctx.request_repaint_after(Duration::from_secs(1));
-        state.toasts.show(ctx);
-
-        if !state.persistent_settings.zen_mode {
-            egui::TopBottomPanel::top("menu")
-                .min_height(30.)
-                .default_height(30.)
-                .show(ctx, |ui| {
-                    main_menu(ui, state, app, gfx);
-                });
-        }
-
-        if state.persistent_settings.show_scrub_bar {
-            egui::TopBottomPanel::bottom("scrubber")
-                .max_height(22.)
-                .min_height(22.)
-                .show(ctx, |ui| {
-                    scrubber_ui(state, ui);
-                });
-        }
-
-        if state.persistent_settings.info_enabled
-            && !state.settings_enabled
-            && !state.persistent_settings.zen_mode
-        {
-            info_ui(ctx, state, gfx);
-        }
-
-        if state.persistent_settings.edit_enabled
-            && !state.settings_enabled
-            && !state.persistent_settings.zen_mode
-        {
-            edit_ui(app, ctx, state, gfx);
-        }
-
-        // if !state.is_loaded {
-        //     egui::TopBottomPanel::bottom("loader").show_animated(
-        //         ctx,
-        //         state.current_path.is_some(),
-        //         |ui| {
-        //             if let Some(p) = &state.current_path {
-        //                 ui.horizontal(|ui| {
-        //                     ui.add(egui::Spinner::default());
-        //                     ui.label(format!("Loading {}", p.display()));
-        //                 });
-        //             }
-        //             app.window().request_frame();
-        //         },
-        //     );
-        // }
-
-        state.pointer_over_ui = ctx.is_pointer_over_area();
-        // info!("using pointer {}", ctx.is_using_pointer());
-
-        // if there is interaction on the ui (dragging etc)
-        // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() || state.edit_state.painting || ctx.is_pointer_over_area() {
-            state.mouse_grab = true;
-        } else {
-            state.mouse_grab = false;
-        }
-
-        if ctx.wants_keyboard_input() {
-            state.key_grab = true;
-        } else {
-            state.key_grab = false;
-        }
-        // Settings come last, as they block keyboard grab (for hotkey assigment)
-        settings_ui(app, ctx, state, gfx);
-    });
-
+    
     if state.network_mode {
         app.window().request_frame();
     }

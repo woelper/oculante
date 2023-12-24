@@ -193,13 +193,14 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
         }
     }
-
+    
     egui::SidePanel::left("side_panel")
     .max_width(PANEL_WIDTH)
     .min_width(PANEL_WIDTH/2.)
+    .default_width(PANEL_WIDTH)
     .show(ctx, |ui| {
-
-
+        
+        
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
@@ -232,7 +233,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
-                        let max_chars = 20;
+                        let max_chars = 18;
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
                         let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
 
@@ -437,8 +438,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 }
                 );
 
-
-
+                egui::ComboBox::from_label("label")
+                .selected_text(format!("{:?}", state.persistent_settings.image_fit_mode))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut state.persistent_settings.image_fit_mode, crate::settings::ImageFitMode::Window, "Window");
+                    ui.selectable_value(&mut state.persistent_settings.image_fit_mode, crate::settings::ImageFitMode::DrawArea, "DrawArea");                    
+                });
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
                     ui.horizontal(|ui| {
