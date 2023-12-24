@@ -957,7 +957,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                             .min(1.0);
                     
                     let offset =
-                        window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
+                        window_size / 2.0 - (img_size * scale_factor) / 2.0;
                     state.image_geometry.scale = scale_factor;
                     state.image_geometry.offset = offset;
                 }
