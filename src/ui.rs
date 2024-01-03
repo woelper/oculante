@@ -233,19 +233,23 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
-                        let max_chars = 18;
+                        let max_chars = 19;
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
                         let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
 
-                        ui.label_i(&format!("{} File", IMAGE_SQUARE));
-                        ui.label(
+                        let path_label = egui::Label::new(
                             RichText::new(format!(
                                 "{skip_symbol}{}",
-                                file_name.chars().rev().take(max_chars).collect::<String>().chars().rev().collect::<String>()
-                            ))
-                            // .monospace(),
+                                file_name.chars().rev().take(max_chars).collect::<String>().chars().rev().collect::<String>()))
+                                //.monospace()
                         )
+                        .truncate(true);
+
+                        ui.label_i(&format!("{} File", IMAGE_SQUARE));
+                        ui.add(path_label)
                         .on_hover_text(format!("{}", path.display()));
+                        
+                        
                         ui.end_row();
                     }
 
