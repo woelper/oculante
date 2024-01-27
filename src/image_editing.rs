@@ -121,7 +121,7 @@ pub enum ImageOperation {
     Invert,
     Blur(u8),
     MMult,
-    MDiv,    
+    MDiv,
     Resize {
         dimensions: (u32, u32),
         aspect: bool,
@@ -159,7 +159,7 @@ impl fmt::Display for ImageOperation {
             Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
             Self::Expression(_) => write!(f, "{FUNCTION} Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
-            Self::ScaleImageMinMax=> write!(f, "\u{2195} Scale image min max"),
+            Self::ScaleImageMinMax => write!(f, "\u{2195} Scale image min max"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
             Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
             // _ => write!(f, "Not implemented Display"),
@@ -817,11 +817,10 @@ impl ImageOperation {
                 }
                 *img = image::imageops::flip_horizontal(img);
             }
-            Self::ScaleImageMinMax =>
-            {            
-                //Step 0: Get color channel min and max values   
-                let mut min = 255u8;                
-                let mut max = 0u8;                
+            Self::ScaleImageMinMax => {
+                //Step 0: Get color channel min and max values
+                let mut min = 255u8;
+                let mut max = 0u8;
 
                 img.chunks_mut(4).for_each(|px| {
                     min = std::cmp::min(min, px[0]);
@@ -833,29 +832,25 @@ impl ImageOperation {
                     max = std::cmp::max(max, px[2]);
                 });
                 let min_f = min as f64;
-                let max_f = max as f64;                
-                
-                
+                let max_f = max as f64;
+
                 //Step 1: Don't do zero division
-                if min!=max {
+                if min != max {
                     //Step 2: Create 8-Bit LUT
-                    let mut lut: [u8; 256] =[0u8;256];
+                    let mut lut: [u8; 256] = [0u8; 256];
 
                     for n in min as usize..=max as usize {
                         let g = n as f64;
-                        lut[n] = (255.0*(g-min_f)/(max_f-min_f)) as u8;
+                        lut[n] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
                     }
-                    
+
                     //Step 3: Apply 8-Bit LUT
-                    img
-                    
-                    .par_chunks_mut(4)
-                    .for_each(|px| {
+                    img.par_chunks_mut(4).for_each(|px| {
                         px[0] = lut[px[0] as usize];
                         px[1] = lut[px[1] as usize];
                         px[2] = lut[px[2] as usize];
-                    });       
-                }         
+                    });
+                }
             }
             Self::ChromaticAberration(amt) => {
                 let center = (img.width() as i32 / 2, img.height() as i32 / 2);
@@ -1063,7 +1058,6 @@ pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
     luts
 }
 
-
 pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
     // use pulp::Arch;
     // let arch = Arch::new();
@@ -1073,9 +1067,7 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
     //             *x = 12 as u8;
     //         }
     //     });
-    
-   
-   
+
     buffer
         // .chunks_mut(4)
         .par_chunks_mut(4)
