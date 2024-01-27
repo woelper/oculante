@@ -69,7 +69,7 @@ libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 egui-phosphor = "=0.3.0"
 egui-notify = "0.10.0"
 ktx2 = "0.3.0"
-wgpu = "0.18.0"
+wgpu = "0.19"
 thiserror = "1.0.51"
 bitflags = "2.4.1"
 flate2 = "1.0.28"
