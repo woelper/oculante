@@ -50,7 +50,6 @@ pub struct Image {
     pub texture_descriptor: wgpu::TextureDescriptor<'static>,
 }
 
-
 impl Default for Image {
     /// default is a 1x1x1 all '1.0' texture
     fn default() -> Self {

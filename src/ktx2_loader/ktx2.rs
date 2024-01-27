@@ -1,6 +1,5 @@
 use std::io::Read;
 
-
 // use crate::color::SrgbColorSpace;
 use basis_universal::{
     DecodeFlags, LowLevelUastcTranscoder, SliceParametersUastc, TranscoderBlockFormat,
@@ -11,12 +10,11 @@ use ktx2::{
     Header, SampleInformation, SupercompressionScheme,
 };
 use wgpu::{
-    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat,
-    TextureViewDimension,
+    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat, TextureViewDimension,
 };
 
 // use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
-use super::{DataFormat, Image, TextureError, TranscodeFormat, CompressedImageFormats};
+use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
 
 pub fn ktx2_buffer_to_image(
     buffer: &[u8],
