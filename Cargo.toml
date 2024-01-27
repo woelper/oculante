@@ -59,10 +59,10 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
-jxl-oxide = "0.4"
+jxl-oxide = "0.6"
 zune-png = "0.4"
-img-parts = "0.3.0"
-dark-light = "1.0.0"
+img-parts = "0.3"
+dark-light = "1.0"
 trash = "3.1"
 lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
 libheif-rs = { version = "0.22.0", default-features = false, optional = true}

@@ -1,6 +1,6 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::{FONT, ktx2_loader};
+use crate::{ktx2_loader, FONT};
 use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use log::{debug, error, info};
 use psd::Psd;
@@ -9,13 +9,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, GrayAlphaImage, GrayImage, RgbImage, RgbaImage, EncodableLayout};
+use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
 use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -59,7 +59,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // file.re
             // let mut reader = ktx2::Reader::new(reader.).expect("Can't create reader"); // Crate instance of reader.
 
-            let ktx = ktx2_loader::ktx2_buffer_to_image(data.as_bytes(), CompressedImageFormats::all(), true)?;
+            let ktx = ktx2_loader::ktx2_buffer_to_image(
+                data.as_bytes(),
+                CompressedImageFormats::all(),
+                true,
+            )?;
             let d = ktx.try_into_dynamic()?;
             _ = sender.send(Frame::new_still(d.into_rgba8()));
             return Ok(receiver);
@@ -273,8 +277,9 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             //TODO this needs to be a thread
 
             fn foo(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
-                let mut image = JxlImage::open(img_location).map_err(|e| anyhow!("{e}"))?;
-
+                let mut image = JxlImage::builder()
+                    .open(img_location)
+                    .map_err(|e| anyhow!("{e}"))?;
                 debug!("{:#?}", image.image_header().metadata);
                 let is_jxl_anim = image.image_header().metadata.animation.is_some();
                 let ticks_ms = image
@@ -288,98 +293,93 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     .map(|x| x as u16)
                     .unwrap_or(40);
                 debug!("TPS: {ticks_ms}");
-                loop {
+
+                for keyframe_idx in 0..image.num_loaded_keyframes() {
                     // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
                     let image_result: DynamicImage;
-                    let result = image
-                        .render_next_frame()
+                    let render = image
+                        .render_frame(keyframe_idx)
+                        // .render_next_frame()
                         .map_err(|e| anyhow!("{e}"))
                         .context("Can't render JXL")?;
-                    match result {
-                        RenderResult::Done(render) => {
-                            let frame_duration = render.duration() as u16 * ticks_ms;
-                            debug!("duration {frame_duration} ms");
-                            let framebuffer = render.image();
-                            debug!("{:?}", image.pixel_format());
-                            match image.pixel_format() {
-                                PixelFormat::Graya => {
-                                    let float_image = GrayAlphaImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255. + 0.5)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>(),
-                                    )
-                                    .context("Can't decode gray alpha buffer")?;
-                                    image_result = DynamicImage::ImageLumaA8(float_image);
-                                }
-                                PixelFormat::Gray => {
-                                    let float_image = image::GrayImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255. + 0.5)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>(),
-                                    )
-                                    .context("Can't decode gray buffer")?;
-                                    image_result = DynamicImage::ImageLuma8(float_image);
-                                }
-                                PixelFormat::Rgba => {
-                                    let float_image = RgbaImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255. + 0.5)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>(),
-                                    )
-                                    .context("Can't decode rgba buffer")?;
-                                    image_result = DynamicImage::ImageRgba8(float_image);
-                                }
-                                PixelFormat::Rgb => {
-                                    let float_image = RgbImage::from_raw(
-                                        framebuffer.width() as u32,
-                                        framebuffer.height() as u32,
-                                        framebuffer
-                                            .buf()
-                                            .par_iter()
-                                            .map(|x| x * 255. + 0.5)
-                                            .map(|x| x as u8)
-                                            .collect::<Vec<_>>(),
-                                    )
-                                    .context("Can't decode rgb buffer")?;
-                                    image_result = DynamicImage::ImageRgb8(float_image);
-                                }
-                                _ => {
-                                    bail!("JXL: Pixel format: {:?}", image.pixel_format())
-                                }
-                            }
 
-                            // Dispatch to still or animation
-                            if is_jxl_anim {
-                                // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
-                                _ = frame_sender.send(Frame::new(
-                                    image_result.to_rgba8(),
-                                    frame_duration,
-                                    FrameSource::Animation,
-                                ));
-                            } else {
-                                // col.add_still(image_result.to_rgba8());
-                                _ = frame_sender.send(Frame::new_still(image_result.to_rgba8()));
-                            }
+                    let frame_duration = render.duration() as u16 * ticks_ms;
+                    debug!("duration {frame_duration} ms");
+                    let framebuffer = render.image();
+                    debug!("{:?}", image.pixel_format());
+                    match image.pixel_format() {
+                        PixelFormat::Graya => {
+                            let float_image = GrayAlphaImage::from_raw(
+                                framebuffer.width() as u32,
+                                framebuffer.height() as u32,
+                                framebuffer
+                                    .buf()
+                                    .par_iter()
+                                    .map(|x| x * 255. + 0.5)
+                                    .map(|x| x as u8)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .context("Can't decode gray alpha buffer")?;
+                            image_result = DynamicImage::ImageLumaA8(float_image);
                         }
-                        RenderResult::NeedMoreData => {
-                            info!("Need more data in JXL");
+                        PixelFormat::Gray => {
+                            let float_image = image::GrayImage::from_raw(
+                                framebuffer.width() as u32,
+                                framebuffer.height() as u32,
+                                framebuffer
+                                    .buf()
+                                    .par_iter()
+                                    .map(|x| x * 255. + 0.5)
+                                    .map(|x| x as u8)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .context("Can't decode gray buffer")?;
+                            image_result = DynamicImage::ImageLuma8(float_image);
                         }
-                        RenderResult::NoMoreFrames => break,
+                        PixelFormat::Rgba => {
+                            let float_image = RgbaImage::from_raw(
+                                framebuffer.width() as u32,
+                                framebuffer.height() as u32,
+                                framebuffer
+                                    .buf()
+                                    .par_iter()
+                                    .map(|x| x * 255. + 0.5)
+                                    .map(|x| x as u8)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .context("Can't decode rgba buffer")?;
+                            image_result = DynamicImage::ImageRgba8(float_image);
+                        }
+                        PixelFormat::Rgb => {
+                            let float_image = RgbImage::from_raw(
+                                framebuffer.width() as u32,
+                                framebuffer.height() as u32,
+                                framebuffer
+                                    .buf()
+                                    .par_iter()
+                                    .map(|x| x * 255. + 0.5)
+                                    .map(|x| x as u8)
+                                    .collect::<Vec<_>>(),
+                            )
+                            .context("Can't decode rgb buffer")?;
+                            image_result = DynamicImage::ImageRgb8(float_image);
+                        }
+                        _ => {
+                            bail!("JXL: Pixel format: {:?}", image.pixel_format())
+                        }
+                    }
+
+                    // Dispatch to still or animation
+                    if is_jxl_anim {
+                        // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
+                        _ = frame_sender.send(Frame::new(
+                            image_result.to_rgba8(),
+                            frame_duration,
+                            FrameSource::Animation,
+                        ));
+                    } else {
+                        // col.add_still(image_result.to_rgba8());
+                        _ = frame_sender.send(Frame::new_still(image_result.to_rgba8()));
                     }
                 }
                 debug!("Done decoding JXL");
