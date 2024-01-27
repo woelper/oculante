@@ -379,7 +379,7 @@ impl TextureFormatPixelInfo for TextureFormat {
     fn pixel_size(&self) -> usize {
         let info = self;
         match info.block_dimensions() {
-            (1, 1) => info.block_size(None).unwrap() as usize,
+            (1, 1) => info.block_copy_size(None).unwrap() as usize,
             _ => panic!("Using pixel_size for compressed textures is invalid"),
         }
     }

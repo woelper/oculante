@@ -10,7 +10,7 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
-use jxl_oxide::{JxlImage, PixelFormat, RenderResult};
+use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
@@ -277,7 +277,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             //TODO this needs to be a thread
 
             fn foo(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
-                let mut image = JxlImage::builder()
+                let image = JxlImage::builder()
                     .open(img_location)
                     .map_err(|e| anyhow!("{e}"))?;
                 debug!("{:#?}", image.image_header().metadata);
