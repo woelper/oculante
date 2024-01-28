@@ -101,6 +101,7 @@ pub enum ImageOperation {
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
+    Filter3x3([i32; 9]),
     GradientMap(Vec<GradientStop>),
     Exposure(i32),
     Equalize((i32, i32)),
@@ -162,6 +163,7 @@ impl fmt::Display for ImageOperation {
             Self::ScaleImageMinMax => write!(f, "\u{2195} Scale image min max"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
             Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
+            Self::Filter3x3(_) => write!(f, "{DOTS_NINE} 3x3 Filter"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -178,6 +180,7 @@ impl ImageOperation {
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
             Self::LUT(_) => false,
+            Self::Filter3x3(_) => false,
             Self::ScaleImageMinMax => false,
             _ => true,
         }
@@ -190,6 +193,33 @@ impl ImageOperation {
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::Filter3x3(val) => {
+                let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+
+                let presets = [
+                    ("Sharpen", [0, -100, 0, -100, 500, -100, 0, -100, 0]),
+                    ("Blur", [6, 12, 6, 12, 25, 12, 6, 12, 6]),
+                    ("Emboss", [-200, -100, 0, -100, 100, 100, 0, 100, 200]),
+                ];
+
+                egui::ComboBox::from_label("Presets")
+                    .selected_text(
+                        presets
+                            .iter()
+                            .filter(|p| p.1 == *val)
+                            .map(|p| p.0)
+                            .nth(0)
+                            .unwrap_or("Select"),
+                    )
+                    .show_ui(ui, |ui| {
+                        for p in presets {
+                            if ui.selectable_value(val, p.1, p.0).clicked() {
+                                x.mark_changed();
+                            }
+                        }
+                    });
+                x
+            }
             Self::Posterize(val) => ui.slider_styled(val, 1..=255),
             Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::LUT(lut_name) => {
@@ -722,6 +752,13 @@ impl ImageOperation {
                 if *amt != 0 {
                     *img = imageops::blur(img, *amt as f32);
                 }
+            }
+            Self::Filter3x3(amt) => {
+                let kernel = amt
+                    .into_iter()
+                    .map(|a| *a as f32 / 100.)
+                    .collect::<Vec<_>>();
+                *img = imageops::filter3x3(img, &kernel);
             }
             Self::LUT(lut_name) => {
                 use lutgen::identity::correct_image;
