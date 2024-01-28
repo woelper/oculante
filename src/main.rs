@@ -861,23 +861,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         app.window().request_frame();
     }
 
-    if state.reset_image {
-        let window_size = app.window().size().size_vec();
-        if let Some(current_image) = &state.current_image {
-            let img_size = current_image.size_vec();
-            let scale_factor = (window_size.x / img_size.x)
-                .min(window_size.y / img_size.y)
-                .min(1.0);
-            state.image_geometry.scale = scale_factor;
-            state.image_geometry.offset =
-                window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
-
-            debug!("Image has been reset.");
-            state.reset_image = false;
-        }
-        // app.window().request_frame();
-    }
-
     // TODO: Do we need/want a "global" checker?
     // if state.persistent_settings.show_checker_background {
     //     if let Some(checker) = &state.checker_texture {
@@ -1043,6 +1026,28 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         } else {
             state.key_grab = false;
         }
+
+        if state.reset_image {
+            let draw_area = ctx.available_rect();
+            let window_size = nalgebra::Vector2::new(draw_area.width(), draw_area.height());
+
+            if let Some(current_image) = &state.current_image {
+                let img_size = current_image.size_vec();
+                state.image_geometry.scale = (window_size.x / img_size.x)
+                    .min(window_size.y / img_size.y)
+                    .min(1.0);
+                state.image_geometry.offset =
+                    window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
+                // offset by left UI elements
+                state.image_geometry.offset.x += draw_area.left();
+                // offset by top UI elements
+                state.image_geometry.offset.y += draw_area.top();
+                debug!("Image has been reset.");
+                state.reset_image = false;
+            }
+            app.window().request_frame();
+        }
+
         // Settings come last, as they block keyboard grab (for hotkey assigment)
         settings_ui(app, ctx, state, gfx);
     });
