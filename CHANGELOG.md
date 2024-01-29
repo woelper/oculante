@@ -1,3 +1,9 @@
+# 0.8.7 (2024-01-27)
+
+### :sparkles: Features
+
+* Basik support for ktx2 (6a41adda)
+
 # 0.8.6 (2023-12-17)
 
 ### :beetle: Bug Fixes

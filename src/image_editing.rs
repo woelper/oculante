@@ -101,6 +101,7 @@ pub enum ImageOperation {
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
+    Filter3x3([i32; 9]),
     GradientMap(Vec<GradientStop>),
     Exposure(i32),
     Equalize((i32, i32)),
@@ -121,7 +122,7 @@ pub enum ImageOperation {
     Invert,
     Blur(u8),
     MMult,
-    MDiv,    
+    MDiv,
     Resize {
         dimensions: (u32, u32),
         aspect: bool,
@@ -159,9 +160,10 @@ impl fmt::Display for ImageOperation {
             Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
             Self::Expression(_) => write!(f, "{FUNCTION} Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
-            Self::ScaleImageMinMax=> write!(f, "\u{2195} Scale image min max"),
+            Self::ScaleImageMinMax => write!(f, "\u{2195} Scale image min max"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
             Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
+            Self::Filter3x3(_) => write!(f, "{DOTS_NINE} 3x3 Filter"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -178,6 +180,7 @@ impl ImageOperation {
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
             Self::LUT(_) => false,
+            Self::Filter3x3(_) => false,
             Self::ScaleImageMinMax => false,
             _ => true,
         }
@@ -190,6 +193,33 @@ impl ImageOperation {
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
             Self::Exposure(val) => ui.slider_styled(val, -100..=100),
             Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::Filter3x3(val) => {
+                let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+
+                let presets = [
+                    ("Sharpen", [0, -100, 0, -100, 500, -100, 0, -100, 0]),
+                    ("Blur", [6, 12, 6, 12, 25, 12, 6, 12, 6]),
+                    ("Emboss", [-200, -100, 0, -100, 100, 100, 0, 100, 200]),
+                ];
+
+                egui::ComboBox::from_label("Presets")
+                    .selected_text(
+                        presets
+                            .iter()
+                            .filter(|p| p.1 == *val)
+                            .map(|p| p.0)
+                            .nth(0)
+                            .unwrap_or("Select"),
+                    )
+                    .show_ui(ui, |ui| {
+                        for p in presets {
+                            if ui.selectable_value(val, p.1, p.0).clicked() {
+                                x.mark_changed();
+                            }
+                        }
+                    });
+                x
+            }
             Self::Posterize(val) => ui.slider_styled(val, 1..=255),
             Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::LUT(lut_name) => {
@@ -723,6 +753,13 @@ impl ImageOperation {
                     *img = imageops::blur(img, *amt as f32);
                 }
             }
+            Self::Filter3x3(amt) => {
+                let kernel = amt
+                    .into_iter()
+                    .map(|a| *a as f32 / 100.)
+                    .collect::<Vec<_>>();
+                *img = imageops::filter3x3(img, &kernel);
+            }
             Self::LUT(lut_name) => {
                 use lutgen::identity::correct_image;
                 let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
@@ -817,11 +854,10 @@ impl ImageOperation {
                 }
                 *img = image::imageops::flip_horizontal(img);
             }
-            Self::ScaleImageMinMax =>
-            {            
-                //Step 0: Get color channel min and max values   
-                let mut min = 255u8;                
-                let mut max = 0u8;                
+            Self::ScaleImageMinMax => {
+                //Step 0: Get color channel min and max values
+                let mut min = 255u8;
+                let mut max = 0u8;
 
                 img.chunks_mut(4).for_each(|px| {
                     min = std::cmp::min(min, px[0]);
@@ -833,29 +869,25 @@ impl ImageOperation {
                     max = std::cmp::max(max, px[2]);
                 });
                 let min_f = min as f64;
-                let max_f = max as f64;                
-                
-                
+                let max_f = max as f64;
+
                 //Step 1: Don't do zero division
-                if min!=max {
+                if min != max {
                     //Step 2: Create 8-Bit LUT
-                    let mut lut: [u8; 256] =[0u8;256];
+                    let mut lut: [u8; 256] = [0u8; 256];
 
                     for n in min as usize..=max as usize {
                         let g = n as f64;
-                        lut[n] = (255.0*(g-min_f)/(max_f-min_f)) as u8;
+                        lut[n] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
                     }
-                    
+
                     //Step 3: Apply 8-Bit LUT
-                    img
-                    
-                    .par_chunks_mut(4)
-                    .for_each(|px| {
+                    img.par_chunks_mut(4).for_each(|px| {
                         px[0] = lut[px[0] as usize];
                         px[1] = lut[px[1] as usize];
                         px[2] = lut[px[2] as usize];
-                    });       
-                }         
+                    });
+                }
             }
             Self::ChromaticAberration(amt) => {
                 let center = (img.width() as i32 / 2, img.height() as i32 / 2);
@@ -1063,7 +1095,6 @@ pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
     luts
 }
 
-
 pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
     // use pulp::Arch;
     // let arch = Arch::new();
@@ -1073,9 +1104,7 @@ pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
     //             *x = 12 as u8;
     //         }
     //     });
-    
-   
-   
+
     buffer
         // .chunks_mut(4)
         .par_chunks_mut(4)

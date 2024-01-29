@@ -1,6 +1,5 @@
 use std::io::Read;
 
-
 // use crate::color::SrgbColorSpace;
 use basis_universal::{
     DecodeFlags, LowLevelUastcTranscoder, SliceParametersUastc, TranscoderBlockFormat,
@@ -11,12 +10,11 @@ use ktx2::{
     Header, SampleInformation, SupercompressionScheme,
 };
 use wgpu::{
-    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat,
-    TextureViewDimension,
+    AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat, TextureViewDimension,
 };
 
 // use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
-use super::{DataFormat, Image, TextureError, TranscodeFormat, CompressedImageFormats};
+use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
 
 pub fn ktx2_buffer_to_image(
     buffer: &[u8],
@@ -156,7 +154,7 @@ pub fn ktx2_buffer_to_image(
                         texture_format_info.block_dimensions().1,
                     );
                     // Texture is not a depth or stencil format, it is possible to pass `None` and unwrap
-                    let block_bytes = texture_format_info.block_size(None).unwrap();
+                    let block_bytes = texture_format_info.block_copy_size(None).unwrap();
 
                     let transcoder = LowLevelUastcTranscoder::new();
                     for (level, level_data) in levels.iter().enumerate() {
@@ -234,7 +232,7 @@ pub fn ktx2_buffer_to_image(
         texture_format_info.block_dimensions().1 as usize,
     );
     // Texture is not a depth or stencil format, it is possible to pass `None` and unwrap
-    let block_bytes = texture_format_info.block_size(None).unwrap() as usize;
+    let block_bytes = texture_format_info.block_copy_size(None).unwrap() as usize;
 
     let mut wgpu_data = vec![Vec::default(); (layer_count * face_count) as usize];
     for (level, level_data) in levels.iter().enumerate() {

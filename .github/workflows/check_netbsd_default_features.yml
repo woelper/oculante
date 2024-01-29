@@ -4,13 +4,13 @@ on: [push]
 
 jobs:
   test:
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     name: Build in NetBSD with default features
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Build in NetBSD
       id: testnet
-      uses: vmactions/netbsd-vm@v0
+      uses: vmactions/netbsd-vm@v1
       with:
         mem: 4096
         usesh: true

@@ -11,7 +11,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.8.6"
+version = "0.8.7"
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
@@ -25,7 +25,7 @@ avif-decode = {version = "0.2", optional = true}
 clap = "3.2"
 dds-rs = "0.7"
 dirs = "5.0"
-env_logger = "0.10"
+env_logger = "0.11"
 evalexpr = "11.1"
 exr = "1.7"
 fast_image_resize = "2.7"
@@ -59,17 +59,17 @@ turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
-jxl-oxide = "0.4"
+jxl-oxide = "0.6"
 zune-png = "0.4"
-img-parts = "0.3.0"
-dark-light = "1.0.0"
+img-parts = "0.3"
+dark-light = "1.0"
 trash = "3.1"
 lutgen = {version ="0.9.0", features = ["lutgen-palettes"]}
 libheif-rs = { version = "0.22.0", default-features = false, optional = true}
 egui-phosphor = "=0.3.0"
 egui-notify = "0.10.0"
 ktx2 = "0.3.0"
-wgpu = "0.18.0"
+wgpu = "0.19"
 thiserror = "1.0.51"
 bitflags = "2.4.1"
 flate2 = "1.0.28"
@@ -95,7 +95,7 @@ fruitbasket = "0.10.0"
 windres = "0.2"
 
 [build-dependencies]
-env_logger = "0.10.0"
+env_logger = "0.11"
 log = "0.4.14"
 winres = "0.1"
 cc = "1.0.46"

@@ -757,8 +757,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
+                        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
                         ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
-                        ImageOperation::MMult,                        
+                        ImageOperation::MMult,
                         ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
                         ImageOperation::Noise {
