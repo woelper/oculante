@@ -177,6 +177,55 @@ impl EguiExt for Ui {
     }
 }
 
+
+/// Proof-of-concept funtion to draw texture completely with egui
+pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+    if let Some(texture) = &state.current_texture {
+        let tex_id = gfx.egui_register_texture(texture);
+
+
+        let image_rect = Rect::from_center_size(
+            Pos2::new(
+                state.image_geometry.offset.x
+                    + state.image_dimension.0 as f32 / 2. * state.image_geometry.scale,
+                state.image_geometry.offset.y
+                    + state.image_dimension.1 as f32 / 2. * state.image_geometry.scale,
+            ),
+            vec2(
+                state.image_dimension.0 as f32,
+                state.image_dimension.1 as f32,
+            ) * state.image_geometry.scale,
+        );
+
+        // egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).debug_rect(
+        //     image_rect,
+        //     Color32::RED,
+        //     "yo",
+        // );
+        egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
+            tex_id.id,
+            image_rect,
+            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+            Color32::WHITE
+        );
+
+    }
+
+    // state.image_geometry.scale;
+
+    // let preview_rect = ui
+    // .add(
+    //     egui::Image::new(tex_id)
+    //     .maintain_aspect_ratio(false)
+    //     .fit_to_exact_size(egui::Vec2::splat(desired_width))
+    //     .uv(egui::Rect::from_x_y_ranges(
+    //         uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
+    //         uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
+    //     )),
+    // )
+    // .rect;
+}
+
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
         let mut img = img;
