@@ -179,6 +179,7 @@ impl EguiExt for Ui {
 
 
 /// Proof-of-concept funtion to draw texture completely with egui
+#[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
         let tex_id = gfx.egui_register_texture(texture);
