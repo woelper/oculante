@@ -53,6 +53,7 @@ pub struct PersistentSettings {
     pub linear_mag_filter: bool,
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
+    pub borderless: bool,
 }
 
 impl Default for PersistentSettings {
@@ -85,6 +86,7 @@ impl Default for PersistentSettings {
             linear_mag_filter: false,
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
+            borderless: false,
         }
     }
 }

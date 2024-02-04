@@ -116,6 +116,7 @@ fn main() -> Result<(), String> {
         Ok(settings) => {
             window_config.vsync = settings.vsync;
             window_config.lazy_loop = !settings.force_redraw;
+            window_config.decorations = !settings.borderless;
             if settings.window_geometry != Default::default() {
                 window_config.width = settings.window_geometry.1 .0 as u32;
                 window_config.height = settings.window_geometry.1 .1 as u32;

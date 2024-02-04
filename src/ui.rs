@@ -16,12 +16,12 @@ use crate::{
 
 const ICON_SIZE: f32 = 24.;
 
-use egui_phosphor::regular::*;
-
 use arboard::Clipboard;
+use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
 use log::{debug, error, info};
+use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
@@ -177,13 +177,11 @@ impl EguiExt for Ui {
     }
 }
 
-
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
         let tex_id = gfx.egui_register_texture(texture);
-
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -207,9 +205,8 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             tex_id.id,
             image_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE
+            Color32::WHITE,
         );
-
     }
 
     // state.image_geometry.scale;
@@ -598,6 +595,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
+                ui.checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
+                ui.end_row();
+
+
             });
 
                 ui.horizontal(|ui| {
@@ -1795,6 +1796,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         use crate::shortcuts::InputEvent::*;
 
         // ui.label("Channels");
+        if state.persistent_settings.borderless {
+            if unframed_button(X, ui).clicked() {
+                app.backend.exit();
+            }
+        }
 
         #[cfg(feature = "file_open")]
         if unframed_button(FOLDER, ui)
@@ -2006,6 +2012,48 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 });
             }
             app.window().request_frame();
+        }
+
+        if state.persistent_settings.borderless {
+            let r = ui.interact(
+                ui.available_rect_before_wrap(),
+                Id::new("drag"),
+                Sense::click_and_drag(),
+            );
+
+            if r.dragged() {
+                // improve responsiveness
+                app.window().request_frame();
+                let position = Mouse::get_mouse_position();
+                match position {
+                    Mouse::Position { mut x, mut y } => {
+                        // translate mouse pos into real pixels
+                        let dpi = app.backend.window().dpi();
+                        x = (x as f64 * dpi) as i32;
+                        y = (y as f64 * dpi) as i32;
+
+                        let offset = match ui
+                            .ctx()
+                            .memory(|r| r.data.get_temp::<(i32, i32)>("offset".into()))
+                        {
+                            Some(o) => o,
+                            None => {
+                                let window_pos = app.window().position();
+                                let offset = (window_pos.0 - x, window_pos.1 - y);
+                                ui.ctx()
+                                    .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
+                                offset
+                            }
+                        };
+                        app.window().set_position(x + offset.0, y + offset.1);
+                    }
+                    Mouse::Error => error!("Error getting mouse position"),
+                }
+            }
+            if r.drag_released() {
+                ui.ctx()
+                    .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
+            }
         }
 
         ui.add_space(ui.available_width() - 32.);

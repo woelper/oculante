@@ -3503,6 +3503,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mouse_position"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffd272ac3ad817af3d158eecd4d4ba6f92a1fa5f7255e3c0d63b72d4dac12edd"
+dependencies = [
+ "core-graphics",
+ "winapi",
+ "x11-dl",
+]
+
+[[package]]
 name = "mutate_once"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4178,6 +4189,7 @@ dependencies = [
  "libwebp-sys",
  "log",
  "lutgen",
+ "mouse_position",
  "nalgebra",
  "notan",
  "palette",
