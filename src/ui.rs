@@ -21,6 +21,7 @@ use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
 use log::{debug, error, info};
+#[cfg(not(target_os = "netbsd"))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
@@ -595,6 +596,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
+                #[cfg(not(target_os = "netbsd"))]
                 ui.checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
                 ui.end_row();
 
@@ -2014,6 +2016,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().request_frame();
         }
 
+        #[cfg(not(target_os = "netbsd"))]
         if state.persistent_settings.borderless {
             let r = ui.interact(
                 ui.available_rect_before_wrap(),
@@ -2064,8 +2067,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             ui.style_mut().visuals.button_frame = false;
             ui.style_mut().visuals.widgets.inactive.expansion = 20.;
 
-            // FIXME: Needs submenu not to be out of bounds
-            // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 
             ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
