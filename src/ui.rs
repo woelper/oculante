@@ -12,6 +12,7 @@ use crate::{
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
+    FrameSource,
 };
 
 const ICON_SIZE: f32 = 24.;
@@ -177,13 +178,11 @@ impl EguiExt for Ui {
     }
 }
 
-
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
         let tex_id = gfx.egui_register_texture(texture);
-
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -207,9 +206,8 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             tex_id.id,
             image_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE
+            Color32::WHITE,
         );
-
     }
 
     // state.image_geometry.scale;
@@ -385,22 +383,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     for (path, geo) in compare_list {
                         if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                             state.image_geometry = geo.clone();
-                            state.is_loaded = false;
-                            state.current_image = None;
                             state
                                 .player
-                                .load(&path, state.message_channel.0.clone());
+                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
                             state.current_path = Some(path);
-                            state.persistent_settings.keep_view = true;
                         }
                     }
                     if ui.button("Clear").clicked() {
                         state.compare_list.clear();
                     }
                 }
-                if state.is_loaded {
-                    state.persistent_settings.keep_view = false;
-                }
+
             });
             });
 

@@ -194,7 +194,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         Err(e) => {
             warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
             state.persistent_settings = Default::default();
-            state.persistent_settings.save();
+            state.persistent_settings.save_blocking();
         }
     }
 
@@ -717,7 +717,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
-        _ = state.persistent_settings.save();
     }
 
     // check if a new texture has been sent
@@ -812,6 +811,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             FrameSource::Animation => {
                 state.redraw = true;
+            }
+            FrameSource::CompareResult => {
+                state.redraw = false;
             }
         }
 
