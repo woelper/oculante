@@ -31,6 +31,7 @@ use utils::*;
 mod appstate;
 mod image_loader;
 use appstate::*;
+mod filebrowser;
 
 pub mod ktx2_loader;
 // mod events;
@@ -418,11 +419,16 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-            #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 state.redraw = true;
+                #[cfg(feature = "file_open")]
                 browse_for_image_path(state);
+                #[cfg(not(feature = "file_open"))]
+                {
+                    state.filebrowser_id = Some("OPEN_SHORTCUT".into());
+                }
             }
+
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
                     next_image(state)
@@ -712,7 +718,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
-        state.player.load(&p, state.message_channel.0.clone());
+                state.player.load(&p, state.message_channel.0.clone());
         if let Some(dir) = p.parent() {
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
@@ -963,6 +969,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
+
+        if let Some(id) = state.filebrowser_id.take() {
+            ctx.memory_mut(|w| w.open_popup(Id::new(id)));
+        }
+        #[cfg(not(feature = "file_open"))]
+        {
+            if ctx.memory(|w| w.is_popup_open(Id::new("OPEN_SHORTCUT"))) {
+                filebrowser::browse(
+                    false,
+                    |p| {
+                        if let Some(p) = p {
+                            let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                        }
+                        ctx.memory_mut(|w| w.close_popup());
+                    },
+                    ctx,
+                );
+            }
+        }
 
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")

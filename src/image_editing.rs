@@ -3,6 +3,7 @@ use std::fmt;
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 
+use crate::filebrowser;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 
@@ -259,6 +260,27 @@ impl ImageOperation {
                                 }
                             });
 
+                        #[cfg(not(feature = "file_open"))]
+                        {
+                            if ui.button("Load lut").clicked() {
+                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("LUT")));
+                            }
+
+                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
+                                filebrowser::browse(
+                                    false,
+                                    |p| {
+                                        if let Some(p) = p {
+                                            *lut_name = p.to_string_lossy().to_string();
+                                        }
+                                        ui.ctx().memory_mut(|w| w.close_popup());
+                                        x.mark_changed();
+                                    },
+                                    ui.ctx(),
+                                );
+                            }
+                        }
+
                         #[cfg(feature = "file_open")]
                         if ui
                             .button("Load from disk")
@@ -281,6 +303,7 @@ impl ImageOperation {
                             }
                             x.mark_changed();
                         }
+
                         ui.label("Find more LUTs here:");
 
                         ui.hyperlink_to(

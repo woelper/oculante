@@ -1,5 +1,4 @@
-#[cfg(feature = "file_open")]
-use crate::browse_for_image_path;
+use crate::{filebrowser};
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
@@ -1789,13 +1788,33 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // ui.label("Channels");
 
-        #[cfg(feature = "file_open")]
+
         if unframed_button(FOLDER, ui)
             .on_hover_text("Browse for image")
             .clicked()
         {
-            browse_for_image_path(state)
+            #[cfg(feature = "file_open")]
+            crate::browse_for_image_path(state);
+            #[cfg(not(feature = "file_open"))]
+            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
         }
+
+        #[cfg(not(feature = "file_open"))]
+        {
+            if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
+                filebrowser::browse(
+                    false,
+                    |p| {
+                        if let Some(p) = p {
+                            let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                        }
+                        ui.ctx().memory_mut(|w| w.close_popup());
+                    },
+                    ui.ctx(),
+                );
+            }
+        }
+
 
         let mut changed_channels = false;
 
