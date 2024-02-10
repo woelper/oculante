@@ -38,7 +38,7 @@ fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) -> Result
     Ok(())
 }
 
-pub fn recv(port: i32, texture_sender: Sender<Frame>) {
+pub fn recv(port: u16, texture_sender: Sender<Frame>) {
     thread::spawn(move || {
         // FIXME remove unwrap
         let listener = TcpListener::bind(format!("0.0.0.0:{port}")).unwrap();

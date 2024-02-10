@@ -75,6 +75,7 @@ bitflags = "2.4.1"
 flate2 = "1.0.28"
 ruzstd = "0.5.0"
 basis-universal = "0.3.1"
+gumdrop = "0.8.1"
 
 [features]
 heif = ["libheif-rs"]
