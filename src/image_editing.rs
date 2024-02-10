@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::filebrowser;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
+use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 use anyhow::Result;
 use evalexpr::*;
@@ -225,11 +225,6 @@ impl ImageOperation {
             Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::LUT(lut_name) => {
                 ui.scope(|ui| {
-                    // let last_folder: &mut PathBuf = ui.ctx().data_mut(|w| w.get_temp_mut_or_default::<PathBuf>(Id::new("lutsrc")));
-                    let last_folder: Option<PathBuf> = ui
-                        .ctx()
-                        .data_mut(|w| w.get_persisted::<PathBuf>(Id::new("lutsrc")));
-
                     let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
                     ui.vertical(|ui| {
                         let lut_fname = Path::new(lut_name)
@@ -269,11 +264,9 @@ impl ImageOperation {
                             if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
                                 filebrowser::browse_modal(
                                     false,
+                                    SUPPORTED_EXTENSIONS,
                                     |p| {
-                                        if let Some(p) = p {
-                                            *lut_name = p.to_string_lossy().to_string();
-                                        }
-                                        ui.ctx().memory_mut(|w| w.close_popup());
+                                        *lut_name = p.to_string_lossy().to_string();
                                         x.mark_changed();
                                     },
                                     ui.ctx(),
@@ -282,34 +275,44 @@ impl ImageOperation {
                         }
 
                         #[cfg(feature = "file_open")]
-                        if ui
-                            .button("Load from disk")
-                            .on_hover_ui(|ui| {
-                                ui.label("Load Hald CLUT");
-                            })
-                            .clicked()
                         {
-                            if let Some(lut_file) = rfd::FileDialog::new()
-                                .set_directory(last_folder.unwrap_or_default())
-                                .pick_file()
+                            // let last_folder: &mut PathBuf = ui.ctx().data_mut(|w| w.get_temp_mut_or_default::<PathBuf>(Id::new("lutsrc")));
+                            let last_folder: Option<std::path::PathBuf> = ui.ctx().data_mut(|w| {
+                                w.get_persisted::<std::path::PathBuf>(Id::new("lutsrc"))
+                            });
+                            if ui
+                                .button("Load from disk")
+                                .on_hover_ui(|ui| {
+                                    ui.label("Load Hald CLUT");
+                                })
+                                .clicked()
                             {
-                                *lut_name = lut_file.to_string_lossy().to_string();
-                                let parent = lut_file
-                                    .parent()
-                                    .map(|p| p.to_path_buf())
-                                    .unwrap_or_default();
-                                ui.ctx()
-                                    .data_mut(|w| w.insert_persisted(Id::new("lutsrc"), parent));
+                                if let Some(lut_file) = rfd::FileDialog::new()
+                                    .set_directory(last_folder.unwrap_or_default())
+                                    .pick_file()
+                                {
+                                    *lut_name = lut_file.to_string_lossy().to_string();
+                                    let parent = lut_file
+                                        .parent()
+                                        .map(|p| p.to_path_buf())
+                                        .unwrap_or_default();
+                                    ui.ctx().data_mut(|w| {
+                                        w.insert_persisted(Id::new("lutsrc"), parent)
+                                    });
+                                }
+                                x.mark_changed();
                             }
-                            x.mark_changed();
                         }
 
                         ui.label("Find more LUTs here:");
 
-                        ui.hyperlink_to(
-                            "Cédric Eberhardt's collection",
-                            "https://github.com/cedeber/hald-clut",
-                        );
+                        if ui
+                            .link("Cédric Eberhardt's collection")
+                            .on_hover_text("You can find more interesting LUTs here to use")
+                            .clicked()
+                        {
+                            _ = webbrowser::open("https://github.com/cedeber/hald-clut");
+                        }
                     });
                     x
                 })

@@ -978,11 +978,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN_SHORTCUT"))) {
                 filebrowser::browse_modal(
                     false,
+                    SUPPORTED_EXTENSIONS,
                     |p| {
-                        if let Some(p) = p {
-                            let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        }
-                        ctx.memory_mut(|w| w.close_popup());
+                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
                     },
                     ctx,
                 );

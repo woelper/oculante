@@ -88,7 +88,7 @@ pub struct OculanteState {
     pub redraw: bool,
     pub first_start: bool,
     pub toasts: Toasts,
-    pub filebrowser_id: Option<String>
+    pub filebrowser_id: Option<String>,
 }
 
 impl OculanteState {

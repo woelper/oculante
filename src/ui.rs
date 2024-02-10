@@ -1,4 +1,3 @@
-use crate::{filebrowser};
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
@@ -13,6 +12,7 @@ use crate::{
     },
     FrameSource,
 };
+use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24.;
 
@@ -1158,34 +1158,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                #[cfg(not(feature = "file_open"))]
-                ui.horizontal(|ui| {
-                    ui.label("File:");
-                    if let Some(p) = &mut state.current_path {
-                        if let Some(pstem) = p.file_stem() {
-                            let mut stem = pstem.to_string_lossy().to_string();
-                            if ui.text_edit_singleline(&mut stem).changed() {
-                                if let Some(parent) = p.parent() {
-                                    *p = parent
-                                        .join(stem)
-                                        .with_extension(&state.edit_state.export_extension);
-                                }
-                            }
-                        }
-                    }
-                    egui::ComboBox::from_id_source("ext")
-                        .selected_text(&state.edit_state.export_extension)
-                        .width(ui.available_width())
-                        .show_ui(ui, |ui| {
-                            for f in ["png", "jpg", "bmp", "webp", "tif", "tga"] {
-                                ui.selectable_value(
-                                    &mut state.edit_state.export_extension,
-                                    f.to_string(),
-                                    f,
-                                );
-                            }
-                        });
-                });
 
                 #[cfg(feature = "turbo")]
                 jpg_lossless_ui(state, ui);
@@ -1262,26 +1234,23 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     }
 
+
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
 
-                        let start_directory = state.persistent_settings.last_open_directory.clone();
 
-                        let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
-                        let err_sender = state.message_channel.0.clone();
-                        let image_info = state.image_info.clone();
 
                         filebrowser::browse_modal(
                             true,
+                            &["png", "jpg", "bmp", "webp", "tif", "tga"],
                             |p| {
-                                if let Some(p) = p {
-                                    match image_to_save
+                                    match state.edit_state.result_pixel_op
                                     .save(&p) {
                                         Ok(_) => {
                                             _ = msg_sender.send(Message::Saved(p.clone()));
                                             debug!("Saved to {}", p.display());
                                             // Re-apply exif
-                                            if let Some(info) = &image_info {
+                                            if let Some(info) = &state.image_info {
                                                 debug!("Extended image info present");
 
                                                 // before doing anything, make sure we have raw exif data
@@ -1289,7 +1258,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                     if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
                                                         error!("{e}");
                                                     } else {
-                                                        info!("Saved EXIF.")
+                                                        info!("Saved EXIF.");
+                                                        _ = msg_sender.send(Message::Info("Exif metadata was saved to file".into()));
                                                     }
                                                 } else {
                                                     debug!("No raw exif");
@@ -1297,29 +1267,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                             }
                                         }
                                         Err(e) => {
-                                            _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                            _ = msg_sender.send(Message::err(&format!("Error: Could not save: {e}")));
                                         }
-                                    }
-
                                 }
-                                ctx.memory_mut(|w| w.close_popup());
                             },
                             ctx,
                         );
                     }
-
-
-
-
-                         
-                                  
-                                
-
-                    
-
-                        ui.ctx().request_repaint();
-
-                    
                 }
 
                 if let Some(p) = &state.current_path {
@@ -1855,7 +1809,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // ui.label("Channels");
 
-
         if unframed_button(FOLDER, ui)
             .on_hover_text("Browse for image")
             .clicked()
@@ -1871,17 +1824,15 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
                 filebrowser::browse_modal(
                     false,
+                    SUPPORTED_EXTENSIONS,
                     |p| {
-                        if let Some(p) = p {
-                            let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        }
+                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
                         ui.ctx().memory_mut(|w| w.close_popup());
                     },
                     ui.ctx(),
                 );
             }
         }
-
 
         let mut changed_channels = false;
 
