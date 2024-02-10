@@ -718,7 +718,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
-                state.player.load(&p, state.message_channel.0.clone());
+        state.player.load(&p, state.message_channel.0.clone());
         if let Some(dir) = p.parent() {
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
@@ -976,7 +976,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN_SHORTCUT"))) {
-                filebrowser::browse(
+                filebrowser::browse_modal(
                     false,
                     |p| {
                         if let Some(p) = p {

@@ -34,14 +34,18 @@ fn save_recent_dir(p: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egui::Context) {
+pub fn browse_modal<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egui::Context) {
     let mut path = ctx
         .data(|r| r.get_temp::<PathBuf>(Id::new("FBPATH")))
         .unwrap_or(load_recent_dir().unwrap_or_default());
 
+    let mut filename = ctx
+        .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
+        .unwrap_or(String::from("unnamed.png"));
+
     let mut open = true;
 
-    egui::Window::new("Browse")
+    egui::Window::new(if save { "Save" } else { "Open" })
         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
         .collapsible(false)
         .open(&mut open)
@@ -83,6 +87,7 @@ pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egu
                         }
                     },
                 );
+                ui.separator();
 
                 ui.vertical(|ui| {
                     if ui.button(ARROW_BEND_LEFT_UP).clicked() {
@@ -92,9 +97,11 @@ pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egu
                         }
                     }
 
+                    ui.separator();
+
                     egui::ScrollArea::new([false, true])
                         // .max_width(500.)
-                        .min_scrolled_height(500.)
+                        .min_scrolled_height(200.)
                         .auto_shrink([true, false])
                         .show(ui, |ui| match d {
                             Some(contents) => {
@@ -156,7 +163,24 @@ pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egu
                                                     .clicked()
                                                 {
                                                     _ = save_recent_dir(&de.path());
-                                                    callback(Some(&de.path()));
+                                                    if !save {
+                                                        callback(Some(&de.path()));
+                                                    } else {
+                                                        filename = de
+                                                            .path()
+                                                            .to_path_buf()
+                                                            .file_name()
+                                                            .map(|f| {
+                                                                f.to_string_lossy().to_string()
+                                                            })
+                                                            .unwrap_or_default();
+                                                        ui.ctx().data_mut(|w| {
+                                                            w.insert_temp(
+                                                                Id::new("FBFILENAME"),
+                                                                filename.clone(),
+                                                            )
+                                                        });
+                                                    }
                                                     // self.result = Some(de.path().to_path_buf());
                                                 }
                                             }
@@ -168,6 +192,40 @@ pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egu
                                 ui.label("no contents");
                             }
                         });
+                    ui.spacing();
+                    ui.separator();
+
+                    if !save {
+                        if ui.button("Cancel").clicked() {
+                            ctx.memory_mut(|w| w.close_popup());
+                        }
+                    }
+
+                    if save {
+                        ui.horizontal(|ui| {
+                            ui.label("Filename");
+                            if ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut filename)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                ui.ctx().data_mut(|w| {
+                                    w.insert_temp(Id::new("FBFILENAME"), filename.clone())
+                                });
+                            }
+                        });
+
+                        ui.horizontal(|ui| {
+                            if ui.button("Save").clicked() {
+                                callback(Some(&path.join(filename)));
+                            }
+                            if ui.button("Cancel").clicked() {
+                                ctx.memory_mut(|w| w.close_popup());
+                            }
+                        });
+                    }
                 });
             });
 
@@ -177,3 +235,4 @@ pub fn browse<F: FnMut(Option<&PathBuf>)>(save: bool, mut callback: F, ctx: &egu
         ctx.memory_mut(|w| w.close_popup());
     }
 }
+

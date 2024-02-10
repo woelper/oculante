@@ -267,7 +267,7 @@ impl ImageOperation {
                             }
 
                             if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
-                                filebrowser::browse(
+                                filebrowser::browse_modal(
                                     false,
                                     |p| {
                                         if let Some(p) = p {

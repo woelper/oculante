@@ -1255,6 +1255,73 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
+                #[cfg(not(feature = "file_open"))]
+                if state.current_image.is_some() {
+                    if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
+                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
+
+                    }
+
+                    if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
+
+                        let start_directory = state.persistent_settings.last_open_directory.clone();
+
+                        let image_to_save = state.edit_state.result_pixel_op.clone();
+                        let msg_sender = state.message_channel.0.clone();
+                        let err_sender = state.message_channel.0.clone();
+                        let image_info = state.image_info.clone();
+
+                        filebrowser::browse_modal(
+                            true,
+                            |p| {
+                                if let Some(p) = p {
+                                    match image_to_save
+                                    .save(&p) {
+                                        Ok(_) => {
+                                            _ = msg_sender.send(Message::Saved(p.clone()));
+                                            debug!("Saved to {}", p.display());
+                                            // Re-apply exif
+                                            if let Some(info) = &image_info {
+                                                debug!("Extended image info present");
+
+                                                // before doing anything, make sure we have raw exif data
+                                                if info.raw_exif.is_some() {
+                                                    if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
+                                                        error!("{e}");
+                                                    } else {
+                                                        info!("Saved EXIF.")
+                                                    }
+                                                } else {
+                                                    debug!("No raw exif");
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                        }
+                                    }
+
+                                }
+                                ctx.memory_mut(|w| w.close_popup());
+                            },
+                            ctx,
+                        );
+                    }
+
+
+
+
+                         
+                                  
+                                
+
+                    
+
+                        ui.ctx().request_repaint();
+
+                    
+                }
+
                 if let Some(p) = &state.current_path {
                     let text = if p
                         // .with_extension(&state.edit_state.export_extension)
@@ -1802,7 +1869,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         #[cfg(not(feature = "file_open"))]
         {
             if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
-                filebrowser::browse(
+                filebrowser::browse_modal(
                     false,
                     |p| {
                         if let Some(p) = p {
