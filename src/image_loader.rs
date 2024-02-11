@@ -18,8 +18,10 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::SystemTime;
 use tiff::decoder::Limits;
 use usvg::{TreeParsing, TreeTextToPath};
+use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
 use zune_png::PngDecoder;
@@ -429,9 +431,38 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "webp" => {
-            let contents = std::fs::read(img_location)?;
-            let buf = decode_webp(&contents).context("Can't decode webp")?;
-            _ = sender.send(Frame::new_still(buf));
+            // let contents = std::fs::read(img_location)?;
+            // let buf = decode_webp(&contents).context("Can't decode webp")?;
+            // _ = sender.send(Frame::new_still(buf));
+            // return Ok(receiver);
+            let stamp = SystemTime::now();
+
+            let buffer = std::fs::read(img_location)?;
+            info!("Loaded after {}s", stamp.elapsed().unwrap().as_secs_f32());
+
+            let decoder = Decoder::new(&buffer)?;
+            info!("Dec 2 after {}s", stamp.elapsed().unwrap().as_secs_f32());
+
+            let mut last_timestamp = 0;
+
+            let mut last_buffer : Option<Vec<u8>>;
+
+            for frame in decoder.into_iter() {
+                let buf = image::ImageBuffer::from_raw(
+                    frame.dimensions().0,
+                    frame.dimensions().1,
+                    frame.data().to_vec(),
+                )
+                .context("Can't create imagebuffer from webp")?;
+                let t = frame.timestamp();
+                let delay = t - last_timestamp;
+                debug!("time {t} {delay}");
+                last_timestamp = t;
+                _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+            }
+
+            // TODO: Use thread for animation and return receiver immediately
+
             return Ok(receiver);
         }
         "png" => {

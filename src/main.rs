@@ -55,7 +55,9 @@ pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf")
 #[notan_main]
 fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "warning");
+        std::env::set_var("RUST_LOG", "info");
+        let _ = env_logger::try_init();
+
     }
     // on debug builds, override log level
     #[cfg(debug_assertions)]
