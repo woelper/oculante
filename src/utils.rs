@@ -190,6 +190,7 @@ pub struct Player {
 }
 
 impl Player {
+    /// Create a new Player
     pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
@@ -226,14 +227,23 @@ impl Player {
         }
     }
 
-    pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
+    pub fn load_advanced(
+        &mut self,
+        img_location: &Path,
+        forced_frame_source: Option<FrameSource>,
+        message_sender: Sender<Message>,
+    ) {
         debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
 
         if let Some(cached_image) = self.cache.get(img_location) {
-            _ = self.image_sender.send(Frame::new_still(cached_image));
+            let mut frame = Frame::new_still(cached_image);
+            if let Some(fs) = forced_frame_source {
+                frame.source = fs;
+            }
+            _ = self.image_sender.send(frame);
             info!("Cache hit for {}", img_location.display());
             return;
         }
@@ -244,6 +254,7 @@ impl Player {
             message_sender,
             stop_receiver,
             self.max_texture_size,
+            forced_frame_source,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -251,6 +262,10 @@ impl Player {
                 self.watcher.insert(img_location.into(), modified);
             }
         }
+    }
+
+    pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
+        self.load_advanced(img_location, None, message_sender);
     }
 
     pub fn stop(&self) {
@@ -264,6 +279,7 @@ pub fn send_image_threaded(
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
     max_texture_size: u32,
+    forced_frame_source: Option<FrameSource>,
 ) {
     let loc = img_location.to_owned();
 
@@ -278,7 +294,10 @@ pub fn send_image_threaded(
                 // .send(Frame::new_reset(f.buffer.clone()));
 
                 let mut first = true;
-                for f in frame_receiver.iter() {
+                for mut f in frame_receiver.iter() {
+                    if let Some(ref fs) = forced_frame_source {
+                        f.source = fs.clone();
+                    }
                     if stop_receiver.try_recv().is_ok() {
                         info!("Stopped from receiver.");
                         return;
@@ -304,6 +323,7 @@ pub fn send_image_threaded(
                             );
 
                             let mut frame = f;
+
                             let op = ImageOperation::Resize {
                                 dimensions: new_dimensions,
                                 aspect: true,
@@ -372,6 +392,7 @@ pub enum FrameSource {
     AnimationStart,
     Still,
     EditResult,
+    CompareResult,
 }
 
 /// A single frame
@@ -795,9 +816,12 @@ pub fn compare_next(state: &mut OculanteState) {
             state.image_geometry = geo.clone();
             state.is_loaded = false;
             state.current_image = None;
-            state.player.load(path, state.message_channel.0.clone());
+            state.player.load_advanced(
+                path,
+                Some(FrameSource::CompareResult),
+                state.message_channel.0.clone(),
+            );
             state.current_path = Some(path.clone());
-            state.persistent_settings.keep_view = true;
         }
     }
 }

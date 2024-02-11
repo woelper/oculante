@@ -88,6 +88,7 @@ pub struct OculanteState {
     pub redraw: bool,
     pub first_start: bool,
     pub toasts: Toasts,
+    pub filebrowser_id: Option<String>,
 }
 
 impl OculanteState {
@@ -147,6 +148,7 @@ impl Default for OculanteState {
             redraw: Default::default(),
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
+            filebrowser_id: None,
         }
     }
 }

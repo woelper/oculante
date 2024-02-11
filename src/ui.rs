@@ -1,5 +1,3 @@
-#[cfg(feature = "file_open")]
-use crate::browse_for_image_path;
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
@@ -12,7 +10,10 @@ use crate::{
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
+    FrameSource,
 };
+#[cfg(not(feature = "file_open"))]
+use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24.;
 
@@ -177,13 +178,11 @@ impl EguiExt for Ui {
     }
 }
 
-
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
         let tex_id = gfx.egui_register_texture(texture);
-
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -207,9 +206,8 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             tex_id.id,
             image_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE
+            Color32::WHITE,
         );
-
     }
 
     // state.image_geometry.scale;
@@ -385,22 +383,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     for (path, geo) in compare_list {
                         if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                             state.image_geometry = geo.clone();
-                            state.is_loaded = false;
-                            state.current_image = None;
                             state
                                 .player
-                                .load(&path, state.message_channel.0.clone());
+                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
                             state.current_path = Some(path);
-                            state.persistent_settings.keep_view = true;
                         }
                     }
                     if ui.button("Clear").clicked() {
                         state.compare_list.clear();
                     }
                 }
-                if state.is_loaded {
-                    state.persistent_settings.keep_view = false;
-                }
+
             });
             });
 
@@ -1166,34 +1159,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                #[cfg(not(feature = "file_open"))]
-                ui.horizontal(|ui| {
-                    ui.label("File:");
-                    if let Some(p) = &mut state.current_path {
-                        if let Some(pstem) = p.file_stem() {
-                            let mut stem = pstem.to_string_lossy().to_string();
-                            if ui.text_edit_singleline(&mut stem).changed() {
-                                if let Some(parent) = p.parent() {
-                                    *p = parent
-                                        .join(stem)
-                                        .with_extension(&state.edit_state.export_extension);
-                                }
-                            }
-                        }
-                    }
-                    egui::ComboBox::from_id_source("ext")
-                        .selected_text(&state.edit_state.export_extension)
-                        .width(ui.available_width())
-                        .show_ui(ui, |ui| {
-                            for f in ["png", "jpg", "bmp", "webp", "tif", "tga"] {
-                                ui.selectable_value(
-                                    &mut state.edit_state.export_extension,
-                                    f.to_string(),
-                                    f,
-                                );
-                            }
-                        });
-                });
 
                 #[cfg(feature = "turbo")]
                 jpg_lossless_ui(state, ui);
@@ -1260,6 +1225,55 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                         ui.ctx().request_repaint();
 
+                    }
+                }
+
+                #[cfg(not(feature = "file_open"))]
+                if state.current_image.is_some() {
+                    if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
+                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
+
+                    }
+
+
+                    if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
+
+
+                        let msg_sender = state.message_channel.0.clone();
+
+                        filebrowser::browse_modal(
+                            true,
+                            &["png", "jpg", "bmp", "webp", "tif", "tga"],
+                            |p| {
+                                    match state.edit_state.result_pixel_op
+                                    .save(&p) {
+                                        Ok(_) => {
+                                            _ = msg_sender.send(Message::Saved(p.clone()));
+                                            debug!("Saved to {}", p.display());
+                                            // Re-apply exif
+                                            if let Some(info) = &state.image_info {
+                                                debug!("Extended image info present");
+
+                                                // before doing anything, make sure we have raw exif data
+                                                if info.raw_exif.is_some() {
+                                                    if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
+                                                        error!("{e}");
+                                                    } else {
+                                                        info!("Saved EXIF.");
+                                                        _ = msg_sender.send(Message::Info("Exif metadata was saved to file".into()));
+                                                    }
+                                                } else {
+                                                    debug!("No raw exif");
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            _ = msg_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                        }
+                                }
+                            },
+                            ctx,
+                        );
                     }
                 }
 
@@ -1796,12 +1810,29 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // ui.label("Channels");
 
-        #[cfg(feature = "file_open")]
         if unframed_button(FOLDER, ui)
             .on_hover_text("Browse for image")
             .clicked()
         {
-            browse_for_image_path(state)
+            #[cfg(feature = "file_open")]
+            crate::browse_for_image_path(state);
+            #[cfg(not(feature = "file_open"))]
+            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+        }
+
+        #[cfg(not(feature = "file_open"))]
+        {
+            if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
+                filebrowser::browse_modal(
+                    false,
+                    SUPPORTED_EXTENSIONS,
+                    |p| {
+                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                        ui.ctx().memory_mut(|w| w.close_popup());
+                    },
+                    ui.ctx(),
+                );
+            }
         }
 
         let mut changed_channels = false;

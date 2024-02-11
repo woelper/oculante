@@ -31,6 +31,8 @@ use utils::*;
 mod appstate;
 mod image_loader;
 use appstate::*;
+#[cfg(not(feature = "file_open"))]
+mod filebrowser;
 
 pub mod ktx2_loader;
 // mod events;
@@ -196,7 +198,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         Err(e) => {
             warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
             state.persistent_settings = Default::default();
-            state.persistent_settings.save();
+            state.persistent_settings.save_blocking();
         }
     }
 
@@ -420,11 +422,16 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-            #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 state.redraw = true;
+                #[cfg(feature = "file_open")]
                 browse_for_image_path(state);
+                #[cfg(not(feature = "file_open"))]
+                {
+                    state.filebrowser_id = Some("OPEN_SHORTCUT".into());
+                }
             }
+
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
                     next_image(state)
@@ -719,7 +726,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
-        _ = state.persistent_settings.save();
     }
 
     // check if a new texture has been sent
@@ -814,6 +820,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             FrameSource::Animation => {
                 state.redraw = true;
+            }
+            FrameSource::CompareResult => {
+                state.redraw = false;
             }
         }
 
@@ -963,6 +972,23 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
+
+        if let Some(id) = state.filebrowser_id.take() {
+            ctx.memory_mut(|w| w.open_popup(Id::new(id)));
+        }
+        #[cfg(not(feature = "file_open"))]
+        {
+            if ctx.memory(|w| w.is_popup_open(Id::new("OPEN_SHORTCUT"))) {
+                filebrowser::browse_modal(
+                    false,
+                    SUPPORTED_EXTENSIONS,
+                    |p| {
+                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                    },
+                    ctx,
+                );
+            }
+        }
 
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")
