@@ -1,7 +1,6 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
 use crate::{ktx2_loader, FONT};
-use libwebp_sys::{WebPDecodeRGBA, WebPGetInfo};
 use log::{debug, error, info};
 use psd::Psd;
 
@@ -18,7 +17,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::SystemTime;
 use tiff::decoder::Limits;
 use usvg::{TreeParsing, TreeTextToPath};
 use webp_animation::prelude::*;
@@ -437,10 +435,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // return Ok(receiver);
 
             let buffer = std::fs::read(img_location)?;
-
-            let decoder = Decoder::new(&buffer)?;
-
-            let mut dec_iter = decoder.into_iter();
+            let mut decoder = Decoder::new(&buffer)?.into_iter();
 
             let mut last_timestamp = 0;
 
@@ -448,7 +443,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let mut i = 0;
 
             loop {
-                if let Some(frame) = dec_iter.next() {
+                if let Some(frame) = decoder.next() {
                     if frames.len() > 1 {
                         if let Some(last) = frames.pop() {
                             _ = sender.send(last);
@@ -472,12 +467,15 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             }
 
             if i == 1 {
-                info!("This is a still");
+                debug!("This is a still");
                 if let Some(mut last) = frames.pop() {
                     last.source = FrameSource::Still;
                     _ = sender.send(last);
                 }
-                // _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+            } else {
+                for f in frames {
+                    _ = sender.send(f);
+                }
             }
 
             // TODO: Use thread for animation and return receiver immediately
@@ -679,21 +677,6 @@ fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
     let mut tm = tonemap_rgba([px[0], px[1], px[2], 1.0]);
     tm[3] = 255;
     tm
-}
-
-// Unsafe webp decoding using webp-sys
-fn decode_webp(buf: &[u8]) -> Option<RgbaImage> {
-    let mut width = 0;
-    let mut height = 0;
-    let len = buf.len();
-    let webp_buffer: Vec<u8>;
-    unsafe {
-        WebPGetInfo(buf.as_ptr(), len, &mut width, &mut height);
-        let out_buf = WebPDecodeRGBA(buf.as_ptr(), len, &mut width, &mut height);
-        let len = width * height * 4;
-        webp_buffer = Vec::from_raw_parts(out_buf, len as usize, len as usize);
-    }
-    image::ImageBuffer::from_raw(width as u32, height as u32, webp_buffer)
 }
 
 fn u16_to_u8(p: u16) -> u8 {
