@@ -435,30 +435,49 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             // let buf = decode_webp(&contents).context("Can't decode webp")?;
             // _ = sender.send(Frame::new_still(buf));
             // return Ok(receiver);
-            let stamp = SystemTime::now();
 
             let buffer = std::fs::read(img_location)?;
-            info!("Loaded after {}s", stamp.elapsed().unwrap().as_secs_f32());
 
             let decoder = Decoder::new(&buffer)?;
-            info!("Dec 2 after {}s", stamp.elapsed().unwrap().as_secs_f32());
+
+            let mut dec_iter = decoder.into_iter();
 
             let mut last_timestamp = 0;
 
-            let mut last_buffer : Option<Vec<u8>>;
+            let mut frames = vec![];
+            let mut i = 0;
 
-            for frame in decoder.into_iter() {
-                let buf = image::ImageBuffer::from_raw(
-                    frame.dimensions().0,
-                    frame.dimensions().1,
-                    frame.data().to_vec(),
-                )
-                .context("Can't create imagebuffer from webp")?;
-                let t = frame.timestamp();
-                let delay = t - last_timestamp;
-                debug!("time {t} {delay}");
-                last_timestamp = t;
-                _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+            loop {
+                if let Some(frame) = dec_iter.next() {
+                    if frames.len() > 1 {
+                        if let Some(last) = frames.pop() {
+                            _ = sender.send(last);
+                        }
+                    }
+                    let buf = image::ImageBuffer::from_raw(
+                        frame.dimensions().0,
+                        frame.dimensions().1,
+                        frame.data().to_vec(),
+                    )
+                    .context("Can't create imagebuffer from webp")?;
+                    let t = frame.timestamp();
+                    let delay = t - last_timestamp;
+                    debug!("time {t} {delay}");
+                    last_timestamp = t;
+                    frames.push(Frame::new(buf, delay as u16, FrameSource::Animation));
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+
+            if i == 1 {
+                info!("This is a still");
+                if let Some(mut last) = frames.pop() {
+                    last.source = FrameSource::Still;
+                    _ = sender.send(last);
+                }
+                // _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
             }
 
             // TODO: Use thread for animation and return receiver immediately
