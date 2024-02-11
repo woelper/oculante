@@ -2180,6 +2180,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     }
                 });
 
+                if ui.button("Quit").clicked() {
+                    app.backend.exit();
+                }
+
                 // TODO: expose favourites with a tool button
                 // ui.menu_button("Favourites", |ui| {
                 //     for r in &state.persistent_settings.favourite_images.clone() {
