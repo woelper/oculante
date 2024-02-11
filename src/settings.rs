@@ -99,7 +99,7 @@ impl PersistentSettings {
     }
 
     // save settings in a thread so we don't block
-    pub fn save(&self) {
+    pub fn save_threaded(&self) {
         let settings = self.clone();
         std::thread::spawn(move || {
             _ = save(&settings);
@@ -114,7 +114,7 @@ impl PersistentSettings {
 fn save(s: &PersistentSettings) -> Result<()> {
     let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
     let f = File::create(local_dir.join(".oculante"))?;
-    Ok(serde_json::to_writer_pretty(f, s)?)
+    Ok(serde_json::to_writer(f, s)?)
 }
 
 pub fn set_system_theme(ctx: &Context) {
