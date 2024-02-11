@@ -5,6 +5,7 @@ use std::path::Path;
 
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
+#[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 use anyhow::Result;

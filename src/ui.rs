@@ -12,6 +12,7 @@ use crate::{
     },
     FrameSource,
 };
+#[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24.;

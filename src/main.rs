@@ -31,6 +31,7 @@ use utils::*;
 mod appstate;
 mod image_loader;
 use appstate::*;
+#[cfg(not(feature = "file_open"))]
 mod filebrowser;
 
 pub mod ktx2_loader;
