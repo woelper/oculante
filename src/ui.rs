@@ -2051,155 +2051,166 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().request_frame();
         }
 
-        #[cfg(not(target_os = "netbsd"))]
-        if state.persistent_settings.borderless {
-            let r = ui.interact(
-                ui.available_rect_before_wrap(),
-                Id::new("drag"),
-                Sense::click_and_drag(),
-            );
-
-            if r.dragged() {
-                // improve responsiveness
-                app.window().request_frame();
-                let position = Mouse::get_mouse_position();
-                match position {
-                    Mouse::Position { mut x, mut y } => {
-                        // translate mouse pos into real pixels
-                        let dpi = app.backend.window().dpi();
-                        x = (x as f64 * dpi) as i32;
-                        y = (y as f64 * dpi) as i32;
-
-                        let offset = match ui
-                            .ctx()
-                            .memory(|r| r.data.get_temp::<(i32, i32)>("offset".into()))
-                        {
-                            Some(o) => o,
-                            None => {
-                                let window_pos = app.window().position();
-                                let offset = (window_pos.0 - x, window_pos.1 - y);
-                                ui.ctx()
-                                    .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
-                                offset
-                            }
-                        };
-                        app.window().set_position(x + offset.0, y + offset.1);
-                    }
-                    Mouse::Error => error!("Error getting mouse position"),
-                }
-            }
-            if r.drag_released() {
-                ui.ctx()
-                    .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
-            }
-        }
+       drag_area(ui, state, app);
 
         ui.add_space(ui.available_width() - 32.);
-
-        ui.scope(|ui| {
-            // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
-            // maybe override font size?
-            ui.style_mut().visuals.button_frame = false;
-            ui.style_mut().visuals.widgets.inactive.expansion = 20.;
+        draw_hamburger_menu(ui, state, app);
+        
+    });
+}
 
 
-            ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
+pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+    use crate::shortcuts::InputEvent::*;
 
-            ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
-                if ui.button("Reset view").clicked() {
-                    state.reset_image = true;
-                    ui.close_menu();
-                }
-                if ui.button("View 1:1").clicked() {
-                    set_zoom(
-                        1.0,
-                        Some(nalgebra::Vector2::new(
-                            app.window().width() as f32 / 2.,
-                            app.window().height() as f32 / 2.,
-                        )),
-                        state,
-                    );
-                    ui.close_menu();
-                }
+    ui.scope(|ui| {
+        // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
+        // maybe override font size?
+        ui.style_mut().visuals.button_frame = false;
+        ui.style_mut().visuals.widgets.inactive.expansion = 20.;
 
-                let copy_pressed = key_pressed(app, state, Copy);
-                if let Some(img) = &state.current_image {
-                    if ui
-                        .button("🗐 Copy")
-                        .on_hover_text("Copy image to clipboard")
-                        .clicked()
-                        || copy_pressed
-                    {
-                        clipboard_copy(img);
-                        ui.close_menu();
-                    }
-                }
 
+        ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
+
+        ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
+            if ui.button("Reset view").clicked() {
+                state.reset_image = true;
+                ui.close_menu();
+            }
+            if ui.button("View 1:1").clicked() {
+                set_zoom(
+                    1.0,
+                    Some(nalgebra::Vector2::new(
+                        app.window().width() as f32 / 2.,
+                        app.window().height() as f32 / 2.,
+                    )),
+                    state,
+                );
+                ui.close_menu();
+            }
+
+            let copy_pressed = key_pressed(app, state, Copy);
+            if let Some(img) = &state.current_image {
                 if ui
-                    .button("📋 Paste")
-                    .on_hover_text("Paste image from clipboard")
+                    .button("🗐 Copy")
+                    .on_hover_text("Copy image to clipboard")
                     .clicked()
-                    || key_pressed(app, state, Paste)
+                    || copy_pressed
                 {
-                    if let Ok(clipboard) = &mut Clipboard::new() {
-                        if let Ok(imagedata) = clipboard.get_image() {
-                            if let Some(image) = image::RgbaImage::from_raw(
-                                imagedata.width as u32,
-                                imagedata.height as u32,
-                                (imagedata.bytes).to_vec(),
-                            ) {
-                                state.current_path = None;
-                                // Stop in the even that an animation is running
-                                state.player.stop();
-                                _ = state
-                                    .player
-                                    .image_sender
-                                    .send(crate::utils::Frame::new_still(image));
-                                // Since pasted data has no path, make sure it's not set
-                                state.send_message_info("Image pasted");
-                            }
-                        } else {
-                            state.send_message_err("Clipboard did not contain image")
-                        }
-                    }
+                    clipboard_copy(img);
                     ui.close_menu();
                 }
+            }
 
-                if ui.button("⛭ Preferences").clicked() {
-                    state.settings_enabled = !state.settings_enabled;
-                    ui.close_menu();
+            if ui
+                .button("📋 Paste")
+                .on_hover_text("Paste image from clipboard")
+                .clicked()
+                || key_pressed(app, state, Paste)
+            {
+                if let Ok(clipboard) = &mut Clipboard::new() {
+                    if let Ok(imagedata) = clipboard.get_image() {
+                        if let Some(image) = image::RgbaImage::from_raw(
+                            imagedata.width as u32,
+                            imagedata.height as u32,
+                            (imagedata.bytes).to_vec(),
+                        ) {
+                            state.current_path = None;
+                            // Stop in the even that an animation is running
+                            state.player.stop();
+                            _ = state
+                                .player
+                                .image_sender
+                                .send(crate::utils::Frame::new_still(image));
+                            // Since pasted data has no path, make sure it's not set
+                            state.send_message_info("Image pasted");
+                        }
+                    } else {
+                        state.send_message_err("Clipboard did not contain image")
+                    }
                 }
+                ui.close_menu();
+            }
 
-                ui.menu_button("Recent", |ui| {
-                    for r in &state.persistent_settings.recent_images.clone() {
-                        if let Some(filename) = r.file_name() {
-                            if ui.button(filename.to_string_lossy()).clicked() {
-                                load_image_from_path(r, state);
-                                ui.close_menu();
-                            }
+            if ui.button("⛭ Preferences").clicked() {
+                state.settings_enabled = !state.settings_enabled;
+                ui.close_menu();
+            }
+
+            ui.menu_button("Recent", |ui| {
+                for r in &state.persistent_settings.recent_images.clone() {
+                    if let Some(filename) = r.file_name() {
+                        if ui.button(filename.to_string_lossy()).clicked() {
+                            load_image_from_path(r, state);
+                            ui.close_menu();
                         }
                     }
-                });
-
-                if ui.button("Quit").clicked() {
-                    app.backend.exit();
                 }
-
-                // TODO: expose favourites with a tool button
-                // ui.menu_button("Favourites", |ui| {
-                //     for r in &state.persistent_settings.favourite_images.clone() {
-                //         if let Some(filename) = r.file_name() {
-                //             if ui.button(filename.to_string_lossy()).clicked() {
-                //ui.close_menu();
-
-                //             }
-                //         }
-                //     }
-
-                // });
             });
+
+            if ui.button("Quit").clicked() {
+                app.backend.exit();
+            }
+
+            // TODO: expose favourites with a tool button
+            // ui.menu_button("Favourites", |ui| {
+            //     for r in &state.persistent_settings.favourite_images.clone() {
+            //         if let Some(filename) = r.file_name() {
+            //             if ui.button(filename.to_string_lossy()).clicked() {
+            //ui.close_menu();
+
+            //             }
+            //         }
+            //     }
 
             // });
         });
+
+        // });
     });
+}
+
+pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+    #[cfg(not(target_os = "netbsd"))]
+    if state.persistent_settings.borderless {
+        let r = ui.interact(
+            ui.available_rect_before_wrap(),
+            Id::new("drag"),
+            Sense::click_and_drag(),
+        );
+
+        if r.dragged() {
+            // improve responsiveness
+            app.window().request_frame();
+            let position = Mouse::get_mouse_position();
+            match position {
+                Mouse::Position { mut x, mut y } => {
+                    // translate mouse pos into real pixels
+                    let dpi = app.backend.window().dpi();
+                    x = (x as f64 * dpi) as i32;
+                    y = (y as f64 * dpi) as i32;
+
+                    let offset = match ui
+                        .ctx()
+                        .memory(|r| r.data.get_temp::<(i32, i32)>("offset".into()))
+                    {
+                        Some(o) => o,
+                        None => {
+                            let window_pos = app.window().position();
+                            let offset = (window_pos.0 - x, window_pos.1 - y);
+                            ui.ctx()
+                                .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
+                            offset
+                        }
+                    };
+                    app.window().set_position(x + offset.0, y + offset.1);
+                }
+                Mouse::Error => error!("Error getting mouse position"),
+            }
+        }
+        if r.drag_released() {
+            ui.ctx()
+                .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
+        }
+    }
 }
