@@ -59,7 +59,6 @@ fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");
         let _ = env_logger::try_init();
-
     }
     // on debug builds, override log level
     #[cfg(debug_assertions)]
@@ -120,6 +119,7 @@ fn main() -> Result<(), String> {
         Ok(settings) => {
             window_config.vsync = settings.vsync;
             window_config.lazy_loop = !settings.force_redraw;
+            window_config.decorations = !settings.borderless;
             if settings.window_geometry != Default::default() {
                 window_config.width = settings.window_geometry.1 .0 as u32;
                 window_config.height = settings.window_geometry.1 .1 as u32;
@@ -996,6 +996,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .default_height(30.)
                 .show(ctx, |ui| {
                     main_menu(ui, state, app, gfx);
+                });
+        }
+        if state.persistent_settings.zen_mode && state.persistent_settings.borderless {
+            egui::TopBottomPanel::top("menu_zen")
+                .min_height(40.)
+                .default_height(40.)
+                .show_separator_line(false)
+                .frame(egui::containers::Frame::none())
+                .show(ctx, |ui| {
+
+                    ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                        drag_area(ui, state, app);
+                        ui.add_space(15.);
+                        draw_hamburger_menu(ui, state, app);
+                    });
                 });
         }
 
