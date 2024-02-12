@@ -304,6 +304,9 @@ pub fn send_image_threaded(
                     }
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
+
+                        info!("Received image in {:?}", timer.elapsed());
+
                         let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
                         // Check if texture is too large to fit on the texture
