@@ -1110,9 +1110,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
-    if egui_output.needs_repaint() {
-        app.window().request_frame();
-    }
 }
 
 // Show file browser to select image to load
