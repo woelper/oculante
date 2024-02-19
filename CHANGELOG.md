@@ -1,3 +1,22 @@
+# 0.8.8 (2024-02-19)
+
+### :beetle: Bug Fixes
+
+* Prevent "Do not reset image view" being reset (4e06ca71)
+
+### :sparkles: Features
+
+* Allow opening of webp animations (8cfb3a40)
+* Use custom filebrowser instead of rfd (de581a9f)
+* Enable borderless mode and allow to toggle via settings menu (01d48256)
+* add 3x3 Filter operator (8ce56fad)
+* scale to available ui area (89969e13)
+
+### :green_apple: Chore
+
+* Update notan (f163e3c8)
+* Update rfd and strum (0b2d246e)
+
 # 0.8.7 (2024-01-27)
 
 ### :sparkles: Features
