@@ -4,6 +4,10 @@
 _A no-nonsense hardware-accelerated image viewer_
 
 
+
+
+[<img src="https://img.shields.io/badge/Download-blue">](https://github.com/woelper/oculante/releases/latest)
+
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
 - Free of charge, bloat-free, ad-free, privacy-respecting open source application
 - Fast opening of images, fast startup
