@@ -1,3 +1,10 @@
+# 0.8.9 (2024-02-21)
+
+### :sparkles: Features
+
+* Only redraw when needed on windows (less cpu/gpu usage) (bffccf7f)
+* App Id is now available for wayland (db7afa31)
+
 # 0.8.8 (2024-02-19)
 
 ### :beetle: Bug Fixes
