@@ -76,12 +76,13 @@ fn main() -> Result<(), String> {
         .set_window_icon_data(Some(icon_data))
         .set_taskbar_icon_data(Some(icon_data))
         .set_multisampling(0)
+        .set_app_id("oculante")
         .set_min_size(200, 200);
 
     #[cfg(target_os = "windows")]
     {
         window_config = window_config
-            // .set_lazy_loop(true)
+            .set_lazy_loop(true)
             .set_vsync(true)
             .set_high_dpi(true);
     }
