@@ -82,7 +82,7 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         window_config = window_config
-            .set_lazy_loop(true)
+            .set_lazy_loop(true) // don't redraw every frame on windows
             .set_vsync(true)
             .set_high_dpi(true);
     }
