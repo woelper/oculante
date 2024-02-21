@@ -2051,14 +2051,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().request_frame();
         }
 
-       drag_area(ui, state, app);
+        drag_area(ui, state, app);
 
         ui.add_space(ui.available_width() - 32.);
         draw_hamburger_menu(ui, state, app);
-        
     });
 }
-
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     use crate::shortcuts::InputEvent::*;
@@ -2068,7 +2066,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         // maybe override font size?
         ui.style_mut().visuals.button_frame = false;
         ui.style_mut().visuals.widgets.inactive.expansion = 20.;
-
 
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
