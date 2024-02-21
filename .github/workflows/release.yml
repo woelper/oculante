@@ -18,6 +18,8 @@ jobs:
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
     - uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
     - name: Install kokai
       run: cargo install kokai
     - name: Make changelog
@@ -31,7 +33,7 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: true
-        body_path: changes
+        body_path: ./changes
 
   build_job:
     name: Build release
