@@ -154,7 +154,7 @@ fn main() -> Result<(), String> {
         .build()
 }
 
-fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
+fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     info!("Now matching arguments {:?}", std::env::args());
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
@@ -257,6 +257,8 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
 
     // Set up egui style
     plugins.egui(|ctx| {
+        // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
+        ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
         fonts
@@ -1006,7 +1008,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .show_separator_line(false)
                 .frame(egui::containers::Frame::none())
                 .show(ctx, |ui| {
-
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                         drag_area(ui, state, app);
                         ui.add_space(15.);
