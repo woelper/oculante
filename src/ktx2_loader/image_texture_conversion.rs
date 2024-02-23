@@ -4,7 +4,7 @@ use crate::ktx2_loader::Image;
 
 use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
-use log::info;
+use log::{debug, info};
 use thiserror::Error;
 use wgpu::TextureFormat;
 
@@ -21,17 +21,17 @@ impl Image {
     ///
     /// To convert [`Image`] to a different format see: [`Image::convert`].
     pub fn try_into_dynamic(self) -> Result<DynamicImage, IntoDynamicImageError> {
-        info!(
+        debug!(
             "Attemting to interpret format {:?}",
             self.texture_descriptor.format
         );
-        info!("Mip levels: {:?}", self.texture_descriptor.mip_level_count);
-        info!(
+        debug!("Mip levels: {:?}", self.texture_descriptor.mip_level_count);
+        debug!(
             "Array Layers {:?}",
             self.texture_descriptor.array_layer_count()
         );
-        info!("Size {:?}", self.texture_descriptor.size);
-        info!("W x H {}x{}", self.width(), self.height());
+        debug!("Size {:?}", self.texture_descriptor.size);
+        debug!("W x H {}x{}", self.width(), self.height());
         match self.texture_descriptor.format {
             TextureFormat::R8Unorm => ImageBuffer::from_raw(self.width(), self.height(), self.data)
                 .map(DynamicImage::ImageLuma8),

@@ -85,11 +85,11 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     if let Ok(oculante_exe) = std::env::current_exe() {
         match file_arg.lock().unwrap().as_ref() {
             Some(f) => {
-                info!("Chainloaing {:?} with {}", oculante_exe, f);
+                info!("Chainloading {:?} with {}", oculante_exe, f);
                 let _ = Command::new(oculante_exe).args(&[&f, "-c"]).spawn();
             }
             None => {
-                info!("Chainloaing {:?} with -c arg", oculante_exe);
+                info!("Chainloading {:?} with -c arg", oculante_exe);
                 let _ = Command::new(oculante_exe).args(&["-c"]).spawn();
             }
         }

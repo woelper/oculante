@@ -207,12 +207,8 @@ impl Player {
 
     pub fn check_modified(&mut self, path: &Path, message_sender: Sender<Message>) {
         if let Some(watched_mod) = self.watcher.get(path) {
-            // info!("{:?}", self.watcher);
-
             if let Ok(meta) = std::fs::metadata(path) {
                 if let Ok(modified) = meta.modified() {
-                    // info!("Read from meta {:?} stored: {:?}", modified, watched_mod);
-
                     if watched_mod != &modified {
                         debug!(
                             "Modified! read from meta {:?} stored: {:?}",
@@ -244,7 +240,7 @@ impl Player {
                 frame.source = fs;
             }
             _ = self.image_sender.send(frame);
-            info!("Cache hit for {}", img_location.display());
+            debug!("Cache hit for {}", img_location.display());
             return;
         }
 
@@ -299,12 +295,12 @@ pub fn send_image_threaded(
                         f.source = fs.clone();
                     }
                     if stop_receiver.try_recv().is_ok() {
-                        info!("Stopped from receiver.");
+                        debug!("Stopped from receiver.");
                         return;
                     }
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
-                        info!("Received image in {:?}", timer.elapsed());
+                        debug!("Received image in {:?}", timer.elapsed());
 
                         let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
@@ -360,7 +356,7 @@ pub fn send_image_threaded(
                     // let frames = col.frames.clone();
                     for frame in &framecache {
                         if stop_receiver.try_recv().is_ok() {
-                            info!("Stopped from receiver.");
+                            debug!("Stopped from receiver.");
                             return;
                         }
                         let _ = texture_sender.send(frame.clone());

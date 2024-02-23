@@ -198,9 +198,6 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     let mut fontdb = usvg::fontdb::Database::new();
                     fontdb.load_system_fonts();
                     fontdb.load_font_data(FONT.to_vec());
-                    // for f in fontdb.faces() {
-                    //     info!("{:?}",f.post_script_name);
-                    // }
                     fontdb.set_cursive_family("Inter");
                     fontdb.set_sans_serif_family("Inter");
                     fontdb.set_serif_family("Inter");
@@ -648,7 +645,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         },
         _ => {
             // All other supported image files are handled by using `image`
-            info!("Loading using image library");
+            debug!("Loading using image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
             _ = sender.send(Frame::new_still(img.to_rgba8()));

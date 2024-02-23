@@ -855,7 +855,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 state.cursor_relative.x as u32,
                                 state.cursor_relative.y as u32,
                             ) {
-                                info!("{:?}", p);
+                                debug!("{:?}", p);
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -1010,7 +1010,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             state.cursor_relative.x / state.image_dimension.0 as f32,
                             (state.cursor_relative.y / state.image_dimension.1 as f32),
                         );
-                        // info!("pnt @ {:?}", uv);
                         current_stroke.points.push(uv);
                         pixels_changed = true;
                     } else if !current_stroke.is_empty() {
@@ -1055,7 +1054,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             error!("{e}")
                         }
                     }
-                    info!(
+                    debug!(
                         "Image changed. Finished evaluating in {}s",
                         stamp.elapsed().as_secs_f32()
                     );
@@ -1082,7 +1081,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 }
 
-                                info!(
+                                debug!(
                     "Finished Pixel op stack in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
@@ -1111,7 +1110,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                info!(
+                debug!(
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
@@ -1145,7 +1144,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 &state.edit_state.brushes,
                             );
                             stroke.committed = true;
-                            info!("Committed stroke {}", i);
+                            debug!("Committed stroke {}", i);
                         }
                     }
                 }

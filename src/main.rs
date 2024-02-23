@@ -143,7 +143,7 @@ fn main() -> Result<(), String> {
     window_config.min_size = Some((1, 1));
     window_config.max_size = None;
 
-    info!("Starting oculante.");
+    debug!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
         .add_config(EguiConfig)
@@ -155,7 +155,7 @@ fn main() -> Result<(), String> {
 }
 
 fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
-    info!("Now matching arguments {:?}", std::env::args());
+    debug!("Now matching arguments {:?}", std::env::args());
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
@@ -795,7 +795,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     } else if let Some(parent) = p.parent() {
                         debug!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
-                            info!("is file {}", parent.join(".oculante").display());
+                            debug!("is file {}", parent.join(".oculante").display());
 
                             if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
@@ -1039,24 +1039,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        // if !state.is_loaded {
-        //     egui::TopBottomPanel::bottom("loader").show_animated(
-        //         ctx,
-        //         state.current_path.is_some(),
-        //         |ui| {
-        //             if let Some(p) = &state.current_path {
-        //                 ui.horizontal(|ui| {
-        //                     ui.add(egui::Spinner::default());
-        //                     ui.label(format!("Loading {}", p.display()));
-        //                 });
-        //             }
-        //             app.window().request_frame();
-        //         },
-        //     );
-        // }
-
         state.pointer_over_ui = ctx.is_pointer_over_area();
-        // info!("using pointer {}", ctx.is_using_pointer());
+        // ("using pointer {}", ctx.is_using_pointer());
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer

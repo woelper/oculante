@@ -926,8 +926,6 @@ impl ImageOperation {
                         (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
                         (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
                     );
-                    // info!("{:?}", dist_to_center);
-                    // info!("D {}", dist_to_center);
                     if let Some(l) = img_c.get_pixel_checked(
                         (x as i32 + dist_to_center.0 as i32).max(0) as u32,
                         (y as i32 + dist_to_center.1 as i32).max(0) as u32,
