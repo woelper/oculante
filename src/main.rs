@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::info;
@@ -13,6 +14,7 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -240,6 +242,36 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             state
                 .player
                 .load(&img_location, state.message_channel.0.clone());
+        }
+    } else {
+        debug!("Trying to read from pipe");
+        let mut input = vec![];
+        if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input) {
+            if bytes_read > 0 {
+                debug!("There was stdin");
+
+                match image::load_from_memory(input.as_ref()) {
+                    Ok(i) => {
+                        // println!("got image");
+                        debug!("Sending image!");
+
+                        let _ = state
+                            .texture_channel
+                            .0
+                            .clone()
+                            .send(utils::Frame::new_reset(
+                                DynamicImage::new(2, 2, image::ColorType::Rgba8).to_rgba8(),
+                            ));
+
+                        let _ = state
+                            .texture_channel
+                            .0
+                            .clone()
+                            .send(utils::Frame::new_reset(i.to_rgba8()));
+                    }
+                    Err(e) => error!("ERR loading from stdin: {e}"),
+                }
+            }
         }
     }
 
