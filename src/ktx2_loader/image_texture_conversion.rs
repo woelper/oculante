@@ -4,7 +4,7 @@ use crate::ktx2_loader::Image;
 
 use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
-use log::{debug, info};
+use log::debug;
 use thiserror::Error;
 use wgpu::TextureFormat;
 

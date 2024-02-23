@@ -1,9 +1,7 @@
 use arboard::Clipboard;
 
-// use image::codecs::gif::GifDecoder;
-
 use img_parts::{Bytes, DynImage, ImageEXIF};
-use log::{debug, error, info};
+use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::{App, Graphics, TextureFilter};
