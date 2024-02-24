@@ -586,7 +586,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     let divisor = if cfg!(macos) { 0.1 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
-                        (delta_y / divisor).max(-5.0).min(5.0),
+                        ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
+                            .max(-5.0)
+                            .min(5.0),
                         state.image_geometry.scale,
                     );
                     trace!("Delta {delta}, raw {delta_y}");
@@ -597,10 +599,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                             state.image_geometry.offset,
                             state.cursor,
                             state.image_geometry.scale,
-                            delta * state.persistent_settings.zoom_multiplier,
+                            delta,
                         );
-                        state.image_geometry.scale +=
-                            delta * state.persistent_settings.zoom_multiplier;
+                        state.image_geometry.scale += delta;
                     }
                 }
             }
