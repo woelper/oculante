@@ -269,7 +269,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                             .clone()
                             .send(utils::Frame::new_reset(i.to_rgba8()));
                     }
-                    Err(e) => error!("ERR loading from stdin: {e}"),
+                    Err(e) => error!("ERR loading from stdin: {e} - for now, oculante only supports data that can be decoded by the image crate."),
                 }
             }
         }
