@@ -1,3 +1,18 @@
+# 0.8.10 (2024-02-24)
+
+### :beetle: Bug Fixes
+
+* prevent zoom from being stuck at extreme levels (32c6b02f)
+* Blurry text/UI is now rendered crisp (cbb1e165)
+
+### :sparkles: Features
+
+* Allow piping image data to oculante on the command line (e8f92dfa)
+
+### :green_apple: Chore
+
+* rename release artifacts (fcd24e37)
+
 # 0.8.9 (2024-02-21)
 
 ### :sparkles: Features
