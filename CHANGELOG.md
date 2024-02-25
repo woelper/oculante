@@ -1,3 +1,9 @@
+# 0.8.11 (2024-02-25)
+
+### :beetle: Bug Fixes
+
+* Prevent app from hanging if not image in stdin (695b2fa7)
+
 # 0.8.10 (2024-02-24)
 
 ### :beetle: Bug Fixes
