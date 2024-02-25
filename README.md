@@ -100,7 +100,8 @@ pkgin install oculante
 - Lossless JPEG editing: Crop, rotate, mirror without recompressing data
 - Light/Dark theme and follow system theme mode
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
-- EXIF support: Load metadata if present
+- EXIF support: Load metadata if present 
+- Load files from stdin: pipe your data with `cat image | oculante -s`
 
 ### Misc examples:
 
