@@ -60,14 +60,13 @@ pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf")
 fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");
-        let _ = env_logger::try_init();
     }
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
         std::env::set_var("RUST_LOG", "debug");
-        let _ = env_logger::try_init();
     }
+    let _ = env_logger::try_init();
 
     let icon_data = include_bytes!("../icon.ico");
 
