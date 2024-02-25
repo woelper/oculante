@@ -77,8 +77,7 @@ fn main() -> Result<(), String> {
         .set_window_icon_data(Some(icon_data))
         .set_taskbar_icon_data(Some(icon_data))
         .set_multisampling(0)
-        .set_app_id("oculante")
-        .set_min_size(200, 200);
+        .set_app_id("oculante");
 
     #[cfg(target_os = "windows")]
     {
@@ -161,17 +160,19 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
     let matches = Command::new("Oculante")
-        .arg(
-            Arg::new("INPUT")
-                .help("Display this image")
-                // .required(true)
-                .index(1),
-        )
+        .arg(Arg::new("INPUT").help("Display this image").index(1))
         .arg(
             Arg::new("l")
                 .short('l')
                 .help("Listen on port")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::new("stdin")
+                .short('s')
+                .id("stdin")
+                .takes_value(false)
+                .help("Load data from STDIN"),
         )
         .arg(
             Arg::new("chainload")
@@ -242,7 +243,9 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                 .player
                 .load(&img_location, state.message_channel.0.clone());
         }
-    } else {
+    }
+
+    if matches.contains_id("stdin") {
         debug!("Trying to read from pipe");
         let mut input = vec![];
         if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input) {
