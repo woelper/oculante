@@ -21,16 +21,14 @@ git add Cargo.toml
 git add Cargo.lock
 git add PKGBUILD
 # tag the commit with current version
-# create changelog
-git tag $VERSION
 git commit -m "Release version $VERSION"
-git push --tags
-git push
+git tag $VERSION
 kokai release --ref $VERSION > tmp
 cat CHANGELOG.md >> tmp
 mv tmp CHANGELOG.md
 git add CHANGELOG.md
 git commit -m "Update changelog for $VERSION"
+git push --tags
 git push
 # this needs no-verify as we modify the plist during the build, and cargo does not accept that.
 cargo publish --no-verify
