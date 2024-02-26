@@ -2860,27 +2860,28 @@ dependencies = [
 
 [[package]]
 name = "jxl-bitstream"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f38d3c6ae8012e380ff73d5c9265d7a60acc618821d0fb40545c02735223762"
+checksum = "23ace52f4e7df7cf39e3132da74184a9f2dcd375c01008c28bb5e0af668d3254"
 dependencies = [
  "tracing",
 ]
 
 [[package]]
 name = "jxl-coding"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "851149f14415943e525e6259ddff212a1f507e0b12ee6f9fc0fa5266bea88891"
+checksum = "44c62097f56996c1bbb67cd52f102f56e768609dc26ac8c5f811c0618e100ce0"
 dependencies = [
  "jxl-bitstream",
+ "tracing",
 ]
 
 [[package]]
 name = "jxl-color"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eaa098ef84ea4f31fe4f2d93c8737fc9c88d3f3bee18334e3a78aa6b5c0e738"
+checksum = "f68d72fed76c73dc1738654c147bd6e634dc74800e2788d3f03e8d3a581af7a1"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2891,9 +2892,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-frame"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54f386640d4e9e63e876c941191000c49bc6ddef7d719c176fd7d0c735839c02"
+checksum = "a761bd05174c93a3e41901f55ee1eb6b81f4320fd3d38f3b209785229069f127"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2907,18 +2908,18 @@ dependencies = [
 
 [[package]]
 name = "jxl-grid"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4a85129ecf79ca5f6a37ae291b67195a3021b2e445194745728be1b5bf667bf"
+checksum = "986d963bc7a1a7cb6a09d0a3ec3b56ff798f13192688c669cc7283ee51c836ec"
 dependencies = [
  "tracing",
 ]
 
 [[package]]
 name = "jxl-image"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35ae2850f735f9794bfc7ee58ae8178e16a6dc7d08cc3f245820d6c37b9bd5bb"
+checksum = "47fd8d376f06ecf5540b324e4bc67b181771dacf1c8850cf80cf4c7e0b2ea150"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2928,9 +2929,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-modular"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f955512f2921af085d8e55df35cd733ec1e7deeea05a5c3b056d4d0b2b82f70e"
+checksum = "08bd3f027534838b7eec34a42acb5da9c1fca41efd6adacd6e7761f6b36c2247"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2941,9 +2942,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-oxide"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec1bb65f27171804ad8e8710477fd592eec6d369d8cd7951f5179edbfe4c5cb4"
+checksum = "1d5d4e58348b5eaea8496af76cf6323e364d571646e3709750b1bd7fa181871e"
 dependencies = [
  "jxl-bitstream",
  "jxl-color",
@@ -2957,9 +2958,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-render"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8b2eddafe85e2b2ef6730526cb5acee02847c0efaa8f54356fe9fd70bc45392"
+checksum = "36dd2307202d09e8608003ba977a065c266093819c8ae90b73107e42dfcc1e67"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
@@ -2975,9 +2976,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-threadpool"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcd3e9cf51745c0f4e86cd728c2725d62f0d1c8611a10307e96c2af6226db291"
+checksum = "9d2860c68899a3c6266044fc26c6a0041e9f27145f58cc69b6eedc1b77f5ee13"
 dependencies = [
  "rayon",
  "rayon-core",
@@ -2986,9 +2987,9 @@ dependencies = [
 
 [[package]]
 name = "jxl-vardct"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81a3af6c6cbe9de190dc441a687b3b5d08bed4368428516f5bcd793fc5955184"
+checksum = "c7cf239729edf838e2385b9025d472753176af2e34f46ad3c31ae19e585f5b53"
 dependencies = [
  "jxl-bitstream",
  "jxl-coding",
