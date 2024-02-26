@@ -1,3 +1,14 @@
+# 0.8.12 (2024-02-26)
+
+### :beetle: Bug Fixes
+
+* Document that `heif` is now optional on Mac and Linux due to non-static linking. (5f1b4669)
+
+### :green_apple: Chore
+
+* update depndencies (9255847a)
+* update jxl-oxide (c5b7e1d4)
+
 # 0.8.11 (2024-02-25)
 
 ### :beetle: Bug Fixes
