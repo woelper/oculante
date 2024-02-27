@@ -15,6 +15,11 @@ jobs:
       - name: Install vcpkg
         run: vcpkg integrate install
 
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.1.1
+        with:
+          cache: true
+
       - name: Install libheif
         run: vcpkg install libheif:x64-windows-static-md
 
