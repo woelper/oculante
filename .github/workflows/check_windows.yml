@@ -32,5 +32,8 @@ jobs:
       - name: cargo check without default features
         run: cargo check --no-default-features
 
+      - name: clean
+        run: cargo clean
+
       - name: cargo check build features
         run: cargo check --features heif
