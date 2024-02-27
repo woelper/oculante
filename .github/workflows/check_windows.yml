@@ -15,8 +15,8 @@ jobs:
       - name: Install vcpkg
         run: vcpkg integrate install
 
-      - name: Install ninja
-        run: choco -y install ninja
+      - name: Install Ninja
+        run: choco install ninja
 
       # - name: Install Vulkan SDK
       #   uses: humbletim/install-vulkan-sdk@v1.1.1
