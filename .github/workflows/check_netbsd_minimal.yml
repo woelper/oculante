@@ -15,7 +15,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          /usr/sbin/pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 libXrender libxcb nasm perl git
+          /usr/sbin/pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 libXrender libxcb nasm perl git python ninja
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
         run: |
           PATH=$HOME/.cargo/bin:$PATH
