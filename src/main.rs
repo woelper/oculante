@@ -327,7 +327,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
-        debug!("Accent color: {:?}", state.persistent_settings.accent_color);
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -1101,7 +1100,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         if state.reset_image {
             let draw_area = ctx.available_rect();
-            let window_size = nalgebra::Vector2::new(draw_area.width(), draw_area.height());
+            let window_size = nalgebra::Vector2::new(
+                draw_area.width().min(app.window().width() as f32),
+                draw_area.height().min(app.window().height() as f32),
+            );
 
             if let Some(current_image) = &state.current_image {
                 let img_size = current_image.size_vec();
