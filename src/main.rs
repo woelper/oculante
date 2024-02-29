@@ -363,6 +363,8 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             .ok();
     }
 
+    gfx.render(&plugins.egui(|_| {}));
+
     state
 }
 
