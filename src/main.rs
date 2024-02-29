@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use fluent_uri::Uri;
 use image::DynamicImage;
 use log::debug;
 use log::error;
@@ -185,7 +186,14 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
-    let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
+    let maybe_img_location = matches
+        .value_of("INPUT")
+        .map(Uri::parse)
+        .and_then(|uri_result| {
+            uri_result
+                .ok()
+                .map(|uri| PathBuf::from(uri.path().as_str()))
+        });
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
