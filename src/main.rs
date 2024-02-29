@@ -265,14 +265,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                         // println!("got image");
                         debug!("Sending image!");
 
-                        let _ = state
-                            .texture_channel
-                            .0
-                            .clone()
-                            .send(utils::Frame::new_reset(
-                                DynamicImage::new(2, 2, image::ColorType::Rgba8).to_rgba8(),
-                            ));
-
+        
                         let _ = state
                             .texture_channel
                             .0
@@ -362,6 +355,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             .ok();
     }
 
+    // force a frame to render so ctx() has a size (important for centering the image)
     gfx.render(&plugins.egui(|_| {}));
 
     state
@@ -928,92 +922,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     }
     // }
 
-    if let Some(texture) = &state.current_texture {
-        if state.persistent_settings.show_checker_background {
-            if let Some(checker) = &state.checker_texture {
-                draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
-                    .blend_mode(BlendMode::ADD)
-                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
-            }
-        }
-        if state.tiling < 2 {
-            draw.image(texture)
-                .blend_mode(BlendMode::NORMAL)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
-        } else {
-            draw.pattern(texture)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                .size(
-                    texture.width() * state.tiling as f32,
-                    texture.height() * state.tiling as f32,
-                );
-        }
-
-        if state.persistent_settings.show_frame {
-            draw.rect((0.0, 0.0), texture.size())
-                .stroke(1.0)
-                .color(Color {
-                    r: 0.5,
-                    g: 0.5,
-                    b: 0.5,
-                    a: 0.5,
-                })
-                .blend_mode(BlendMode::ADD)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
-        }
-
-        if state.persistent_settings.show_minimap {
-            // let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
-            let offset_x = 0.0;
-
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_dimension.0 as f32 * state.image_geometry.scale
-                > app.window().size().0 as f32;
-
-            if show_minimap {
-                draw.image(texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .translate(offset_x, 100.)
-                    .scale(scale, scale);
-            }
-        }
-
-        // Draw a brush preview when paint mode is on
-        if state.edit_state.painting {
-            if let Some(stroke) = state.edit_state.paint_strokes.last() {
-                let dim = texture.width().min(texture.height()) / 50.;
-                draw.circle(20.)
-                    // .translate(state.cursor_relative.x, state.cursor_relative.y)
-                    .alpha(0.5)
-                    .stroke(1.5)
-                    .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    .scale(stroke.width * dim, stroke.width * dim)
-                    .translate(state.cursor.x, state.cursor.y);
-
-                // For later: Maybe paint the actual brush? Maybe overkill.
-
-                // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
-                //     if let Some(brush_tex) = brush.to_texture(gfx) {
-                //         draw.image(&brush_tex)
-                //             .blend_mode(BlendMode::NORMAL)
-                //             .translate(state.cursor.x, state.cursor.y)
-                //             .scale(state.scale, state.scale)
-                //             .scale(stroke.width*dim, stroke.width*dim)
-                //             // .translate(state.offset.x as f32, state.offset.y as f32)
-                //             // .transform(state.cursor_relative)
-                //             ;
-                //     }
-                // }
-            }
-        }
-    }
+    
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
@@ -1127,6 +1036,93 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // Settings come last, as they block keyboard grab (for hotkey assigment)
         settings_ui(app, ctx, state, gfx);
     });
+
+    if let Some(texture) = &state.current_texture {
+        if state.persistent_settings.show_checker_background {
+            if let Some(checker) = &state.checker_texture {
+                draw.pattern(checker)
+                    // .size(texture.width() as f32, texture.height() as f32)
+                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .blend_mode(BlendMode::ADD)
+                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
+                    ;
+            }
+        }
+        if state.tiling < 2 {
+            draw.image(texture)
+                .blend_mode(BlendMode::NORMAL)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+        } else {
+            draw.pattern(texture)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .size(
+                    texture.width() * state.tiling as f32,
+                    texture.height() * state.tiling as f32,
+                );
+        }
+
+        if state.persistent_settings.show_frame {
+            draw.rect((0.0, 0.0), texture.size())
+                .stroke(1.0)
+                .color(Color {
+                    r: 0.5,
+                    g: 0.5,
+                    b: 0.5,
+                    a: 0.5,
+                })
+                .blend_mode(BlendMode::ADD)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+        }
+
+        if state.persistent_settings.show_minimap {
+            // let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
+            let offset_x = 0.0;
+
+            let scale = 200. / app.window().size().0 as f32;
+            let show_minimap = state.image_dimension.0 as f32 * state.image_geometry.scale
+                > app.window().size().0 as f32;
+
+            if show_minimap {
+                draw.image(texture)
+                    .blend_mode(BlendMode::NORMAL)
+                    .translate(offset_x, 100.)
+                    .scale(scale, scale);
+            }
+        }
+
+        // Draw a brush preview when paint mode is on
+        if state.edit_state.painting {
+            if let Some(stroke) = state.edit_state.paint_strokes.last() {
+                let dim = texture.width().min(texture.height()) / 50.;
+                draw.circle(20.)
+                    // .translate(state.cursor_relative.x, state.cursor_relative.y)
+                    .alpha(0.5)
+                    .stroke(1.5)
+                    .scale(state.image_geometry.scale, state.image_geometry.scale)
+                    .scale(stroke.width * dim, stroke.width * dim)
+                    .translate(state.cursor.x, state.cursor.y);
+
+                // For later: Maybe paint the actual brush? Maybe overkill.
+
+                // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
+                //     if let Some(brush_tex) = brush.to_texture(gfx) {
+                //         draw.image(&brush_tex)
+                //             .blend_mode(BlendMode::NORMAL)
+                //             .translate(state.cursor.x, state.cursor.y)
+                //             .scale(state.scale, state.scale)
+                //             .scale(stroke.width*dim, stroke.width*dim)
+                //             // .translate(state.offset.x as f32, state.offset.y as f32)
+                //             // .transform(state.cursor_relative)
+                //             ;
+                //     }
+                // }
+            }
+        }
+    }
 
     if state.network_mode {
         app.window().request_frame();
