@@ -776,7 +776,7 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
         )
         .replacen(
             "{RES}",
-            &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
+            &format!("{}x{}", state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
             10,
         );
 

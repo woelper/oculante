@@ -188,21 +188,16 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         let image_rect = Rect::from_center_size(
             Pos2::new(
                 state.image_geometry.offset.x
-                    + state.image_dimension.0 as f32 / 2. * state.image_geometry.scale,
+                    + state.image_geometry.dimensions.0 as f32 / 2. * state.image_geometry.scale,
                 state.image_geometry.offset.y
-                    + state.image_dimension.1 as f32 / 2. * state.image_geometry.scale,
+                    + state.image_geometry.dimensions.1 as f32 / 2. * state.image_geometry.scale,
             ),
             vec2(
-                state.image_dimension.0 as f32,
-                state.image_dimension.1 as f32,
+                state.image_geometry.dimensions.0 as f32,
+                state.image_geometry.dimensions.1 as f32,
             ) * state.image_geometry.scale,
         );
 
-        // egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).debug_rect(
-        //     image_rect,
-        //     Color32::RED,
-        //     "yo",
-        // );
         egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
             tex_id.id,
             image_rect,
@@ -262,8 +257,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let scale = (desired_width / 8.) / texture.size().0;
 
                 let uv_center = (
-                    state.cursor_relative.x / state.image_dimension.0 as f32,
-                    (state.cursor_relative.y / state.image_dimension.1 as f32),
+                    state.cursor_relative.x / state.image_geometry.dimensions.0 as f32,
+                    (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                 );
 
                 egui::Grid::new("info").show(ui, |ui| {
@@ -272,7 +267,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ui.label(
                         RichText::new(format!(
                             "{}x{}",
-                            state.image_dimension.0, state.image_dimension.1
+                            state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
                         ))
                         .monospace(),
                     );
@@ -755,6 +750,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Rotate(90),
                         ImageOperation::HSV((0, 100, 100)),
                         ImageOperation::Crop([0, 0, 0, 0]),
+                        ImageOperation::CropPerspective([
+                            (0,0),
+                            (state.image_geometry.dimensions.0, 0),
+                            (0, state.image_geometry.dimensions.1),
+                            (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
+                            ]),
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
@@ -769,7 +770,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         },
                         ImageOperation::Add([0, 0, 0]),
                         ImageOperation::Resize {
-                            dimensions: state.image_dimension,
+                            dimensions: state.image_geometry.dimensions,
                             aspect: true,
                             filter: ScaleFilter::Hamming,
                         },
@@ -801,11 +802,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                     ui.end_row();
 
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui);
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
-                        ui,
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning
                     );
 
                     ui.label_i(&format!("{RECYCLE} Reset"));
@@ -829,7 +830,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             .clicked()
                         {
                             if let Some(img) = &state.current_image {
-                                state.image_dimension = img.dimensions();
+                                state.image_geometry.dimensions = img.dimensions();
                                 state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
                             }
                         }
@@ -1007,8 +1008,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         // get pos in image
                         // let p = state.cursor_relative;
                         let uv = (
-                            state.cursor_relative.x / state.image_dimension.0 as f32,
-                            (state.cursor_relative.y / state.image_dimension.1 as f32),
+                            state.cursor_relative.x / state.image_geometry.dimensions.0 as f32,
+                            (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                         );
                         current_stroke.points.push(uv);
                         pixels_changed = true;
@@ -1034,7 +1035,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     if let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result_pixel_op.clone();
                         state.edit_state = Default::default();
-                        // state.image_dimension = img.dimensions();
+                        // state.dimensions = img.dimensions();
                         pixels_changed = true;
                         image_changed = true;
                     }
@@ -1150,7 +1151,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             }
 
-            state.image_dimension = state.edit_state.result_pixel_op.dimensions();
+            state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
 
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
@@ -1485,7 +1486,13 @@ pub fn stroke_ui(
     combined_response
 }
 
-fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, ui: &mut Ui) {
+fn modifier_stack_ui(
+    stack: &mut Vec<ImageOperation>,
+    image_changed: &mut bool,
+    ui: &mut Ui,
+    geo: &ImageGeometry,
+    mouse_grab: &mut bool,
+) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
@@ -1499,7 +1506,7 @@ fn modifier_stack_ui(stack: &mut Vec<ImageOperation>, image_changed: &mut bool, 
             // ui.end_row();
 
             // draw the image operator
-            if operation.ui(ui).changed() {
+            if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
             }
 
