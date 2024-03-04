@@ -16,6 +16,7 @@ use image::{imageops, DynamicImage, Pixel, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
+use notan::egui::epaint::PathShape;
 use notan::egui::{
     self, lerp, vec2, Align2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2,
 };
@@ -141,7 +142,10 @@ pub enum ImageOperation {
     // x,y (top left corner of crop), width, height
     // 1.0 equals 10000
     Crop([u32; 4]),
-    CropPerspective([(u32, u32); 4]),
+    CropPerspective {
+        points: [(u32, u32); 4],
+        original_size: (u32, u32),
+    },
     LUT(String),
 }
 
@@ -160,7 +164,7 @@ impl fmt::Display for ImageOperation {
             Self::Fill(_) => write!(f, "{PAINT_BUCKET} Fill color"),
             Self::Blur(_) => write!(f, "{DROP} Blur"),
             Self::Crop(_) => write!(f, "{CROP} Crop"),
-            Self::CropPerspective(_) => write!(f, "{CROP} Perspective crop"),
+            Self::CropPerspective { .. } => write!(f, "{CROP} Perspective crop"),
             Self::Flip(_) => write!(f, "{SWAP} Flip"),
             Self::Rotate(_) => write!(f, "{ARROW_CLOCKWISE} Rotate"),
             Self::Invert => write!(f, "{SELECTION_INVERSE} Invert"),
@@ -187,7 +191,7 @@ impl ImageOperation {
             Self::Resize { .. } => false,
             // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
-            Self::CropPerspective(_) => false,
+            Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
@@ -578,24 +582,28 @@ impl ImageOperation {
                 if ui.selectable_value(angle, 180, "⬇ 180°").clicked() {
                     r.mark_changed();
                 }
-
                 r
             }
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
-            Self::CropPerspective(pts) => {
+            Self::CropPerspective {
+                points,
+                original_size,
+            } => {
                 let id = Id::new("crop");
+                let points_transformed = points.iter().map(|p|(geo.scale * p.0 as f32 + geo.offset.x, geo.scale * p.1 as f32 + geo.offset.y)).collect::<Vec<_>>();
+                // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button("reset").clicked() {
                         ui.data_mut(|w| w.remove_temp::<bool>(id));
                         r.mark_changed();
-                        *pts = [
+                        *points = [
                             (0, 0),
-                            (geo.dimensions.0, 0),
-                            (0, geo.dimensions.1),
-                            (geo.dimensions.0, geo.dimensions.1),
+                            (original_size.0, 0),
+                            (0, original_size.1),
+                            (original_size.0, original_size.1),
                         ];
                     }
                 } else {
@@ -608,7 +616,7 @@ impl ImageOperation {
                         geo.scale,
                     );
 
-                    for crop_pt in pts.iter_mut() {
+                    for (i, crop_pt) in points.iter_mut().enumerate() {
                         let x = geo.scale * crop_pt.0 as f32 + geo.offset.x;
                         let y = geo.scale * crop_pt.1 as f32 + geo.offset.y;
 
@@ -620,25 +628,16 @@ impl ImageOperation {
 
                         if d < maxdist {
                             ui.painter().circle_filled(cursor_abs, 20., Color32::BLUE);
+
                             if ui.input(|i| i.pointer.any_down()) {
                                 *block_panning = true;
-
-                                crop_pt.0 = cursor_relative.x as u32;
-                                crop_pt.1 = cursor_relative.y as u32;
-                            } else {
+                                ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                            }
+                            if ui.input(|r| r.pointer.any_released()) {
                                 *block_panning = false;
+                                ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
                             }
                         }
-
-                        // ui.painter().debug_text(
-                        //     cursor_abs,
-                        //     Align2::CENTER_CENTER,
-                        //     Color32::RED,
-                        //     format!(
-                        //         "d:{} x:{} c_rel:{}/{}",
-                        //         d, x, cursor_relative.x, cursor_relative.y
-                        //     ),
-                        // );
 
                         let col = if d < maxdist {
                             Color32::GREEN
@@ -652,20 +651,38 @@ impl ImageOperation {
                             col,
                             format!("{:?}", crop_pt),
                         );
+                        
+                    }
+
+                    let pts = vec![
+                        Pos2::new(geo.scale *points[0].0 as f32+ geo.offset.x, geo.scale *points[0].1 as f32+ geo.offset.y),
+                        Pos2::new(geo.scale *points[1].0 as f32+ geo.offset.x, geo.scale *points[1].1 as f32+ geo.offset.y),
+                        Pos2::new(geo.scale *points[3].0 as f32+ geo.offset.x, geo.scale *points[3].1 as f32+ geo.offset.y),
+                        Pos2::new(geo.scale *points[2].0 as f32+ geo.offset.x, geo.scale *points[2].1 as f32+ geo.offset.y),
+
+                    ];
+                    //points.iter().map(|p| Pos2::new(p.0 as f32, p.1 as f32)).collect()
+
+                    let shape = PathShape::convex_polygon(pts, Color32::from_rgba_unmultiplied(222, 222, 222, 22), Stroke::new(2., Color32::WHITE));
+                    ui.painter().add(shape);
+
+                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                        points[pt].0 = cursor_relative.x as u32;
+                        points[pt].1 = cursor_relative.y as u32;
                     }
 
                     if ui.button("Apply").clicked() {
                         ui.ctx().data_mut(|w| w.insert_temp(id, true));
                         r.changed = true;
                     }
-                    if ui.button("Revert").clicked() {
-                        *pts = [
-                            (0, 0),
-                            (geo.dimensions.0, 0),
-                            (0, geo.dimensions.1),
-                            (geo.dimensions.0, geo.dimensions.1),
-                        ];
-                    }
+                    // if ui.button("Revert").clicked() {
+                    //     *pts = [
+                    //         (0, 0),
+                    //         (geo.dimensions.0, 0),
+                    //         (0, geo.dimensions.1),
+                    //         (geo.dimensions.0, geo.dimensions.1),
+                    //     ];
+                    // }
                 }
 
                 // for x in [0, 2] {
@@ -921,21 +938,21 @@ impl ImageOperation {
                     *img = sub_img.to_image();
                 }
             }
-            Self::CropPerspective(dim) => {
+            Self::CropPerspective { points, .. } => {
                 let img_dim = img.dimensions();
 
-                let max_width = dim[1].0.max(dim[3].0);
-                let min_width = dim[0].0.min(dim[2].0);
-                let max_height = dim[2].1.max(dim[3].1);
-                let min_height = dim[0].1.min(dim[1].1);
+                let max_width = points[1].0.max(points[3].0);
+                let min_width = points[0].0.min(points[2].0);
+                let max_height = points[2].1.max(points[3].1);
+                let min_height = points[0].1.min(points[1].1);
                 let x = max_width - min_width;
                 let y = max_height - min_height;
 
                 let from = [
-                    (dim[0].0 as f32, dim[0].1 as f32),
-                    (dim[1].0 as f32, dim[1].1 as f32),
-                    (dim[2].0 as f32, dim[2].1 as f32),
-                    (dim[3].0 as f32, dim[3].1 as f32),
+                    (points[0].0 as f32, points[0].1 as f32),
+                    (points[1].0 as f32, points[1].1 as f32),
+                    (points[2].0 as f32, points[2].1 as f32),
+                    (points[3].0 as f32, points[3].1 as f32),
                 ];
 
                 let to = [

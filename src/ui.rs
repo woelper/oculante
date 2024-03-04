@@ -750,12 +750,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Rotate(90),
                         ImageOperation::HSV((0, 100, 100)),
                         ImageOperation::Crop([0, 0, 0, 0]),
-                        ImageOperation::CropPerspective([
+                        ImageOperation::CropPerspective{points: [
                             (0,0),
                             (state.image_geometry.dimensions.0, 0),
                             (0, state.image_geometry.dimensions.1),
                             (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
-                            ]),
+                            ]
+                        , original_size : state.image_geometry.dimensions
+                        },
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
