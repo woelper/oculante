@@ -3,7 +3,6 @@
 use clap::Arg;
 use clap::Command;
 use fluent_uri::Uri;
-use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::info;
@@ -264,8 +263,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                     Ok(i) => {
                         // println!("got image");
                         debug!("Sending image!");
-
-        
                         let _ = state
                             .texture_channel
                             .0
@@ -924,8 +921,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     }
     // }
 
-    
-
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
@@ -999,7 +994,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() || state.edit_state.painting || ctx.is_pointer_over_area() || state.edit_state.block_panning {
+        if ctx.is_using_pointer()
+            || state.edit_state.painting
+            || ctx.is_pointer_over_area()
+            || state.edit_state.block_panning
+        {
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
@@ -1085,7 +1084,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             let offset_x = 0.0;
 
             let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_geometry.dimensions.0 as f32 * state.image_geometry.scale
+            let show_minimap = state.image_geometry.dimensions.0 as f32
+                * state.image_geometry.scale
                 > app.window().size().0 as f32;
 
             if show_minimap {

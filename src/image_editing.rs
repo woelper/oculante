@@ -12,14 +12,12 @@ use crate::{pos_from_coord, ImageGeometry};
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, DynamicImage, Pixel, Rgba, RgbaImage};
+use image::{imageops, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
-use log::{debug, error, info};
+use log::{debug, error};
 use nalgebra::{Vector2, Vector4};
 use notan::egui::epaint::PathShape;
-use notan::egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2,
-};
+use notan::egui::{self, lerp, vec2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
@@ -591,12 +589,20 @@ impl ImageOperation {
                 original_size,
             } => {
                 let id = Id::new("crop");
-                let points_transformed = points.iter().map(|p|(geo.scale * p.0 as f32 + geo.offset.x, geo.scale * p.1 as f32 + geo.offset.y)).collect::<Vec<_>>();
+                let points_transformed = points
+                    .iter()
+                    .map(|p| {
+                        (
+                            geo.scale * p.0 as f32 + geo.offset.x,
+                            geo.scale * p.1 as f32 + geo.offset.y,
+                        )
+                    })
+                    .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
-                    if ui.button("reset").clicked() {
+                    if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
                         ui.data_mut(|w| w.remove_temp::<bool>(id));
                         r.mark_changed();
                         *points = [
@@ -616,19 +622,11 @@ impl ImageOperation {
                         geo.scale,
                     );
 
-                    for (i, crop_pt) in points.iter_mut().enumerate() {
-                        let x = geo.scale * crop_pt.0 as f32 + geo.offset.x;
-                        let y = geo.scale * crop_pt.1 as f32 + geo.offset.y;
-
-                        // ui.label(format!("rel {}/{}", cursor_relative.x, cursor_relative.y));
-
-                        let maxdist = 60.;
-                        let d = Pos2::new(crop_pt.0 as f32, crop_pt.1 as f32)
-                            .distance(Pos2::new(cursor_relative.x, cursor_relative.y));
+                    for (i, pt) in points_transformed.iter().enumerate() {
+                        let maxdist = 20.;
+                        let d = Pos2::new(pt.0, pt.1).distance(cursor_abs);
 
                         if d < maxdist {
-                            ui.painter().circle_filled(cursor_abs, 20., Color32::BLUE);
-
                             if ui.input(|i| i.pointer.any_down()) {
                                 *block_panning = true;
                                 ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
@@ -640,30 +638,45 @@ impl ImageOperation {
                         }
 
                         let col = if d < maxdist {
-                            Color32::GREEN
+                            Color32::LIGHT_BLUE
                         } else {
-                            Color32::RED
+                            Color32::GOLD
                         };
 
-                        ui.painter().debug_text(
-                            Pos2::new(x, y),
-                            Align2::CENTER_CENTER,
+                        // ui.painter().debug_text(
+                        //     Pos2::new(pt.0, pt.1),
+                        //     Align2::CENTER_CENTER,
+                        //     col,
+                        //     format!("X"),
+                        // );
+
+                        ui.painter().rect_filled(
+                            Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
+                            2.,
                             col,
-                            format!("{:?}", crop_pt),
                         );
-                        
                     }
 
+                    // egui shape needs these in a different order
                     let pts = vec![
-                        Pos2::new(geo.scale *points[0].0 as f32+ geo.offset.x, geo.scale *points[0].1 as f32+ geo.offset.y),
-                        Pos2::new(geo.scale *points[1].0 as f32+ geo.offset.x, geo.scale *points[1].1 as f32+ geo.offset.y),
-                        Pos2::new(geo.scale *points[3].0 as f32+ geo.offset.x, geo.scale *points[3].1 as f32+ geo.offset.y),
-                        Pos2::new(geo.scale *points[2].0 as f32+ geo.offset.x, geo.scale *points[2].1 as f32+ geo.offset.y),
-
+                        Pos2::new(points_transformed[0].0, points_transformed[0].1),
+                        Pos2::new(points_transformed[1].0, points_transformed[1].1),
+                        Pos2::new(points_transformed[3].0, points_transformed[3].1),
+                        Pos2::new(points_transformed[2].0, points_transformed[2].1),
                     ];
-                    //points.iter().map(|p| Pos2::new(p.0 as f32, p.1 as f32)).collect()
 
-                    let shape = PathShape::convex_polygon(pts, Color32::from_rgba_unmultiplied(222, 222, 222, 22), Stroke::new(2., Color32::WHITE));
+                    // make a black background covering everything
+                    ui.painter().rect_filled(
+                        Rect::EVERYTHING,
+                        0.,
+                        Color32::from_rgba_premultiplied(0, 0, 0, 70),
+                    );
+
+                    let shape = PathShape::convex_polygon(
+                        pts,
+                        Color32::from_rgba_unmultiplied(255, 255, 255, 10),
+                        Stroke::new(1., Color32::GOLD),
+                    );
                     ui.painter().add(shape);
 
                     if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
@@ -671,35 +684,15 @@ impl ImageOperation {
                         points[pt].1 = cursor_relative.y as u32;
                     }
 
-                    if ui.button("Apply").clicked() {
+                    if ui
+                        .button(format!("{CHECK} Apply"))
+                        .on_hover_text("Apply the crop. You don't lose image data by this.")
+                        .clicked()
+                    {
                         ui.ctx().data_mut(|w| w.insert_temp(id, true));
                         r.changed = true;
                     }
-                    // if ui.button("Revert").clicked() {
-                    //     *pts = [
-                    //         (0, 0),
-                    //         (geo.dimensions.0, 0),
-                    //         (0, geo.dimensions.1),
-                    //         (geo.dimensions.0, geo.dimensions.1),
-                    //     ];
-                    // }
                 }
-
-                // for x in [0, 2] {
-                //     ui.painter().line_segment(
-                //         [
-                //             Pos2::new(
-                //                 pts[x].0 as f32 + geo.offset.x,
-                //                 pts[x].1 as f32 + geo.offset.y,
-                //             ),
-                //             Pos2::new(
-                //                 pts[x + 1].0 as f32 + geo.offset.x,
-                //                 pts[x + 1].1 as f32 + geo.offset.y,
-                //             ),
-                //         ],
-                //         Stroke::new(3., Color32::RED),
-                //     );
-                // }
 
                 r
             }

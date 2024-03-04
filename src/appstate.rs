@@ -19,7 +19,7 @@ pub struct ImageGeometry {
     pub scale: f32,
     /// Image offset on canvas
     pub offset: Vector2<f32>,
-    pub dimensions: (u32, u32)
+    pub dimensions: (u32, u32),
 }
 
 #[derive(Debug, Clone)]
