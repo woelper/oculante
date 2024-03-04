@@ -3,7 +3,6 @@
 use clap::Arg;
 use clap::Command;
 use fluent_uri::Uri;
-use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::info;
@@ -264,8 +263,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                     Ok(i) => {
                         // println!("got image");
                         debug!("Sending image!");
-
-        
                         let _ = state
                             .texture_channel
                             .0
@@ -695,13 +692,15 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
+    state.image_geometry.dimensions = state.image_geometry.dimensions;
+
     if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.image_geometry.offset,
             state.cursor,
             Vector2::new(
-                state.image_dimension.0 as f32,
-                state.image_dimension.1 as f32,
+                state.image_geometry.dimensions.0 as f32,
+                state.image_geometry.dimensions.1 as f32,
             ),
             state.image_geometry.scale,
         );
@@ -773,7 +772,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
         debug!("Received image buffer: {:?}", img.dimensions());
-        state.image_dimension = img.dimensions();
+        state.image_geometry.dimensions = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
         // debug!("Frame source: {:?}", frame.source);
@@ -922,8 +921,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     }
     // }
 
-    
-
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
@@ -997,7 +994,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() || state.edit_state.painting || ctx.is_pointer_over_area() {
+        if ctx.is_using_pointer()
+            || state.edit_state.painting
+            || ctx.is_pointer_over_area()
+            || state.edit_state.block_panning
+        {
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
@@ -1079,11 +1080,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.persistent_settings.show_minimap {
-            // let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
+            // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
             let offset_x = 0.0;
 
             let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_dimension.0 as f32 * state.image_geometry.scale
+            let show_minimap = state.image_geometry.dimensions.0 as f32
+                * state.image_geometry.scale
                 > app.window().size().0 as f32;
 
             if show_minimap {
@@ -1174,8 +1176,8 @@ fn browse_for_image_path(state: &mut OculanteState) {
 fn limit_offset(app: &mut App, state: &mut OculanteState) {
     let window_size = app.window().size();
     let scaled_image_size = (
-        state.image_dimension.0 as f32 * state.image_geometry.scale,
-        state.image_dimension.1 as f32 * state.image_geometry.scale,
+        state.image_geometry.dimensions.0 as f32 * state.image_geometry.scale,
+        state.image_geometry.dimensions.1 as f32 * state.image_geometry.scale,
     );
     state.image_geometry.offset.x = state
         .image_geometry

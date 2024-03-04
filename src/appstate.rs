@@ -19,6 +19,7 @@ pub struct ImageGeometry {
     pub scale: f32,
     /// Image offset on canvas
     pub offset: Vector2<f32>,
+    pub dimensions: (u32, u32),
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +55,6 @@ pub struct OculanteState {
     pub window_size: Vector2<f32>,
     pub cursor: Vector2<f32>,
     pub cursor_relative: Vector2<f32>,
-    pub image_dimension: (u32, u32),
     pub sampled_color: [f32; 4],
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
@@ -112,6 +112,7 @@ impl Default for OculanteState {
             image_geometry: ImageGeometry {
                 scale: 1.0,
                 offset: Default::default(),
+                dimensions: Default::default(),
             },
             compare_list: Default::default(),
             drag_enabled: Default::default(),
@@ -119,7 +120,6 @@ impl Default for OculanteState {
             is_loaded: Default::default(),
             cursor: Default::default(),
             cursor_relative: Default::default(),
-            image_dimension: (0, 0),
             sampled_color: [0., 0., 0., 0.],
             player: Player::new(tx_channel.0.clone(), 20, 16384),
             texture_channel: tx_channel,
