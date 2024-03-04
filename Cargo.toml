@@ -93,6 +93,7 @@ shaderc = ["notan/shaderc"]
 spirv = ["notan/glsl-to-spirv"]
 
 
+
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
 
