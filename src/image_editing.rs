@@ -584,65 +584,88 @@ impl ImageOperation {
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
             Self::CropPerspective(pts) => {
+                let id = Id::new("crop");
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
 
-                let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+                if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
+                    if ui.button("reset").clicked() {
+                        ui.data_mut(|w| w.remove_temp::<bool>(id));
+                        r.mark_changed();
+                        *pts = [
+                            (0, 0),
+                            (geo.dimensions.0, 0),
+                            (0, geo.dimensions.1),
+                            (geo.dimensions.0, geo.dimensions.1),
+                        ];
+                    }
+                } else {
+                    let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
-                let cursor_relative = pos_from_coord(
-                    geo.offset,
-                    Vector2::new(cursor_abs.x, cursor_abs.y),
-                    Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
-                    geo.scale,
-                );
+                    let cursor_relative = pos_from_coord(
+                        geo.offset,
+                        Vector2::new(cursor_abs.x, cursor_abs.y),
+                        Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
+                        geo.scale,
+                    );
 
-                for crop_pt in pts.iter_mut() {
-                    let x = geo.scale * crop_pt.0 as f32 + geo.offset.x;
-                    let y = geo.scale * crop_pt.1 as f32 + geo.offset.y;
+                    for crop_pt in pts.iter_mut() {
+                        let x = geo.scale * crop_pt.0 as f32 + geo.offset.x;
+                        let y = geo.scale * crop_pt.1 as f32 + geo.offset.y;
 
-                    // ui.label(format!("rel {}/{}", cursor_relative.x, cursor_relative.y));
+                        // ui.label(format!("rel {}/{}", cursor_relative.x, cursor_relative.y));
 
-                    let maxdist = 60.;
-                    let d = Pos2::new(crop_pt.0 as f32, crop_pt.1 as f32)
-                        .distance(Pos2::new(cursor_relative.x, cursor_relative.y));
+                        let maxdist = 60.;
+                        let d = Pos2::new(crop_pt.0 as f32, crop_pt.1 as f32)
+                            .distance(Pos2::new(cursor_relative.x, cursor_relative.y));
 
-                    if d < maxdist {
-                        ui.painter().circle_filled(cursor_abs, 20., Color32::BLUE);
-                        if ui.input(|i| i.pointer.any_down()) {
-                            *block_panning = true;
+                        if d < maxdist {
+                            ui.painter().circle_filled(cursor_abs, 20., Color32::BLUE);
+                            if ui.input(|i| i.pointer.any_down()) {
+                                *block_panning = true;
 
-                            crop_pt.0 = cursor_relative.x as u32;
-                            crop_pt.1 = cursor_relative.y as u32;
-                        } else {
-                            *block_panning = false;
+                                crop_pt.0 = cursor_relative.x as u32;
+                                crop_pt.1 = cursor_relative.y as u32;
+                            } else {
+                                *block_panning = false;
+                            }
                         }
+
+                        // ui.painter().debug_text(
+                        //     cursor_abs,
+                        //     Align2::CENTER_CENTER,
+                        //     Color32::RED,
+                        //     format!(
+                        //         "d:{} x:{} c_rel:{}/{}",
+                        //         d, x, cursor_relative.x, cursor_relative.y
+                        //     ),
+                        // );
+
+                        let col = if d < maxdist {
+                            Color32::GREEN
+                        } else {
+                            Color32::RED
+                        };
+
+                        ui.painter().debug_text(
+                            Pos2::new(x, y),
+                            Align2::CENTER_CENTER,
+                            col,
+                            format!("{:?}", crop_pt),
+                        );
                     }
 
-                    // ui.painter().debug_text(
-                    //     cursor_abs,
-                    //     Align2::CENTER_CENTER,
-                    //     Color32::RED,
-                    //     format!(
-                    //         "d:{} x:{} c_rel:{}/{}",
-                    //         d, x, cursor_relative.x, cursor_relative.y
-                    //     ),
-                    // );
-
-                    let col = if cursor_relative.x == x {
-                        Color32::GREEN
-                    } else {
-                        Color32::RED
-                    };
-
-                    ui.painter().debug_text(
-                        Pos2::new(x, y),
-                        Align2::CENTER_CENTER,
-                        col,
-                        format!("{:?}", crop_pt),
-                    );
-                }
-
-                if ui.button("Apply").clicked() {
-                    r.changed = true;
+                    if ui.button("Apply").clicked() {
+                        ui.ctx().data_mut(|w| w.insert_temp(id, true));
+                        r.changed = true;
+                    }
+                    if ui.button("Revert").clicked() {
+                        *pts = [
+                            (0, 0),
+                            (geo.dimensions.0, 0),
+                            (0, geo.dimensions.1),
+                            (geo.dimensions.0, geo.dimensions.1),
+                        ];
+                    }
                 }
 
                 // for x in [0, 2] {
@@ -901,8 +924,13 @@ impl ImageOperation {
             Self::CropPerspective(dim) => {
                 let img_dim = img.dimensions();
 
-                // let cp = dim.into_iter().map(|c| (c.0 as f32, c.1 as f32)).collect();
-                // let cp = [(dim[0].0 as f32,dim[0].1 as f32),(dim[1].0 as f32,dim[1].1 as f32),(dim[2].0 as f32,dim[2].1 as f32),(dim[3].0 as f32,dim[3].1 as f32)];
+                let max_width = dim[1].0.max(dim[3].0);
+                let min_width = dim[0].0.min(dim[2].0);
+                let max_height = dim[2].1.max(dim[3].1);
+                let min_height = dim[0].1.min(dim[1].1);
+                let x = max_width - min_width;
+                let y = max_height - min_height;
+
                 let from = [
                     (dim[0].0 as f32, dim[0].1 as f32),
                     (dim[1].0 as f32, dim[1].1 as f32),
@@ -917,30 +945,22 @@ impl ImageOperation {
                     (img_dim.0 as f32, img_dim.1 as f32),
                 ];
 
-
-                // let to = [
-                //     (from[0].0, from[0].1 as f32),
-                //     (from[1].0, from[1].1),
-                //     (from[2].0, from[2].1),
-                //     (from[3].0, from[3].1),
-                // ];
-
-                if let Some(proj) = 
+                if let Some(proj) =
                     imageproc::geometric_transformations::Projection::from_control_points(from, to)
-            {
-                let default_p:Rgba<u8> = [0,0,0,0].into();
-    
-                *img = imageproc::geometric_transformations::warp(
-                    img,
-                    &proj,
-                    Interpolation::Bicubic,
-                    default_p,
-                );
+                {
+                    let default_p: Rgba<u8> = [0, 0, 0, 0].into();
 
-            } else {
-                error!("Projection failed")
-            }
+                    *img = imageproc::geometric_transformations::warp(
+                        img,
+                        &proj,
+                        Interpolation::Bicubic,
+                        default_p,
+                    );
 
+                    *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);
+                } else {
+                    error!("Projection failed")
+                }
             }
             Self::Resize {
                 dimensions, filter, ..
