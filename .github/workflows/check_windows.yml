@@ -30,7 +30,7 @@ jobs:
         run: vcpkg install libheif:x64-windows-static
 
       - name: cargo check without default features
-        run: cargo check --no-default-features  --features spirv
+        run: cargo check --no-default-features  --features shaderc
 
       - name: clean
         run: cargo clean
