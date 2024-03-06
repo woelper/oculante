@@ -1011,13 +1011,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.reset_image {
-            let draw_area = ctx.available_rect();
-            let window_size = nalgebra::Vector2::new(
-                draw_area.width().min(app.window().width() as f32),
-                draw_area.height().min(app.window().height() as f32),
-            );
-
             if let Some(current_image) = &state.current_image {
+                let draw_area = ctx.available_rect();
+                let window_size = nalgebra::Vector2::new(
+                    draw_area.width().min(app.window().width() as f32),
+                    draw_area.height().min(app.window().height() as f32),
+                );
                 let img_size = current_image.size_vec();
                 state.image_geometry.scale = (window_size.x / img_size.x)
                     .min(window_size.y / img_size.y)
@@ -1030,8 +1029,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.image_geometry.offset.y += draw_area.top();
                 debug!("Image has been reset.");
                 state.reset_image = false;
+                app.window().request_frame();
             }
-            app.window().request_frame();
         }
 
         // Settings come last, as they block keyboard grab (for hotkey assigment)
