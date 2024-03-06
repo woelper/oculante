@@ -2047,16 +2047,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .unwrap_or_default()
                 ));
             }
-        }
 
-        if !state.is_loaded {
-            if let Some(p) = &state.current_path {
+            if !state.is_loaded {
                 ui.horizontal(|ui| {
                     ui.add(egui::Spinner::default());
                     ui.label(format!("Loading {}", p.display()));
                 });
+                app.window().request_frame();
             }
-            app.window().request_frame();
         }
 
         drag_area(ui, state, app);
