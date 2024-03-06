@@ -20,7 +20,7 @@ name = "oculante"
 
 [dependencies]
 anyhow = "1.0"
-arboard = "3.2"
+arboard = {version="3.2", features = ["wayland-data-control"]}
 avif-decode = {version = "0.2", optional = true}
 clap = "3.2"
 dds-rs = "0.7"
