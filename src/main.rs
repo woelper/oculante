@@ -412,6 +412,29 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
             }
+            if key_pressed(app, state, Copy) {
+                if let Some(img) = &state.current_image {
+                    clipboard_copy(img);
+                    state.send_message_info("Image copied");
+                }
+            }
+
+            if key_pressed(app, state, Paste) {
+                match clipboard_to_image() {
+                    Ok(img) => {
+                        state.current_path = None;
+                        // Stop in the even that an animation is running
+                        state.player.stop();
+                        _ = state
+                            .player
+                            .image_sender
+                            .send(crate::utils::Frame::new_still(img));
+                        // Since pasted data has no path, make sure it's not set
+                        state.send_message_info("Image pasted");
+                    }
+                    Err(e) => state.send_message_err(&e.to_string()),
+                }
+            }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
                 app.backend.exit();

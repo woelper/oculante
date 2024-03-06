@@ -1,5 +1,6 @@
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
+    clipboard_to_image,
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -17,7 +18,6 @@ use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24.;
 
-use arboard::Clipboard;
 use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
@@ -2113,26 +2113,19 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 .clicked()
                 || key_pressed(app, state, Paste)
             {
-                if let Ok(clipboard) = &mut Clipboard::new() {
-                    if let Ok(imagedata) = clipboard.get_image() {
-                        if let Some(image) = image::RgbaImage::from_raw(
-                            imagedata.width as u32,
-                            imagedata.height as u32,
-                            (imagedata.bytes).to_vec(),
-                        ) {
-                            state.current_path = None;
-                            // Stop in the even that an animation is running
-                            state.player.stop();
-                            _ = state
-                                .player
-                                .image_sender
-                                .send(crate::utils::Frame::new_still(image));
-                            // Since pasted data has no path, make sure it's not set
-                            state.send_message_info("Image pasted");
-                        }
-                    } else {
-                        state.send_message_err("Clipboard did not contain image")
+                match clipboard_to_image() {
+                    Ok(img) => {
+                        state.current_path = None;
+                        // Stop in the even that an animation is running
+                        state.player.stop();
+                        _ = state
+                            .player
+                            .image_sender
+                            .send(crate::utils::Frame::new_still(img));
+                        // Since pasted data has no path, make sure it's not set
+                        state.send_message_info("Image pasted");
                     }
+                    Err(e) => state.send_message_err(&e.to_string()),
                 }
                 ui.close_menu();
             }
