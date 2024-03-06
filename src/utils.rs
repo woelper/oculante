@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self};
+use image::{self, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -846,4 +846,18 @@ pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     let output = File::create(p)?;
     dynimage.encoder().write_to(output)?;
     Ok(())
+}
+
+pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    let clipboard = &mut Clipboard::new()?;
+
+    let imagedata = clipboard.get_image()?;
+    let image = image::RgbaImage::from_raw(
+        imagedata.width as u32,
+        imagedata.height as u32,
+        (imagedata.bytes).to_vec(),
+    )
+    .context("Can't decode RgbaImage")?;
+
+    Ok(image)
 }
