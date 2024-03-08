@@ -1,3 +1,17 @@
+# 0.8.14 (2024-03-08)
+
+### :beetle: Bug Fixes
+
+* Enable hotkey copy and paste (a538c1d5)
+* Enable clipboard support on wayland (f86af424)
+* Prevent image from flickering at the first frame (df4439a8)
+* Make sure window size is not larger than window (36c03c8f)
+
+### :sparkles: Features
+
+* use .config location on unix for storing settings (024dc70b)
+* Add perspective cropping with UI. You can now de-warp scans or similar into a nice rectangular picture. (ba7c7575)
+
 # 0.8.13 (2024-02-27)
 
 # 0.8.12 (2024-02-26)
