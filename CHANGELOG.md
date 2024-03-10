@@ -1,3 +1,9 @@
+# 0.8.15 (2024-03-10)
+
+### :beetle: Bug Fixes
+
+* Fix issue where "Open with..." does not work any more (b5677977)
+
 # 0.8.14 (2024-03-08)
 
 ### :beetle: Bug Fixes
