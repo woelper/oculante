@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 
 use clap::Arg;
 use clap::Command;
@@ -185,6 +185,10 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
+    #[cfg(target_os = "windows")]
+    let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
+
+    #[cfg(not(target_os = "windows"))]
     let maybe_img_location = matches
         .value_of("INPUT")
         .map(Uri::parse)
