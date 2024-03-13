@@ -2,7 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
-use fluent_uri::Uri;
+// use fluent_uri::Uri;
 use log::debug;
 use log::error;
 use log::info;
@@ -185,18 +185,18 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
-    #[cfg(target_os = "windows")]
+    // #[cfg(target_os = "windows")]
     let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
 
-    #[cfg(not(target_os = "windows"))]
-    let maybe_img_location = matches
-        .value_of("INPUT")
-        .map(Uri::parse)
-        .and_then(|uri_result| {
-            uri_result
-                .ok()
-                .map(|uri| PathBuf::from(uri.path().as_str()))
-        });
+    // #[cfg(not(target_os = "windows"))]
+    // let maybe_img_location = matches
+    //     .value_of("INPUT")
+    //     .map(Uri::parse)
+    //     .and_then(|uri_result| {
+    //         uri_result
+    //             .ok()
+    //             .map(|uri| PathBuf::from(uri.path().as_str()))
+    //     });
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
