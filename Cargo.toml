@@ -120,3 +120,13 @@ debug = false
 incremental = true
 opt-level = 1
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ version }/{ name }_linux{ archive-suffix }"
+pkg-fmt = "zip"
+bin-dir = "target/release/{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.aarch64-unknown-linux-musl]
+pkg-url = "{ repo }/releases/download/{ version }/{ name }_linux_aarch64_minimal{ archive-suffix }"
+pkg-fmt = "zip"
+bin-dir = "target/aarch64-unknown-linux-gnu/release/{ bin }{ binary-ext }"
+
