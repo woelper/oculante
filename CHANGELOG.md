@@ -1,3 +1,9 @@
+# 0.8.16 (2024-03-13)
+
+### :beetle: Bug Fixes
+
+* Fix Uri causing files not loading (ad886555)
+
 # 0.8.15 (2024-03-10)
 
 ### :beetle: Bug Fixes
