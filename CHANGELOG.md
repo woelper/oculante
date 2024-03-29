@@ -1,3 +1,9 @@
+# 0.8.17 (2024-03-29)
+
+### :beetle: Bug Fixes
+
+* Do not display console window on Windows (fixes #300) (f83eb463)
+
 # 0.8.16 (2024-03-13)
 
 ### :beetle: Bug Fixes
