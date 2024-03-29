@@ -676,6 +676,7 @@ fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
     tm
 }
 
+#[allow(unused)]
 fn u16_to_u8(p: u16) -> u8 {
     ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
 }
