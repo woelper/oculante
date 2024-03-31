@@ -18,6 +18,15 @@ pub enum ColorTheme {
     System,
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum MouseWheelAction {
+    /// Zoom in/out
+    #[default]
+    Zoom,
+    /// Next/Prev image
+    NextPrev,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct PersistentSettings {
@@ -58,6 +67,7 @@ pub struct PersistentSettings {
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
     pub borderless: bool,
+    pub mouse_wheel_action: MouseWheelAction,
 }
 
 impl Default for PersistentSettings {
@@ -91,6 +101,7 @@ impl Default for PersistentSettings {
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
             borderless: false,
+            mouse_wheel_action: Default::default(),
         }
     }
 }

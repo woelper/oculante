@@ -631,6 +631,13 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     keybinding_ui(app, state, ui);
                 });
 
+                ui.collapsing("Mouse", |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Wheel:").on_hover_text("Unselected action is performed with ctrl+wheel");
+                        ui.radio_value(&mut state.persistent_settings.mouse_wheel_action, crate::settings::MouseWheelAction::Zoom, "Zoom");
+                        ui.radio_value(&mut state.persistent_settings.mouse_wheel_action, crate::settings::MouseWheelAction::NextPrev, "Next/Prev");
+                        });
+                });
             });
     state.settings_enabled = settings_enabled;
 }

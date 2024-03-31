@@ -27,6 +27,7 @@ use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
 use crate::settings::set_system_theme;
 use crate::settings::ColorTheme;
+use crate::settings::MouseWheelAction;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
@@ -603,7 +604,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
-                if app.keyboard.ctrl() {
+                if app.keyboard.ctrl()
+                    ^ (state.persistent_settings.mouse_wheel_action == MouseWheelAction::NextPrev)
+                {
                     // Change image to next/prev
                     // - map scroll-down == next, as that's the natural scrolling direction
                     if delta_y > 0.0 {
