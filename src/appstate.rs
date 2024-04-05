@@ -1,7 +1,7 @@
 use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
-    settings::PersistentSettings,
+    settings::{PersistentSettings, VolatileSettings},
     utils::{ExtendedImageInfo, Frame, Player},
 };
 use egui_notify::Toasts;
@@ -77,6 +77,7 @@ pub struct OculanteState {
     pub pointer_over_ui: bool,
     /// Things that perisist between launches
     pub persistent_settings: PersistentSettings,
+    pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
     /// how long the toast message appears
@@ -139,6 +140,7 @@ impl Default for OculanteState {
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: Default::default(),
+            volatile_settings: Default::default(),
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),

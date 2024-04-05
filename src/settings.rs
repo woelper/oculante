@@ -38,14 +38,9 @@ pub struct PersistentSettings {
     pub wrap_folder: bool,
     /// Whether to keep the image edit stack
     pub keep_edits: bool,
-    pub favourite_images: HashSet<PathBuf>,
-    pub recent_images: Vec<PathBuf>,
     pub title_format: String,
     pub info_enabled: bool,
     pub edit_enabled: bool,
-    // pos.x, pos.y, width, height
-    pub window_geometry: ((u32, u32), (u32, u32)),
-    pub last_open_directory: PathBuf,
     pub show_checker_background: bool,
     pub show_minimap: bool,
     pub show_frame: bool,
@@ -73,13 +68,9 @@ impl Default for PersistentSettings {
             show_scrub_bar: Default::default(),
             wrap_folder: true,
             keep_edits: Default::default(),
-            favourite_images: Default::default(),
-            recent_images: Default::default(),
             title_format: "{APP} | {VERSION} | {FULLPATH}".into(),
             info_enabled: Default::default(),
             edit_enabled: Default::default(),
-            window_geometry: Default::default(),
-            last_open_directory: std::env::current_dir().unwrap_or_default(),
             show_checker_background: Default::default(),
             show_minimap: Default::default(),
             show_frame: Default::default(),
@@ -137,7 +128,45 @@ fn save(s: &PersistentSettings) -> Result<()> {
     }
 
     let f = File::create(local_dir.join("config.json"))?;
-    Ok(serde_json::to_writer(f, s)?)
+    Ok(serde_json::to_writer_pretty(f, s)?)
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct VolatileSettings {
+    pub favourite_images: HashSet<PathBuf>,
+    pub recent_images: Vec<PathBuf>,
+    pub window_geometry: ((u32, u32), (u32, u32)),
+    pub last_open_directory: PathBuf,
+}
+
+impl VolatileSettings {
+    pub fn load() -> Result<Self> {
+        //data_local_dir
+        let config_path = dirs::config_local_dir()
+            .ok_or(anyhow!("Can't get config_local dir"))?
+            .join("oculante")
+            .join("config_volatile.json")
+            .canonicalize()
+            // migrate old config
+            ?;
+
+        Ok(serde_json::from_reader::<_, VolatileSettings>(File::open(
+            config_path,
+        )?)?)
+    }
+
+    pub fn save_blocking(&self) -> Result<()> {
+        let local_dir = dirs::config_local_dir()
+            .ok_or(anyhow!("Can't get local dir"))?
+            .join("oculante");
+        if !local_dir.exists() {
+            _ = create_dir_all(&local_dir);
+        }
+
+        let f = File::create(local_dir.join("config_volatile.json"))?;
+        Ok(serde_json::to_writer_pretty(f, self)?)
+    }
 }
 
 pub fn set_system_theme(ctx: &Context) {

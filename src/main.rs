@@ -575,8 +575,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
-            state.persistent_settings.window_geometry.1 = (width, height);
-            state.persistent_settings.window_geometry.0 = (
+            state.volatile_settings.window_geometry.1 = (width, height);
+            state.volatile_settings.window_geometry.0 = (
                 app.backend.window().position().0 as u32,
                 app.backend.window().position().1 as u32,
             );
@@ -592,7 +592,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Exit => {
             info!("About to exit");
             // save position
-            state.persistent_settings.window_geometry = (
+            state.volatile_settings.window_geometry = (
                 (
                     app.window().position().0 as u32,
                     app.window().position().1 as u32,
@@ -694,7 +694,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Save every 1.5 secs
     let t = app.timer.elapsed_f32() % 1.5;
     if t <= 0.01 {
-        state.persistent_settings.window_geometry = (
+        state.volatile_settings.window_geometry = (
             (
                 app.window().position().0 as u32,
                 app.window().position().1 as u32,
@@ -790,7 +790,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_image = None;
         state.player.load(&p, state.message_channel.0.clone());
         if let Some(dir) = p.parent() {
-            state.persistent_settings.last_open_directory = dir.to_path_buf();
+            state.volatile_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
     }
