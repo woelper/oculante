@@ -4339,6 +4339,7 @@ dependencies = [
  "wgpu",
  "windres",
  "winres",
+ "zune-core",
  "zune-png",
 ]
 

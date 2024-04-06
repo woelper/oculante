@@ -487,6 +487,74 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     .set_max_height(50000)
                     .set_max_width(50000),
             );
+
+            //animation
+            decoder.decode_headers()?;
+            if decoder.is_animated() {
+
+                info!("Image is animated");
+                decoder.decode_headers()?;
+
+                let colorspace = decoder.get_colorspace().context("Can't get color space")?;
+                let depth = decoder.get_depth().context("Can't get decoder depth")?;
+                //  get decoder information,we clone this because we need a standalone
+                // info since we mutably modify decoder struct below
+                let info = decoder.get_info().context("Can't get decoder info")?.clone();
+                // set up our background variable. Soon it will contain the data for the previous
+                // frame, the first frame has no background hence why this is None
+                let mut background: Option<Vec<u8>> = None;
+                // the output, since we know that no frame will be bigger than the width and height, we can
+                // set this up outside of the loop.
+                let mut output = vec![
+                    0;
+                    info.width
+                        * info.height
+                        * decoder.get_colorspace().context("Can't get decoder color depth")?.num_components()
+                ];
+
+
+                while decoder.more_frames() {
+                    // decode the header, in case we haven't processed a frame header
+                    decoder.decode_headers()?;
+                    // then decode the current frame information,
+                    // NB: Frame information is for current frame hence should be accessed before decoding the frame
+                    // as it will change on subsequent frames
+                    let frame = decoder.frame_info().context("Can't get frame info")?;
+                    debug!("Frame: {:?}", frame);
+
+                    // decode the raw pixels, even on smaller frames, we only allocate frame_info.width*frame_info.height
+                    let pix = decoder.decode_raw()?;
+                    // call post process
+                    zune_png::post_process_image(
+                        &info,
+                        colorspace,
+                        &frame,
+                        &pix,
+                        background.as_ref().map(|x| x.as_slice()),
+                        &mut output,
+                        None,
+                    )
+                    ?;
+                    // create encoder parameters
+                    let encoder_opts = zune_core::options::EncoderOptions::new(
+                        info.width,
+                        info.height,
+                        colorspace,
+                        depth,
+                    );
+
+                    let bytes = zune_png::PngEncoder::new(&output, encoder_opts).encode();
+                    let img = image::load_from_memory(&bytes)?;
+                    let buf = img.to_rgba8();
+
+                    let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
+                    _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+                    background = Some(output.clone());
+                }
+                return Ok(receiver);
+            }
+
+            debug!("Image is not animated");
             match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
                 // 16 bpp data
                 DecodingResult::U16(imgdata) => {
