@@ -392,16 +392,16 @@ pub enum FrameSource {
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub buffer: RgbaImage,
-    /// How long to pause until the next frame
+    /// How long to pause until the next frame, in milliseconds
     pub delay: u16,
     pub source: FrameSource,
 }
 
 impl Frame {
-    pub fn new(buffer: RgbaImage, delay: u16, source: FrameSource) -> Frame {
+    pub fn new(buffer: RgbaImage, delay_ms: u16, source: FrameSource) -> Frame {
         Frame {
             buffer,
-            delay,
+            delay: delay_ms,
             source,
         }
     }
