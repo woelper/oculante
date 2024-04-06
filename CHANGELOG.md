@@ -1,3 +1,14 @@
+# 0.8.18 (2024-04-06)
+
+### :sparkles: Features
+
+* APNG support (c633764d)
+
+### :green_apple: Chore
+
+* **deps**: bump h2 from 0.3.24 to 0.3.26 (59c559ac)
+* update logo (6ae3bc03)
+
 # 0.8.17 (2024-03-29)
 
 ### :beetle: Bug Fixes
