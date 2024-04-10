@@ -5,7 +5,7 @@ use crate::{
     paint::PaintStroke,
     set_zoom,
     settings::{set_system_theme, ColorTheme},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    shortcuts::{key_pressed, keypresses_as_string, lookup, MouseWheelDirection, MouseWheelEvent},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
@@ -631,12 +631,48 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     keybinding_ui(app, state, ui);
                 });
 
-                ui.collapsing("Mouse", |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Wheel:").on_hover_text("Unselected action is performed with ctrl+wheel");
-                        ui.radio_value(&mut state.persistent_settings.mouse_wheel_action, crate::settings::MouseWheelAction::Zoom, "Zoom");
-                        ui.radio_value(&mut state.persistent_settings.mouse_wheel_action, crate::settings::MouseWheelAction::NextPrev, "Next/Prev");
-                        });
+                ui.collapsing("Mouse wheel", |ui| {
+                    egui::Grid::new("mouse_settings").show(ui, |ui| {
+                        ui.label("Action");
+                        ui.label("Up/Down");
+                        ui.label("Modifiers");
+                        ui.end_row();
+
+                        let mut enabled_triggers: std::collections::HashSet<MouseWheelEvent> = Default::default();
+
+                        for (action, opt_trigger) in state.persistent_settings.mouse_wheel_settings.iter_mut() {
+                            if let Some(trigger) = opt_trigger {
+                                if enabled_triggers.insert(*trigger) {
+                                    ui.label(format!("{action:?}"));
+                                    enabled_triggers.insert(*trigger);
+                                } else {
+                                    ui.label(RichText::new(format!("{action:?}")).strikethrough())
+                                        .on_hover_text("Invalid setting for the action. Change the setting or only the first action with the same setting will be performed.");
+                                }
+
+                                egui::ComboBox::from_id_source(format!("Up/Down {action:?}"))
+                                    .selected_text(format!("{:?}", trigger.direction))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut trigger.direction, MouseWheelDirection::Up, "Up");
+                                        ui.selectable_value(&mut trigger.direction, MouseWheelDirection::Down, "Down");
+                                    }
+                                );
+                                ui.horizontal(|ui| { ui.checkbox(&mut trigger.ctrl, "Ctrl");
+                                ui.checkbox(&mut trigger.shift, "Shift"); });
+                                if ui.button("Disable").on_hover_text("Click to disable this binding").clicked() {
+                                    *opt_trigger = None;
+                                }
+                                
+
+                            } else {
+                                ui.label(format!("{action:?}"));
+                                if ui.button("Enable").on_hover_text("Click to enable binding").clicked() {
+                                    *opt_trigger = Some(Default::default());
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    });
                 });
             });
     state.settings_enabled = settings_enabled;

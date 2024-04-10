@@ -757,6 +757,28 @@ pub fn next_image(state: &mut OculanteState) {
     }
 }
 
+pub fn zoom_image(state: &mut OculanteState, delta_y: f32) {
+    let divisor = if cfg!(macos) { 0.1 } else { 10. };
+    // Normal scaling
+    let delta = zoomratio(
+        ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
+            .max(-5.0)
+            .min(5.0),
+        state.image_geometry.scale,
+    );
+    let new_scale = state.image_geometry.scale + delta;
+    // limit scale
+    if new_scale > 0.01 && new_scale < 40. {
+        state.image_geometry.offset -= scale_pt(
+            state.image_geometry.offset,
+            state.cursor,
+            state.image_geometry.scale,
+            delta,
+        );
+        state.image_geometry.scale += delta;
+    }
+}
+
 /// Set the window title
 pub fn set_title(app: &mut App, state: &mut OculanteState) {
     let p = state.current_path.clone().unwrap_or_default();
