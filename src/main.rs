@@ -297,6 +297,8 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
+        ctx.options_mut(|o|o.zoom_with_keyboard = false);
+
         fonts
             .font_data
             .insert("my_font".to_owned(), FontData::from_static(FONT));
