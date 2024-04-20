@@ -1770,12 +1770,21 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         }
     });
 
-    let k = app
+    let mut k = app
         .keyboard
         .down
         .iter()
         .map(|k| format!("{:?}", k.0))
         .collect::<BTreeSet<String>>();
+
+    if app.mouse.is_scrolling() {
+        if app.mouse.wheel_delta.y < 0. {
+            k.insert("MWheelUp".into());
+        } else {
+            k.insert("MWheelDown".into());
+
+        }
+    }
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, true])
