@@ -897,7 +897,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
        
         if let Some(tex) = &mut state.current_texture {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                img.update_texture(gfx, & mut tex.texor[0]); //TODO: Kachel-Update
+                img.update_texture(gfx, & mut tex.texture_array[0]); //TODO: Kachel-Update
             } else {                
                 state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
             }
@@ -1078,22 +1078,33 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         if state.tiling < 2 {
-            draw.image(&texture.texor[0])
-                .blend_mode(BlendMode::NORMAL)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+            let mut tex_idx = 0;
+            for row_idx in 0..texture.row_count
+            {
+                let translate_y = state.image_geometry.offset.y+state.image_geometry.scale*row_idx as f32*texture.row_translation as f32;
+                for col_idx in 0..texture.col_count
+                {
+                    let translate_x = state.image_geometry.offset.x+state.image_geometry.scale*col_idx as f32 *texture.col_translation as f32;
+                    draw.image(&texture.texture_array[tex_idx])
+                        .blend_mode(BlendMode::NORMAL)
+                        .scale(state.image_geometry.scale, state.image_geometry.scale)
+                        .translate(translate_x, translate_y);
+                    tex_idx += 1;
+                }
+            }
         } else {
-            draw.pattern(&texture.texor[0])
+            //TODO: How to implement this efficient?
+            draw.pattern(&texture.texture_array[0])
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
                 .size(
-                    texture.texor[0].width() * state.tiling as f32,
-                    texture.texor[0].height() * state.tiling as f32,
+                    texture.texture_array[0].width() * state.tiling as f32,
+                    texture.texture_array[0].height() * state.tiling as f32,
                 );
         }
 
         if state.persistent_settings.show_frame {
-            draw.rect((0.0, 0.0), texture.texor[0].size())
+            draw.rect((0.0, 0.0), texture.size())
                 .stroke(1.0)
                 .color(Color {
                     r: 0.5,
@@ -1115,8 +1126,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 * state.image_geometry.scale
                 > app.window().size().0 as f32;
 
-            if show_minimap {
-                draw.image(&texture.texor[0])
+            if show_minimap { //TODO!
+                draw.image(&texture.texture_array[0])
                     .blend_mode(BlendMode::NORMAL)
                     .translate(offset_x, 100.)
                     .scale(scale, scale);
@@ -1126,7 +1137,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // Draw a brush preview when paint mode is on
         if state.edit_state.painting {
             if let Some(stroke) = state.edit_state.paint_strokes.last() {
-                let dim = texture.texor[0].width().min(texture.texor[0].height()) / 50.;
+                let dim = texture.width().min(texture.height()) / 50.;
                 draw.circle(20.)
                     // .translate(state.cursor_relative.x, state.cursor_relative.y)
                     .alpha(0.5)

@@ -46,14 +46,12 @@ impl Message {
 }
 
 pub struct TexWrap{
-    //pub tex:Texture,
-    pub texor:Vec<Texture>,
-    //pub asbet:Option<Texture>,
+    pub texture_array:Vec<Texture>,
     pub col_count:u32,
     pub row_count:u32,
     pub col_translation:u32,
     pub row_translation:u32,
-    pub size_vec:(f32,f32) // Will be the whole Texture Array size soon
+    pub size_vec:(f32,f32) // The whole Texture Array size
 }
 
 impl TexWrap{
@@ -148,7 +146,7 @@ impl TexWrap{
         }*/
         
         if(fine){
-        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texor:a, col_translation:col_increment, row_translation:row_increment })
+        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texture_array:a, col_translation:col_increment, row_translation:row_increment })
     }
     else {
         None
