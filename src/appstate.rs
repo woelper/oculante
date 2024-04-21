@@ -43,6 +43,30 @@ impl Message {
     }
 }
 
+pub struct TexWrap{
+    pub tex:Texture,
+    pub size_vec:(f32,f32) // Will be the whole Texture Array size soon
+}
+
+impl TexWrap{
+    pub fn new(texture: Texture) -> Self{
+        let s = texture.size();
+        TexWrap { tex: texture, size_vec:s }        
+    }
+
+    pub fn size(&self)->(f32,f32){
+        return self.size_vec;
+    }
+
+    pub fn width(&self)-> f32 {
+        return self.size_vec.0;
+    }
+
+    pub fn height(&self)-> f32 {
+        return self.size_vec.1;
+    }
+}
+
 /// The state of the application
 #[derive(AppState)]
 pub struct OculanteState {
@@ -65,7 +89,7 @@ pub struct OculanteState {
     pub extended_info_loading: bool,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
-    pub current_texture: Option<Texture>,
+    pub current_texture: Option<TexWrap>,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
     pub settings_enabled: bool,

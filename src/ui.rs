@@ -183,7 +183,7 @@ impl EguiExt for Ui {
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
-        let tex_id = gfx.egui_register_texture(texture);
+        let tex_id = gfx.egui_register_texture(&texture.tex);
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -248,7 +248,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
                 // texture.
-                let tex_id = gfx.egui_register_texture(texture);
+                let tex_id = gfx.egui_register_texture(&texture.tex);
 
                 // width of image widget
                 // let desired_width = ui.available_width() - ui.spacing().indent;
@@ -1105,7 +1105,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
-                            state.edit_state.result_pixel_op.update_texture(gfx, tex);
+                            state.edit_state.result_pixel_op.update_texture(gfx, & mut tex.tex);
                         } else {
                             state.current_texture =
                                 state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);

@@ -29,6 +29,7 @@ use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::TexWrap;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -608,7 +609,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<Texture> {
+    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<TexWrap> {
         unimplemented!()
     }
 
@@ -630,8 +631,8 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
-        gfx.create_texture()
+    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<TexWrap> {
+        let tex = gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
             .with_mipmaps(true)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
@@ -646,7 +647,11 @@ impl ImageExt for RgbaImage {
             )
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
-            .ok()
+            .ok();
+        match tex {
+            None => None,
+            Some(t) => Some(TexWrap::new(t)),
+        }
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
