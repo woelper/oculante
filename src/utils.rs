@@ -288,6 +288,8 @@ pub fn send_image_threaded(
                 // .clone()
                 // .send(Frame::new_reset(f.buffer.clone()));
 
+                let cheat_max_texture_size:u32 = 65384;
+
                 let mut first = true;
                 for mut f in frame_receiver.iter() {
                     if let Some(ref fs) = forced_frame_source {
@@ -304,15 +306,15 @@ pub fn send_image_threaded(
                         let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
                         // Check if texture is too large to fit on the texture
-                        if largest_side > max_texture_size {
+                        if largest_side > cheat_max_texture_size {
                             _ = message_sender.send(Message::warn("This image exceeded the maximum resolution and will be be scaled down."));
-                            let scale_factor = max_texture_size as f32 / largest_side as f32;
+                            let scale_factor = cheat_max_texture_size as f32 / largest_side as f32;
                             let new_dimensions = (
                                 (f.buffer.dimensions().0 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
+                                    .min(cheat_max_texture_size as f32)
                                     as u32,
                                 (f.buffer.dimensions().1 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
+                                    .min(cheat_max_texture_size as f32)
                                     as u32,
                             );
 
@@ -632,7 +634,7 @@ impl ImageExt for RgbaImage {
     }
 
     fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<TexWrap> {
-        let tex = gfx.create_texture()
+        /*let tex = gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
             .with_mipmaps(true)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
@@ -651,7 +653,8 @@ impl ImageExt for RgbaImage {
         match tex {
             None => None,
             Some(t) => Some(TexWrap::new(t)),
-        }
+        }*/
+        TexWrap::from_rgbaimage(gfx, linear_mag_filter, self)
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {

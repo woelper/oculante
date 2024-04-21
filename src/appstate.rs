@@ -2,12 +2,14 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::PersistentSettings,
-    utils::{ExtendedImageInfo, Frame, Player},
+    utils::{ExtendedImageInfo, Frame, Player}, ImageExt,
 };
 use egui_notify::Toasts;
 use image::RgbaImage;
+use image::imageops;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
+use notan::prelude::{Graphics, TextureFilter};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
@@ -44,14 +46,114 @@ impl Message {
 }
 
 pub struct TexWrap{
-    pub tex:Texture,
+    //pub tex:Texture,
+    pub texor:Vec<Texture>,
+    //pub asbet:Option<Texture>,
+    pub col_count:u32,
+    pub row_count:u32,
+    pub col_translation:u32,
+    pub row_translation:u32,
     pub size_vec:(f32,f32) // Will be the whole Texture Array size soon
 }
 
 impl TexWrap{
-    pub fn new(texture: Texture) -> Self{
+    /*pub fn new(texture: Texture) -> Self{
         let s = texture.size();
         TexWrap { tex: texture, size_vec:s }        
+    }*/
+
+    pub fn from_rgbaimage(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{
+        let im_w = image.width();
+        let im_h = image.height();
+        let s = (im_w as f32, im_h as f32);
+        let max_texture_size = gfx.limits().max_texture_size;
+        let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
+        let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;
+
+        
+
+        let mut a:Vec<Texture> = Vec::new();
+        let row_increment = std::cmp::min(max_texture_size, im_h);
+        let col_increment = std::cmp::min(max_texture_size, im_w);
+        let mut fine = true;
+        
+        for row_index in  0..row_count {
+            let tex_start_y = row_index*row_increment;
+            let tex_height = std::cmp::min(
+                row_increment,
+                im_h-tex_start_y
+            );
+            for col_index in  0..col_count {
+                let tex_start_x = col_index*col_increment;
+                let tex_width = std::cmp::min(
+                    col_increment,
+                    im_w-tex_start_x
+                );
+                print!("{0},{1},{2},{3}",tex_start_y, tex_height, tex_start_x, tex_width);
+                let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
+                let my_img = sub_img.to_image();
+                let tex = gfx.create_texture()
+                    .from_bytes(my_img.as_ref(), my_img.width(), my_img.height())
+                    .with_mipmaps(true)
+                    // .with_format(notan::prelude::TextureFormat::SRgba8)
+                    // .with_premultiplied_alpha()
+                    .with_filter(
+                        TextureFilter::Linear,
+                        if linear_mag_filter {
+                            TextureFilter::Linear
+                        } else {
+                            TextureFilter::Nearest
+                        },
+                    )
+                    // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+                    .build()
+                    .ok();
+
+                    
+                    if let Some(t) = tex {
+                        a.push(t);                        
+                    }
+                    else{
+                        fine = false;
+                        break;
+                    }                  
+            }
+            if(fine == false){
+                break;
+            }
+        }
+        
+        /*let sub_img = imageops::crop_imm(image, 0, 0, max_texture_size, image.height());
+        let my_img = sub_img.to_image();
+        let tex = gfx.create_texture()
+            .from_bytes(my_img.as_ref(), my_img.width(), my_img.height())
+            .with_mipmaps(true)
+            // .with_format(notan::prelude::TextureFormat::SRgba8)
+            // .with_premultiplied_alpha()
+            .with_filter(
+                TextureFilter::Linear,
+                if linear_mag_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+            )
+            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+            .build()
+            .ok();
+        
+        match tex {
+            None => None,
+            Some(t) => Some(TexWrap { tex: t, size_vec:s, col_count:col_count, row_count:row_count }),
+        }*/
+        
+        if(fine){
+        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texor:a, col_translation:col_increment, row_translation:row_increment })
+    }
+    else {
+        None
+    }
+
     }
 
     pub fn size(&self)->(f32,f32){
