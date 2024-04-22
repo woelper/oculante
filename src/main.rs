@@ -897,7 +897,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
        
         if let Some(tex) = &mut state.current_texture {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                img.update_texture(gfx, & mut tex.texture_array[0]); //TODO: Kachel-Update
+                img.update_texture_with_texwrap(gfx, tex); //TODO: Kachel-Update
             } else {                
                 state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
             }

@@ -31,6 +31,8 @@ use crate::image_loader::open_image;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 use crate::TexWrap;
 
+use crate::utils::image::imageops;
+
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
     "dds",
@@ -623,6 +625,10 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    fn update_texture_with_texwrap(&self, _: &mut Graphics, _: &mut TexWrap) {
+        unimplemented!()
+    }
+
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
     }
@@ -633,27 +639,7 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<TexWrap> {
-        /*let tex = gfx.create_texture()
-            .from_bytes(self, self.width(), self.height())
-            .with_mipmaps(true)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(
-                TextureFilter::Linear,
-                if linear_mag_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok();
-        match tex {
-            None => None,
-            Some(t) => Some(TexWrap::new(t)),
-        }*/
+    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<TexWrap> {        
         TexWrap::from_rgbaimage(gfx, linear_mag_filter, self)
     }
 
@@ -671,6 +657,10 @@ impl ImageExt for RgbaImage {
         if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
             error!("{e}");
         }
+    }
+
+    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
+        texture.update_textures(gfx,self);
     }
 }
 

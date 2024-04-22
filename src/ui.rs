@@ -1105,7 +1105,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
-                            state.edit_state.result_pixel_op.update_texture(gfx, & mut tex.texture_array[0]); //TODO!
+                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex); //TODO!
                         } else {
                             state.current_texture =
                                 state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);

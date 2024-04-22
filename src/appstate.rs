@@ -14,6 +14,7 @@ use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
 };
+use log::error;
 
 #[derive(Debug, Clone)]
 pub struct ImageGeometry {
@@ -60,7 +61,58 @@ impl TexWrap{
         TexWrap { tex: texture, size_vec:s }        
     }*/
 
+    //pub fn from_rgba_image_premult(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{}
+
     pub fn from_rgbaimage(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{
+        Self::gen_from_rgbaimage(gfx, linear_mag_filter, image, Self::gen_texture_standard)
+    }
+
+    pub fn from_rgbaimage_premult(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{
+        Self::gen_from_rgbaimage(gfx, linear_mag_filter, image, Self::gen_texture_premult)
+    }
+
+    fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, linear_mag_filter:bool)-> Option<Texture>
+    {
+        gfx.create_texture()
+                    .from_bytes(bytes, width, height)
+                    .with_mipmaps(true)
+                    // .with_format(notan::prelude::TextureFormat::SRgba8)
+                    // .with_premultiplied_alpha()
+                    .with_filter(
+                        TextureFilter::Linear,
+                        if linear_mag_filter {
+                            TextureFilter::Linear
+                        } else {
+                            TextureFilter::Nearest
+                        },
+                    )
+                    // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+                    .build()
+                    .ok()    
+    }
+
+    fn gen_texture_premult(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, linear_mag_filter:bool)-> Option<Texture>
+    {
+        gfx.create_texture()
+                    .from_bytes(bytes, width, height)
+                    .with_premultiplied_alpha()
+                    .with_mipmaps(true)
+                    // .with_format(notan::prelude::TextureFormat::SRgba8)
+                    // .with_premultiplied_alpha()
+                    .with_filter(
+                        TextureFilter::Linear,
+                        if linear_mag_filter {
+                            TextureFilter::Linear
+                        } else {
+                            TextureFilter::Nearest
+                        },
+                    )
+                    // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+                    .build()
+                    .ok()    
+    }
+
+    fn gen_from_rgbaimage(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage, fuuun: fn (&mut Graphics, &[u8], u32, u32, bool)-> Option<Texture>) -> Option<TexWrap>{
         let im_w = image.width();
         let im_h = image.height();
         let s = (im_w as f32, im_h as f32);
@@ -90,24 +142,8 @@ impl TexWrap{
                 print!("{0},{1},{2},{3}",tex_start_y, tex_height, tex_start_x, tex_width);
                 let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                 let my_img = sub_img.to_image();
-                let tex = gfx.create_texture()
-                    .from_bytes(my_img.as_ref(), my_img.width(), my_img.height())
-                    .with_mipmaps(true)
-                    // .with_format(notan::prelude::TextureFormat::SRgba8)
-                    // .with_premultiplied_alpha()
-                    .with_filter(
-                        TextureFilter::Linear,
-                        if linear_mag_filter {
-                            TextureFilter::Linear
-                        } else {
-                            TextureFilter::Nearest
-                        },
-                    )
-                    // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-                    .build()
-                    .ok();
+                let tex = fuuun(gfx, my_img.as_ref(), my_img.width(), my_img.height(), linear_mag_filter);
 
-                    
                     if let Some(t) = tex {
                         a.push(t);                        
                     }
@@ -121,37 +157,43 @@ impl TexWrap{
             }
         }
         
-        /*let sub_img = imageops::crop_imm(image, 0, 0, max_texture_size, image.height());
-        let my_img = sub_img.to_image();
-        let tex = gfx.create_texture()
-            .from_bytes(my_img.as_ref(), my_img.width(), my_img.height())
-            .with_mipmaps(true)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(
-                TextureFilter::Linear,
-                if linear_mag_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok();
-        
-        match tex {
-            None => None,
-            Some(t) => Some(TexWrap { tex: t, size_vec:s, col_count:col_count, row_count:row_count }),
-        }*/
-        
         if(fine){
         Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texture_array:a, col_translation:col_increment, row_translation:row_increment })
     }
     else {
         None
     }
+    }
 
+    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage){
+        if(self.col_count==1 && self.row_count==1){
+            if let Err(e) = gfx.update_texture(&mut self.texture_array[0]).with_data(image).update() {
+                error!("{e}");
+            }
+        }else{
+            let mut tex_index = 0;
+            for row_index in  0..self.row_count {
+                let tex_start_y = row_index*self.row_translation;
+                let tex_height = std::cmp::min(
+                    self.row_translation,
+                    image.height()-tex_start_y
+                );
+                for col_index in  0..self.col_count {
+                    let tex_start_x = col_index*self.col_translation;
+                    let tex_width = std::cmp::min(
+                        self.col_translation,
+                        image.width()-tex_start_x
+                    );
+                    print!("{0},{1},{2},{3}",tex_start_y, tex_height, tex_start_x, tex_width);
+                    let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
+                    let my_img = sub_img.to_image();
+                    if let Err(e) = gfx.update_texture(&mut self.texture_array[tex_index]).with_data(my_img.as_ref()).update() {
+                        error!("{e}");
+                    }
+                    tex_index += 1;
+                }
+            }
+        }
     }
 
     pub fn size(&self)->(f32,f32){
@@ -166,6 +208,26 @@ impl TexWrap{
         return self.size_vec.1;
     }
 }
+
+// Implement `Iterator` for `Fibonacci`.
+// The `Iterator` trait only requires a method to be defined for the `next` element.
+/*impl Iterator for TexWrap {
+    // We can refer to this type using Self::Item
+    type Item = (u32,u32, Texture);
+
+    // Here, we define the sequence using `.curr` and `.next`.
+    // The return type is `Option<T>`:
+    //     * When the `Iterator` is finished, `None` is returned.
+    //     * Otherwise, the next value is wrapped in `Some` and returned.
+    // We use Self::Item in the return type, so we can change
+    // the type without having to update the function signatures.
+    fn next(&mut self) -> Option<Self::Item> {
+
+        self.index +=1;
+        
+        None
+    }
+}*/
 
 /// The state of the application
 #[derive(AppState)]
