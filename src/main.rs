@@ -1078,20 +1078,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         if state.tiling < 2 {
-            let mut tex_idx = 0;
-            for row_idx in 0..texture.row_count
-            {
-                let translate_y = state.image_geometry.offset.y+state.image_geometry.scale*row_idx as f32*texture.row_translation as f32;
-                for col_idx in 0..texture.col_count
-                {
-                    let translate_x = state.image_geometry.offset.x+state.image_geometry.scale*col_idx as f32 *texture.col_translation as f32;
-                    draw.image(&texture.texture_array[tex_idx])
-                        .blend_mode(BlendMode::NORMAL)
-                        .scale(state.image_geometry.scale, state.image_geometry.scale)
-                        .translate(translate_x, translate_y);
-                    tex_idx += 1;
-                }
-            }
+            texture.draw_textures(&mut draw,
+                state.image_geometry.offset.x,
+                state.image_geometry.offset.y,
+                state.image_geometry.scale);            
         } else {
             //TODO: How to implement this efficient?
             draw.pattern(&texture.texture_array[0])
@@ -1126,11 +1116,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 * state.image_geometry.scale
                 > app.window().size().0 as f32;
 
-            if show_minimap { //TODO!
-                draw.image(&texture.texture_array[0])
-                    .blend_mode(BlendMode::NORMAL)
-                    .translate(offset_x, 100.)
-                    .scale(scale, scale);
+            if show_minimap {
+                texture.draw_textures(&mut draw,
+                    offset_x,
+                    100.,
+                    scale);
             }
         }
 

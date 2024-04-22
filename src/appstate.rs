@@ -2,14 +2,16 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::PersistentSettings,
-    utils::{ExtendedImageInfo, Frame, Player}, ImageExt,
+    utils::{ExtendedImageInfo, Frame, Player}
 };
+use notan::draw::*;
+use crate::Draw;
 use egui_notify::Toasts;
 use image::RgbaImage;
 use image::imageops;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
-use notan::prelude::{Graphics, TextureFilter};
+use notan::prelude::{Graphics, TextureFilter, BlendMode};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
@@ -165,6 +167,23 @@ impl TexWrap{
     }
     }
 
+    pub fn draw_textures(&self,draw: &mut Draw, translation_x:f32, translation_y:f32, scale: f32){
+        let mut tex_idx = 0;
+            for row_idx in 0..self.row_count
+            {
+                let translate_y = translation_y+scale*row_idx as f32*self.row_translation as f32;
+                for col_idx in 0..self.col_count
+                {
+                    let translate_x = translation_x+scale*col_idx as f32 *self.col_translation as f32;
+                    draw.image(&self.texture_array[tex_idx])
+                        .blend_mode(BlendMode::NORMAL)
+                        .scale(scale, scale)
+                        .translate(translate_x, translate_y);
+                    tex_idx += 1;
+                }
+            }
+    }
+
     pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage){
         if(self.col_count==1 && self.row_count==1){
             if let Err(e) = gfx.update_texture(&mut self.texture_array[0]).with_data(image).update() {
@@ -208,26 +227,6 @@ impl TexWrap{
         return self.size_vec.1;
     }
 }
-
-// Implement `Iterator` for `Fibonacci`.
-// The `Iterator` trait only requires a method to be defined for the `next` element.
-/*impl Iterator for TexWrap {
-    // We can refer to this type using Self::Item
-    type Item = (u32,u32, Texture);
-
-    // Here, we define the sequence using `.curr` and `.next`.
-    // The return type is `Option<T>`:
-    //     * When the `Iterator` is finished, `None` is returned.
-    //     * Otherwise, the next value is wrapped in `Some` and returned.
-    // We use Self::Item in the return type, so we can change
-    // the type without having to update the function signatures.
-    fn next(&mut self) -> Option<Self::Item> {
-
-        self.index +=1;
-        
-        None
-    }
-}*/
 
 /// The state of the application
 #[derive(AppState)]
