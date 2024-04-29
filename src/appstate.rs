@@ -57,6 +57,18 @@ pub struct TexWrap{
     pub size_vec:(f32,f32) // The whole Texture Array size
 }
 
+pub struct TextureResponse<'a>{
+    pub texture: &'a Texture,
+    pub u_start_global : f32, 
+    pub v_start_global : f32, 
+    pub u_offset_global : f32, 
+    pub v_offset_global : f32, 
+    pub u_tex_right_global : f32, 
+    pub v_tex_bottom_global : f32,
+    pub u_scale:f32,
+    pub v_scale:f32
+}
+
 impl TexWrap{
     /*pub fn new(texture: Texture) -> Self{
         let s = texture.size();
@@ -118,7 +130,7 @@ impl TexWrap{
         let im_w = image.width();
         let im_h = image.height();
         let s = (im_w as f32, im_h as f32);
-        let max_texture_size = gfx.limits().max_texture_size;
+        let max_texture_size = 128;//gfx.limits().max_texture_size;
         let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
         let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;
 
@@ -141,7 +153,7 @@ impl TexWrap{
                     col_increment,
                     im_w-tex_start_x
                 );
-                print!("{0},{1},{2},{3}",tex_start_y, tex_height, tex_start_x, tex_width);
+                
                 let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                 let my_img = sub_img.to_image();
                 let tex = fuuun(gfx, my_img.as_ref(), my_img.width(), my_img.height(), linear_mag_filter);
@@ -203,7 +215,7 @@ impl TexWrap{
                         self.col_translation,
                         image.width()-tex_start_x
                     );
-                    print!("{0},{1},{2},{3}",tex_start_y, tex_height, tex_start_x, tex_width);
+                    
                     let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                     let my_img = sub_img.to_image();
                     if let Err(e) = gfx.update_texture(&mut self.texture_array[tex_index]).with_data(my_img.as_ref()).update() {
@@ -213,6 +225,44 @@ impl TexWrap{
                 }
             }
         }
+    }
+
+    pub fn get_texture_at_uv(&self, ua:f32, va:f32)->TextureResponse {
+        let v =  (va).max(0.0).min(1.0);
+        let u =  ua.max(0.0).min(1.0);
+        let x = u*self.width();
+        let y = v*self.height();
+
+        let x_idx = (x /self.col_translation as f32).floor() as u32;
+        let y_idx = (y /self.row_translation as f32).floor() as u32;
+        let tex_idx = (y_idx*self.col_count+x_idx).min((self.texture_array.len() as i32 -1) as u32);
+        
+        let tex_top = y_idx*self.row_translation;
+        let tex_left = x_idx*self.col_translation;
+        let tex_bottom = tex_top+self.row_translation;
+        let tex_right = tex_left+self.col_translation;
+
+        let u_start_global = tex_left as f32/self.width();
+        let v_start_global = tex_top as f32/self.height();
+        
+        let u_offset = (x-tex_left as f32)/self.width();
+        let v_offset = (y-tex_top as f32)/self.height();
+        
+        let u_tex_right = (tex_right) as f32 /self.width();
+        let v_tex_bottom = (tex_bottom) as f32 /self.height();
+        let u_scale = self.col_translation as f32/self.width();
+        let v_scale = self.row_translation as f32/self.height();
+        //TexWrap { tex: texture, size_vec:s }    
+        TextureResponse {texture: &self.texture_array[tex_idx as usize], 
+            u_start_global:u_start_global,
+            v_start_global:v_start_global,
+            u_offset_global:u_offset, 
+            v_offset_global:v_offset, 
+            u_tex_right_global:u_tex_right, 
+            v_tex_bottom_global:v_tex_bottom,
+            u_scale:u_scale,
+            v_scale:v_scale }
+        //(&self.texture_array[tex_idx as usize],u_offset, v_offset, u_tex_right, v_tex_bottom)
     }
 
     pub fn size(&self)->(f32,f32){

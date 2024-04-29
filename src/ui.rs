@@ -334,7 +334,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let uv_size = (scale, scale * ratio);
 
 
-                let preview_rect = ui
+                /*let preview_rect = ui
                     .add(
                         egui::Image::new(tex_id)
                         .maintain_aspect_ratio(false)
@@ -344,13 +344,68 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
                         )),
                     )
-                    .rect;
+                    .rect;*/
+
+                
+                let end_cursor_x = uv_center.0 + uv_size.0;
+                let end_cursor_y = uv_center.1 + uv_size.1;
+                print!("Schdard end_cursor_x{} ",end_cursor_x);
+                println!("{} ",end_cursor_y);
+                println!(" {} ",end_cursor_y);
+                let mut curr_cursor_y = uv_center.1 - uv_size.1;
+                while(curr_cursor_y<end_cursor_y){
+                    
+                    let mut curr_cursor_x = uv_center.0 - uv_size.0;
+                    let mut curr_tex_v_end:f32 = 0.0;
+                    ui.horizontal(|ui| {
+                        
+                  
+                    while(curr_cursor_x<end_cursor_x){
+                        print!(" curr_cursor_x{} ",curr_cursor_x);
+                        print!(" curr_cursor_y{} ",curr_cursor_y);
+                        let curr_tex = texture.get_texture_at_uv(curr_cursor_x, curr_cursor_y);
+                        
+                        //Where does the picked texture end
+                        let curr_tex_u_end = f32::min(curr_tex.u_tex_right_global, end_cursor_x);
+                        curr_tex_v_end = f32::min(curr_tex.v_tex_bottom_global, end_cursor_y);
+
+                        print!(" curr_tex_u_end+curs{} ",curr_cursor_x+curr_tex_u_end);
+                        println!(" curr_tex_v_end+curs{} ",curr_cursor_y+curr_tex_v_end);
+
+                        //The uv coordinates to draw the picked texture                        
+                        let u_offset_texture_snipped = curr_tex.u_offset_global/curr_tex.u_scale;
+                        let v_offset_texture_snipped = curr_tex.v_offset_global/curr_tex.v_scale;
+                        let curr_tex_u_end_texture = curr_tex_u_end/curr_tex.u_scale;
+                        let curr_tex_v_end_texture = curr_tex_v_end/curr_tex.v_scale;
+
+                        //Display size
+                        let u_size = desired_width*(curr_tex_u_end-curr_cursor_x)/(2.0*uv_size.0);
+                        let v_size = desired_width*(curr_tex_v_end-curr_cursor_y)/(2.0*uv_size.1);
+                    
+                    let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
+                    let r_ret = ui
+                    .add(
+                        egui::Image::new(tex_id2)
+                        .maintain_aspect_ratio(false)
+                        .fit_to_exact_size(egui::Vec2::new(u_size, v_size)
+                        )
+                        .uv(egui::Rect::from_x_y_ranges(
+                            u_offset_texture_snipped ..=curr_tex_u_end_texture,
+                            v_offset_texture_snipped ..=curr_tex_v_end_texture,
+                        )),
+                    );
+                    curr_cursor_x = curr_tex_u_end;
+                    }
+                });
+                    curr_cursor_y = curr_tex_v_end;
+                }
+
 
 
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
-                ui.painter_at(preview_rect).line_segment(
+                /*ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
                 );
@@ -365,7 +420,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.left_center(), preview_rect.right_center()],
                     Stroke::new(1., stroke_color),
-                );
+                );*/
             }
             ui.collapsing("Compare", |ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -1105,7 +1160,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
-                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex); //TODO!
+                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
                         } else {
                             state.current_texture =
                                 state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
