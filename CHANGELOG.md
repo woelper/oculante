@@ -1,3 +1,19 @@
+# 0.8.19 (2024-04-29)
+
+### :beetle: Bug Fixes
+
+* prevent zoom with keyboard (fixes #304) (2de35ed6)
+
+### :sparkles: Features
+
+* Map float TIFF images to min-max range (52f87f82)
+
+### :green_apple: Chore
+
+* Update logo (1783609d)
+* update icon (716f6e9c)
+* **deps**: bump rustls from 0.21.10 to 0.21.11 (f0c1743b)
+
 # 0.8.18 (2024-04-06)
 
 ### :sparkles: Features
