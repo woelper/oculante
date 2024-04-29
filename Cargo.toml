@@ -79,6 +79,7 @@ webp-animation = { version = "0.9.0", features = ["static"] }
 fluent-uri = "0.1.4"
 imageproc = { version = "0.23.0", features = ["rayon"] }
 zune-core = "0.4.12"
+num-traits = "0.2.18"
 
 [features]
 heif = ["libheif-rs"]
