@@ -23,13 +23,13 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="0.72426347"
-     inkscape:cx="490.15312"
-     inkscape:cy="572.30555"
+     inkscape:zoom="2.2066112"
+     inkscape:cx="241.77345"
+     inkscape:cy="566.25291"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
-     inkscape:window-y="0"
+     inkscape:window-y="32"
      inkscape:window-maximized="1"
      inkscape:current-layer="svg8" />
   <defs
@@ -103,6 +103,15 @@
   </defs>
   <metadata
      id="metadata5" />
+  <circle
+     style="fill:#ffffff;stroke:none;stroke-width:0.243809;stroke-linecap:round;stroke-linejoin:bevel;opacity:0.4"
+     id="path1"
+     cx="39.709866"
+     cy="155.77286"
+     r="12.177826"
+     inkscape:export-filename="oculante.png"
+     inkscape:export-xdpi="58.573666"
+     inkscape:export-ydpi="58.573666" />
   <rect
      style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:none;stroke-width:2.11667;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000"
      id="rect1039"
