@@ -491,7 +491,6 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             //animation
             decoder.decode_headers()?;
             if decoder.is_animated() {
-
                 info!("Image is animated");
                 decoder.decode_headers()?;
 
@@ -499,7 +498,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 let depth = decoder.get_depth().context("Can't get decoder depth")?;
                 //  get decoder information,we clone this because we need a standalone
                 // info since we mutably modify decoder struct below
-                let info = decoder.get_info().context("Can't get decoder info")?.clone();
+                let info = decoder
+                    .get_info()
+                    .context("Can't get decoder info")?
+                    .clone();
                 // set up our background variable. Soon it will contain the data for the previous
                 // frame, the first frame has no background hence why this is None
                 let mut background: Option<Vec<u8>> = None;
@@ -509,9 +511,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     0;
                     info.width
                         * info.height
-                        * decoder.get_colorspace().context("Can't get decoder color depth")?.num_components()
+                        * decoder
+                            .get_colorspace()
+                            .context("Can't get decoder color depth")?
+                            .num_components()
                 ];
-
 
                 while decoder.more_frames() {
                     // decode the header, in case we haven't processed a frame header
@@ -533,8 +537,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         background.as_ref().map(|x| x.as_slice()),
                         &mut output,
                         None,
-                    )
-                    ?;
+                    )?;
                     // create encoder parameters
                     let encoder_opts = zune_core::options::EncoderOptions::new(
                         info.width,
@@ -793,66 +796,47 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
         }
         tiff::decoder::DecodingResult::U16(contents) => {
             debug!("TIFF U16");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u16::MIN as f32, u16::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::U32(contents) => {
             debug!("TIFF U32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u32::MIN as f32, u32::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::U64(contents) => {
             debug!("TIFF U64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u64::MIN as f32, u64::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::F32(contents) => {
             debug!("TIFF F32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p, 0.0, 1.0, 0., 255.) as u8)
-                .collect();
+            ldr_img = autoscale(&contents).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::F64(contents) => {
             debug!("TIFF F64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, 0.0, 1.0, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I8(contents) => {
             debug!("TIFF I8");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i8::MIN as f32, i8::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I16(contents) => {
             debug!("TIFF I16");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i16::MIN as f32, i16::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I32(contents) => {
             debug!("TIFF I32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i32::MIN as f32, i32::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I64(contents) => {
             debug!("TIFF I64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i64::MIN as f32, i64::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
     }
 
@@ -892,4 +876,23 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
             )
         }
     }
+}
+
+fn autoscale(values: &Vec<f32>) -> Vec<f32> {
+    let mut lowest = f32::MAX;
+    let mut highest = f32::MIN;
+
+    for v in values {
+        if *v < lowest {
+            lowest = *v
+        }
+        if *v > highest {
+            highest = *v
+        }
+    }
+
+    values
+        .into_iter()
+        .map(|v| fit(*v, lowest, highest, 0., 255.))
+        .collect()
 }
