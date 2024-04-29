@@ -347,40 +347,43 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     .rect;*/
 
                 
-                let end_cursor_x = uv_center.0 + uv_size.0;
-                let end_cursor_y = uv_center.1 + uv_size.1;
-                print!("Schdard end_cursor_x{} ",end_cursor_x);
-                println!("{} ",end_cursor_y);
-                println!(" {} ",end_cursor_y);
-                let mut curr_cursor_y = uv_center.1 - uv_size.1;
-                while(curr_cursor_y<end_cursor_y){
-                    
-                    let mut curr_cursor_x = uv_center.0 - uv_size.0;
-                    let mut curr_tex_v_end:f32 = 0.0;
-                    ui.horizontal(|ui| {
-                        
-                  
-                    while(curr_cursor_x<end_cursor_x){
-                        print!(" curr_cursor_x{} ",curr_cursor_x);
-                        print!(" curr_cursor_y{} ",curr_cursor_y);
-                        let curr_tex = texture.get_texture_at_uv(curr_cursor_x, curr_cursor_y);
-                        
-                        //Where does the picked texture end
-                        let curr_tex_u_end = f32::min(curr_tex.u_tex_right_global, end_cursor_x);
-                        curr_tex_v_end = f32::min(curr_tex.v_tex_bottom_global, end_cursor_y);
+                let end_cursor_u = uv_center.0 + uv_size.0;
+                let end_cursor_v = uv_center.1 + uv_size.1;
+                
+                let curr_spacing = ui.spacing().item_spacing;
 
-                        print!(" curr_tex_u_end+curs{} ",curr_cursor_x+curr_tex_u_end);
-                        println!(" curr_tex_v_end+curs{} ",curr_cursor_y+curr_tex_v_end);
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                let mut curr_cursor_v = uv_center.1 - uv_size.1;
+                ui.vertical(|ui| {
+                let mut counter_v = 0; //Safety measure...
+                while(curr_cursor_v<end_cursor_v && counter_v<10){
+                    counter_v += 1;
+                    let mut counter_u = 0; //Safety measure...
+                    let mut curr_cursor_u = uv_center.0 - uv_size.0;
+                    let mut curr_tex_v_end:f32 = 0.0;
+                    
+                    ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                  
+                    while(curr_cursor_u<end_cursor_u && counter_u<10){
+                        counter_u += 1;
+                        let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
+                        
+                        //Where does the picked texture end globally?
+                        let curr_tex_u_end = f32::min(curr_tex.u_tex_right_global, end_cursor_u);
+                        curr_tex_v_end = f32::min(curr_tex.v_tex_bottom_global, end_cursor_v);
+
+                        
 
                         //The uv coordinates to draw the picked texture                        
-                        let u_offset_texture_snipped = curr_tex.u_offset_global/curr_tex.u_scale;
-                        let v_offset_texture_snipped = curr_tex.v_offset_global/curr_tex.v_scale;
-                        let curr_tex_u_end_texture = curr_tex_u_end/curr_tex.u_scale;
-                        let curr_tex_v_end_texture = curr_tex_v_end/curr_tex.v_scale;
+                        let u_offset_texture_snipped = curr_tex.u_offset_texture;
+                        let v_offset_texture_snipped = curr_tex.v_offset_texture;
+                        let curr_tex_u_end_texture = (curr_tex_u_end-curr_tex.u_tex_left_global)/curr_tex.u_scale;
+                        let curr_tex_v_end_texture = (curr_tex_v_end-curr_tex.v_tex_top_global)/curr_tex.v_scale;
 
                         //Display size
-                        let u_size = desired_width*(curr_tex_u_end-curr_cursor_x)/(2.0*uv_size.0);
-                        let v_size = desired_width*(curr_tex_v_end-curr_cursor_y)/(2.0*uv_size.1);
+                        let u_size = desired_width*(curr_tex_u_end-curr_cursor_u)/(2.0*uv_size.0);
+                        let v_size = desired_width*(curr_tex_v_end-curr_cursor_v)/(2.0*uv_size.1);
                     
                     let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
                     let r_ret = ui
@@ -392,16 +395,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .uv(egui::Rect::from_x_y_ranges(
                             u_offset_texture_snipped ..=curr_tex_u_end_texture,
                             v_offset_texture_snipped ..=curr_tex_v_end_texture,
-                        )),
+                        ))
                     );
-                    curr_cursor_x = curr_tex_u_end;
+                    curr_cursor_u = curr_tex.u_tex_next_right_global;
+                    curr_tex_v_end = curr_tex.v_tex_next_bottom_global;
+                    
                     }
                 });
-                    curr_cursor_y = curr_tex_v_end;
-                }
+                    
+                    curr_cursor_v = curr_tex_v_end;                    
+                }});
 
 
-
+                ui.spacing_mut().item_spacing = curr_spacing;
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);

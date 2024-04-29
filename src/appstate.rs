@@ -59,12 +59,14 @@ pub struct TexWrap{
 
 pub struct TextureResponse<'a>{
     pub texture: &'a Texture,
-    pub u_start_global : f32, 
-    pub v_start_global : f32, 
-    pub u_offset_global : f32, 
-    pub v_offset_global : f32, 
+    pub u_tex_left_global : f32, 
+    pub v_tex_top_global : f32, 
+    pub u_offset_texture : f32, 
+    pub v_offset_texture : f32, 
     pub u_tex_right_global : f32, 
     pub v_tex_bottom_global : f32,
+    pub u_tex_next_right_global : f32, 
+    pub v_tex_next_bottom_global : f32,
     pub u_scale:f32,
     pub v_scale:f32
 }
@@ -233,33 +235,42 @@ impl TexWrap{
         let x = u*self.width();
         let y = v*self.height();
 
-        let x_idx = (x /self.col_translation as f32).floor() as u32;
-        let y_idx = (y /self.row_translation as f32).floor() as u32;
-        let tex_idx = (y_idx*self.col_count+x_idx).min((self.texture_array.len() as i32 -1) as u32);
+        let x_idx = (x /self.col_translation as f32).floor() as i32;
+        let y_idx = (y /self.row_translation as f32).floor() as i32;
+        let tex_idx = (y_idx*self.col_count as i32+x_idx).min((self.texture_array.len() as i32 -1));
         
-        let tex_top = y_idx*self.row_translation;
-        let tex_left = x_idx*self.col_translation;
-        let tex_bottom = tex_top+self.row_translation;
-        let tex_right = tex_left+self.col_translation;
+        
+        let tex_left = x_idx*self.col_translation as i32;
+        let tex_top = y_idx*self.row_translation as i32;
+        
+        let tex_right = tex_left+self.col_translation as i32;
+        let tex_bottom = tex_top+self.row_translation as i32;
+        let tex_right_next = tex_left+self.col_translation as i32;
+        let tex_bottom_next = tex_top+self.row_translation as i32;
 
-        let u_start_global = tex_left as f32/self.width();
-        let v_start_global = tex_top as f32/self.height();
+        let u_tex_left_global = tex_left as f32/self.width();
+        let v_tex_top_global = tex_top as f32/self.height();
         
-        let u_offset = (x-tex_left as f32)/self.width();
-        let v_offset = (y-tex_top as f32)/self.height();
+        let u_offset = (x-tex_left as f32)/self.col_translation as f32;
+        let v_offset = (y-tex_top as f32)/self.row_translation as f32;
         
-        let u_tex_right = (tex_right) as f32 /self.width();
-        let v_tex_bottom = (tex_bottom) as f32 /self.height();
+        let u_tex_right = tex_right as f32 /self.width();
+        let v_tex_bottom = tex_bottom as f32 /self.height();
+        let u_tex_next_right_global = tex_right_next as f32 /self.width();
+        let v_tex_next_bottom_global = tex_bottom_next as f32 /self.height();
+
         let u_scale = self.col_translation as f32/self.width();
         let v_scale = self.row_translation as f32/self.height();
         //TexWrap { tex: texture, size_vec:s }    
         TextureResponse {texture: &self.texture_array[tex_idx as usize], 
-            u_start_global:u_start_global,
-            v_start_global:v_start_global,
-            u_offset_global:u_offset, 
-            v_offset_global:v_offset, 
+            u_tex_left_global,
+            v_tex_top_global,
+            u_offset_texture:u_offset, 
+            v_offset_texture:v_offset, 
             u_tex_right_global:u_tex_right, 
             v_tex_bottom_global:v_tex_bottom,
+            u_tex_next_right_global,
+            v_tex_next_bottom_global,
             u_scale:u_scale,
             v_scale:v_scale }
         //(&self.texture_array[tex_idx as usize],u_offset, v_offset, u_tex_right, v_tex_bottom)
