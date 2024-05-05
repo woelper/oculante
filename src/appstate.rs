@@ -63,8 +63,8 @@ pub struct TextureResponse<'a>{
     pub v_tex_top_global : f32, 
     pub u_offset_texture : f32, 
     pub v_offset_texture : f32, 
-    pub u_tex_right_global : f32, 
-    pub v_tex_bottom_global : f32,
+    u_tex_right_global : f32, 
+    v_tex_bottom_global : f32,
     pub u_tex_next_right_global : f32, 
     pub v_tex_next_bottom_global : f32,
     pub u_scale:f32,
@@ -132,11 +132,9 @@ impl TexWrap{
         let im_w = image.width();
         let im_h = image.height();
         let s = (im_w as f32, im_h as f32);
-        let max_texture_size = 128;//gfx.limits().max_texture_size;
+        let max_texture_size = 128;//gfx.limits().max_texture_size; //
         let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
-        let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;
-
-        
+        let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;        
 
         let mut a:Vec<Texture> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);

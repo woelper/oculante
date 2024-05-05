@@ -374,10 +374,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
                         
                         //Where does the picked texture end globally?
-                        let curr_tex_u_end = f32::min(curr_tex.u_tex_right_global, end_cursor_u);
-                        curr_tex_v_end = f32::min(curr_tex.v_tex_bottom_global, end_cursor_v);
+                        let mut curr_tex_u_end = f32::min(curr_tex.u_tex_next_right_global, end_cursor_u);
+                        curr_tex_v_end = f32::min(curr_tex.v_tex_next_bottom_global, end_cursor_v);
 
-                        
+                        if end_cursor_u>1.0 && f32::abs(curr_tex.u_tex_next_right_global-1.0)< f32::EPSILON  {
+                            curr_tex_u_end = end_cursor_u;
+                        }
+
+                        if end_cursor_v>1.0 && f32::abs(curr_tex.v_tex_next_bottom_global-1.0)< f32::EPSILON {
+                            curr_tex_v_end = end_cursor_v;
+                        }
 
                         //The uv coordinates to draw the picked texture                        
                         let u_offset_texture_snipped = curr_tex.u_offset_texture;
@@ -411,8 +417,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     bbox_br.x = bbox_br.x.max(r_ret.right());
                     bbox_br.y = bbox_br.y.max(r_ret.bottom());
 
-                    curr_cursor_u = curr_tex.u_tex_next_right_global;
-                    curr_tex_v_end = curr_tex.v_tex_next_bottom_global;
+                    curr_cursor_u = curr_tex_u_end;
+                    curr_tex_v_end = curr_tex_v_end;
                     
                     }
                 });
