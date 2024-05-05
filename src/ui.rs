@@ -346,7 +346,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     )
                     .rect;*/
 
-                
+                let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
+                let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
+
                 let end_cursor_u = uv_center.0 + uv_size.0;
                 let end_cursor_v = uv_center.1 + uv_size.1;
                 
@@ -367,6 +369,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                   
                     while(curr_cursor_u<end_cursor_u && counter_u<10){
                         counter_u += 1;
+                        
+
                         let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
                         
                         //Where does the picked texture end globally?
@@ -386,6 +390,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let v_size = desired_width*(curr_tex_v_end-curr_cursor_v)/(2.0*uv_size.1);
                     
                     let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
+                    
                     let r_ret = ui
                     .add(
                         egui::Image::new(tex_id2)
@@ -396,7 +401,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             u_offset_texture_snipped ..=curr_tex_u_end_texture,
                             v_offset_texture_snipped ..=curr_tex_v_end_texture,
                         ))
-                    );
+                        .texture_options(TextureOptions::LINEAR)
+                    ).rect;
+
+                    //Update coordinates for preview rectangle
+                    bbox_tl.x = bbox_tl.x.min(r_ret.left());
+                    bbox_tl.y = bbox_tl.y.min(r_ret.top());
+
+                    bbox_br.x = bbox_br.x.max(r_ret.right());
+                    bbox_br.y = bbox_br.y.max(r_ret.bottom());
+
                     curr_cursor_u = curr_tex.u_tex_next_right_global;
                     curr_tex_v_end = curr_tex.v_tex_next_bottom_global;
                     
@@ -406,12 +420,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     curr_cursor_v = curr_tex_v_end;                    
                 }});
 
-
+                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.spacing_mut().item_spacing = curr_spacing;
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
-                /*ui.painter_at(preview_rect).line_segment(
+                ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
                 );
@@ -426,7 +440,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.left_center(), preview_rect.right_center()],
                     Stroke::new(1., stroke_color),
-                );*/
+                );
             }
             ui.collapsing("Compare", |ui| {
                 ui.vertical_centered_justified(|ui| {

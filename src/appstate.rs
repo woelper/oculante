@@ -261,7 +261,7 @@ impl TexWrap{
 
         let u_scale = self.col_translation as f32/self.width();
         let v_scale = self.row_translation as f32/self.height();
-        //TexWrap { tex: texture, size_vec:s }    
+        
         TextureResponse {texture: &self.texture_array[tex_idx as usize], 
             u_tex_left_global,
             v_tex_top_global,
@@ -273,7 +273,6 @@ impl TexWrap{
             v_tex_next_bottom_global,
             u_scale:u_scale,
             v_scale:v_scale }
-        //(&self.texture_array[tex_idx as usize],u_offset, v_offset, u_tex_right, v_tex_bottom)
     }
 
     pub fn size(&self)->(f32,f32){
