@@ -183,7 +183,7 @@ impl EguiExt for Ui {
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture {
-        let tex_id = gfx.egui_register_texture(texture);
+        let tex_id = gfx.egui_register_texture(&texture.texture_array[0]); //TODO: Adapt if needed
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -248,7 +248,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
                 // texture.
-                let tex_id = gfx.egui_register_texture(texture);
+                let tex_id = gfx.egui_register_texture(&texture.texture_array[0]);
 
                 // width of image widget
                 // let desired_width = ui.available_width() - ui.spacing().indent;
@@ -334,7 +334,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let uv_size = (scale, scale * ratio);
 
 
-                let preview_rect = ui
+                /*let preview_rect = ui
                     .add(
                         egui::Image::new(tex_id)
                         .maintain_aspect_ratio(false)
@@ -344,9 +344,90 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
                         )),
                     )
-                    .rect;
+                    .rect;*/
 
+                let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
+                let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
 
+                let end_cursor_u = uv_center.0 + uv_size.0;
+                let end_cursor_v = uv_center.1 + uv_size.1;
+                
+                let curr_spacing = ui.spacing().item_spacing;
+
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                let mut curr_cursor_v = uv_center.1 - uv_size.1;
+                ui.vertical(|ui| {
+                let mut counter_v = 0; //Safety measure...
+                while(curr_cursor_v<end_cursor_v && counter_v<10){
+                    counter_v += 1;
+                    let mut counter_u = 0; //Safety measure...
+                    let mut curr_cursor_u = uv_center.0 - uv_size.0;
+                    let mut curr_tex_v_end:f32 = 0.0;
+                    
+                    ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                  
+                    while(curr_cursor_u<end_cursor_u && counter_u<10){
+                        counter_u += 1;
+                        
+
+                        let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
+                        
+                        //Where does the picked texture end globally?
+                        let mut curr_tex_u_end = f32::min(curr_tex.u_tex_next_right_global, end_cursor_u);
+                        curr_tex_v_end = f32::min(curr_tex.v_tex_next_bottom_global, end_cursor_v);
+
+                        if end_cursor_u>1.0 && f32::abs(curr_tex.u_tex_next_right_global-1.0)< f32::EPSILON  {
+                            curr_tex_u_end = end_cursor_u;
+                        }
+
+                        if end_cursor_v>1.0 && f32::abs(curr_tex.v_tex_next_bottom_global-1.0)< f32::EPSILON {
+                            curr_tex_v_end = end_cursor_v;
+                        }
+
+                        //The uv coordinates to draw the picked texture                        
+                        let u_offset_texture_snipped = curr_tex.u_offset_texture;
+                        let v_offset_texture_snipped = curr_tex.v_offset_texture;
+                        let curr_tex_u_end_texture = (curr_tex_u_end-curr_tex.u_tex_left_global)/curr_tex.u_scale;
+                        let curr_tex_v_end_texture = (curr_tex_v_end-curr_tex.v_tex_top_global)/curr_tex.v_scale;
+
+                        //Display size
+                        let u_size = desired_width*(curr_tex_u_end-curr_cursor_u)/(2.0*uv_size.0);
+                        let v_size = desired_width*(curr_tex_v_end-curr_cursor_v)/(2.0*uv_size.1);
+                    
+                    let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
+                    
+                    let r_ret = ui
+                    .add(
+                        egui::Image::new(tex_id2)
+                        .maintain_aspect_ratio(false)
+                        .fit_to_exact_size(egui::Vec2::new(u_size, v_size)
+                        )
+                        .uv(egui::Rect::from_x_y_ranges(
+                            u_offset_texture_snipped ..=curr_tex_u_end_texture,
+                            v_offset_texture_snipped ..=curr_tex_v_end_texture,
+                        ))
+                        .texture_options(TextureOptions::LINEAR)
+                    ).rect;
+
+                    //Update coordinates for preview rectangle
+                    bbox_tl.x = bbox_tl.x.min(r_ret.left());
+                    bbox_tl.y = bbox_tl.y.min(r_ret.top());
+
+                    bbox_br.x = bbox_br.x.max(r_ret.right());
+                    bbox_br.y = bbox_br.y.max(r_ret.bottom());
+
+                    curr_cursor_u = curr_tex_u_end;
+                    curr_tex_v_end = curr_tex_v_end;
+                    
+                    }
+                });
+                    
+                    curr_cursor_v = curr_tex_v_end;                    
+                }});
+
+                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+                ui.spacing_mut().item_spacing = curr_spacing;
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
@@ -1105,7 +1186,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
-                            state.edit_state.result_pixel_op.update_texture(gfx, tex);
+                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
                         } else {
                             state.current_texture =
                                 state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);

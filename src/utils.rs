@@ -29,6 +29,9 @@ use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::TexWrap;
+
+use crate::utils::image::imageops;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -287,6 +290,8 @@ pub fn send_image_threaded(
                 // .clone()
                 // .send(Frame::new_reset(f.buffer.clone()));
 
+                let cheat_max_texture_size:u32 = 65384;
+
                 let mut first = true;
                 for mut f in frame_receiver.iter() {
                     if let Some(ref fs) = forced_frame_source {
@@ -303,15 +308,15 @@ pub fn send_image_threaded(
                         let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
                         // Check if texture is too large to fit on the texture
-                        if largest_side > max_texture_size {
+                        if largest_side > cheat_max_texture_size {
                             _ = message_sender.send(Message::warn("This image exceeded the maximum resolution and will be be scaled down."));
-                            let scale_factor = max_texture_size as f32 / largest_side as f32;
+                            let scale_factor = cheat_max_texture_size as f32 / largest_side as f32;
                             let new_dimensions = (
                                 (f.buffer.dimensions().0 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
+                                    .min(cheat_max_texture_size as f32)
                                     as u32,
                                 (f.buffer.dimensions().1 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
+                                    .min(cheat_max_texture_size as f32)
                                     as u32,
                             );
 
@@ -608,7 +613,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<Texture> {
+    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<TexWrap> {
         unimplemented!()
     }
 
@@ -617,6 +622,10 @@ pub trait ImageExt {
     }
 
     fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
+        unimplemented!()
+    }
+
+    fn update_texture_with_texwrap(&self, _: &mut Graphics, _: &mut TexWrap) {
         unimplemented!()
     }
 
@@ -630,23 +639,8 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
-        gfx.create_texture()
-            .from_bytes(self, self.width(), self.height())
-            .with_mipmaps(true)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(
-                TextureFilter::Linear,
-                if linear_mag_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
+    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<TexWrap> {        
+        TexWrap::from_rgbaimage(gfx, linear_mag_filter, self)
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
@@ -663,6 +657,10 @@ impl ImageExt for RgbaImage {
         if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
             error!("{e}");
         }
+    }
+
+    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
+        texture.update_textures(gfx,self);
     }
 }
 

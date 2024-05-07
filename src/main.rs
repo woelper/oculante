@@ -894,13 +894,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.redraw = false;
             }
         }
-
+       
         if let Some(tex) = &mut state.current_texture {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                img.update_texture(gfx, tex);
-            } else {
-                state.current_texture =
-                    img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                img.update_texture_with_texwrap(gfx, tex);
+            } else {                
+                state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
             }
         } else {
             debug!("Setting texture");
@@ -1079,17 +1078,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         if state.tiling < 2 {
-            draw.image(texture)
-                .blend_mode(BlendMode::NORMAL)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+            texture.draw_textures(&mut draw,
+                state.image_geometry.offset.x,
+                state.image_geometry.offset.y,
+                state.image_geometry.scale);            
         } else {
-            draw.pattern(texture)
+            //TODO: How to implement this efficient?
+            draw.pattern(&texture.texture_array[0])
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
                 .size(
-                    texture.width() * state.tiling as f32,
-                    texture.height() * state.tiling as f32,
+                    texture.texture_array[0].width() * state.tiling as f32,
+                    texture.texture_array[0].height() * state.tiling as f32,
                 );
         }
 
@@ -1117,10 +1117,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 > app.window().size().0 as f32;
 
             if show_minimap {
-                draw.image(texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .translate(offset_x, 100.)
-                    .scale(scale, scale);
+                texture.draw_textures(&mut draw,
+                    offset_x,
+                    100.,
+                    scale);
             }
         }
 
