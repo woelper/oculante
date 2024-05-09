@@ -409,12 +409,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         last_v_size = v_size;
                         let curr_ui_curs_after = curr_ui_curs+Vec2::new(u_size, 0.0);
 
+                        //Safety measure: the cursor could perfectly hit the boundary
                         if(u_size<=f32::EPSILON)
-                        {
-                        print!("{}, ", u_size);
-                        println!("{}", v_size);
-                        curr_cursor_u += f32::EPSILON;
-                        continue;
+                        {                        
+                            curr_cursor_u += f32::EPSILON;
+                            continue;
+                        }
+
+                        if(v_size<=f32::EPSILON)
+                        {                        
+                            curr_cursor_v += f32::EPSILON;
+                            continue;
                         }
 
                     
@@ -424,7 +429,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         //.add(
                             egui::Image::new(tex_id2)
                             .maintain_aspect_ratio(false)
-                            .texture_options(TextureOptions::NEAREST)
+                           
                             .fit_to_exact_size(egui::Vec2::new(u_size, v_size))
                             .uv(egui::Rect::from_x_y_ranges(
                                 u_offset_texture_snipped ..=curr_tex_u_end_texture,
@@ -447,11 +452,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         );*/
 
                         //Update coordinates for preview rectangle
-                        bbox_tl.x = bbox_tl.x.min(r_ret.left());
-                        bbox_tl.y = bbox_tl.y.min(r_ret.top());
+                        //We round because of numerical instability. TODO: Improve!
+                        bbox_tl.x = bbox_tl.x.min(r_ret.left()).round();
+                        bbox_tl.y = bbox_tl.y.min(r_ret.top()).round();
 
-                        bbox_br.x = bbox_br.x.max(r_ret.right());
-                        bbox_br.y = bbox_br.y.max(r_ret.bottom());
+                        bbox_br.x = bbox_br.x.max(r_ret.right()).round();
+                        bbox_br.y = bbox_br.y.max(r_ret.bottom()).round();
 
                         curr_ui_curs = curr_ui_curs_after;
                         curr_cursor_u = next_tex_u_begin;                    
@@ -461,9 +467,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 curr_cursor_v = next_tex_v_begin;                    
             }
 
-                //gfx.render(&draw);
                 
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+
+                println!("{}", preview_rect.bottom());
                 ui.advance_cursor_after_rect(preview_rect);
                 ui.spacing_mut().item_spacing = curr_spacing;
 

@@ -228,6 +228,9 @@ impl TexWrap{
     }
 
     pub fn get_texture_at_uv(&self, ua:f32, va:f32)->TextureResponse {
+        let xa = ua*self.width();
+        let ya = va*self.height();
+        
         let v =  (va).max(0.0).min(1.0);
         let u =  ua.max(0.0).min(1.0);
         let x = u*self.width();
@@ -236,31 +239,34 @@ impl TexWrap{
         let x_idx = (x /self.col_translation as f32).floor() as i32;
         let y_idx = (y /self.row_translation as f32).floor() as i32;
         let tex_idx = (y_idx*self.col_count as i32+x_idx).min((self.texture_array.len() as i32 -1));
-        
+        let my_tex = &self.texture_array[tex_idx as usize];
         
         let tex_left = x_idx*self.col_translation as i32;
         let tex_top = y_idx*self.row_translation as i32;
         
-        let tex_right = tex_left+self.col_translation as i32;
-        let tex_bottom = tex_top+self.row_translation as i32;
-        let tex_right_next = tex_left+self.col_translation as i32;
-        let tex_bottom_next = tex_top+self.row_translation as i32;
+        //the current texture might be smaller than the set translation. (Last element on x or y axis)
+        let tex_right_next = tex_left+my_tex.width() as i32;
+        let tex_bottom_next = tex_top+my_tex.height() as i32;
+        let tex_right = tex_right_next;
+        let tex_bottom = tex_bottom_next;
+        let u_scale = my_tex.width() as f32/self.width();
+        let v_scale = my_tex.height() as f32/self.height();
 
+        
         let u_tex_left_global = tex_left as f32/self.width();
         let v_tex_top_global = tex_top as f32/self.height();
         
-        let u_offset = (x-tex_left as f32)/self.col_translation as f32;
-        let v_offset = (y-tex_top as f32)/self.row_translation as f32;
+        let u_offset = (xa-tex_left as f32)/my_tex.width();
+        let v_offset = (ya-tex_top as f32)/my_tex.height();
         
         let u_tex_right = tex_right as f32 /self.width();
         let v_tex_bottom = tex_bottom as f32 /self.height();
         let u_tex_next_right_global = tex_right_next as f32 /self.width();
         let v_tex_next_bottom_global = tex_bottom_next as f32 /self.height();
 
-        let u_scale = self.col_translation as f32/self.width();
-        let v_scale = self.row_translation as f32/self.height();
         
-        TextureResponse {texture: &self.texture_array[tex_idx as usize], 
+        
+        TextureResponse {texture: my_tex, 
             u_tex_left_global,
             v_tex_top_global,
             u_offset_texture:u_offset, 
