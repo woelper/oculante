@@ -26,8 +26,9 @@ use log::{debug, error, info};
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
-    prelude::{App, Graphics},
+    prelude::{App, Graphics, BlendMode},
 };
+use notan::draw::*;
 use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
@@ -329,10 +330,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ui.end_row();
                 });
 
+
+                //let mut draw = gfx.create_draw();
+
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio);
-
+                let bg_color = Color32::BLACK.linear_multiply(0.5);
 
                 /*let preview_rect = ui
                     .add(
@@ -354,35 +358,43 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 
                 let curr_spacing = ui.spacing().item_spacing;
 
-                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                let base_ui_curs = ui.cursor().min; //our start position
+                let mut curr_ui_curs = ui.cursor().min; //our start position
+
+                
                 let mut curr_cursor_v = uv_center.1 - uv_size.1;
-                ui.vertical(|ui| {
+                
                 let mut counter_v = 0; //Safety measure...
-                while(curr_cursor_v<end_cursor_v && counter_v<10){
+                while(curr_cursor_v<end_cursor_v && counter_v<100){
                     counter_v += 1;
                     let mut counter_u = 0; //Safety measure...
                     let mut curr_cursor_u = uv_center.0 - uv_size.0;
                     let mut curr_tex_v_end:f32 = 0.0;
+                    let mut next_tex_v_begin:f32 = 0.0;
+                    let mut last_v_size: f32 = 0.0;
                     
-                    ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                  
-                    while(curr_cursor_u<end_cursor_u && counter_u<10){
+                    curr_ui_curs.x = base_ui_curs.x;
+                    
+                    while(curr_cursor_u<end_cursor_u && counter_u<100){
                         counter_u += 1;
                         
-
+                        //Get Texure at current cursor position
                         let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
                         
                         //Where does the picked texture end globally?
-                        let mut curr_tex_u_end = f32::min(curr_tex.u_tex_next_right_global, end_cursor_u);
-                        curr_tex_v_end = f32::min(curr_tex.v_tex_next_bottom_global, end_cursor_v);
+                        let mut curr_tex_u_end = f32::min(curr_tex.u_tex_right_global, end_cursor_u);
+                        curr_tex_v_end = f32::min(curr_tex.v_tex_bottom_global, end_cursor_v);
+                        let mut next_tex_u_begin = f32::min(curr_tex.u_tex_next_right_global, end_cursor_u);
+                        next_tex_v_begin = f32::min(curr_tex.v_tex_next_bottom_global, end_cursor_v);
 
-                        if end_cursor_u>1.0 && f32::abs(curr_tex.u_tex_next_right_global-1.0)< f32::EPSILON  {
+                        if end_cursor_u>1.0 && f32::abs(curr_tex.u_tex_right_global-1.0)< f32::EPSILON  {
                             curr_tex_u_end = end_cursor_u;
+                            next_tex_u_begin = end_cursor_u;
                         }
 
-                        if end_cursor_v>1.0 && f32::abs(curr_tex.v_tex_next_bottom_global-1.0)< f32::EPSILON {
+                        if end_cursor_v>1.0 && f32::abs(curr_tex.v_tex_bottom_global-1.0)< f32::EPSILON {
                             curr_tex_v_end = end_cursor_v;
+                            next_tex_v_begin = end_cursor_v;
                         }
 
                         //The uv coordinates to draw the picked texture                        
@@ -394,43 +406,69 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         //Display size
                         let u_size = desired_width*(curr_tex_u_end-curr_cursor_u)/(2.0*uv_size.0);
                         let v_size = desired_width*(curr_tex_v_end-curr_cursor_v)/(2.0*uv_size.1);
-                    
-                    let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
-                    
-                    let r_ret = ui
-                    .add(
-                        egui::Image::new(tex_id2)
-                        .maintain_aspect_ratio(false)
-                        .fit_to_exact_size(egui::Vec2::new(u_size, v_size)
-                        )
-                        .uv(egui::Rect::from_x_y_ranges(
-                            u_offset_texture_snipped ..=curr_tex_u_end_texture,
-                            v_offset_texture_snipped ..=curr_tex_v_end_texture,
-                        ))
-                        .texture_options(TextureOptions::LINEAR)
-                    ).rect;
+                        last_v_size = v_size;
+                        let curr_ui_curs_after = curr_ui_curs+Vec2::new(u_size, 0.0);
 
-                    //Update coordinates for preview rectangle
-                    bbox_tl.x = bbox_tl.x.min(r_ret.left());
-                    bbox_tl.y = bbox_tl.y.min(r_ret.top());
+                        if(u_size<=f32::EPSILON)
+                        {
+                        print!("{}, ", u_size);
+                        println!("{}", v_size);
+                        curr_cursor_u += f32::EPSILON;
+                        continue;
+                        }
 
-                    bbox_br.x = bbox_br.x.max(r_ret.right());
-                    bbox_br.y = bbox_br.y.max(r_ret.bottom());
-
-                    curr_cursor_u = curr_tex_u_end;
-                    curr_tex_v_end = curr_tex_v_end;
                     
-                    }
-                });
-                    
-                    curr_cursor_v = curr_tex_v_end;                    
-                }});
+                        let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
+                        let r_ret =egui::Rect::from_min_max(curr_ui_curs, curr_ui_curs_after+Vec2::new(0.0, v_size));
+                        //let r_ret = ui
+                        //.add(
+                            egui::Image::new(tex_id2)
+                            .maintain_aspect_ratio(false)
+                            .texture_options(TextureOptions::NEAREST)
+                            .fit_to_exact_size(egui::Vec2::new(u_size, v_size))
+                            .uv(egui::Rect::from_x_y_ranges(
+                                u_offset_texture_snipped ..=curr_tex_u_end_texture,
+                                v_offset_texture_snipped ..=curr_tex_v_end_texture,
+                            )
+                            )
+                            .paint_at(ui, r_ret);
+                            //.texture_options(TextureOptions::LINEAR)
+                        //).rect;
 
+                        /*draw.image(&curr_tex.texture)
+                        .blend_mode(BlendMode::NORMAL)
+                        //.scale(u_size, scale)
+                        .size(u_size, v_size)
+                        .translate(curr_ui_curs.x, curr_ui_curs.y);*/
+
+                        /*ui.painter_at(r_ret).line_segment(
+                            [Pos2::new(r_ret.left(), r_ret.bottom()) , Pos2::new(r_ret.right(), r_ret.bottom())],
+                            Stroke::new(4., bg_color),
+                        );*/
+
+                        //Update coordinates for preview rectangle
+                        bbox_tl.x = bbox_tl.x.min(r_ret.left());
+                        bbox_tl.y = bbox_tl.y.min(r_ret.top());
+
+                        bbox_br.x = bbox_br.x.max(r_ret.right());
+                        bbox_br.y = bbox_br.y.max(r_ret.bottom());
+
+                        curr_ui_curs = curr_ui_curs_after;
+                        curr_cursor_u = next_tex_u_begin;                    
+                        }
+                
+                curr_ui_curs+=Vec2::new(0.0, last_v_size);
+                curr_cursor_v = next_tex_v_begin;                    
+            }
+
+                //gfx.render(&draw);
+                
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+                ui.advance_cursor_after_rect(preview_rect);
                 ui.spacing_mut().item_spacing = curr_spacing;
 
                 let stroke_color = Color32::from_white_alpha(240);
-                let bg_color = Color32::BLACK.linear_multiply(0.5);
+                
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
