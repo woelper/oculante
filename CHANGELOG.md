@@ -1,3 +1,13 @@
+# 0.8.20 (2024-05-10)
+
+### :sparkles: Features
+
+* Support EXR with single layers (non-rgba) (d22e78c4)
+
+### :green_apple: Chore
+
+* update deps and use new HDR support from `image` (bd7cbf89)
+
 # 0.8.19 (2024-04-29)
 
 ### :beetle: Bug Fixes
