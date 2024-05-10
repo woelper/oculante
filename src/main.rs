@@ -14,6 +14,7 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
+use shortcuts::MouseWheelEvent;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -605,35 +606,14 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
-                if app.keyboard.ctrl() {
-                    // Change image to next/prev
-                    // - map scroll-down == next, as that's the natural scrolling direction
-                    if delta_y > 0.0 {
-                        prev_image(state)
-                    } else {
-                        next_image(state)
-                    }
-                } else {
-                    let divisor = if cfg!(macos) { 0.1 } else { 10. };
-                    // Normal scaling
-                    let delta = zoomratio(
-                        ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
-                            .max(-5.0)
-                            .min(5.0),
-                        state.image_geometry.scale,
-                    );
-                    trace!("Delta {delta}, raw {delta_y}");
-                    let new_scale = state.image_geometry.scale + delta;
-                    // limit scale
-                    if new_scale > 0.01 && new_scale < 40. {
-                        state.image_geometry.offset -= scale_pt(
-                            state.image_geometry.offset,
-                            state.cursor,
-                            state.image_geometry.scale,
-                            delta,
-                        );
-                        state.image_geometry.scale += delta;
-                    }
+                let wheel_event = MouseWheelEvent::new(delta_y, &app.keyboard);
+                let found_action = state.persistent_settings.mouse_wheel_settings.iter().find(
+                    |(_action, opt_trigger)| {
+                        opt_trigger.is_some_and(|trigger| trigger == wheel_event)
+                    },
+                );
+                if let Some((action, _opt_trigger)) = found_action {
+                    action.clone().perform(state, delta_y);
                 }
             }
         }

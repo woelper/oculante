@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use log::{debug, error};
 // use std::collections::HashMap;
 
-use crate::OculanteState;
-use notan::prelude::App;
+use crate::{next_image, prev_image, zoom_image, OculanteState};
+use notan::{input::keyboard::Keyboard, prelude::App};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
@@ -310,4 +310,129 @@ fn is_key_modifier(key: &str) -> bool {
         "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" | "LWin" | "Rwin" => true,
         _ => false,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MouseWheelDirection {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MouseWheelEvent {
+    pub direction: MouseWheelDirection,
+    pub ctrl: bool,
+    pub shift: bool,
+}
+
+impl Default for MouseWheelEvent {
+    fn default() -> Self {
+        Self {
+            direction: MouseWheelDirection::Up,
+            ctrl: false,
+            shift: false,
+        }
+    }
+}
+
+impl MouseWheelEvent {
+    pub fn new(delta_y: f32, keyboard: &Keyboard) -> Self {
+        let direction = if delta_y > 0.0 {
+            MouseWheelDirection::Up
+        } else {
+            MouseWheelDirection::Down
+        };
+        let ctrl = keyboard.ctrl();
+        let shift = keyboard.shift();
+        Self {
+            direction,
+            ctrl,
+            shift,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum MouseWheelAction {
+    ZoomOut,
+    ZoomIn,
+    NextImage,
+    PrevImage,
+    // TODO: implement other actions
+    // NextChannel,
+    // PrevChannel,
+    // RotateRight,
+    // RotateLeft,
+}
+
+impl MouseWheelAction {
+    pub fn perform(&self, state: &mut OculanteState, delta_y: f32) {
+        match self {
+            MouseWheelAction::ZoomOut => zoom_image(state, delta_y),
+            MouseWheelAction::ZoomIn => zoom_image(state, delta_y),
+            MouseWheelAction::NextImage => next_image(state),
+            MouseWheelAction::PrevImage => prev_image(state),
+            // MouseWheelAction::NextChannel => todo!(),
+            // MouseWheelAction::PrevChannel => todo!(),
+            // MouseWheelAction::RotateRight => rotate_right(state),
+            // MouseWheelAction::RotateLeft => rotate_left(state),
+        }
+    }
+}
+
+pub type MouseWheelSettings = Vec<(MouseWheelAction, Option<MouseWheelEvent>)>;
+
+pub fn default_wheel_settings() -> MouseWheelSettings {
+    MouseWheelSettings::from([
+        (
+            MouseWheelAction::ZoomOut,
+            Some(MouseWheelEvent {
+                direction: MouseWheelDirection::Down,
+                ctrl: false,
+                shift: false,
+            }),
+        ),
+        (
+            MouseWheelAction::ZoomIn,
+            Some(MouseWheelEvent {
+                direction: MouseWheelDirection::Up,
+                ctrl: false,
+                shift: false,
+            }),
+        ),
+        (
+            MouseWheelAction::NextImage,
+            Some(MouseWheelEvent {
+                direction: MouseWheelDirection::Down,
+                ctrl: true,
+                shift: false,
+            }),
+        ),
+        (
+            MouseWheelAction::PrevImage,
+            Some(MouseWheelEvent {
+                direction: MouseWheelDirection::Up,
+                ctrl: true,
+                shift: false,
+            }),
+        ),
+        // (MouseWheelAction::NextChannel, None),
+        // (MouseWheelAction::PrevChannel, None),
+        // (
+        //     MouseWheelAction::RotateRight,
+        //     Some(MouseWheelEvent {
+        //         direction: MouseWheelDirection::Down,
+        //         ctrl: true,
+        //         shift: true,
+        //     }),
+        // ),
+        // (
+        //     MouseWheelAction::RotateLeft,
+        //     Some(MouseWheelEvent {
+        //         direction: MouseWheelDirection::Up,
+        //         ctrl: true,
+        //         shift: true,
+        //     }),
+        // ),
+    ])
 }
