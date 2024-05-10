@@ -1,3 +1,9 @@
+# 0.8.21 (2024-05-10)
+
+### :green_apple: Chore
+
+* Disable AUR publishing: This package has been moved to the official [extra] repository. (55245529)
+
 # 0.8.20 (2024-05-10)
 
 ### :sparkles: Features
