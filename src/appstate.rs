@@ -49,7 +49,7 @@ impl Message {
 }
 
 pub struct TexWrap{
-    pub texture_array:Vec<Texture>,
+    texture_array:Vec<Texture>,
     pub col_count:u32,
     pub row_count:u32,
     pub col_translation:u32,
