@@ -8,7 +8,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
+use image::{
+    DynamicImage, EncodableLayout, GenericImageView, GrayAlphaImage, GrayImage, ImageDecoder, Rgb32FImage, RgbImage, RgbaImage
+};
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -261,7 +263,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
                     // col.add_still(png_buffer);
                 }
-                Err(e) => error!("{} from {:?}", e, img_location),
+                Err(e) => bail!("{} from {:?}", e, img_location),
             }
         }
         "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
@@ -396,24 +398,18 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let reader = BufReader::new(f);
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
-            let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
 
-            let hdr_img = hdr_decoder.read_image_hdr()?;
-            for pixel in hdr_img {
-                let tp = image::Rgba(tonemap_rgb(pixel.0));
-                ldr_img.push(tp);
-            }
-            let mut s: Vec<u8> = vec![];
-            let l = ldr_img.clone();
-            for p in l {
-                let mut x = vec![p.0[0], p.0[1], p.0[2], 255];
-                s.append(&mut x);
-            }
+            let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
+                DynamicImage::ImageRgb32F(image) => image,
+                _ => bail!("expected rgb32f image"),
+            };
 
-            let buf = RgbaImage::from_raw(meta.width, meta.height, s)
-                .context("Failed to create RgbaImage with given dimensions")?;
-            // col.add_still(buf);
-            _ = sender.send(Frame::new_still(buf));
+            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x,y| {
+                let pixel = hdr_img.get_pixel(x, y);
+                image::Rgba(tonemap_rgb(pixel.0))
+            });
+            
+            _ = sender.send(Frame::new_still(rgba_image));
             return Ok(receiver);
         }
         "psd" => {
@@ -693,10 +689,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
             let jpeg_data = std::fs::read(img_location)?;
-            let buf: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
-            _ = sender.send(Frame::new_still(buf));
+            let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
+            let d = DynamicImage::ImageRgb8(buf);
+            
+            _ = sender.send(Frame::new_still(d.to_rgba8()));
             return Ok(receiver);
-            // col.add_still(img);
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(tiff) => {
