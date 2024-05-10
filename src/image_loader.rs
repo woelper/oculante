@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
+use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Luma, RgbImage, RgbaImage};
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -251,17 +251,38 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 Image<Layer<SpecificChannels<RgbaImage, RgbaChannels>>>,
                 exrs::Error,
             > = reader.from_file(&img_location);
-
             match maybe_image {
                 Ok(image) => {
                     let buf = image.layer_data.channel_data.pixels;
                     _ = sender.send(Frame::new_still(buf));
                     return Ok(receiver);
-                    // return Ok(OpenResult::still(buf));
-
-                    // col.add_still(png_buffer);
                 }
-                Err(e) => error!("{} from {:?}", e, img_location),
+                Err(e) => {
+                    let layer = exrs::read_first_flat_layer_from_file(&img_location)?;
+
+                    let size = layer.layer_data.size;
+                    for i in layer.layer_data.channel_data.list {
+                        let d = i.sample_data;
+                        match d {
+                            FlatSamples::F16(_) => bail!("F16 color mode not supported"),
+                            FlatSamples::F32(f) => {
+                                let gray_image = GrayImage::from_raw(
+                                    size.width() as u32,
+                                    size.height() as u32,
+                                    f.par_iter().map(|x| tonemap_f32(*x)).collect::<Vec<_>>(),
+                                )
+                                .context("Can't decode gray alpha buffer")?;
+
+                                let d = DynamicImage::ImageLuma8(gray_image);
+                                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                                return Ok(receiver);
+                            }
+                            FlatSamples::U32(_) => bail!("U32 color mode not supported"),
+                        }
+                    }
+
+                    bail!("{} from {:?}", e, img_location)
+                }
             }
         }
         "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
