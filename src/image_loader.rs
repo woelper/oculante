@@ -484,8 +484,8 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let mut decoder = PngDecoder::new(&contents);
             decoder.set_options(
                 DecoderOptions::new_fast()
-                    .set_max_height(50000)
-                    .set_max_width(50000),
+                    .set_max_height(128000)
+                    .set_max_width(128000),
             );
 
             //animation

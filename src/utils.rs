@@ -288,9 +288,7 @@ pub fn send_image_threaded(
             Ok(frame_receiver) => {
                 // _ = texture_sender
                 // .clone()
-                // .send(Frame::new_reset(f.buffer.clone()));
-
-                let cheat_max_texture_size:u32 = 65384;
+                // .send(Frame::new_reset(f.buffer.clone()));              
 
                 let mut first = true;
                 for mut f in frame_receiver.iter() {
@@ -305,34 +303,7 @@ pub fn send_image_threaded(
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
 
-                        let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
-
-                        // Check if texture is too large to fit on the texture
-                        if largest_side > cheat_max_texture_size {
-                            _ = message_sender.send(Message::warn("This image exceeded the maximum resolution and will be be scaled down."));
-                            let scale_factor = cheat_max_texture_size as f32 / largest_side as f32;
-                            let new_dimensions = (
-                                (f.buffer.dimensions().0 as f32 * scale_factor)
-                                    .min(cheat_max_texture_size as f32)
-                                    as u32,
-                                (f.buffer.dimensions().1 as f32 * scale_factor)
-                                    .min(cheat_max_texture_size as f32)
-                                    as u32,
-                            );
-
-                            let mut frame = f;
-
-                            let op = ImageOperation::Resize {
-                                dimensions: new_dimensions,
-                                aspect: true,
-                                filter: image_editing::ScaleFilter::Box,
-                            };
-                            _ = op.process_image(&mut frame.buffer);
-                            let _ = texture_sender.send(frame);
-                        } else {
-                            let _ = texture_sender.send(f);
-                        }
-
+                        let _ = texture_sender.send(f);
                         return;
                     }
                     if f.source == FrameSource::Animation {
