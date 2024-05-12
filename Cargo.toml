@@ -81,6 +81,7 @@ imageproc = { version = "0.24.0", features = ["rayon"] }
 zune-core = "0.4.12"
 num-traits = "0.2.18"
 zerocopy = "0.7.34"
+icns = "0.3.1"
 
 [features]
 heif = ["libheif-rs"]

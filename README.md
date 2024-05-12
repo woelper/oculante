@@ -65,6 +65,7 @@ pkgin install oculante
 - gif (animation support and correct timing)
 - hdr, tonemapped
 - ico
+- icns (via `rust-icns`)
 - jpeg
 - png
 - pnm

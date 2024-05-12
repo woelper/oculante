@@ -61,6 +61,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "sr2",
     "braw",
     "r3d",
+    "icns",
     "nrw",
     "raw",
     "avif",

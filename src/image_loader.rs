@@ -16,7 +16,7 @@ use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -715,6 +715,23 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             
             _ = sender.send(Frame::new_still(d.to_rgba8()));
             return Ok(receiver);
+        }
+        "icns" => {
+            let file = BufReader::new(File::open(img_location)?);
+            let icon_family = icns::IconFamily::read(file)?;
+            
+            // loop over the largest icons, take the largest one and return
+            for icon_type in [icns::IconType::RGBA32_512x512_2x, icns::IconType::RGBA32_512x512, icns::IconType::RGBA32_256x256, icns::IconType::RGBA32_128x128] {
+                // just a vec to write the ong to
+                let mut target = vec![];
+                let image = icon_family.get_icon_with_type(icon_type)?;
+                image.write_png(&mut target)?;
+                let d = image::load_from_memory(&target).context("Load icns mem")?;
+                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                return Ok(receiver);
+
+            }
+
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(tiff) => {
