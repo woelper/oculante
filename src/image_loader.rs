@@ -9,14 +9,14 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -80,6 +80,18 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
 
             // col.add_still(i.to_rgba8());
+        }
+        #[cfg(feature = "j2k")]
+        "jp2" => {
+            let jp2_image = jpeg2k::Image::from_file(img_location)?;
+
+            let image_buffer = RgbaImage::from_raw(
+                jp2_image.width(),
+                jp2_image.height(),
+                jp2_image.get_pixels(Some(255))?.data,
+            ).context("Can't decode jp2k buffer")?;
+            _ = sender.send(Frame::new_still(image_buffer));
+            return Ok(receiver);
         }
         #[cfg(feature = "heif")]
         "heif" | "heic" => {
@@ -425,11 +437,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 _ => bail!("expected rgb32f image"),
             };
 
-            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x,y| {
+            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
                 let pixel = hdr_img.get_pixel(x, y);
                 image::Rgba(tonemap_rgb(pixel.0))
             });
-            
+
             _ = sender.send(Frame::new_still(rgba_image));
             return Ok(receiver);
         }
@@ -712,16 +724,21 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let jpeg_data = std::fs::read(img_location)?;
             let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
             let d = DynamicImage::ImageRgb8(buf);
-            
+
             _ = sender.send(Frame::new_still(d.to_rgba8()));
             return Ok(receiver);
         }
         "icns" => {
             let file = BufReader::new(File::open(img_location)?);
             let icon_family = icns::IconFamily::read(file)?;
-            
+
             // loop over the largest icons, take the largest one and return
-            for icon_type in [icns::IconType::RGBA32_512x512_2x, icns::IconType::RGBA32_512x512, icns::IconType::RGBA32_256x256, icns::IconType::RGBA32_128x128] {
+            for icon_type in [
+                icns::IconType::RGBA32_512x512_2x,
+                icns::IconType::RGBA32_512x512,
+                icns::IconType::RGBA32_256x256,
+                icns::IconType::RGBA32_128x128,
+            ] {
                 // just a vec to write the ong to
                 let mut target = vec![];
                 let image = icon_family.get_icon_with_type(icon_type)?;
@@ -729,9 +746,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 let d = image::load_from_memory(&target).context("Load icns mem")?;
                 _ = sender.send(Frame::new_still(d.to_rgba8()));
                 return Ok(receiver);
-
             }
-
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(tiff) => {
