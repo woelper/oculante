@@ -9,19 +9,21 @@ use crate::ui::EguiExt;
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 use crate::{pos_from_coord, ImageGeometry};
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use evalexpr::*;
 use fast_image_resize as fr;
 use image::{imageops, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
-use log::{debug, error};
+use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use notan::egui::epaint::PathShape;
 use notan::egui::{self, lerp, vec2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
+use rayon::iter::IntoParallelRefIterator;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
+use rgb::RGBA;
 use serde::{Deserialize, Serialize};
 
 use egui_phosphor::variants::regular::*;
@@ -145,6 +147,7 @@ pub enum ImageOperation {
         original_size: (u32, u32),
     },
     LUT(String),
+    ICC(String),
 }
 
 impl fmt::Display for ImageOperation {
@@ -176,6 +179,7 @@ impl fmt::Display for ImageOperation {
             Self::ScaleImageMinMax => write!(f, "\u{2195} Scale image min max"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
             Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
+            Self::ICC(_) => write!(f, "{SWATCHES} Apply ICC profile"),
             Self::Filter3x3(_) => write!(f, "{DOTS_NINE} 3x3 Filter"),
             // _ => write!(f, "Not implemented Display"),
         }
@@ -194,6 +198,7 @@ impl ImageOperation {
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
             Self::LUT(_) => false,
+            Self::ICC(_) => false,
             Self::Filter3x3(_) => false,
             Self::ScaleImageMinMax => false,
             _ => true,
@@ -325,6 +330,91 @@ impl ImageOperation {
                             .clicked()
                         {
                             _ = webbrowser::open("https://github.com/cedeber/hald-clut");
+                        }
+                    });
+                    x
+                })
+                .inner
+            }
+            Self::ICC(icc_name) => {
+                ui.scope(|ui| {
+                    let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+                    ui.vertical(|ui| {
+                        let lut_fname = Path::new(icc_name)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy();
+
+                        egui::ComboBox::from_label("")
+                            .selected_text(lut_fname)
+                            .show_ui(ui, |ui| {
+                                let lut_names = builtin_luts();
+                                let mut lut_names = lut_names.keys().collect::<Vec<_>>();
+                                lut_names.sort();
+                                for lut in lut_names {
+                                    if ui
+                                        .selectable_value(
+                                            icc_name,
+                                            lut.clone(),
+                                            Path::new(lut)
+                                                .file_name()
+                                                .unwrap_or_default()
+                                                .to_string_lossy(),
+                                        )
+                                        .clicked()
+                                    {
+                                        x.mark_changed();
+                                    }
+                                }
+                            });
+
+                        #[cfg(not(feature = "file_open"))]
+                        {
+                            if ui.button("Load lut").clicked() {
+                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("LUT")));
+                            }
+
+                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
+                                filebrowser::browse_modal(
+                                    false,
+                                    SUPPORTED_EXTENSIONS,
+                                    |p| {
+                                        *icc_name = p.to_string_lossy().to_string();
+                                        x.mark_changed();
+                                    },
+                                    ui.ctx(),
+                                );
+                            }
+                        }
+
+                        #[cfg(feature = "file_open")]
+                        {
+                            // let last_folder: &mut PathBuf = ui.ctx().data_mut(|w| w.get_temp_mut_or_default::<PathBuf>(Id::new("iccsrc")));
+                            let last_folder: Option<std::path::PathBuf> = ui.ctx().data_mut(|w| {
+                                w.get_persisted::<std::path::PathBuf>(Id::new("iccsrc"))
+                            });
+                            if ui
+                                .button("Load from disk")
+                                .on_hover_ui(|ui| {
+                                    ui.label("Load ICC");
+                                })
+                                .clicked()
+                            {
+                                if let Some(lut_file) = rfd::FileDialog::new()
+                                    .set_directory(last_folder.unwrap_or_default())
+                                    .pick_file()
+                                {
+                                    *icc_name = lut_file.to_string_lossy().to_string();
+                                    let parent = lut_file
+                                        .parent()
+                                        .map(|p| p.to_path_buf())
+                                        .unwrap_or_default();
+                                    ui.ctx().data_mut(|w| {
+                                        w.insert_persisted(Id::new("iccsrc"), parent)
+                                    });
+                                }
+                                x.mark_changed();
+                            }
                         }
                     });
                     x
@@ -923,6 +1013,42 @@ impl ImageOperation {
                 }
                 *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
             }
+            Self::ICC(icc_name) => {
+                
+                use lcms2::*;
+                let custom_profile = lcms2::Profile::new_file(icc_name)?;
+                let srgb_profile = Profile::new_srgb();
+                let transform = Transform::new(
+                    &custom_profile,
+                    PixelFormat::RGBA_8,
+                    &srgb_profile,
+                    PixelFormat::RGBA_8,
+                    Intent::Perceptual,
+                )
+                ?;
+                // Pixel struct must have layout compatible with PixelFormat specified in new()
+                let mut source_pixels = img
+                    .par_pixels()
+                    .map(|p| RGBA {
+                        r: p.0[0],
+                        g: p.0[1],
+                        b: p.0[2],
+                        a: p.0[3],
+                    })
+                    .collect::<Vec<_>>();
+                // t.transform_pixels(&source_pixels, destination_pixels);
+                transform.transform_in_place(&mut source_pixels);
+                // If input and output pixel formats are the same, you can overwrite them instead of copying
+                // t.transform_in_place(&mut source_pixels);
+                let res_pixels = source_pixels
+                    .par_iter()
+                    .map(|p| [p.r, p.g, p.b, p.a])
+                    .flatten()
+                    .collect::<Vec<_>>();
+
+                *img = RgbaImage::from_vec(img.width(), img.height(), res_pixels).context("Can't create image buffer")?;
+                // *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
+            }
             Self::Crop(dim) => {
                 if *dim != [0, 0, 0, 0] {
                     let window = cropped_range(dim, &(img.width(), img.height()));
@@ -1148,22 +1274,22 @@ impl ImageOperation {
                 }?;
 
                 if eval_empty_with_context_mut(expr, &mut context).is_ok() {
-                    if let Some(r) = context.get_value("r") {
+                    if let Some(r) = evalexpr::Context::get_value(&context, "r") {
                         if let Ok(r) = r.as_float() {
                             p[0] = r as f32
                         }
                     }
-                    if let Some(g) = context.get_value("g") {
+                    if let Some(g) = evalexpr::Context::get_value(&context, "g") {
                         if let Ok(g) = g.as_float() {
                             p[1] = g as f32
                         }
                     }
-                    if let Some(b) = context.get_value("b") {
+                    if let Some(b) = evalexpr::Context::get_value(&context, "b") {
                         if let Ok(b) = b.as_float() {
                             p[2] = b as f32
                         }
                     }
-                    if let Some(a) = context.get_value("a") {
+                    if let Some(a) = evalexpr::Context::get_value(&context, "a") {
                         if let Ok(a) = a.as_float() {
                             p[3] = a as f32
                         }

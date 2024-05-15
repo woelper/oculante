@@ -743,6 +743,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Exposure(20),
                         ImageOperation::Desaturate(0),
                         ImageOperation::LUT("Lomography Redscale 100".into()),
+                        ImageOperation::ICC("".into()),
                         ImageOperation::Equalize((0, 255)),
                         ImageOperation::ScaleImageMinMax,
                         ImageOperation::Posterize(8),
@@ -1054,7 +1055,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     state.edit_state.result_image_op = img.clone();
                     for operation in &mut state.edit_state.image_op_stack {
                         if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}")
+                            // error!("{e}")
+                            _ = state.message_channel.0.clone().send(Message::Error(e.to_string()));
                         }
                     }
                     debug!(

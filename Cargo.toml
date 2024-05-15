@@ -82,6 +82,7 @@ zune-core = "0.4.12"
 num-traits = "0.2.18"
 zerocopy = "0.7.34"
 icns = "0.3.1"
+lcms2 = { version = "6.1.0", features = ["static"] }
 
 [features]
 heif = ["libheif-rs"]
