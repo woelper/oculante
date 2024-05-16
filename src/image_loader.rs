@@ -9,14 +9,14 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -425,11 +425,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 _ => bail!("expected rgb32f image"),
             };
 
-            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x,y| {
+            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
                 let pixel = hdr_img.get_pixel(x, y);
                 image::Rgba(tonemap_rgb(pixel.0))
             });
-            
+
             _ = sender.send(Frame::new_still(rgba_image));
             return Ok(receiver);
         }
@@ -497,8 +497,12 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "png" => {
+            use zune_png::zune_core::bytestream::ZCursor;
+            use zune_png::zune_core::options::EncoderOptions;
+            use zune_png::{post_process_image, PngDecoder};
+
             let contents = std::fs::read(&img_location)?;
-            let mut decoder = PngDecoder::new(&contents);
+            let mut decoder = PngDecoder::new(ZCursor::new(contents));
             decoder.set_options(
                 DecoderOptions::new_fast()
                     .set_max_height(50000)
@@ -511,14 +515,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 info!("Image is animated");
                 decoder.decode_headers()?;
 
-                let colorspace = decoder.get_colorspace().context("Can't get color space")?;
-                let depth = decoder.get_depth().context("Can't get decoder depth")?;
+                let colorspace = decoder.colorspace().context("Can't get color space")?;
+                let depth = decoder.depth().context("Can't get decoder depth")?;
                 //  get decoder information,we clone this because we need a standalone
                 // info since we mutably modify decoder struct below
-                let info = decoder
-                    .get_info()
-                    .context("Can't get decoder info")?
-                    .clone();
+                let info = decoder.info().context("Can't get decoder info")?.clone();
                 // set up our background variable. Soon it will contain the data for the previous
                 // frame, the first frame has no background hence why this is None
                 let mut background: Option<Vec<u8>> = None;
@@ -529,7 +530,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     info.width
                         * info.height
                         * decoder
-                            .get_colorspace()
+                            .colorspace()
                             .context("Can't get decoder color depth")?
                             .num_components()
                 ];
@@ -556,15 +557,12 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         None,
                     )?;
                     // create encoder parameters
-                    let encoder_opts = zune_core::options::EncoderOptions::new(
-                        info.width,
-                        info.height,
-                        colorspace,
-                        depth,
-                    );
+                    let encoder_opts =
+                        EncoderOptions::new(info.width, info.height, colorspace, depth);
 
-                    let bytes = zune_png::PngEncoder::new(&output, encoder_opts).encode();
-                    let img = image::load_from_memory(&bytes)?;
+                    let mut out = vec![];
+                    _ = zune_png::PngEncoder::new(&output, encoder_opts).encode(&mut out);
+                    let img = image::load_from_memory(&out)?;
                     let buf = img.to_rgba8();
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
@@ -587,10 +585,9 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         // .map(|x| x as u8)
                         .collect::<Vec<_>>();
 
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
 
                     if colorspace.is_grayscale() {
                         let buf: GrayImage =
@@ -621,11 +618,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 }
                 // 8bpp
                 DecodingResult::U8(value) => {
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
 
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
                     if colorspace.is_grayscale() && !colorspace.has_alpha() {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
@@ -712,16 +708,21 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let jpeg_data = std::fs::read(img_location)?;
             let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
             let d = DynamicImage::ImageRgb8(buf);
-            
+
             _ = sender.send(Frame::new_still(d.to_rgba8()));
             return Ok(receiver);
         }
         "icns" => {
             let file = BufReader::new(File::open(img_location)?);
             let icon_family = icns::IconFamily::read(file)?;
-            
+
             // loop over the largest icons, take the largest one and return
-            for icon_type in [icns::IconType::RGBA32_512x512_2x, icns::IconType::RGBA32_512x512, icns::IconType::RGBA32_256x256, icns::IconType::RGBA32_128x128] {
+            for icon_type in [
+                icns::IconType::RGBA32_512x512_2x,
+                icns::IconType::RGBA32_512x512,
+                icns::IconType::RGBA32_256x256,
+                icns::IconType::RGBA32_128x128,
+            ] {
                 // just a vec to write the ong to
                 let mut target = vec![];
                 let image = icon_family.get_icon_with_type(icon_type)?;
@@ -729,9 +730,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 let d = image::load_from_memory(&target).context("Load icns mem")?;
                 _ = sender.send(Frame::new_still(d.to_rgba8()));
                 return Ok(receiver);
-
             }
-
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(tiff) => {
