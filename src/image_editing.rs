@@ -1036,10 +1036,7 @@ impl ImageOperation {
                         a: p.0[3],
                     })
                     .collect::<Vec<_>>();
-                // t.transform_pixels(&source_pixels, destination_pixels);
                 transform.transform_in_place(&mut source_pixels);
-                // If input and output pixel formats are the same, you can overwrite them instead of copying
-                // t.transform_in_place(&mut source_pixels);
                 let res_pixels = source_pixels
                     .par_iter()
                     .map(|p| [p.r, p.g, p.b, p.a])
@@ -1047,7 +1044,6 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
 
                 *img = RgbaImage::from_vec(img.width(), img.height(), res_pixels).context("Can't create image buffer")?;
-                // *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
             }
             Self::Crop(dim) => {
                 if *dim != [0, 0, 0, 0] {
