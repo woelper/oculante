@@ -442,26 +442,21 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "webp" => {
-            // let contents = std::fs::read(img_location)?;
-            // let buf = decode_webp(&contents).context("Can't decode webp")?;
-            // _ = sender.send(Frame::new_still(buf));
-            // return Ok(receiver);
+            let contents = std::fs::read(&img_location)?;
+
+            let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(contents))?;
+            if ! decoder.has_animation() {
+                let img = image::open(img_location)?;
+                _ = sender.send(Frame::new_still(img.to_rgba8()));
+                return Ok(receiver);
+            }
 
             let buffer = std::fs::read(img_location)?;
             let mut decoder = Decoder::new(&buffer)?.into_iter();
-
             let mut last_timestamp = 0;
-
-            let mut frames = vec![];
-            let mut i = 0;
 
             loop {
                 if let Some(frame) = decoder.next() {
-                    if frames.len() > 1 {
-                        if let Some(last) = frames.pop() {
-                            _ = sender.send(last);
-                        }
-                    }
                     let buf = image::ImageBuffer::from_raw(
                         frame.dimensions().0,
                         frame.dimensions().1,
@@ -472,27 +467,14 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     let delay = t - last_timestamp;
                     debug!("time {t} {delay}");
                     last_timestamp = t;
-                    frames.push(Frame::new(buf, delay as u16, FrameSource::Animation));
-                    i += 1;
+                    let frame = Frame::new(buf, delay as u16, FrameSource::Animation);
+                    _ = sender.send(frame);
                 } else {
                     break;
                 }
             }
 
-            if i == 1 {
-                debug!("This is a still");
-                if let Some(mut last) = frames.pop() {
-                    last.source = FrameSource::Still;
-                    _ = sender.send(last);
-                }
-            } else {
-                for f in frames {
-                    _ = sender.send(f);
-                }
-            }
-
-            // TODO: Use thread for animation and return receiver immediately
-
+            // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
         }
         "png" => {
