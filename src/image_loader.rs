@@ -24,7 +24,6 @@ use usvg::{TreeParsing, TreeTextToPath};
 use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
-use zune_png::PngDecoder;
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
@@ -499,7 +498,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         "png" => {
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
-            use zune_png::{post_process_image, PngDecoder};
+            use zune_png::PngDecoder;
 
             let contents = std::fs::read(&img_location)?;
             let mut decoder = PngDecoder::new(ZCursor::new(contents));
