@@ -2,7 +2,11 @@ use crate::{shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
 use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs::File, path::PathBuf};
+use std::{
+    collections::HashSet,
+    fs::{create_dir_all, File},
+    path::PathBuf,
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ColorTheme {
@@ -93,9 +97,22 @@ impl Default for PersistentSettings {
 
 impl PersistentSettings {
     pub fn load() -> Result<Self> {
-        let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
-        let f = File::open(local_dir.join(".oculante"))?;
-        Ok(serde_json::from_reader::<_, PersistentSettings>(f)?)
+        //data_local_dir
+        let config_path = dirs::config_local_dir()
+            .ok_or(anyhow!("Can't get config_local dir"))?
+            .join("oculante")
+            .join("config.json")
+            .canonicalize()
+            // migrate old config
+            .unwrap_or(
+                dirs::data_local_dir()
+                    .ok_or(anyhow!("Can't get data_local dir"))?
+                    .join(".oculante"),
+            );
+
+        Ok(serde_json::from_reader::<_, PersistentSettings>(
+            File::open(config_path)?,
+        )?)
     }
 
     // save settings in a thread so we don't block
@@ -112,8 +129,14 @@ impl PersistentSettings {
 }
 
 fn save(s: &PersistentSettings) -> Result<()> {
-    let local_dir = dirs::data_local_dir().ok_or(anyhow!("Can't get local dir"))?;
-    let f = File::create(local_dir.join(".oculante"))?;
+    let local_dir = dirs::config_local_dir()
+        .ok_or(anyhow!("Can't get local dir"))?
+        .join("oculante");
+    if !local_dir.exists() {
+        _ = create_dir_all(&local_dir);
+    }
+
+    let f = File::create(local_dir.join("config.json"))?;
     Ok(serde_json::to_writer(f, s)?)
 }
 

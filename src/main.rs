@@ -2,7 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
-use image::DynamicImage;
+// use fluent_uri::Uri;
 use log::debug;
 use log::error;
 use log::info;
@@ -122,8 +122,8 @@ fn main() -> Result<(), String> {
             window_config.lazy_loop = !settings.force_redraw;
             window_config.decorations = !settings.borderless;
             if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1 .0 as u32;
-                window_config.height = settings.window_geometry.1 .1 as u32;
+                window_config.width = settings.window_geometry.1.0 as u32;
+                window_config.height = settings.window_geometry.1.1 as u32;
             }
             debug!("Loaded settings.");
             if settings.zen_mode {
@@ -140,7 +140,7 @@ fn main() -> Result<(), String> {
         }
     }
     window_config.always_on_top = true;
-    window_config.min_size = Some((1, 1));
+    window_config.min_size = Some((100, 100));
     window_config.max_size = None;
 
     debug!("Starting oculante.");
@@ -185,7 +185,18 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
+    // #[cfg(target_os = "windows")]
     let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
+
+    // #[cfg(not(target_os = "windows"))]
+    // let maybe_img_location = matches
+    //     .value_of("INPUT")
+    //     .map(Uri::parse)
+    //     .and_then(|uri_result| {
+    //         uri_result
+    //             .ok()
+    //             .map(|uri| PathBuf::from(uri.path().as_str()))
+    //     });
 
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
@@ -256,15 +267,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                     Ok(i) => {
                         // println!("got image");
                         debug!("Sending image!");
-
-                        let _ = state
-                            .texture_channel
-                            .0
-                            .clone()
-                            .send(utils::Frame::new_reset(
-                                DynamicImage::new(2, 2, image::ColorType::Rgba8).to_rgba8(),
-                            ));
-
                         let _ = state
                             .texture_channel
                             .0
@@ -295,6 +297,8 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
+        ctx.options_mut(|o|o.zoom_with_keyboard = false);
+
         fonts
             .font_data
             .insert("my_font".to_owned(), FontData::from_static(FONT));
@@ -319,7 +323,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
         style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
         style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
-        debug!("Accent color: {:?}", state.persistent_settings.accent_color);
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -354,6 +357,9 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             .build()
             .ok();
     }
+
+    // force a frame to render so ctx() has a size (important for centering the image)
+    gfx.render(&plugins.egui(|_| {}));
 
     state
 }
@@ -411,6 +417,29 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
+            }
+            if key_pressed(app, state, Copy) {
+                if let Some(img) = &state.current_image {
+                    clipboard_copy(img);
+                    state.send_message_info("Image copied");
+                }
+            }
+
+            if key_pressed(app, state, Paste) {
+                match clipboard_to_image() {
+                    Ok(img) => {
+                        state.current_path = None;
+                        // Stop in the even that an animation is running
+                        state.player.stop();
+                        _ = state
+                            .player
+                            .image_sender
+                            .send(crate::utils::Frame::new_still(img));
+                        // Since pasted data has no path, make sure it's not set
+                        state.send_message_info("Image pasted");
+                    }
+                    Err(e) => state.send_message_err(&e.to_string()),
+                }
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
@@ -692,13 +721,15 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
+    state.image_geometry.dimensions = state.image_geometry.dimensions;
+
     if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
             state.image_geometry.offset,
             state.cursor,
             Vector2::new(
-                state.image_dimension.0 as f32,
-                state.image_dimension.1 as f32,
+                state.image_geometry.dimensions.0 as f32,
+                state.image_geometry.dimensions.1 as f32,
             ),
             state.image_geometry.scale,
         );
@@ -770,7 +801,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
         debug!("Received image buffer: {:?}", img.dimensions());
-        state.image_dimension = img.dimensions();
+        state.image_geometry.dimensions = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
         // debug!("Frame source: {:?}", frame.source);
@@ -919,93 +950,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     }
     // }
 
-    if let Some(texture) = &state.current_texture {
-        if state.persistent_settings.show_checker_background {
-            if let Some(checker) = &state.checker_texture {
-                draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
-                    .blend_mode(BlendMode::ADD)
-                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
-            }
-        }
-        if state.tiling < 2 {
-            draw.image(texture)
-                .blend_mode(BlendMode::NORMAL)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
-        } else {
-            draw.pattern(texture)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                .size(
-                    texture.width() * state.tiling as f32,
-                    texture.height() * state.tiling as f32,
-                );
-        }
-
-        if state.persistent_settings.show_frame {
-            draw.rect((0.0, 0.0), texture.size())
-                .stroke(1.0)
-                .color(Color {
-                    r: 0.5,
-                    g: 0.5,
-                    b: 0.5,
-                    a: 0.5,
-                })
-                .blend_mode(BlendMode::ADD)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
-        }
-
-        if state.persistent_settings.show_minimap {
-            // let offset_x = app.window().size().0 as f32 - state.image_dimension.0 as f32;
-            let offset_x = 0.0;
-
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_dimension.0 as f32 * state.image_geometry.scale
-                > app.window().size().0 as f32;
-
-            if show_minimap {
-                draw.image(texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .translate(offset_x, 100.)
-                    .scale(scale, scale);
-            }
-        }
-
-        // Draw a brush preview when paint mode is on
-        if state.edit_state.painting {
-            if let Some(stroke) = state.edit_state.paint_strokes.last() {
-                let dim = texture.width().min(texture.height()) / 50.;
-                draw.circle(20.)
-                    // .translate(state.cursor_relative.x, state.cursor_relative.y)
-                    .alpha(0.5)
-                    .stroke(1.5)
-                    .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    .scale(stroke.width * dim, stroke.width * dim)
-                    .translate(state.cursor.x, state.cursor.y);
-
-                // For later: Maybe paint the actual brush? Maybe overkill.
-
-                // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
-                //     if let Some(brush_tex) = brush.to_texture(gfx) {
-                //         draw.image(&brush_tex)
-                //             .blend_mode(BlendMode::NORMAL)
-                //             .translate(state.cursor.x, state.cursor.y)
-                //             .scale(state.scale, state.scale)
-                //             .scale(stroke.width*dim, stroke.width*dim)
-                //             // .translate(state.offset.x as f32, state.offset.y as f32)
-                //             // .transform(state.cursor_relative)
-                //             ;
-                //     }
-                // }
-            }
-        }
-    }
-
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
@@ -1079,7 +1023,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer() || state.edit_state.painting || ctx.is_pointer_over_area() {
+        if ctx.is_using_pointer()
+            || state.edit_state.painting
+            || ctx.is_pointer_over_area()
+            || state.edit_state.block_panning
+        {
             state.mouse_grab = true;
         } else {
             state.mouse_grab = false;
@@ -1092,10 +1040,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.reset_image {
-            let draw_area = ctx.available_rect();
-            let window_size = nalgebra::Vector2::new(draw_area.width(), draw_area.height());
-
             if let Some(current_image) = &state.current_image {
+                let draw_area = ctx.available_rect();
+                let window_size = nalgebra::Vector2::new(
+                    draw_area.width().min(app.window().width() as f32),
+                    draw_area.height().min(app.window().height() as f32),
+                );
                 let img_size = current_image.size_vec();
                 state.image_geometry.scale = (window_size.x / img_size.x)
                     .min(window_size.y / img_size.y)
@@ -1108,13 +1058,101 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.image_geometry.offset.y += draw_area.top();
                 debug!("Image has been reset.");
                 state.reset_image = false;
+                app.window().request_frame();
             }
-            app.window().request_frame();
         }
 
         // Settings come last, as they block keyboard grab (for hotkey assigment)
         settings_ui(app, ctx, state, gfx);
     });
+
+    if let Some(texture) = &state.current_texture {
+        if state.persistent_settings.show_checker_background {
+            if let Some(checker) = &state.checker_texture {
+                draw.pattern(checker)
+                    // .size(texture.width() as f32, texture.height() as f32)
+                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .blend_mode(BlendMode::ADD)
+                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
+                    ;
+            }
+        }
+        if state.tiling < 2 {
+            draw.image(texture)
+                .blend_mode(BlendMode::NORMAL)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+        } else {
+            draw.pattern(texture)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .size(
+                    texture.width() * state.tiling as f32,
+                    texture.height() * state.tiling as f32,
+                );
+        }
+
+        if state.persistent_settings.show_frame {
+            draw.rect((0.0, 0.0), texture.size())
+                .stroke(1.0)
+                .color(Color {
+                    r: 0.5,
+                    g: 0.5,
+                    b: 0.5,
+                    a: 0.5,
+                })
+                .blend_mode(BlendMode::ADD)
+                .scale(state.image_geometry.scale, state.image_geometry.scale)
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+        }
+
+        if state.persistent_settings.show_minimap {
+            // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
+            let offset_x = 0.0;
+
+            let scale = 200. / app.window().size().0 as f32;
+            let show_minimap = state.image_geometry.dimensions.0 as f32
+                * state.image_geometry.scale
+                > app.window().size().0 as f32;
+
+            if show_minimap {
+                draw.image(texture)
+                    .blend_mode(BlendMode::NORMAL)
+                    .translate(offset_x, 100.)
+                    .scale(scale, scale);
+            }
+        }
+
+        // Draw a brush preview when paint mode is on
+        if state.edit_state.painting {
+            if let Some(stroke) = state.edit_state.paint_strokes.last() {
+                let dim = texture.width().min(texture.height()) / 50.;
+                draw.circle(20.)
+                    // .translate(state.cursor_relative.x, state.cursor_relative.y)
+                    .alpha(0.5)
+                    .stroke(1.5)
+                    .scale(state.image_geometry.scale, state.image_geometry.scale)
+                    .scale(stroke.width * dim, stroke.width * dim)
+                    .translate(state.cursor.x, state.cursor.y);
+
+                // For later: Maybe paint the actual brush? Maybe overkill.
+
+                // if let Some(brush) = state.edit_state.brushes.get(stroke.brush_index) {
+                //     if let Some(brush_tex) = brush.to_texture(gfx) {
+                //         draw.image(&brush_tex)
+                //             .blend_mode(BlendMode::NORMAL)
+                //             .translate(state.cursor.x, state.cursor.y)
+                //             .scale(state.scale, state.scale)
+                //             .scale(stroke.width*dim, stroke.width*dim)
+                //             // .translate(state.offset.x as f32, state.offset.y as f32)
+                //             // .transform(state.cursor_relative)
+                //             ;
+                //     }
+                // }
+            }
+        }
+    }
 
     if state.network_mode {
         app.window().request_frame();
@@ -1166,8 +1204,8 @@ fn browse_for_image_path(state: &mut OculanteState) {
 fn limit_offset(app: &mut App, state: &mut OculanteState) {
     let window_size = app.window().size();
     let scaled_image_size = (
-        state.image_dimension.0 as f32 * state.image_geometry.scale,
-        state.image_dimension.1 as f32 * state.image_geometry.scale,
+        state.image_geometry.dimensions.0 as f32 * state.image_geometry.scale,
+        state.image_geometry.dimensions.1 as f32 * state.image_geometry.scale,
     );
     state.image_geometry.offset.x = state
         .image_geometry

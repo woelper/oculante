@@ -8,7 +8,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
-use image::{DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, RgbImage, RgbaImage};
+use image::{
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage,
+};
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -251,17 +253,38 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 Image<Layer<SpecificChannels<RgbaImage, RgbaChannels>>>,
                 exrs::Error,
             > = reader.from_file(&img_location);
-
             match maybe_image {
                 Ok(image) => {
                     let buf = image.layer_data.channel_data.pixels;
                     _ = sender.send(Frame::new_still(buf));
                     return Ok(receiver);
-                    // return Ok(OpenResult::still(buf));
-
-                    // col.add_still(png_buffer);
                 }
-                Err(e) => error!("{} from {:?}", e, img_location),
+                Err(e) => {
+                    let layer = exrs::read_first_flat_layer_from_file(&img_location)?;
+
+                    let size = layer.layer_data.size;
+                    for i in layer.layer_data.channel_data.list {
+                        let d = i.sample_data;
+                        match d {
+                            FlatSamples::F16(_) => bail!("F16 color mode not supported"),
+                            FlatSamples::F32(f) => {
+                                let gray_image = GrayImage::from_raw(
+                                    size.width() as u32,
+                                    size.height() as u32,
+                                    f.par_iter().map(|x| tonemap_f32(*x)).collect::<Vec<_>>(),
+                                )
+                                .context("Can't decode gray alpha buffer")?;
+
+                                let d = DynamicImage::ImageLuma8(gray_image);
+                                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                                return Ok(receiver);
+                            }
+                            FlatSamples::U32(_) => bail!("U32 color mode not supported"),
+                        }
+                    }
+
+                    bail!("{} from {:?}", e, img_location)
+                }
             }
         }
         "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
@@ -396,24 +419,18 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let reader = BufReader::new(f);
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
-            let mut ldr_img: Vec<image::Rgba<u8>> = vec![];
 
-            let hdr_img = hdr_decoder.read_image_hdr()?;
-            for pixel in hdr_img {
-                let tp = image::Rgba(tonemap_rgb(pixel.0));
-                ldr_img.push(tp);
-            }
-            let mut s: Vec<u8> = vec![];
-            let l = ldr_img.clone();
-            for p in l {
-                let mut x = vec![p.0[0], p.0[1], p.0[2], 255];
-                s.append(&mut x);
-            }
+            let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
+                DynamicImage::ImageRgb32F(image) => image,
+                _ => bail!("expected rgb32f image"),
+            };
 
-            let buf = RgbaImage::from_raw(meta.width, meta.height, s)
-                .context("Failed to create RgbaImage with given dimensions")?;
-            // col.add_still(buf);
-            _ = sender.send(Frame::new_still(buf));
+            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
+                let pixel = hdr_img.get_pixel(x, y);
+                image::Rgba(tonemap_rgb(pixel.0))
+            });
+
+            _ = sender.send(Frame::new_still(rgba_image));
             return Ok(receiver);
         }
         "psd" => {
@@ -480,13 +497,82 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "png" => {
+            use zune_png::zune_core::bytestream::ZCursor;
+            use zune_png::zune_core::options::EncoderOptions;
+            use zune_png::{post_process_image, PngDecoder};
+
             let contents = std::fs::read(&img_location)?;
-            let mut decoder = PngDecoder::new(&contents);
+            let mut decoder = PngDecoder::new(ZCursor::new(contents));
             decoder.set_options(
                 DecoderOptions::new_fast()
                     .set_max_height(50000)
                     .set_max_width(50000),
             );
+
+            //animation
+            decoder.decode_headers()?;
+            if decoder.is_animated() {
+                info!("Image is animated");
+                decoder.decode_headers()?;
+
+                let colorspace = decoder.colorspace().context("Can't get color space")?;
+                let depth = decoder.depth().context("Can't get decoder depth")?;
+                //  get decoder information,we clone this because we need a standalone
+                // info since we mutably modify decoder struct below
+                let info = decoder.info().context("Can't get decoder info")?.clone();
+                // set up our background variable. Soon it will contain the data for the previous
+                // frame, the first frame has no background hence why this is None
+                let mut background: Option<Vec<u8>> = None;
+                // the output, since we know that no frame will be bigger than the width and height, we can
+                // set this up outside of the loop.
+                let mut output = vec![
+                    0;
+                    info.width
+                        * info.height
+                        * decoder
+                            .colorspace()
+                            .context("Can't get decoder color depth")?
+                            .num_components()
+                ];
+
+                while decoder.more_frames() {
+                    // decode the header, in case we haven't processed a frame header
+                    decoder.decode_headers()?;
+                    // then decode the current frame information,
+                    // NB: Frame information is for current frame hence should be accessed before decoding the frame
+                    // as it will change on subsequent frames
+                    let frame = decoder.frame_info().context("Can't get frame info")?;
+                    debug!("Frame: {:?}", frame);
+
+                    // decode the raw pixels, even on smaller frames, we only allocate frame_info.width*frame_info.height
+                    let pix = decoder.decode_raw()?;
+                    // call post process
+                    zune_png::post_process_image(
+                        &info,
+                        colorspace,
+                        &frame,
+                        &pix,
+                        background.as_ref().map(|x| x.as_slice()),
+                        &mut output,
+                        None,
+                    )?;
+                    // create encoder parameters
+                    let encoder_opts =
+                        EncoderOptions::new(info.width, info.height, colorspace, depth);
+
+                    let mut out = vec![];
+                    _ = zune_png::PngEncoder::new(&output, encoder_opts).encode(&mut out);
+                    let img = image::load_from_memory(&out)?;
+                    let buf = img.to_rgba8();
+
+                    let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
+                    _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+                    background = Some(output.clone());
+                }
+                return Ok(receiver);
+            }
+
+            debug!("Image is not animated");
             match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
                 // 16 bpp data
                 DecodingResult::U16(imgdata) => {
@@ -499,10 +585,9 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         // .map(|x| x as u8)
                         .collect::<Vec<_>>();
 
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
 
                     if colorspace.is_grayscale() {
                         let buf: GrayImage =
@@ -533,11 +618,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 }
                 // 8bpp
                 DecodingResult::U8(value) => {
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
 
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
                     if colorspace.is_grayscale() && !colorspace.has_alpha() {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
@@ -622,10 +706,31 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
             let jpeg_data = std::fs::read(img_location)?;
-            let buf: RgbaImage = turbojpeg::decompress_image(&jpeg_data)?;
-            _ = sender.send(Frame::new_still(buf));
+            let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
+            let d = DynamicImage::ImageRgb8(buf);
+
+            _ = sender.send(Frame::new_still(d.to_rgba8()));
             return Ok(receiver);
-            // col.add_still(img);
+        }
+        "icns" => {
+            let file = BufReader::new(File::open(img_location)?);
+            let icon_family = icns::IconFamily::read(file)?;
+
+            // loop over the largest icons, take the largest one and return
+            for icon_type in [
+                icns::IconType::RGBA32_512x512_2x,
+                icns::IconType::RGBA32_512x512,
+                icns::IconType::RGBA32_256x256,
+                icns::IconType::RGBA32_128x128,
+            ] {
+                // just a vec to write the ong to
+                let mut target = vec![];
+                let image = icon_family.get_icon_with_type(icon_type)?;
+                image.write_png(&mut target)?;
+                let d = image::load_from_memory(&target).context("Load icns mem")?;
+                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                return Ok(receiver);
+            }
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(tiff) => {
@@ -676,6 +781,7 @@ fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
     tm
 }
 
+#[allow(unused)]
 fn u16_to_u8(p: u16) -> u8 {
     ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
 }
@@ -724,66 +830,47 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
         }
         tiff::decoder::DecodingResult::U16(contents) => {
             debug!("TIFF U16");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u16::MIN as f32, u16::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::U32(contents) => {
             debug!("TIFF U32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u32::MIN as f32, u32::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::U64(contents) => {
             debug!("TIFF U64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, u64::MIN as f32, u64::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::F32(contents) => {
             debug!("TIFF F32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p, 0.0, 1.0, 0., 255.) as u8)
-                .collect();
+            ldr_img = autoscale(&contents).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::F64(contents) => {
             debug!("TIFF F64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, 0.0, 1.0, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I8(contents) => {
             debug!("TIFF I8");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i8::MIN as f32, i8::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I16(contents) => {
             debug!("TIFF I16");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i16::MIN as f32, i16::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I32(contents) => {
             debug!("TIFF I32");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i32::MIN as f32, i32::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
         tiff::decoder::DecodingResult::I64(contents) => {
             debug!("TIFF I64");
-            ldr_img = contents
-                .par_iter()
-                .map(|p| fit(*p as f32, i64::MIN as f32, i64::MAX as f32, 0., 255.) as u8)
-                .collect();
+            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
         }
     }
 
@@ -823,4 +910,23 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
             )
         }
     }
+}
+
+fn autoscale(values: &Vec<f32>) -> Vec<f32> {
+    let mut lowest = f32::MAX;
+    let mut highest = f32::MIN;
+
+    for v in values {
+        if *v < lowest {
+            lowest = *v
+        }
+        if *v > highest {
+            highest = *v
+        }
+    }
+
+    values
+        .into_iter()
+        .map(|v| fit(*v, lowest, highest, 0., 255.))
+        .collect()
 }

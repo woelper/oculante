@@ -1,3 +1,78 @@
+# 0.8.21 (2024-05-10)
+
+### :green_apple: Chore
+
+* Disable AUR publishing: This package has been moved to the official [extra] repository. (55245529)
+
+# 0.8.20 (2024-05-10)
+
+### :sparkles: Features
+
+* Support EXR with single layers (non-rgba) (d22e78c4)
+
+### :green_apple: Chore
+
+* update deps and use new HDR support from `image` (bd7cbf89)
+
+# 0.8.19 (2024-04-29)
+
+### :beetle: Bug Fixes
+
+* prevent zoom with keyboard (fixes #304) (2de35ed6)
+
+### :sparkles: Features
+
+* Map float TIFF images to min-max range (52f87f82)
+
+### :green_apple: Chore
+
+* Update logo (1783609d)
+* update icon (716f6e9c)
+* **deps**: bump rustls from 0.21.10 to 0.21.11 (f0c1743b)
+
+# 0.8.18 (2024-04-06)
+
+### :sparkles: Features
+
+* APNG support (c633764d)
+
+### :green_apple: Chore
+
+* **deps**: bump h2 from 0.3.24 to 0.3.26 (59c559ac)
+* update logo (6ae3bc03)
+
+# 0.8.17 (2024-03-29)
+
+### :beetle: Bug Fixes
+
+* Do not display console window on Windows (fixes #300) (f83eb463)
+
+# 0.8.16 (2024-03-13)
+
+### :beetle: Bug Fixes
+
+* Fix Uri causing files not loading (ad886555)
+
+# 0.8.15 (2024-03-10)
+
+### :beetle: Bug Fixes
+
+* Fix issue where "Open with..." does not work any more (b5677977)
+
+# 0.8.14 (2024-03-08)
+
+### :beetle: Bug Fixes
+
+* Enable hotkey copy and paste (a538c1d5)
+* Enable clipboard support on wayland (f86af424)
+* Prevent image from flickering at the first frame (df4439a8)
+* Make sure window size is not larger than window (36c03c8f)
+
+### :sparkles: Features
+
+* use .config location on unix for storing settings (024dc70b)
+* Add perspective cropping with UI. You can now de-warp scans or similar into a nice rectangular picture. (ba7c7575)
+
 # 0.8.13 (2024-02-27)
 
 # 0.8.12 (2024-02-26)

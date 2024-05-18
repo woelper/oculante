@@ -1,12 +1,14 @@
-# <img src="res/oculante.png" align="top" width="45">Oculante
+
+<h1 align="center">
+    <img alt="banner" src="res/banner.png">
+</h1>
+
+ _A no-nonsense hardware-accelerated image viewer_
 
 
-_A no-nonsense hardware-accelerated image viewer_
 
 
-
-
-[<img src="https://img.shields.io/badge/Download-blue">](https://github.com/woelper/oculante/releases/latest)
+[<img src="https://img.shields.io/badge/Download-blue" height="40">](https://github.com/woelper/oculante/releases/latest)
 
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
 - Free of charge, bloat-free, ad-free, privacy-respecting open source application
@@ -19,12 +21,13 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 - SIMD-accelerated image editing
 
+---
 [![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
 [![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
 [![Ubuntu](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml)
 [![Check Windows](https://github.com/woelper/oculante/actions/workflows/check_windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_windows.yml)
 [![ARM](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml)
-
+---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
 
@@ -62,6 +65,7 @@ pkgin install oculante
 - gif (animation support and correct timing)
 - hdr, tonemapped
 - ico
+- icns (via `rust-icns`)
 - jpeg
 - png
 - pnm

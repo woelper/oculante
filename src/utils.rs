@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self};
+use image::{self, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -61,6 +61,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "sr2",
     "braw",
     "r3d",
+    "icns",
     "nrw",
     "raw",
     "avif",
@@ -392,16 +393,16 @@ pub enum FrameSource {
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub buffer: RgbaImage,
-    /// How long to pause until the next frame
+    /// How long to pause until the next frame, in milliseconds
     pub delay: u16,
     pub source: FrameSource,
 }
 
 impl Frame {
-    pub fn new(buffer: RgbaImage, delay: u16, source: FrameSource) -> Frame {
+    pub fn new(buffer: RgbaImage, delay_ms: u16, source: FrameSource) -> Frame {
         Frame {
             buffer,
-            delay,
+            delay: delay_ms,
             source,
         }
     }
@@ -776,7 +777,10 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
         )
         .replacen(
             "{RES}",
-            &format!("{}x{}", state.image_dimension.0, state.image_dimension.1),
+            &format!(
+                "{}x{}",
+                state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
+            ),
             10,
         );
 
@@ -843,4 +847,18 @@ pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     let output = File::create(p)?;
     dynimage.encoder().write_to(output)?;
     Ok(())
+}
+
+pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+    let clipboard = &mut Clipboard::new()?;
+
+    let imagedata = clipboard.get_image()?;
+    let image = image::RgbaImage::from_raw(
+        imagedata.width as u32,
+        imagedata.height as u32,
+        (imagedata.bytes).to_vec(),
+    )
+    .context("Can't decode RgbaImage")?;
+
+    Ok(image)
 }

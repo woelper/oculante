@@ -7,14 +7,17 @@ use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
+use crate::{pos_from_coord, ImageGeometry};
 
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize as fr;
-use image::{imageops, DynamicImage, RgbaImage};
+use image::{imageops, DynamicImage, Rgba, RgbaImage};
+use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error};
-use nalgebra::Vector4;
-use notan::egui::{self, lerp, vec2, DragValue, Id, Sense, Vec2};
+use nalgebra::{Vector2, Vector4};
+use notan::egui::epaint::PathShape;
+use notan::egui::{self, lerp, vec2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
@@ -32,6 +35,8 @@ pub struct EditState {
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: RgbaImage,
     pub painting: bool,
+    #[serde(skip)]
+    pub block_panning: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
@@ -48,6 +53,7 @@ impl Default for EditState {
             result_pixel_op: RgbaImage::default(),
             result_image_op: RgbaImage::default(),
             painting: Default::default(),
+            block_panning: false,
             non_destructive_painting: Default::default(),
             paint_strokes: Default::default(),
             paint_fade: false,
@@ -134,6 +140,10 @@ pub enum ImageOperation {
     // x,y (top left corner of crop), width, height
     // 1.0 equals 10000
     Crop([u32; 4]),
+    CropPerspective {
+        points: [(u32, u32); 4],
+        original_size: (u32, u32),
+    },
     LUT(String),
 }
 
@@ -152,6 +162,7 @@ impl fmt::Display for ImageOperation {
             Self::Fill(_) => write!(f, "{PAINT_BUCKET} Fill color"),
             Self::Blur(_) => write!(f, "{DROP} Blur"),
             Self::Crop(_) => write!(f, "{CROP} Crop"),
+            Self::CropPerspective { .. } => write!(f, "{CROP} Perspective crop"),
             Self::Flip(_) => write!(f, "{SWAP} Flip"),
             Self::Rotate(_) => write!(f, "{ARROW_CLOCKWISE} Rotate"),
             Self::Invert => write!(f, "{SELECTION_INVERSE} Invert"),
@@ -178,6 +189,7 @@ impl ImageOperation {
             Self::Resize { .. } => false,
             // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
+            Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
@@ -189,7 +201,7 @@ impl ImageOperation {
     }
 
     // Add functionality about how to draw UI here
-    pub fn ui(&mut self, ui: &mut Ui) -> Response {
+    pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.slider_styled(val, -255..=255),
@@ -568,11 +580,122 @@ impl ImageOperation {
                 if ui.selectable_value(angle, 180, "⬇ 180°").clicked() {
                     r.mark_changed();
                 }
-
                 r
             }
             Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
             Self::Contrast(val) => ui.slider_styled(val, -128..=128),
+            Self::CropPerspective {
+                points,
+                original_size,
+            } => {
+                let id = Id::new("crop");
+                let points_transformed = points
+                    .iter()
+                    .map(|p| {
+                        (
+                            geo.scale * p.0 as f32 + geo.offset.x,
+                            geo.scale * p.1 as f32 + geo.offset.y,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                // create a fake response to alter
+                let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+
+                if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
+                    if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
+                        ui.data_mut(|w| w.remove_temp::<bool>(id));
+                        r.mark_changed();
+                        *points = [
+                            (0, 0),
+                            (original_size.0, 0),
+                            (0, original_size.1),
+                            (original_size.0, original_size.1),
+                        ];
+                    }
+                } else {
+                    let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+
+                    let cursor_relative = pos_from_coord(
+                        geo.offset,
+                        Vector2::new(cursor_abs.x, cursor_abs.y),
+                        Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
+                        geo.scale,
+                    );
+
+                    for (i, pt) in points_transformed.iter().enumerate() {
+                        let maxdist = 20.;
+                        let d = Pos2::new(pt.0, pt.1).distance(cursor_abs);
+
+                        if d < maxdist {
+                            if ui.input(|i| i.pointer.any_down()) {
+                                *block_panning = true;
+                                ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                            }
+                            if ui.input(|r| r.pointer.any_released()) {
+                                *block_panning = false;
+                                ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
+                            }
+                        }
+
+                        let col = if d < maxdist {
+                            Color32::LIGHT_BLUE
+                        } else {
+                            Color32::GOLD
+                        };
+
+                        // ui.painter().debug_text(
+                        //     Pos2::new(pt.0, pt.1),
+                        //     Align2::CENTER_CENTER,
+                        //     col,
+                        //     format!("X"),
+                        // );
+
+                        ui.painter().rect_filled(
+                            Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
+                            2.,
+                            col,
+                        );
+                    }
+
+                    // egui shape needs these in a different order
+                    let pts = vec![
+                        Pos2::new(points_transformed[0].0, points_transformed[0].1),
+                        Pos2::new(points_transformed[1].0, points_transformed[1].1),
+                        Pos2::new(points_transformed[3].0, points_transformed[3].1),
+                        Pos2::new(points_transformed[2].0, points_transformed[2].1),
+                    ];
+
+                    // make a black background covering everything
+                    ui.painter().rect_filled(
+                        Rect::EVERYTHING,
+                        0.,
+                        Color32::from_rgba_premultiplied(0, 0, 0, 70),
+                    );
+
+                    let shape = PathShape::convex_polygon(
+                        pts,
+                        Color32::from_rgba_unmultiplied(255, 255, 255, 10),
+                        Stroke::new(1., Color32::GOLD),
+                    );
+                    ui.painter().add(shape);
+
+                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                        points[pt].0 = cursor_relative.x as u32;
+                        points[pt].1 = cursor_relative.y as u32;
+                    }
+
+                    if ui
+                        .button(format!("{CHECK} Apply"))
+                        .on_hover_text("Apply the crop. You don't lose image data by this.")
+                        .clicked()
+                    {
+                        ui.ctx().data_mut(|w| w.insert_temp(id, true));
+                        r.changed = true;
+                    }
+                }
+
+                r
+            }
             Self::Crop(bounds) => {
                 let mut float_bounds = bounds.map(|b| b as f32 / 10000.);
                 // debug!("Float bounds {:?}", float_bounds);
@@ -806,6 +929,47 @@ impl ImageOperation {
                     let sub_img =
                         image::imageops::crop_imm(img, window[0], window[1], window[2], window[3]);
                     *img = sub_img.to_image();
+                }
+            }
+            Self::CropPerspective { points, .. } => {
+                let img_dim = img.dimensions();
+
+                let max_width = points[1].0.max(points[3].0);
+                let min_width = points[0].0.min(points[2].0);
+                let max_height = points[2].1.max(points[3].1);
+                let min_height = points[0].1.min(points[1].1);
+                let x = max_width - min_width;
+                let y = max_height - min_height;
+
+                let from = [
+                    (points[0].0 as f32, points[0].1 as f32),
+                    (points[1].0 as f32, points[1].1 as f32),
+                    (points[2].0 as f32, points[2].1 as f32),
+                    (points[3].0 as f32, points[3].1 as f32),
+                ];
+
+                let to = [
+                    (0 as f32, 0 as f32),
+                    (img_dim.0 as f32, 0 as f32),
+                    (0 as f32, img_dim.1 as f32),
+                    (img_dim.0 as f32, img_dim.1 as f32),
+                ];
+
+                if let Some(proj) =
+                    imageproc::geometric_transformations::Projection::from_control_points(from, to)
+                {
+                    let default_p: Rgba<u8> = [0, 0, 0, 0].into();
+
+                    *img = imageproc::geometric_transformations::warp(
+                        img,
+                        &proj,
+                        Interpolation::Bicubic,
+                        default_p,
+                    );
+
+                    *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);
+                } else {
+                    error!("Projection failed")
                 }
             }
             Self::Resize {
