@@ -134,13 +134,14 @@ fn main() -> Result<(), String> {
                 ));
                 window_config = window_config.set_title(&title_string);
             }
+            window_config.min_size = Some(settings.min_window_size);
+
         }
         Err(e) => {
             error!("Could not load settings: {e}");
         }
     }
     window_config.always_on_top = true;
-    window_config.min_size = Some((100, 100));
     window_config.max_size = None;
 
     debug!("Starting oculante.");
