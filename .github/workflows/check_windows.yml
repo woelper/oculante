@@ -15,6 +15,14 @@ jobs:
       - name: Install vcpkg
         run: vcpkg integrate install
 
+      - name: Install Ninja
+        run: choco install ninja
+
+      # - name: Install Vulkan SDK
+      #   uses: humbletim/install-vulkan-sdk@v1.1.1
+      #   with:
+      #     cache: true
+
       - name: Install libheif
         run: vcpkg install libheif:x64-windows-static-md
 
@@ -22,7 +30,10 @@ jobs:
         run: vcpkg install libheif:x64-windows-static
 
       - name: cargo check without default features
-        run: cargo check --no-default-features
+        run: cargo check --no-default-features  --features shaderc
 
-      - name: cargo check build features
+      - name: clean
+        run: cargo clean
+
+      - name: cargo check build features & heif
         run: cargo check --features heif

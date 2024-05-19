@@ -122,8 +122,8 @@ fn main() -> Result<(), String> {
             window_config.lazy_loop = !settings.force_redraw;
             window_config.decorations = !settings.borderless;
             if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1 .0 as u32;
-                window_config.height = settings.window_geometry.1 .1 as u32;
+                window_config.width = settings.window_geometry.1.0 as u32;
+                window_config.height = settings.window_geometry.1.1 as u32;
             }
             debug!("Loaded settings.");
             if settings.zen_mode {
@@ -140,7 +140,7 @@ fn main() -> Result<(), String> {
         }
     }
     window_config.always_on_top = true;
-    window_config.min_size = Some((1, 1));
+    window_config.min_size = Some((100, 100));
     window_config.max_size = None;
 
     debug!("Starting oculante.");

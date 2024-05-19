@@ -24,7 +24,6 @@ use usvg::{TreeParsing, TreeTextToPath};
 use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
-use zune_png::PngDecoder;
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
@@ -509,8 +508,12 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "png" => {
+            use zune_png::zune_core::bytestream::ZCursor;
+            use zune_png::zune_core::options::EncoderOptions;
+            use zune_png::PngDecoder;
+
             let contents = std::fs::read(&img_location)?;
-            let mut decoder = PngDecoder::new(&contents);
+            let mut decoder = PngDecoder::new(ZCursor::new(contents));
             decoder.set_options(
                 DecoderOptions::new_fast()
                     .set_max_height(50000)
@@ -523,14 +526,11 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 info!("Image is animated");
                 decoder.decode_headers()?;
 
-                let colorspace = decoder.get_colorspace().context("Can't get color space")?;
-                let depth = decoder.get_depth().context("Can't get decoder depth")?;
+                let colorspace = decoder.colorspace().context("Can't get color space")?;
+                let depth = decoder.depth().context("Can't get decoder depth")?;
                 //  get decoder information,we clone this because we need a standalone
                 // info since we mutably modify decoder struct below
-                let info = decoder
-                    .get_info()
-                    .context("Can't get decoder info")?
-                    .clone();
+                let info = decoder.info().context("Can't get decoder info")?.clone();
                 // set up our background variable. Soon it will contain the data for the previous
                 // frame, the first frame has no background hence why this is None
                 let mut background: Option<Vec<u8>> = None;
@@ -541,7 +541,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                     info.width
                         * info.height
                         * decoder
-                            .get_colorspace()
+                            .colorspace()
                             .context("Can't get decoder color depth")?
                             .num_components()
                 ];
@@ -568,15 +568,12 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         None,
                     )?;
                     // create encoder parameters
-                    let encoder_opts = zune_core::options::EncoderOptions::new(
-                        info.width,
-                        info.height,
-                        colorspace,
-                        depth,
-                    );
+                    let encoder_opts =
+                        EncoderOptions::new(info.width, info.height, colorspace, depth);
 
-                    let bytes = zune_png::PngEncoder::new(&output, encoder_opts).encode();
-                    let img = image::load_from_memory(&bytes)?;
+                    let mut out = vec![];
+                    _ = zune_png::PngEncoder::new(&output, encoder_opts).encode(&mut out);
+                    let img = image::load_from_memory(&out)?;
                     let buf = img.to_rgba8();
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
@@ -599,10 +596,9 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                         // .map(|x| x as u8)
                         .collect::<Vec<_>>();
 
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
 
                     if colorspace.is_grayscale() {
                         let buf: GrayImage =
@@ -633,11 +629,10 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 }
                 // 8bpp
                 DecodingResult::U8(value) => {
-                    let (width, height) = decoder
-                        .get_dimensions()
-                        .context("Can't get png dimensions")?;
+                    let (width, height) =
+                        decoder.dimensions().context("Can't get png dimensions")?;
 
-                    let colorspace = decoder.get_colorspace().context("Can't get colorspace")?;
+                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
                     if colorspace.is_grayscale() && !colorspace.has_alpha() {
                         let buf: GrayImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
