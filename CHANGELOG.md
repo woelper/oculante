@@ -1,3 +1,20 @@
+# 0.8.22 (2024-05-19)
+
+### :beetle: Bug Fixes
+
+* Ensure spirv is not used when only using shaderc (03f9167e)
+* Allow loading huge webp images and handle still frames differently (e4ebc2dc)
+* Set window min size to 100x100 to prevent super tiny window (fixes #325) (d63d971c)
+
+### :sparkles: Features
+
+* add icns image support (internal png data only, load largest contained image) (0703d220)
+
+### :green_apple: Chore
+
+* update avif-decode, evalexpr, exr, rfd, self_update, jxl-oxide, imageproc (a6c98436)
+* Clean up warnings (ab2b03fe)
+
 # 0.8.21 (2024-05-10)
 
 ### :green_apple: Chore
