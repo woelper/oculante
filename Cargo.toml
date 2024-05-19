@@ -102,7 +102,7 @@ turbo = ["turbojpeg"]
 update = ["self_update"]
 shaderc = ["notan/shaderc"]
 spirv = ["notan/glsl-to-spirv"]
-
+j2k = ["jpeg2k"]
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
