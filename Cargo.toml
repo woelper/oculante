@@ -88,15 +88,13 @@ zerocopy = "0.7.34"
 icns = "0.3.1"
 
 [features]
-default = ["turbo", "avif_native", "file_open", "update", "spirv"]
+default = ["turbo", "avif_native", "file_open", "update", "notan/glsl-to-spirv"]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
-shaderc = ["notan/shaderc"]
-spirv = ["notan/glsl-to-spirv"]
 
 
 

@@ -21,7 +21,7 @@ jobs:
         if: matrix.os == 'ubuntu-18.04'
 
       - name: Cross-compile arm
-        run: cross build --target armv7-unknown-linux-musleabihf --no-default-features
+        run: cross build --target armv7-unknown-linux-musleabihf --no-default-features --features notan/glsl-to-spirv
         if: matrix.os == 'ubuntu-18.04'
 
       # - name: Set up pagefile
@@ -49,5 +49,5 @@ jobs:
         run: cargo build
 
       - name: cargo check without default features
-        run: cargo check --no-default-features
+        run: cargo check --no-default-features --features notan/glsl-to-spirv
 
