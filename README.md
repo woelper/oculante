@@ -170,8 +170,15 @@ Mac
 `brew install nasm`
 
 ### Cargo Features
-If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
-The feature `file_open` will enable/disable a file open dialog. This pulls in additional dependencies and is enabled by default.
+- `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
+
+- `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
+
+- `notan/glsl-to-spirv` (default) uses the spirv shader compiler
+
+- `notan/shaderc` uses shaderc as a shader compiler. Longer build time.
+
+- `update` (default) enable app updating.
 
 ### Shortcuts:
 `mouse wheel` = zoom
