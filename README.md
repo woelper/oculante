@@ -67,6 +67,7 @@ pkgin install oculante
 - ico
 - icns (via `rust-icns`)
 - jpeg
+- jpeg2000 (via `jpeg2k`, feature "j2k", on by default)
 - png
 - pnm
 - tga
