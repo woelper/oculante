@@ -95,7 +95,7 @@ fn main() -> Result<(), String> {
             .set_high_dpi(true);
     }
 
-    #[cfg(target_os = "netbsd")]
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
     {
         window_config = window_config.set_lazy_loop(true).set_vsync(true);
     }
@@ -134,13 +134,14 @@ fn main() -> Result<(), String> {
                 ));
                 window_config = window_config.set_title(&title_string);
             }
+            window_config.min_size = Some(settings.min_window_size);
+
         }
         Err(e) => {
             error!("Could not load settings: {e}");
         }
     }
     window_config.always_on_top = true;
-    window_config.min_size = Some((100, 100));
     window_config.max_size = None;
 
     debug!("Starting oculante.");
@@ -529,7 +530,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(not(target_os = "netbsd"))]
+            #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
             if key_pressed(app, state, DeleteFile) {
                 if let Some(p) = &state.current_path {
                     _ = trash::delete(p);
