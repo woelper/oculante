@@ -58,6 +58,7 @@ pub struct PersistentSettings {
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
     pub borderless: bool,
+    pub min_window_size: (u32,u32)
 }
 
 impl Default for PersistentSettings {
@@ -91,6 +92,7 @@ impl Default for PersistentSettings {
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
             borderless: false,
+            min_window_size: (100,100)
         }
     }
 }
