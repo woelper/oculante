@@ -95,7 +95,7 @@ fn main() -> Result<(), String> {
             .set_high_dpi(true);
     }
 
-    #[cfg(target_os = "netbsd")]
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
     {
         window_config = window_config.set_lazy_loop(true).set_vsync(true);
     }
@@ -529,7 +529,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(not(target_os = "netbsd"))]
+            #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
             if key_pressed(app, state, DeleteFile) {
                 if let Some(p) = &state.current_path {
                     _ = trash::delete(p);

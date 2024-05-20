@@ -22,7 +22,7 @@ use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
 use log::{debug, error, info};
-#[cfg(not(target_os = "netbsd"))]
+#[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
@@ -588,7 +588,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
-                #[cfg(not(target_os = "netbsd"))]
+                #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
                 ui.checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
                 ui.end_row();
 
@@ -2167,7 +2167,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
 }
 
 pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
-    #[cfg(not(target_os = "netbsd"))]
+    #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
             ui.available_rect_before_wrap(),
