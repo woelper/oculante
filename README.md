@@ -13,7 +13,7 @@
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
 - Free of charge, bloat-free, ad-free, privacy-respecting open source application
 - Fast opening of images, fast startup
-- Available for Win, Mac, Linux and NetBSD
+- Available for Win, Mac, Linux, FreeBSD and NetBSD
 - Supports a wide range of images and SVG
 - Caches images for faster reloading
 - Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
