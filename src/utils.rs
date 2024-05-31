@@ -69,6 +69,8 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "ppm",
     "qoi",
     "ktx2",
+    #[cfg(feature = "j2k")]
+    "jp2",
     #[cfg(feature = "heif")]
     "heif",
     #[cfg(feature = "heif")]
