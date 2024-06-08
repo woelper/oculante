@@ -643,7 +643,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
-                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().as_str()) {
+                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().to_lowercase().as_str()) {
                         state.is_loaded = false;
                         state.current_image = None;
                         state.player.load(&p, state.message_channel.0.clone());
