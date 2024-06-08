@@ -1764,6 +1764,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-format"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ffe3a660c3a1b10e96f304a9413d673b2118d62e4520f7ddf4a4faccfe8b9b9"
+
+[[package]]
 name = "find-winsdk"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4336,6 +4342,7 @@ dependencies = [
  "evalexpr",
  "exr",
  "fast_image_resize",
+ "file-format",
  "flate2",
  "fluent-uri",
  "fruitbasket",

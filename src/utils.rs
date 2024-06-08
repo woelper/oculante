@@ -284,7 +284,7 @@ pub fn send_image_threaded(
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
 
-        match open_image(&loc) {
+        match open_image(&loc, Some(message_sender.clone())) {
             Ok(frame_receiver) => {
                 // _ = texture_sender
                 // .clone()
