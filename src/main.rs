@@ -318,6 +318,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         }
 
         let mut style: egui::Style = (*ctx.style()).clone();
+        style.interaction.tooltip_delay = 0.0;
         let font_scale = 0.80;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
@@ -642,7 +643,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
-                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().as_str()) {
+                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().to_lowercase().as_str()) {
                         state.is_loaded = false;
                         state.current_image = None;
                         state.player.load(&p, state.message_channel.0.clone());

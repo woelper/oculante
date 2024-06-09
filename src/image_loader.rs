@@ -80,6 +80,18 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
 
             // col.add_still(i.to_rgba8());
         }
+        #[cfg(feature = "j2k")]
+        "jp2" => {
+            let jp2_image = jpeg2k::Image::from_file(img_location)?;
+
+            let image_buffer = RgbaImage::from_raw(
+                jp2_image.width(),
+                jp2_image.height(),
+                jp2_image.get_pixels(Some(255))?.data,
+            ).context("Can't decode jp2k buffer")?;
+            _ = sender.send(Frame::new_still(image_buffer));
+            return Ok(receiver);
+        }
         #[cfg(feature = "heif")]
         "heif" | "heic" => {
             // Built on work in https://github.com/rsuu/rmg - thanks!

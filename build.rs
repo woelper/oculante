@@ -77,7 +77,7 @@ fn main() {
     println!("Build script");
     // #[cfg(windows)]
     match std::process::Command::new("convert")
-        .args(vec!["res/oculante.png", "icon.ico"])
+        .args(vec!["res/oculante.png", "-define", "icon:auto-resize=16,32,48,64,128,256", "icon.ico"])
         .spawn()
     {
         Ok(_b) => println!("Converted icon"),

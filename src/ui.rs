@@ -554,9 +554,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     );
                 ui.end_row();
                 ui
-                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background")
+                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background where transparent")
                     .on_hover_text(
-                        "Show a checker pattern as backdrop.",
+                        "Show checker pattern as backdrop.",
                     );
 
                 ui

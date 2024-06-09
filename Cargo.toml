@@ -85,16 +85,21 @@ imageproc = { version = "0.25", features = ["rayon"] }
 num-traits = "0.2.18"
 zerocopy = "0.7.34"
 icns = "0.3.1"
+jpeg2k = { version = "0.7.0", optional = true, default-features = false, features = [
+  "threads",
+  "file-io",
+  "openjpeg-sys",
+] }
 
 [features]
-default = ["turbo", "avif_native", "file_open", "update"]
+default = ["turbo", "avif_native", "file_open", "update", "notan/glsl-to-spirv", "j2k"]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
-
+j2k = ["jpeg2k"]
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
