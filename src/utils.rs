@@ -236,14 +236,18 @@ impl Player {
         self.stop_sender = stop_sender;
 
         if let Some(cached_image) = self.cache.get(img_location) {
+            debug!("Cache hit for {}", img_location.display());
+
             let mut frame = Frame::new_still(cached_image);
             if let Some(fs) = forced_frame_source {
+                debug!("Frame source set to {:?}", fs);
                 frame.source = fs;
             }
             _ = self.image_sender.send(frame);
-            debug!("Cache hit for {}", img_location.display());
             return;
         }
+
+        debug!("Image not in cache.");
 
         send_image_threaded(
             img_location,
@@ -286,15 +290,13 @@ pub fn send_image_threaded(
 
         match open_image(&loc) {
             Ok(frame_receiver) => {
+                debug!("Got a frame receiver from opening image");
                 // _ = texture_sender
                 // .clone()
                 // .send(Frame::new_reset(f.buffer.clone()));
 
                 let mut first = true;
                 for mut f in frame_receiver.iter() {
-                    if let Some(ref fs) = forced_frame_source {
-                        f.source = fs.clone();
-                    }
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
                         return;
@@ -317,6 +319,10 @@ pub fn send_image_threaded(
                                     .min(max_texture_size as f32)
                                     as u32,
                             );
+
+                            if let Some(ref fs) = forced_frame_source {
+                                f.source = fs.clone();
+                            }
 
                             let mut frame = f;
 

@@ -88,7 +88,8 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 jp2_image.width(),
                 jp2_image.height(),
                 jp2_image.get_pixels(Some(255))?.data,
-            ).context("Can't decode jp2k buffer")?;
+            )
+            .context("Can't decode jp2k buffer")?;
             _ = sender.send(Frame::new_still(image_buffer));
             return Ok(receiver);
         }
@@ -457,7 +458,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             let contents = std::fs::read(&img_location)?;
 
             let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(contents))?;
-            if ! decoder.has_animation() {
+            if !decoder.has_animation() {
                 let img = image::open(img_location)?;
                 _ = sender.send(Frame::new_still(img.to_rgba8()));
                 return Ok(receiver);

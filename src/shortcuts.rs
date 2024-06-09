@@ -37,6 +37,7 @@ pub enum InputEvent {
     PanUp,
     PanDown,
     DeleteFile,
+    ClearImage,
     LosslessRotateRight,
     LosslessRotateLeft,
     Copy,
@@ -180,7 +181,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // early out if just one key is pressed, and it's a modifier
     if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
         if app.keyboard.down.len() == 1 {
-            debug!("just modifier down");
+            log::trace!("alt/shift/ctrl modifier down");
             return false;
         }
     }
