@@ -33,8 +33,8 @@ jobs:
       #   run: cargo build
 
       - name: cargo check without default features
-        run: cargo check --no-default-features  --features notan/glsl-to-spirv
+        run: cargo check --no-default-features --features notan/glsl-to-spirv
 
       - name: cargo check with heif
-        run: PKG_CONFIG_PATH=libheif/build cargo check --features heif
+        run: PKG_CONFIG_PATH=libheif/build cargo check --features heif --features notan/glsl-to-spirv
 
