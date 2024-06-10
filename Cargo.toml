@@ -40,7 +40,7 @@ notan = { version = "0.12", default-features = false, features = [
   "drop_files",
   "egui",
 ] }
-egui_plot = "0.26"
+egui_plot = "0.27"
 palette = "0.7"
 psd = "0.3"
 quickraw = "0.1.6"
@@ -69,8 +69,8 @@ dark-light = "1.0"
 trash = "3.1"
 lutgen = {version ="0.10.0", features = ["lutgen-palettes"]}
 libheif-rs = { version = "0.22.0", default-features = false, optional = true}
-egui-phosphor = "0.4"
-egui-notify = "0.13"
+egui-phosphor = "0.5"
+egui-notify = "0.14"
 ktx2 = "0.3.0"
 wgpu = "0.19"
 thiserror = "1.0.51"
