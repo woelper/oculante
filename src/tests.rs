@@ -11,7 +11,11 @@ use std::{fs::File, io::Write, path::PathBuf, time::Instant};
 
 #[test]
 fn load() {
-    open_image(&PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg")).unwrap();
+    open_image(
+        &PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"),
+        None,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -52,9 +56,10 @@ fn bench_load_large() {
 
     for _i in 0..iters {
         let start = Instant::now();
-        open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
@@ -70,7 +75,8 @@ fn bench_load_large() {
 
     for _i in 0..iters {
         let start = Instant::now();
-        open_image(&PathBuf::from("tests/large.png")).unwrap();
+
+        open_image(&PathBuf::from("tests/large.png"), None).unwrap();
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
@@ -101,9 +107,10 @@ fn bench_process_pxl() {
     ];
 
     for _i in 0..iters {
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
@@ -128,9 +135,10 @@ fn bench_process_bright() {
     let ops = vec![ImageOperation::Brightness(10)];
 
     for _i in 0..iters {
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
@@ -181,9 +189,10 @@ fn bench_process_all() {
             },
             // ImageOperation::
         ];
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();

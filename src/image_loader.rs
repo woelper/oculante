@@ -1,6 +1,6 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::{ktx2_loader, FONT};
+use crate::{ktx2_loader, Message, FONT};
 use log::{debug, error, info};
 use psd::Psd;
 
@@ -9,7 +9,7 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage,
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
@@ -26,18 +26,32 @@ use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
 
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
+pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
 
-    match img_location
+    use file_format::FileFormat;
+
+    let mut extension = img_location
         .extension()
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
-        .to_lowercase()
-        .as_str()
-    {
+        .to_lowercase();
+
+    if let Ok(fmt) = FileFormat::from_file(&img_location) {
+        info!("Detected as {:?}", fmt.name());
+        if fmt.extension() != extension {
+            message_sender.map(|s|s.send(Message::Warning(format!("Extension mismatch. This image is loaded as {}", fmt.extension()))));
+            extension = fmt.extension().into()
+        }
+    } else {
+        error!("Can't determine image type")
+    }
+
+    info!("matching {extension}");
+
+    match extension.as_str() {
         "dds" => {
             let file = File::open(img_location)?;
             let mut reader = BufReader::new(file);
@@ -88,7 +102,8 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
                 jp2_image.width(),
                 jp2_image.height(),
                 jp2_image.get_pixels(Some(255))?.data,
-            ).context("Can't decode jp2k buffer")?;
+            )
+            .context("Can't decode jp2k buffer")?;
             _ = sender.send(Frame::new_still(image_buffer));
             return Ok(receiver);
         }
@@ -454,11 +469,14 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
             return Ok(receiver);
         }
         "webp" => {
-            let contents = std::fs::read(&img_location)?;
 
-            let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(contents))?;
-            if ! decoder.has_animation() {
-                let img = image::open(img_location)?;
+            debug!("Loading WebP");
+            let contents = std::fs::read(&img_location)?;
+            let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&contents))?;
+            if !decoder.has_animation() {
+                
+                //force this to webp
+                let img = image::io::Reader::with_format(std::io::Cursor::new(contents), image::ImageFormat::WebP).decode()?;
                 _ = sender.send(Frame::new_still(img.to_rgba8()));
                 return Ok(receiver);
             }
@@ -698,6 +716,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         }
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
+            debug!("Loading jpeg using turbojpeg");
             let jpeg_data = std::fs::read(img_location)?;
             let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
             let d = DynamicImage::ImageRgb8(buf);
@@ -743,7 +762,7 @@ pub fn open_image(img_location: &Path) -> Result<Receiver<Frame>> {
         },
         _ => {
             // All other supported image files are handled by using `image`
-            debug!("Loading using image library");
+            debug!("Loading using generic image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
             _ = sender.send(Frame::new_still(img.to_rgba8()));
