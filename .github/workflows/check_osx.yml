@@ -13,7 +13,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         
       - name: Check without default features
-        run: cargo check --no-default-features --features notan/glsl-to-spirv
+        run: cargo check --no-default-features --features notan/shaderc
 
       # - name: Check with build features
       #   run: cargo check --features heif
