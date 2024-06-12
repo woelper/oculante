@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 // use hashbrown::{HashMap, HashSet};
-use log::{debug, error};
+use log::{debug, error, info, warn};
 // use std::collections::HashMap;
 
 use crate::OculanteState;
@@ -132,6 +132,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
             .add_key(InputEvent::ZenMode, "Z")
             .add_key(InputEvent::DeleteFile, "Delete")
+            .add_keys(InputEvent::ClearImage, &["LShift", "Delete"])
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
@@ -265,13 +266,16 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             }
         }
     } else {
-        error!("Command not registered: '{:?}'. Inserting new.", command);
+        warn!("Command not registered: '{:?}'", command);
         // update missing shortcut
         if let Some(default_shortcut) = Shortcuts::default_keys().get(&command) {
+            info!("Inserted command: {:?}", default_shortcut);
             state
                 .persistent_settings
                 .shortcuts
                 .insert(command, default_shortcut.clone());
+        } else {
+            error!("Failed to insert command. Please report this as a bug.")
         }
     }
     false
