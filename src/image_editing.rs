@@ -868,7 +868,7 @@ impl ImageOperation {
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
-                    r0.changed = r0.drag_released() || r1.drag_released() || r2.changed();
+                    r0.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
