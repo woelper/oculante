@@ -122,8 +122,8 @@ fn main() -> Result<(), String> {
             window_config.lazy_loop = !settings.force_redraw;
             window_config.decorations = !settings.borderless;
             if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1.0 as u32;
-                window_config.height = settings.window_geometry.1.1 as u32;
+                window_config.width = settings.window_geometry.1 .0 as u32;
+                window_config.height = settings.window_geometry.1 .1 as u32;
             }
             debug!("Loaded settings.");
             if settings.zen_mode {
@@ -135,7 +135,6 @@ fn main() -> Result<(), String> {
                 window_config = window_config.set_title(&title_string);
             }
             window_config.min_size = Some(settings.min_window_size);
-
         }
         Err(e) => {
             error!("Could not load settings: {e}");
@@ -298,7 +297,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
-        ctx.options_mut(|o|o.zoom_with_keyboard = false);
+        ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         fonts
             .font_data
@@ -538,6 +537,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.send_message_info("Deleted image");
                 }
             }
+            if key_pressed(app, state, ClearImage) {
+                state.current_path = None;
+                state.current_image = None;
+                state.current_texture = None;
+                state.image_info = None;
+            }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -643,7 +648,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Drop(file) => {
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
-                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().to_lowercase().as_str()) {
+                    if SUPPORTED_EXTENSIONS
+                        .contains(&ext.to_string_lossy().to_string().to_lowercase().as_str())
+                    {
                         state.is_loaded = false;
                         state.current_image = None;
                         state.player.load(&p, state.message_channel.0.clone());
@@ -893,6 +900,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.redraw = true;
             }
             FrameSource::CompareResult => {
+                debug!("Received compare result");
+
+                // always reset if first image
+                if state.current_texture.is_none() {
+                    state.reset_image = true;
+                }
+
                 state.redraw = false;
             }
         }

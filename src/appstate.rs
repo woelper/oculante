@@ -13,7 +13,7 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ImageGeometry {
     /// The scale of the displayed image
     pub scale: f32,

@@ -28,7 +28,12 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
-use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
+use std::{
+    collections::BTreeSet,
+    ops::RangeInclusive,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 10.0;
@@ -368,30 +373,90 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
             }
             ui.collapsing("Compare", |ui| {
-                ui.vertical_centered_justified(|ui| {
-                if let Some(p) = &(state.current_path).clone() {
-                    if ui.button("Add/update current image").clicked() {
-                        state.compare_list.insert(p.clone(), state.image_geometry.clone());
-                    }
 
 
-        let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-        compare_list.sort_by(|a,b| a.0.cmp(&b.0));
-                    for (path, geo) in compare_list {
-                        if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
-                            state.image_geometry = geo.clone();
-                            state
-                                .player
-                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
-                            state.current_path = Some(path);
-                        }
-                    }
-                    if ui.button("Clear").clicked() {
-                        state.compare_list.clear();
-                    }
+                if state.persistent_settings.max_cache == 0 {
+                    ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                 }
 
-            });
+                ui.vertical_centered_justified(|ui| {
+                    if let Some(p) = &(state.current_path).clone() {
+
+                        if ui.button(&format!("{FOLDER} Open another image..."))
+                        .clicked()
+                    {
+                        #[cfg(feature = "file_open")]
+                        crate::browse_for_image_path(state);
+                        #[cfg(not(feature = "file_open"))]
+                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                    }
+
+
+
+
+
+                        // if ui.button("Add/update current image").clicked() {
+                        //     state.compare_list.insert(p.clone(), state.image_geometry.clone());
+                        // }
+
+
+                    let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
+                    compare_list.sort_by(|a,b| a.0.cmp(&b.0));
+                        for (path, geo) in compare_list {
+
+
+                            ui.horizontal(|ui|{
+
+                                if ui.button(X).clicked() {
+                                    state.compare_list.remove(&path);
+                                }
+
+
+                                ui.vertical_centered_justified(|ui| {
+
+                                    if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        state.image_geometry = geo.clone();
+                                        state
+                                            .player
+                                            .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
+                                        ui.ctx().request_repaint();
+                                        ui.ctx().request_repaint_after(Duration::from_millis(500));
+
+                                        state.current_path = Some(path);
+                                        state.image_info = None;
+                                    }
+                                });
+
+
+                            });
+
+
+                        }
+
+                        if let Some(path) = &state.current_path {
+                            if let Some(geo) = state.compare_list.get(path) {
+                                if state.image_geometry != *geo {
+                                    if ui.button(RichText::new(format!("{ARROWS_CLOCKWISE} Update position")).color(Color32::YELLOW)).clicked() {
+                                        state.compare_list.insert(p.clone(), state.image_geometry.clone());
+                                    }
+                                }
+                            } else {
+                                if ui.button(format!("{PLUS} Add current image")).clicked() {
+                                    state.compare_list.insert(p.clone(), state.image_geometry.clone());
+                                }
+                            }
+                        }
+
+                        if !state.compare_list.is_empty() {
+
+                            if ui.button(format!("{TRASH} Clear all")).clicked() {
+                                state.compare_list.clear();
+                            }
+                        }
+
+                    }
+
+                });
             });
 
             ui.collapsing("Alpha tools", |ui| {
@@ -2061,6 +2126,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui.label(format!("Loading {}", p.display()));
                 });
                 app.window().request_frame();
+            }
+        }
+
+        if state.current_texture.is_some() {
+            if tooltip(
+                unframed_button(PLACEHOLDER, ui),
+                "Clear image",
+                &lookup(&state.persistent_settings.shortcuts, &ClearImage),
+                ui,
+            )
+            .clicked()
+            {
+                state.current_path = None;
+                state.current_image = None;
+                state.current_texture = None;
+                state.image_info = None;
             }
         }
 
