@@ -507,7 +507,7 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
         }
-        "png" => {
+        "png" | "apng" => {
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
             use zune_png::PngDecoder;

@@ -234,12 +234,9 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                 if let Ok(first_img_location) = find_first_image_in_directory(location) {
                     start_img_location = Some(first_img_location);
                 }
-            } else if is_ext_compatible(location) {
+            } else {
                 // Image File with a usable extension
                 start_img_location = Some(location.clone());
-            } else {
-                // Unsupported extension
-                state.send_message_err(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
@@ -1208,6 +1205,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
         let file_dialog_result = rfd::FileDialog::new()
             .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
             .add_filter("All File Types", &["*"])
+            .add_filter("Axxx", &["*", "", "*.*"])
             .set_directory(start_directory)
             .pick_file();
         if let Some(file_path) = file_dialog_result {
