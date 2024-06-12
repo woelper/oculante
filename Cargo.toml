@@ -90,6 +90,7 @@ jpeg2k = { version = "0.7.0", optional = true, default-features = false, feature
   "file-io",
   "openjpeg-sys",
 ] }
+file-format = "0.25.0"
 
 [features]
 default = ["turbo", "avif_native", "file_open", "update", "notan/glsl-to-spirv", "j2k"]
