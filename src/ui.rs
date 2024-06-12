@@ -95,7 +95,7 @@ impl EguiExt for Ui {
                 )
                 .clicked()
             {
-                r.clicked = [true, true, true, true, true];
+                r.clicked = true;
             }
             r
         })
@@ -2211,7 +2211,7 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
                 Mouse::Error => error!("Error getting mouse position"),
             }
         }
-        if r.drag_released() {
+        if r.drag_stopped() {
             ui.ctx()
                 .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
         }
