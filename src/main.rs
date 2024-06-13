@@ -1205,7 +1205,6 @@ fn browse_for_image_path(state: &mut OculanteState) {
         let file_dialog_result = rfd::FileDialog::new()
             .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
             .add_filter("All File Types", &["*"])
-            .add_filter("Axxx", &["*", "", "*.*"])
             .set_directory(start_directory)
             .pick_file();
         if let Some(file_path) = file_dialog_result {

@@ -84,7 +84,7 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
-        "avif" => {
+        "avif" | "avifs"=> {
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
