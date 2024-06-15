@@ -28,7 +28,7 @@ exr = "1.72"
 fast_image_resize = "2.7"
 gif = "0.12"
 gif-dispose = "4"
-image = {version = "0.25.1", features = ["hdr"]}
+image = {version = "0.25.1", features = ["hdr", "jpeg", "png", "tiff"]}
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = { version = "0.11", optional = true }
@@ -91,6 +91,7 @@ jpeg2k = { version = "0.7.0", optional = true, default-features = false, feature
   "openjpeg-sys",
 ] }
 file-format = "0.25.0"
+egui_extras = { version = "0.27.2", features = ["image", "file"] }
 
 [features]
 default = ["turbo", "avif_native", "file_open", "update", "notan/glsl-to-spirv", "j2k"]

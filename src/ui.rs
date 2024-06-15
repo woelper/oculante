@@ -2222,14 +2222,38 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             ui.menu_button("Recent", |ui| {
-                for r in &state.persistent_settings.recent_images.clone() {
-                    if let Some(filename) = r.file_name() {
-                        if ui.button(filename.to_string_lossy()).clicked() {
-                            load_image_from_path(r, state);
-                            ui.close_menu();
+                ui.allocate_ui_at_rect(
+                    Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::new(ui.ctx().screen_rect().width() * 0.7, 300.)),
+                    |ui| {
+                        for r in &state.persistent_settings.recent_images.clone() {
+
+                            ui.horizontal(|ui| {
+                                ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
+                                if let Some(filename) = r.file_name() {
+                                    if ui.button(filename.to_string_lossy()).clicked() {
+                                        load_image_from_path(r, state);
+                                        ui.close_menu();
+                                    }
+                                }
+
+                            });
+
+
                         }
-                    }
-                }
+                    },
+                );
+
+                // let r = ui.allocate_rect(Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::splat(300.)), Sense::click());
+                // for r in &state.persistent_settings.recent_images.clone() {
+                //     if let Some(filename) = r.file_name() {
+                //         if ui.button(filename.to_string_lossy()).clicked() {
+                //             load_image_from_path(r, state);
+                //             ui.close_menu();
+                //         }
+                //     }
+                // }
+
+                // ui.put(Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::splat(300.)), egui::Button::new("sd"));
             });
 
             if ui.button("Quit").clicked() {
