@@ -48,6 +48,9 @@ jobs:
     - uses: actions/checkout@v2
     - uses: ilammy/setup-nasm@v1
 
+    - name: Install latest rust
+      run: rustup update
+
     - name: Install cargo cross
       run: cargo install cross
       if: matrix.os == 'ubuntu-latest'
