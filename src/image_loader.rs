@@ -46,7 +46,9 @@ pub fn open_image(
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
-        if fmt.extension().replace("apng", "png") != extension {
+        if fmt.extension()
+            .replace("tif", "tiff")
+            .replace("apng", "png") != extension {
             message_sender.map(|s| {
                 s.send(Message::Warning(format!(
                     "Extension mismatch. This image is loaded as {}",
