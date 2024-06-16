@@ -40,18 +40,13 @@ pub fn open_image(
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
-        .to_lowercase();
+        .to_lowercase()
+        .replace("tif", "tiff")
+        .replace("jpeg", "jpg");
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
-        info!("Detected as {:?}", fmt.name());
-        // todo jpeg
-        if fmt
-            .extension()
-            .replace("jpeg", "jpg")
-            .replace("tiff", "tif")
-            .replace("apng", "png")
-            != extension
-        {
+        debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
+        if fmt.extension().replace("apng", "png") != extension {
             message_sender.map(|s| {
                 s.send(Message::Warning(format!(
                     "Extension mismatch. This image is loaded as {}",
@@ -64,7 +59,7 @@ pub fn open_image(
         error!("Can't determine image type")
     }
 
-    info!("matching {extension}");
+    debug!("matching {extension}");
 
     match extension.as_str() {
         "dds" => {
