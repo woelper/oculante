@@ -718,6 +718,7 @@ pub fn prev_image(state: &mut OculanteState) {
     }
 }
 
+#[cfg(feature = "recent_images")]
 pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
     state.is_loaded = false;
     state.player.load(p, state.message_channel.0.clone());

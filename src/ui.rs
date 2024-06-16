@@ -8,11 +8,15 @@ use crate::{
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
-        load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
-        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+        next_image, prev_image, send_extended_info, set_title, solo_channel, toggle_fullscreen,
+        unpremult, ColorChannel, ImageExt,
     },
     FrameSource,
 };
+
+#[cfg(feature = "recent_images")]
+use crate::utils::load_image_from_path;
+
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
@@ -2200,6 +2204,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
+            #[cfg(feature = "recent_images")]
             ui.menu_button("Recent", |ui| {
                 for r in &state.persistent_settings.recent_images.clone() {
                     if let Some(filename) = r.file_name() {

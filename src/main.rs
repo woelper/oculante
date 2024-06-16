@@ -820,6 +820,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
             // debug!("{:#?} from {}", &state.scrubber, p.display());
+            #[cfg(feature = "recent_images")]
             if !state.persistent_settings.recent_images.contains(p) {
                 state.persistent_settings.recent_images.insert(0, p.clone());
                 state.persistent_settings.recent_images.truncate(10);

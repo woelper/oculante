@@ -39,6 +39,7 @@ pub struct PersistentSettings {
     /// Whether to keep the image edit stack
     pub keep_edits: bool,
     pub favourite_images: HashSet<PathBuf>,
+    #[cfg(feature = "recent_images")]
     pub recent_images: Vec<PathBuf>,
     pub title_format: String,
     pub info_enabled: bool,
@@ -75,6 +76,7 @@ impl Default for PersistentSettings {
             wrap_folder: true,
             keep_edits: Default::default(),
             favourite_images: Default::default(),
+            #[cfg(feature = "recent_images")]
             recent_images: Default::default(),
             title_format: "{APP} | {VERSION} | {FULLPATH}".into(),
             info_enabled: Default::default(),
