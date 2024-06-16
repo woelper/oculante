@@ -382,28 +382,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.vertical_centered_justified(|ui| {
                     if let Some(p) = &(state.current_path).clone() {
 
-                        if ui.button(&format!("{FOLDER} Open another image..."))
-                        .clicked()
-                    {
-                        #[cfg(feature = "file_open")]
-                        crate::browse_for_image_path(state);
-                        #[cfg(not(feature = "file_open"))]
-                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
-                    }
-
-
-
-
-
-                        // if ui.button("Add/update current image").clicked() {
-                        //     state.compare_list.insert(p.clone(), state.image_geometry.clone());
-                        // }
-
+                        if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
+                            #[cfg(feature = "file_open")]
+                            crate::browse_for_image_path(state);
+                            #[cfg(not(feature = "file_open"))]
+                            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                        }
 
                     let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
                     compare_list.sort_by(|a,b| a.0.cmp(&b.0));
                         for (path, geo) in compare_list {
-
 
                             ui.horizontal(|ui|{
 
@@ -411,9 +399,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     state.compare_list.remove(&path);
                                 }
 
-
                                 ui.vertical_centered_justified(|ui| {
-
                                     if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                                         state.image_geometry = geo.clone();
                                         state
@@ -421,16 +407,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                             .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
                                         ui.ctx().request_repaint();
                                         ui.ctx().request_repaint_after(Duration::from_millis(500));
-
                                         state.current_path = Some(path);
                                         state.image_info = None;
                                     }
                                 });
 
-
                             });
-
-
                         }
 
                         if let Some(path) = &state.current_path {
@@ -448,14 +430,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         }
 
                         if !state.compare_list.is_empty() {
-
                             if ui.button(format!("{TRASH} Clear all")).clicked() {
                                 state.compare_list.clear();
                             }
                         }
-
                     }
-
                 });
             });
 

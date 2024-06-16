@@ -96,7 +96,7 @@ pub fn open_image(
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
-        "avif" => {
+        "avif" | "avifs" => {
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
@@ -521,7 +521,7 @@ pub fn open_image(
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
         }
-        "png" => {
+        "png" | "apng" => {
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
             use zune_png::PngDecoder;
