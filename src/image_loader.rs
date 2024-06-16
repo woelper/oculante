@@ -40,11 +40,15 @@ pub fn open_image(
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
-        .to_lowercase();
+        .to_lowercase()
+        .replace("tif", "tiff")
+        .replace("jpeg", "jpg");
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
-        info!("Detected as {:?}", fmt.name());
-        if fmt.extension() != extension {
+        debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
+        if fmt.extension()
+            .replace("tif", "tiff")
+            .replace("apng", "png") != extension {
             message_sender.map(|s| {
                 s.send(Message::Warning(format!(
                     "Extension mismatch. This image is loaded as {}",
@@ -57,7 +61,7 @@ pub fn open_image(
         error!("Can't determine image type")
     }
 
-    info!("matching {extension}");
+    debug!("matching {extension}");
 
     match extension.as_str() {
         "dds" => {
@@ -92,7 +96,7 @@ pub fn open_image(
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
-        "avif" => {
+        "avif" | "avifs" => {
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
@@ -517,7 +521,7 @@ pub fn open_image(
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
         }
-        "png" => {
+        "png" | "apng" => {
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
             use zune_png::PngDecoder;

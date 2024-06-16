@@ -433,7 +433,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             state.compare_list.clear();
                         }
                     }
-
                 });
             });
 
@@ -560,7 +559,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     ui.end_row();
 
                     if ui
-                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundary")
+                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
                     .on_hover_text(
                         "When you move past the first or last image in a folder, should oculante continue or stop?",
                     )
@@ -569,12 +568,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
                 }
                 ui.horizontal(|ui| {
-                    ui.label("Number of image to cache");
+                    ui.label("Number of images to cache");
                     if ui
                     .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
 
                     .on_hover_text(
-                        "Keep this many images in memory for faster opening.",
+                        "Keeps this many images in memory for faster opening.",
                     )
                     .changed()
                 {
@@ -611,7 +610,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
                     set_title(app, state);
                 }
-                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires restart. Turn off optimisations and redraw everything each frame. This will consume more CPU but give you instant feedback, for example if new images come in or modifications are made.").changed(){
+                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires a restart. Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback, for example if new images come in or if modifications are made.").changed(){
                     app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
                 }
 
@@ -627,7 +626,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     }
                 }
 
-                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, fir the image with it?");
+                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
