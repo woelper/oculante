@@ -667,6 +667,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    #[allow(unused)]
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
     }

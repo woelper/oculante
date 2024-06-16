@@ -234,12 +234,9 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
                 if let Ok(first_img_location) = find_first_image_in_directory(location) {
                     start_img_location = Some(first_img_location);
                 }
-            } else if is_ext_compatible(location) {
+            } else {
                 // Image File with a usable extension
                 start_img_location = Some(location.clone());
-            } else {
-                // Unsupported extension
-                state.send_message_err(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
             }
         } else {
             // Not a valid path, or user doesn't have permission to access?
