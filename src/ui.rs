@@ -1,6 +1,6 @@
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
-    clipboard_to_image,
+    clipboard_to_image, delete_file,
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -1985,7 +1985,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_path.is_some() {
+        if state.scrubber.len() > 1 {
+            // TODO: Check if wrap is off and we are at fisrt image
             if tooltip(
                 unframed_button(CARET_LEFT, ui),
                 "Previous image",
@@ -1996,6 +1997,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             {
                 prev_image(state)
             }
+            // TODO: Check if wrap is off and we are at last image
             if tooltip(
                 unframed_button(CARET_RIGHT, ui),
                 "Next image",
@@ -2079,7 +2081,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().set_always_on_top(state.always_on_top);
         }
 
-        if let Some(p) = &state.current_path {
+        if state.current_path.is_some() {
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -2088,19 +2090,20 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                _ = trash::delete(p);
-                state.send_message_info(&format!(
-                    "Deleted {}",
-                    p.file_name()
-                        .map(|f| f.to_string_lossy().to_string())
-                        .unwrap_or_default()
-                ));
+                delete_file(state);
             }
 
             if !state.is_loaded {
                 ui.horizontal(|ui| {
                     ui.add(egui::Spinner::default());
-                    ui.label(format!("Loading {}", p.display()));
+                    ui.label(format!(
+                        "Loading {}",
+                        state
+                            .current_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                    ));
                 });
                 app.window().request_frame();
             }
@@ -2115,7 +2118,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                state.current_path = None;
+                // state.current_path = None;
+                state.scrubber.remove_current();
                 state.current_image = None;
                 state.current_texture = None;
                 state.image_info = None;

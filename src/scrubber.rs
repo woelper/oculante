@@ -20,6 +20,11 @@ impl Scrubber {
             wrap: true,
         }
     }
+
+    pub fn has_next(&self) -> bool {
+        self.entries.len() > self.index
+    }
+
     pub fn next(&mut self) -> PathBuf {
         self.index += 1;
         if self.index > self.entries.len().saturating_sub(1) {
@@ -29,6 +34,20 @@ impl Scrubber {
                 self.index = self.entries.len().saturating_sub(1);
             }
         }
+        // debug!("{:?}", self.entries.get(self.index));
+        self.entries.get(self.index).cloned().unwrap_or_default()
+    }
+
+    pub fn remove_current(&mut self) -> PathBuf {
+        self.entries.remove(self.index);
+        self.index += 1;
+        // if self.index > self.entries.len().saturating_sub(1) {
+        //     if self.wrap {
+        //         self.index = 0;
+        //     } else {
+        //         self.index = self.entries.len().saturating_sub(1);
+        //     }
+        // }
         // debug!("{:?}", self.entries.get(self.index));
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
@@ -53,8 +72,15 @@ impl Scrubber {
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
-    pub fn len(&mut self) -> usize {
+    pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn has_folder_changed(&self, path_to_check: &Path) -> bool {
+        self.entries
+            .get(0)
+            .map(|e| e.parent() != path_to_check.parent())
+            .unwrap_or(true)
     }
 }
 

@@ -497,14 +497,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, NextImage) {
-                if state.is_loaded {
-                    next_image(state)
-                }
+                next_image(state)
             }
             if key_pressed(app, state, PreviousImage) {
-                if state.is_loaded {
-                    prev_image(state)
-                }
+                prev_image(state)
             }
             if key_pressed(app, state, FirstImage) {
                 first_image(state)
@@ -527,12 +523,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
             if key_pressed(app, state, DeleteFile) {
-                if let Some(p) = &state.current_path {
-                    _ = trash::delete(p);
-                    state.send_message_info("Deleted image");
-                }
+                delete_file(state);
             }
             if key_pressed(app, state, ClearImage) {
                 state.current_path = None;
@@ -806,7 +798,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer: {:?}", img.dimensions());
+        debug!(
+            "Received image buffer: {:?}, type: {:?}",
+            img.dimensions(),
+            frame.source
+        );
         state.image_geometry.dimensions = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
@@ -814,16 +810,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         set_title(app, state);
 
-        // fill image sequence
-        if let Some(p) = &state.current_path {
-            state.scrubber = scrubber::Scrubber::new(p);
-            state.scrubber.wrap = state.persistent_settings.wrap_folder;
-
-            // debug!("{:#?} from {}", &state.scrubber, p.display());
-            if !state.persistent_settings.recent_images.contains(p) {
-                state.persistent_settings.recent_images.insert(0, p.clone());
-                state.persistent_settings.recent_images.truncate(10);
+        match frame.source {
+            FrameSource::AnimationStart | FrameSource::Still => {
+                if let Some(p) = &state.current_path {
+                    if state.scrubber.has_folder_changed(&p) {
+                        debug!("Folder has changed, creating new scrubber");
+                        state.scrubber = scrubber::Scrubber::new(p);
+                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                    }
+                    if !state.persistent_settings.recent_images.contains(p) {
+                        state.persistent_settings.recent_images.insert(0, p.clone());
+                        state.persistent_settings.recent_images.truncate(10);
+                    }
+                }
             }
+            _ => {}
         }
 
         match frame.source {
@@ -848,9 +849,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if !state.persistent_settings.keep_edits {
                     state.edit_state = Default::default();
-                } else {
-                    state.edit_state.result_pixel_op = Default::default();
-                    state.edit_state.result_image_op = Default::default();
+                    state.persistent_settings.edit_enabled = false;
+                    state.edit_state = Default::default();
                 }
 
                 // Load edit information if any
@@ -880,6 +880,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 }
                             }
                         }
+                    } else {
                     }
                 }
                 state.redraw = false;
