@@ -41,30 +41,36 @@ pub fn open_image(
         .to_str()
         .unwrap_or_default()
         .to_lowercase()
-        .replace("tif", "tiff")
+        .replace("tiff", "tif")
         .replace("jpeg", "jpg");
+
+    let unchecked_extensions = ["svg"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
         if fmt
             .extension()
-            .replace("tif", "tiff")
+            .replace("tiff", "tif")
             .replace("apng", "png")
             != extension
         {
-            message_sender.map(|s| {
-                s.send(Message::Warning(format!(
-                    "Extension mismatch. This image is loaded as {}",
-                    fmt.extension()
-                )))
-            });
-            extension = fmt.extension().into()
+            if unchecked_extensions.contains(&extension.as_str()) {
+                info!("Extension {extension} skipped check.")
+            } else {
+                message_sender.map(|s| {
+                    s.send(Message::Warning(format!(
+                        "Extension mismatch. This image is loaded as {}",
+                        fmt.extension()
+                    )))
+                });
+                extension = fmt.extension().into()
+            }
         }
     } else {
         error!("Can't determine image type")
     }
 
-    debug!("matching {extension}");
+    debug!("matching '{extension}'");
 
     match extension.as_str() {
         "dds" => {
