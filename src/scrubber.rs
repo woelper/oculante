@@ -64,10 +64,9 @@ impl Scrubber {
     pub fn remove_current(&mut self) -> PathBuf {
         self.entries.remove(self.index);
         match self.direction {
-            Direction::Forward => self.index += 1,
-            Direction::Backward => self.index -= 1,
+            Direction::Forward => self.next(),
+            Direction::Backward => self.prev(),
         }
-        self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
     pub fn set(&mut self, index: usize) -> PathBuf {
