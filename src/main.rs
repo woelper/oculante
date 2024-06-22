@@ -809,14 +809,21 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match frame.source {
             FrameSource::AnimationStart | FrameSource::Still => {
-                if let Some(p) = &state.current_path {
-                    if state.scrubber.has_folder_changed(&p) {
+                if let Some(path) = &state.current_path {
+                    if state.scrubber.has_folder_changed(&path) {
                         debug!("Folder has changed, creating new scrubber");
-                        state.scrubber = scrubber::Scrubber::new(p);
+                        state.scrubber = scrubber::Scrubber::new(path);
                         state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                    } else {
+                        let index = state.scrubber.entries.iter().position(|p| p == path).unwrap_or_default();
+                        if index < state.scrubber.entries.len() {
+                            state.scrubber.index = index;
+                        }
+
                     }
-                    if !state.persistent_settings.recent_images.contains(p) {
-                        state.persistent_settings.recent_images.insert(0, p.clone());
+
+                    if !state.persistent_settings.recent_images.contains(path) {
+                        state.persistent_settings.recent_images.insert(0, path.clone());
                         state.persistent_settings.recent_images.truncate(10);
                     }
                 }
