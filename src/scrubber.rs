@@ -37,13 +37,15 @@ impl Scrubber {
     /// Move scrubber forward
     pub fn next(&mut self) -> PathBuf {
         self.index += 1;
-        if self.index > self.entries.len().saturating_sub(1) {
+        if self.index == self.entries.len() {
             if self.wrap {
                 self.index = 0;
             } else {
-                self.index = self.entries.len().saturating_sub(1);
+                self.index = self.entries.len() - 1;
             }
         }
+
+        debug!("Next image in scrubber. Index is now {}", self.index);
         self.direction = Direction::Forward;
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
@@ -57,14 +59,20 @@ impl Scrubber {
         } else {
             self.index = self.index.saturating_sub(1);
         }
+        debug!("Next image in scrubber. Index is now {}", self.index);
+
         self.direction = Direction::Backward;
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
     pub fn remove_current(&mut self) -> PathBuf {
+        debug!("Removing index {}", self.index);
         self.entries.remove(self.index);
         match self.direction {
-            Direction::Forward => self.next(),
+            Direction::Forward => {
+                self.index = self.index.saturating_sub(1);
+                self.next()
+            }
             Direction::Backward => self.prev(),
         }
     }
