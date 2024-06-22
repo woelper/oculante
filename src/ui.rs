@@ -1,17 +1,9 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState},
-    clipboard_to_image, delete_file,
-    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
-    paint::PaintStroke,
-    set_zoom,
-    settings::{set_system_theme, ColorTheme},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
-    utils::{
+    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    },
-    FrameSource,
+    }, FrameSource
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -2118,16 +2110,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                // state.current_path = None;
-                state.scrubber.remove_current();
-                state.current_image = None;
-                state.current_texture = None;
-                state.image_info = None;
+                clear_image(state);
             }
         }
-
         drag_area(ui, state, app);
-
         ui.add_space(ui.available_width() - 32.);
         draw_hamburger_menu(ui, state, app);
     });

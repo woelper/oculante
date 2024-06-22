@@ -114,22 +114,7 @@ pub fn delete_file(state: &mut OculanteState) {
         // remove from cache so we don't suceed to load it agaim
         state.player.cache.data.remove(p);
     }
-    // state.scrubber.remove_current();
-    // state.
-    // TODO dlete function, remove function. Make delete work on Netbsd
-    // delete needs confirg
-
-    clear_file(state);
-}
-
-pub fn clear_file(state: &mut OculanteState) {
-    state.scrubber.remove_current();
-    state.current_image = None;
-    state.current_texture = None;
-    state.image_info = None;
-    state.edit_state.result_image_op = Default::default();
-    state.edit_state.result_pixel_op = Default::default();
-    state.current_path = None;
+    clear_image(state);
 }
 
 impl ExtendedImageInfo {
@@ -774,6 +759,19 @@ pub fn first_image(state: &mut OculanteState) {
                 .player
                 .load(img_location, state.message_channel.0.clone());
         }
+    }
+}
+
+/// clear the current image
+pub fn clear_image(state: &mut OculanteState) {
+    let next_img = state.scrubber.remove_current();
+    // prevent reload if at last or first
+    if Some(&next_img) != state.current_path.as_ref() {
+        state.is_loaded = false;
+        state.current_path = Some(next_img.clone());
+        state
+            .player
+            .load(&next_img, state.message_channel.0.clone());
     }
 }
 

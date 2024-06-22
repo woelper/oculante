@@ -527,10 +527,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 delete_file(state);
             }
             if key_pressed(app, state, ClearImage) {
-                state.current_path = None;
-                state.current_image = None;
-                state.current_texture = None;
-                state.image_info = None;
+                clear_image(state);
             }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
