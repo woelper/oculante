@@ -1,9 +1,17 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
+    appstate::{ImageGeometry, Message, OculanteState},
+    clear_image, clipboard_to_image, delete_file,
+    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    set_zoom,
+    settings::{set_system_theme, ColorTheme},
+    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }, FrameSource
+    },
+    FrameSource,
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -507,11 +515,17 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                             ColorTheme::System =>
                                 set_system_theme(ctx),
                         }
+                        // Switching theme resets accent color, set it again
+                        let mut style: egui::Style = (*ctx.style()).clone();
+                        style.visuals.selection.bg_fill = Color32::from_rgb(
+                            state.persistent_settings.accent_color[0],
+                            state.persistent_settings.accent_color[1],
+                            state.persistent_settings.accent_color[2],
+                        );
+                        ctx.set_style(style);
                     }
                 }
                 );
-
-
 
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
