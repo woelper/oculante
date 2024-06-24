@@ -1,6 +1,6 @@
 use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
-use log::debug;
+use log::{debug, warn};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -67,13 +67,18 @@ impl Scrubber {
 
     pub fn remove_current(&mut self) -> PathBuf {
         debug!("Removing index {}", self.index);
-        self.entries.remove(self.index);
-        match self.direction {
-            Direction::Forward => {
-                self.index = self.index.saturating_sub(1);
-                self.next()
+        if self.entries.get(self.index).is_some() {
+            self.entries.remove(self.index);
+            match self.direction {
+                Direction::Forward => {
+                    self.index = self.index.saturating_sub(1);
+                    self.next()
+                }
+                Direction::Backward => self.prev(),
             }
-            Direction::Backward => self.prev(),
+        } else {
+            warn!("This index can't be removed.");
+            Default::default()
         }
     }
 

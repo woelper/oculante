@@ -185,19 +185,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
-    // #[cfg(target_os = "windows")]
-    let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
-
-    // #[cfg(not(target_os = "windows"))]
-    // let maybe_img_location = matches
-    //     .value_of("INPUT")
-    //     .map(Uri::parse)
-    //     .and_then(|uri_result| {
-    //         uri_result
-    //             .ok()
-    //             .map(|uri| PathBuf::from(uri.path().as_str()))
-    //     });
-
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
         // current_path: maybe_img_location.cloned(/),
@@ -222,35 +209,31 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         gfx.limits().max_texture_size,
     );
 
+    let maybe_img_location = matches
+        .value_of("INPUT")
+        .map(PathBuf::from)
+        .map(|p| p.canonicalize().map_err(|e| error!("{e}")).ok())
+        .flatten();
+
     debug!("Image is: {:?}", maybe_img_location);
 
     if let Some(ref location) = maybe_img_location {
-        // Check if path is a directory or a file (and that it even exists)
-        let mut start_img_location: Option<PathBuf> = None;
-
-        if let Ok(maybe_location_metadata) = location.metadata() {
-            if maybe_location_metadata.is_dir() {
-                // Folder - Pick first image from the folder...
-                if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                    start_img_location = Some(first_img_location);
-                }
-            } else {
-                // Image File with a usable extension
-                start_img_location = Some(location.clone());
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state
+                    .player
+                    .load(&first_img_location, state.message_channel.0.clone());
             }
         } else {
-            // Not a valid path, or user doesn't have permission to access?
-            state.send_message_err(&format!("ERROR: Can't open file: {}", location.display()));
-        }
-
-        // Assign image path if we have a valid one here
-        if let Some(img_location) = start_img_location {
             state.is_loaded = false;
-            state.current_path = Some(img_location.clone());
+            state.current_path = Some(location.clone());
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
+                .load(&location, state.message_channel.0.clone());
+        };
     }
 
     if matches.contains_id("stdin") {
@@ -815,15 +798,22 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         state.scrubber = scrubber::Scrubber::new(path);
                         state.scrubber.wrap = state.persistent_settings.wrap_folder;
                     } else {
-                        let index = state.scrubber.entries.iter().position(|p| p == path).unwrap_or_default();
+                        let index = state
+                            .scrubber
+                            .entries
+                            .iter()
+                            .position(|p| p == path)
+                            .unwrap_or_default();
                         if index < state.scrubber.entries.len() {
                             state.scrubber.index = index;
                         }
-
                     }
 
                     if !state.persistent_settings.recent_images.contains(path) {
-                        state.persistent_settings.recent_images.insert(0, path.clone());
+                        state
+                            .persistent_settings
+                            .recent_images
+                            .insert(0, path.clone());
                         state.persistent_settings.recent_images.truncate(10);
                     }
                 }
