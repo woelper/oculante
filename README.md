@@ -21,6 +21,7 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 - SIMD-accelerated image editing
 
+[![](https://dcbadge.limes.pink/api/server/https://discord.gg/2Q6cF5ZWe7)](https://discord.gg/https://discord.gg/2Q6cF5ZWe7)
 ---
 [![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
 [![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
@@ -30,7 +31,6 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
-
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
 ## Flipbook
