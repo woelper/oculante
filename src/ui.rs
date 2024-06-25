@@ -31,7 +31,7 @@ use notan::{
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 use strum::IntoEnumIterator;
@@ -2222,26 +2222,36 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             ui.menu_button("Recent", |ui| {
-                ui.allocate_ui_at_rect(
-                    Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::new(ui.ctx().screen_rect().width() * 0.7, 300.)),
-                    |ui| {
-                        for r in &state.persistent_settings.recent_images.clone() {
+                let mut r = ui.available_rect_before_wrap();
 
-                            ui.horizontal(|ui| {
-                                ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
-                                if let Some(filename) = r.file_name() {
-                                    if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(r, state);
-                                        ui.close_menu();
-                                    }
-                                }
-
-                            });
-
-
-                        }
-                    },
+                // r.extend_with_x(r.left() - 200.);
+                let recent_rect = Rect::from_center_size(
+                    ui.ctx().screen_rect().center(),
+                    Vec2::new(ui.ctx().screen_rect().width() * 0.7, 300.),
                 );
+
+                let recent_rect = Rect::from_two_pos(
+                    Pos2::new(r.left_bottom().x - 300., r.left_top().y + 300.),
+                    r.left_bottom(),
+                );
+
+                ui.ctx().debug_painter().rect(r, Rounding::ZERO, Color32::RED, Stroke::NONE);
+
+                // let recent_rect = Rect::everything_left_of(r.left());
+                ui.allocate_ui_at_rect(r, |ui| {
+                    for r in &state.persistent_settings.recent_images.clone() {
+                        ui.horizontal(|ui| {
+                            render_file_icon(&r, ui);
+                            // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
+                            if let Some(filename) = r.file_name() {
+                                if ui.button(filename.to_string_lossy()).clicked() {
+                                    load_image_from_path(r, state);
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                    }
+                });
 
                 // let r = ui.allocate_rect(Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::splat(300.)), Sense::click());
                 // for r in &state.persistent_settings.recent_images.clone() {
@@ -2321,4 +2331,22 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
                 .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
         }
     }
+}
+pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
+    let size = 30.;
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
+    ui.painter()
+        .rect_filled(rect, Rounding::same(size / 4.), Color32::LIGHT_BLUE);
+    ui.painter().text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        icon_path
+            .extension()
+            .map(|e| e.to_string_lossy().to_string().to_uppercase())
+            .unwrap_or_default(),
+        FontId::proportional(10.),
+        Color32::BLACK,
+    );
+    // ui.add(egui::Label::new(""))
+    response
 }
