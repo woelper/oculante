@@ -44,6 +44,7 @@ fn net() {
 }
 
 #[test]
+#[allow(unreachable_code)]
 fn bench_load_large() {
     #[cfg(debug_assertions)]
     panic!("This test needs release mode to pass.");
