@@ -160,7 +160,12 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
     let matches = Command::new("Oculante")
-        .arg(Arg::new("INPUT").help("Display this image").index(1))
+        .arg(
+            Arg::new("INPUT")
+                .help("Display this image")
+                .multiple_values(true), // .index(1)
+                                        // )
+        )
         .arg(
             Arg::new("l")
                 .short('l')
@@ -209,15 +214,24 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         gfx.limits().max_texture_size,
     );
 
-    let maybe_img_location = matches
-        .value_of("INPUT")
+    debug!("matches {:?}", matches);
+
+
+    let paths_to_open = matches
+        .get_many("INPUT")
+        .unwrap_or_default()
+        .cloned()
+        .collect::<Vec<String>>()
+        .into_iter()
         .map(PathBuf::from)
-        .map(|p| p.canonicalize().map_err(|e| error!("{e}")).ok())
-        .flatten();
+        .collect::<Vec<_>>();
 
-    debug!("Image is: {:?}", maybe_img_location);
+    debug!("Image is: {:?}", paths_to_open);
 
-    if let Some(ref location) = maybe_img_location {
+    if paths_to_open.len() == 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be tested already that exactly one argument was passed.");
         if location.is_dir() {
             // Folder - Pick first image from the folder...
             if let Ok(first_img_location) = find_first_image_in_directory(location) {
@@ -229,11 +243,38 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             }
         } else {
             state.is_loaded = false;
-            state.current_path = Some(location.clone());
+            state.current_path = Some(location.clone().clone());
             state
                 .player
                 .load(&location, state.message_channel.0.clone());
         };
+    }
+
+    if paths_to_open.len() > 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be verified already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state.player.load_advanced(
+                    &first_img_location,
+                    Some(FrameSource::ImageCollectionMember),
+                    state.message_channel.0.clone(),
+                );
+            }
+        } else {
+            state.is_loaded = false;
+            state.current_path = Some(location.clone().clone());
+            state.player.load_advanced(
+                &location,
+                Some(FrameSource::ImageCollectionMember),
+                state.message_channel.0.clone(),
+            );
+        };
+        state.scrubber.entries = paths_to_open.clone();
     }
 
     if matches.contains_id("stdin") {
@@ -790,7 +831,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         set_title(app, state);
 
-        match frame.source {
+        match &frame.source {
             FrameSource::AnimationStart | FrameSource::Still => {
                 if let Some(path) = &state.current_path {
                     if state.scrubber.has_folder_changed(&path) {
@@ -808,7 +849,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             state.scrubber.index = index;
                         }
                     }
+                }
+            }
+            _ => {}
+        }
 
+        match &frame.source {
+            FrameSource::AnimationStart
+            | FrameSource::Still
+            | FrameSource::ImageCollectionMember => {
+                if let Some(path) = &state.current_path {
                     if !state.persistent_settings.recent_images.contains(path) {
                         state
                             .persistent_settings
@@ -822,7 +872,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         match frame.source {
-            FrameSource::Still => {
+            FrameSource::Still | FrameSource::ImageCollectionMember => {
                 debug!("Received still");
                 state.edit_state.result_image_op = Default::default();
                 state.edit_state.result_pixel_op = Default::default();
@@ -874,7 +924,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                 }
                             }
                         }
-                    } else {
                     }
                 }
                 state.redraw = false;

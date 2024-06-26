@@ -418,6 +418,8 @@ pub enum FrameSource {
     Still,
     EditResult,
     CompareResult,
+    ///A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
+    ImageCollectionMember,
 }
 
 /// A single frame
