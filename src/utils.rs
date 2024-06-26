@@ -94,6 +94,29 @@ pub struct ExtendedImageInfo {
     pub name: String,
 }
 
+pub fn delete_file(state: &mut OculanteState) {
+    if let Some(p) = &state.current_path {
+        #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
+        {
+            _ = trash::delete(p);
+        }
+        #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
+        {
+            _ = std::fs::remove_file(p)
+        }
+
+        state.send_message_info(&format!(
+            "Deleted {}",
+            p.file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default()
+        ));
+        // remove from cache so we don't suceed to load it agaim
+        state.player.cache.data.remove(p);
+    }
+    clear_image(state);
+}
+
 impl ExtendedImageInfo {
     pub fn with_exif(&mut self, image_path: &Path) -> Result<()> {
         self.name = image_path.to_string_lossy().to_string();
@@ -395,6 +418,8 @@ pub enum FrameSource {
     Still,
     EditResult,
     CompareResult,
+    ///A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
+    ImageCollectionMember,
 }
 
 /// A single frame
@@ -629,6 +654,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    #[allow(unused)]
     fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
         unimplemented!()
     }
@@ -703,20 +729,6 @@ pub fn clipboard_copy(img: &RgbaImage) {
     }
 }
 
-pub fn prev_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.prev();
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
-        }
-    }
-}
-
 pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
     state.is_loaded = false;
     state.player.load(p, state.message_channel.0.clone());
@@ -752,17 +764,48 @@ pub fn first_image(state: &mut OculanteState) {
     }
 }
 
+/// clear the current image
+pub fn clear_image(state: &mut OculanteState) {
+    let next_img = state.scrubber.remove_current();
+    debug!("Clearing image. Next is {}", next_img.display());
+    if state.scrubber.entries.len() == 0 {
+        state.current_image = None;
+        state.current_texture = None;
+        state.current_path = None;
+        state.image_info = None;
+        return;
+    }
+    // prevent reload if at last or first
+    if Some(&next_img) != state.current_path.as_ref() {
+        state.is_loaded = false;
+        state.current_path = Some(next_img.clone());
+        state
+            .player
+            .load(&next_img, state.message_channel.0.clone());
+    }
+}
+
 pub fn next_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.next();
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
-        }
+    let next_img = state.scrubber.next();
+    // prevent reload if at last or first
+    if Some(&next_img) != state.current_path.as_ref() {
+        state.is_loaded = false;
+        state.current_path = Some(next_img.clone());
+        state
+            .player
+            .load(&next_img, state.message_channel.0.clone());
+    }
+}
+
+pub fn prev_image(state: &mut OculanteState) {
+    let prev_img = state.scrubber.prev();
+    // prevent reload if at last or first
+    if Some(&prev_img) != state.current_path.as_ref() {
+        state.is_loaded = false;
+        state.current_path = Some(prev_img.clone());
+        state
+            .player
+            .load(&prev_img, state.message_channel.0.clone());
     }
 }
 

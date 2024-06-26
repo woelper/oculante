@@ -9,7 +9,7 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, Rgb32FImage, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
@@ -26,7 +26,10 @@ use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
 
 /// Open an image from disk and send it somewhere
-pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) -> Result<Receiver<Frame>> {
+pub fn open_image(
+    img_location: &Path,
+    message_sender: Option<Sender<Message>>,
+) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
 
@@ -37,19 +40,37 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
-        .to_lowercase();
+        .to_lowercase()
+        .replace("tiff", "tif")
+        .replace("jpeg", "jpg");
+
+    let unchecked_extensions = ["svg"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
-        info!("Detected as {:?}", fmt.name());
-        if fmt.extension() != extension {
-            message_sender.map(|s|s.send(Message::Warning(format!("Extension mismatch. This image is loaded as {}", fmt.extension()))));
-            extension = fmt.extension().into()
+        debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
+        if fmt
+            .extension()
+            .replace("tiff", "tif")
+            .replace("apng", "png")
+            != extension
+        {
+            if unchecked_extensions.contains(&extension.as_str()) {
+                info!("Extension {extension} skipped check.")
+            } else {
+                message_sender.map(|s| {
+                    s.send(Message::Warning(format!(
+                        "Extension mismatch. This image is loaded as {}",
+                        fmt.extension()
+                    )))
+                });
+                extension = fmt.extension().into()
+            }
         }
     } else {
         error!("Can't determine image type")
     }
 
-    info!("matching {extension}");
+    debug!("matching '{extension}'");
 
     match extension.as_str() {
         "dds" => {
@@ -84,7 +105,7 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
-        "avif" => {
+        "avif" | "avifs" => {
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
@@ -469,14 +490,16 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
             return Ok(receiver);
         }
         "webp" => {
-
             debug!("Loading WebP");
             let contents = std::fs::read(&img_location)?;
             let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&contents))?;
             if !decoder.has_animation() {
-                
                 //force this to webp
-                let img = image::io::Reader::with_format(std::io::Cursor::new(contents), image::ImageFormat::WebP).decode()?;
+                let img = image::io::Reader::with_format(
+                    std::io::Cursor::new(contents),
+                    image::ImageFormat::WebP,
+                )
+                .decode()?;
                 _ = sender.send(Frame::new_still(img.to_rgba8()));
                 return Ok(receiver);
             }
@@ -507,7 +530,7 @@ pub fn open_image(img_location: &Path, message_sender: Option<Sender<Message>>) 
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
         }
-        "png" => {
+        "png" | "apng" => {
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
             use zune_png::PngDecoder;
