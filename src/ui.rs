@@ -2202,54 +2202,38 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
-            ui.menu_button("Recent", |ui| {
-                let mut r = ui.available_rect_before_wrap();
+            if ui.button("Quit").clicked() {
+                app.backend.exit();
+            }
 
-                // r.extend_with_x(r.left() - 200.);
-                let recent_rect = Rect::from_center_size(
-                    ui.ctx().screen_rect().center(),
-                    Vec2::new(ui.ctx().screen_rect().width() * 0.7, 300.),
-                );
+            ui.menu_button("Recent", |ui| {
+                let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.left_bottom().x - 300., r.left_top().y + 300.),
-                    r.left_bottom(),
+                    Pos2::new(r.right_bottom().x + 200., r.left_top().y),
+                    Pos2::new(
+                        r.left_bottom().x - ui.available_width(),
+                        r.left_top().y + 300.,
+                    ),
                 );
 
-                ui.ctx().debug_painter().rect(r, Rounding::ZERO, Color32::RED, Stroke::NONE);
-
-                // let recent_rect = Rect::everything_left_of(r.left());
-                ui.allocate_ui_at_rect(r, |ui| {
+                ui.allocate_ui_at_rect(recent_rect, |ui| {
                     for r in &state.persistent_settings.recent_images.clone() {
                         ui.horizontal(|ui| {
                             render_file_icon(&r, ui);
                             // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
-                            if let Some(filename) = r.file_name() {
-                                if ui.button(filename.to_string_lossy()).clicked() {
-                                    load_image_from_path(r, state);
-                                    ui.close_menu();
+                            ui.vertical_centered_justified(|ui| {
+                                if let Some(filename) = r.file_name() {
+                                    if ui.button(filename.to_string_lossy()).clicked() {
+                                        load_image_from_path(r, state);
+                                        ui.close_menu();
+                                    }
                                 }
-                            }
+                            });
                         });
                     }
                 });
-
-                // let r = ui.allocate_rect(Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::splat(300.)), Sense::click());
-                // for r in &state.persistent_settings.recent_images.clone() {
-                //     if let Some(filename) = r.file_name() {
-                //         if ui.button(filename.to_string_lossy()).clicked() {
-                //             load_image_from_path(r, state);
-                //             ui.close_menu();
-                //         }
-                //     }
-                // }
-
-                // ui.put(Rect::from_center_size(ui.ctx().screen_rect().center(), Vec2::splat(300.)), egui::Button::new("sd"));
             });
-
-            if ui.button("Quit").clicked() {
-                app.backend.exit();
-            }
 
             // TODO: expose favourites with a tool button
             // ui.menu_button("Favourites", |ui| {
