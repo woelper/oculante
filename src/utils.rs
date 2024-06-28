@@ -307,6 +307,7 @@ pub fn send_image_threaded(
 ) {
     let loc = img_location.to_owned();
 
+    let path = img_location.to_path_buf();
     thread::spawn(move || {
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
@@ -401,7 +402,8 @@ pub fn send_image_threaded(
             }
             Err(e) => {
                 error!("{e}");
-                _ = message_sender.send(Message::LoadError(e.to_string()));
+                _ = message_sender.send(Message::LoadError(format!("{e}")));
+                _ = message_sender.send(Message::LoadError(format!("Failed to load {}", path.display())));
             }
         }
     });
