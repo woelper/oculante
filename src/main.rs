@@ -216,7 +216,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("matches {:?}", matches);
 
-
     let paths_to_open = matches
         .get_many("INPUT")
         .unwrap_or_default()
@@ -956,13 +955,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture(gfx, tex);
             } else {
-                state.current_texture =
-                    img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
             }
         } else {
             debug!("Setting texture");
-            state.current_texture =
-                img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
         }
 
         state.is_loaded = true;
@@ -970,8 +967,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => {
-                state.current_texture =
-                    unpremult(&img).to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                state.current_texture = unpremult(&img).to_texture(gfx, &state.persistent_settings)
             }
             // Do nuttin'
             ColorChannel::Rgba => (),
@@ -979,7 +975,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {
                 state.current_texture =
                     solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                        .to_texture(gfx, &state.persistent_settings)
             }
         }
         state.current_image = Some(img);

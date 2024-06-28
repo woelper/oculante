@@ -28,6 +28,7 @@ use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
+use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -403,7 +404,10 @@ pub fn send_image_threaded(
             Err(e) => {
                 error!("{e}");
                 _ = message_sender.send(Message::LoadError(format!("{e}")));
-                _ = message_sender.send(Message::LoadError(format!("Failed to load {}", path.display())));
+                _ = message_sender.send(Message::LoadError(format!(
+                    "Failed to load {}",
+                    path.display()
+                )));
             }
         }
     });
@@ -644,7 +648,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics, _linear_mag_filter: bool) -> Option<Texture> {
+    fn to_texture(&self, _: &mut Graphics, _settings: &PersistentSettings) -> Option<Texture> {
         unimplemented!()
     }
 
@@ -667,15 +671,19 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics, linear_mag_filter: bool) -> Option<Texture> {
+    fn to_texture(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<Texture> {
         gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
-            .with_mipmaps(true)
+            .with_mipmaps(settings.use_mipmaps)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
             .with_filter(
-                TextureFilter::Linear,
-                if linear_mag_filter {
+                if settings.linear_min_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+                if settings.linear_mag_filter {
                     TextureFilter::Linear
                 } else {
                     TextureFilter::Nearest
