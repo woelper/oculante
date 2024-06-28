@@ -1,6 +1,6 @@
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
-    clear_image, clipboard_to_image, delete_file,
+    clear_image, clipboard_to_image, delete_file, icons,
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -18,8 +18,9 @@ use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24.;
 
-use egui_phosphor::regular::*;
+// use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
+use icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]

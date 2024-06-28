@@ -22,6 +22,7 @@ pub mod cache;
 pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
+pub mod icons;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
