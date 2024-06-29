@@ -3,11 +3,12 @@
 pub const CARET_LEFT: &str = "\u{E902}";
 pub const CARET_RIGHT: &str = "\u{E903}";
 pub const ARROWS_OUT_SIMPLE: &str = "\u{E904}";
-// pub const IconaMoon-Information-Circle: &str = "\u{E905}";
+pub const INFO: &str = "\u{E905}";
 pub const PENCIL_SIMPLE_LINE: &str = "\u{E906}";
-// pub const IconaMoon-Download: &str = "\u{E907}";
+pub const ARROW_LINE_UP: &str = "\u{E907}";
 pub const TRASH: &str = "\u{E908}";
 pub const GIT_DIFF: &str = "\u{E909}";
+pub const PLACEHOLDER: &str = "\u{E909}";
 pub const FOLDER: &str = "\u{E90A}";
 pub const LIST: &str = "\u{E90B}";
 // pub const IconaMoon-Search: &str = "\u{E90C}";
@@ -23,9 +24,17 @@ pub const STACK: &str = "\u{E915}";
 // pub const Bootstrap-Copy: &str = "\u{E916}";
 // pub const Bootstrap-Intersect: &str = "\u{E917}";
 pub const PALETTE: &str = "\u{E918}";
-// pub const Bootstrap-Bounding-Box-Circles: &str = "\u{E919}";
+pub const ARROWS_OUT: &str = "\u{E919}";
 // pub const Bootstrap-File-Earmark: &str = "\u{E91A}";
 // pub const Bootstrap-Chevron-Up: &str = "\u{E91B}";
 // pub const Bootstrap-Chevron-Down: &str = "\u{E91C}";
 pub const X: &str = "\u{E91D}";
+
 // pub const Bootstrap-Check2: &str = "\u{E91E}";
+// FIX THESE
+pub const PLUS: &str = "+";
+pub const ARROWS_CLOCKWISE: &str = "<>";
+pub const RECYCLE: &str = "";
+pub const PAINT_BRUSH_HOUSEHOLD: &str = "";
+pub const FLOPPY_DISK: &str = "";
+pub const ARCHIVE_TRAY: &str = "";
