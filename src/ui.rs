@@ -1908,31 +1908,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if unframed_button(FOLDER, ui)
-            .on_hover_text("Browse for image")
-            .clicked()
-        {
-            #[cfg(feature = "file_open")]
-            crate::browse_for_image_path(state);
-            #[cfg(not(feature = "file_open"))]
-            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
-        }
-
-        #[cfg(not(feature = "file_open"))]
-        {
-            if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
-                filebrowser::browse_modal(
-                    false,
-                    SUPPORTED_EXTENSIONS,
-                    |p| {
-                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        ui.ctx().memory_mut(|w| w.close_popup());
-                    },
-                    ui.ctx(),
-                );
-            }
-        }
-
         let mut changed_channels = false;
 
         if key_pressed(app, state, RedChannel) {
@@ -2010,31 +1985,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 .to_texture(gfx, &state.persistent_settings)
                     }
                 }
-            }
-        }
-
-        if state.scrubber.len() > 1 {
-            // TODO: Check if wrap is off and we are at fisrt image
-            if tooltip(
-                unframed_button(CARET_LEFT, ui),
-                "Previous image",
-                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
-                ui,
-            )
-            .clicked()
-            {
-                prev_image(state)
-            }
-            // TODO: Check if wrap is off and we are at last image
-            if tooltip(
-                unframed_button(CARET_RIGHT, ui),
-                "Next image",
-                &lookup(&state.persistent_settings.shortcuts, &NextImage),
-                ui,
-            )
-            .clicked()
-            {
-                next_image(state)
             }
         }
 
@@ -2149,8 +2099,60 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 clear_image(state);
             }
         }
+
+        if state.scrubber.len() > 1 {
+            // TODO: Check if wrap is off and we are at fisrt image
+            if tooltip(
+                unframed_button(CARET_LEFT, ui),
+                "Previous image",
+                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
+                ui,
+            )
+            .clicked()
+            {
+                prev_image(state)
+            }
+            // TODO: Check if wrap is off and we are at last image
+            if tooltip(
+                unframed_button(CARET_RIGHT, ui),
+                "Next image",
+                &lookup(&state.persistent_settings.shortcuts, &NextImage),
+                ui,
+            )
+            .clicked()
+            {
+                next_image(state)
+            }
+        }
+
         drag_area(ui, state, app);
-        ui.add_space(ui.available_width() - 32.);
+
+        ui.add_space(ui.available_width() - 64.);
+
+        if unframed_button(FOLDER, ui)
+            .on_hover_text("Browse for image")
+            .clicked()
+        {
+            #[cfg(feature = "file_open")]
+            crate::browse_for_image_path(state);
+            #[cfg(not(feature = "file_open"))]
+            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+        }
+
+        #[cfg(not(feature = "file_open"))]
+        {
+            if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
+                filebrowser::browse_modal(
+                    false,
+                    SUPPORTED_EXTENSIONS,
+                    |p| {
+                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                        ui.ctx().memory_mut(|w| w.close_popup());
+                    },
+                    ui.ctx(),
+                );
+            }
+        }
         draw_hamburger_menu(ui, state, app);
     });
 }
