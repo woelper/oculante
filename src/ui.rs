@@ -286,7 +286,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
                         let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
 
-                        ui.label_i(&format!("{} File", IMAGE_SQUARE));
+                        ui.label_i(&format!("{} File", IMAGE));
                         let path_label = egui::Label::new(
                             RichText::new(format!(
                                 "{skip_symbol}{}",
@@ -889,7 +889,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui, &state.image_geometry, &mut state.edit_state.block_panning
                     );
 
-                    ui.label_i(&format!("{RECYCLE} Reset"));
+                    ui.label_i(&format!("{SYNC} Reset"));
                     ui.centered_and_justified(|ui| {
                         if ui.button("Reset all edits").clicked() {
                             state.edit_state = Default::default();
