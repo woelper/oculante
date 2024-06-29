@@ -16,7 +16,7 @@ use crate::{
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
-const ICON_SIZE: f32 = 24.;
+const ICON_SIZE: f32 = 24. * 0.8;
 
 // use egui_phosphor::regular::*;
 use egui_plot::{Line, Plot, PlotPoints, Points};
@@ -1457,6 +1457,7 @@ pub fn unframed_button(text: impl Into<String>, ui: &mut Ui) -> Response {
 }
 
 pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
+    let scale = 0.8;
     if is_colored {
         ui.add(
             egui::Button::new(
@@ -1991,10 +1992,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if state.current_image.is_some() {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                ui.selectable_label(
-                    state.persistent_settings.info_enabled,
-                    RichText::new(format!("{}", INFO)).size(ICON_SIZE * 0.8),
-                ),
+                unframed_button_colored(INFO, state.persistent_settings.info_enabled, ui),
                 "Show image info",
                 &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                 ui,
@@ -2010,9 +2008,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
 
             if tooltip(
-                ui.selectable_label(
+                unframed_button_colored(
+                    PENCIL_SIMPLE_LINE,
                     state.persistent_settings.edit_enabled,
-                    RichText::new(format!("{}", PENCIL_SIMPLE_LINE)).size(ICON_SIZE * 0.8),
+                    ui,
                 ),
                 "Edit the image",
                 &lookup(&state.persistent_settings.shortcuts, &EditMode),
@@ -2127,7 +2126,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         drag_area(ui, state, app);
 
-        ui.add_space(ui.available_width() - 64.);
+        ui.add_space(ui.available_width() - ICON_SIZE * 2. - ICON_SIZE / 2.);
 
         if unframed_button(FOLDER, ui)
             .on_hover_text("Browse for image")
