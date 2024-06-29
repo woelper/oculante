@@ -19,10 +19,10 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod icons;
 pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
-pub mod icons;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
@@ -318,22 +318,34 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
-
         egui_extras::install_image_loaders(ctx);
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         fonts
             .font_data
-            .insert("my_font".to_owned(), FontData::from_static(FONT));
+            .insert("inter".to_owned(), FontData::from_static(FONT));
+
+        fonts.font_data.insert(
+            "icons".to_owned(),
+            FontData::from_static(include_bytes!(
+                "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
+            )),
+        );
 
         fonts
             .families
             .get_mut(&FontFamily::Proportional)
             .unwrap()
-            .insert(0, "my_font".to_owned());
+            .insert(0, "inter".to_owned());
 
-        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        // egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "icons".to_owned());
+
         match state.persistent_settings.theme {
             ColorTheme::Light => ctx.set_visuals(Visuals::light()),
             ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
