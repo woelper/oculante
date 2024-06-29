@@ -67,7 +67,7 @@ impl Default for PersistentSettings {
     fn default() -> Self {
         PersistentSettings {
             accent_color: [255, 0, 75],
-            background_color: [51, 51, 51],
+            background_color: [30, 30, 30],
             vsync: true,
             force_redraw: false,
             shortcuts: Shortcuts::default_keys(),
