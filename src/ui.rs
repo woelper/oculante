@@ -17,6 +17,7 @@ use crate::{
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24. * 0.8;
+const ROUNDING: f32 = 8.;
 
 // use egui_phosphor::regular::*;
 use egui_plot::{Line, Plot, PlotPoints, Points};
@@ -46,6 +47,10 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn label_right(&mut self, _text: impl Into<WidgetText>) -> Response {
+        unimplemented!()
+    }
+
     fn label_i_selected(&mut self, _selected: bool, _text: &str) -> Response {
         unimplemented!()
     }
@@ -72,15 +77,37 @@ impl EguiExt for Ui {
     fn label_i(&mut self, text: &str) -> Response {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+        // self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+        //     // self.horizontal(|ui| {
+        //     ui.add_sized(
+        //         egui::Vec2::new(28., ui.available_height()),
+        //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
+        //     );
+        //     ui.label(
+        //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
+        //     );
+        // })
+        // .response
+
+        self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             // self.horizontal(|ui| {
             ui.add_sized(
-                egui::Vec2::new(28., ui.available_height()),
+                egui::Vec2::new(8., ui.available_height()),
                 egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
             );
             ui.label(
                 RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
             );
+        })
+        .response
+    }
+
+    /// Draw a justified icon from a string starting with an emoji
+    fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
+        self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+            // self.horizontal(|ui| {
+
+            ui.label(text);
         })
         .response
     }
@@ -253,11 +280,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture {
-                // texture.
                 let tex_id = gfx.egui_register_texture(texture);
 
                 // width of image widget
-                // let desired_width = ui.available_width() - ui.spacing().indent;
                 let desired_width = PANEL_WIDTH - PANEL_WIDGET_OFFSET;
 
                 let scale = (desired_width / 8.) / texture.size().0;
@@ -267,15 +292,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                 );
 
-                egui::Grid::new("info").show(ui, |ui| {
-                    ui.label_i(&format!("{ARROWS_OUT} Size",));
+                egui::Grid::new("info")
 
-                    ui.label(
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                    ui.label_i(&format!("{ARROWS_OUT} Size",));
+                    ui.label_right(
                         RichText::new(format!(
                             "{}x{}",
                             state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
                         ))
-                        .monospace(),
                     );
                     ui.end_row();
 
@@ -300,37 +326,29 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     }
 
                     ui.label_i(&format!("{PALETTE} RGBA"));
-                    ui.label(
+                    ui.label_right(
                         RichText::new(disp_col(state.sampled_color))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
 
                     ui.label_i(&format!("{PALETTE} RGBA"));
-                    ui.label(
+                    ui.label_right(
                         RichText::new(disp_col_norm(state.sampled_color, 255.))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
 
                     ui.label_i("⊞ Pos");
-                    ui.label(
+                    ui.label_right(
                         RichText::new(format!(
                             "{:.0},{:.0}",
                             state.cursor_relative.x, state.cursor_relative.y
                         ))
-                        .monospace()
-                        .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
 
                     ui.label_i(" UV");
-                    ui.label(
+                    ui.label_right(
                         RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                            .monospace()
-                            .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 6)),
                     );
                     ui.end_row();
                 });
@@ -339,20 +357,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio);
 
-
+                ui.add_space(10.);
                 let preview_rect = ui
                     .add(
                         egui::Image::new(tex_id)
                         .maintain_aspect_ratio(false)
                         .fit_to_exact_size(egui::Vec2::splat(desired_width))
+                        .rounding(ROUNDING)
                         .uv(egui::Rect::from_x_y_ranges(
                             uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
                             uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
                         )),
                     )
                     .rect;
-
-
 
                 let stroke_color = Color32::from_white_alpha(240);
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
@@ -373,6 +390,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     Stroke::new(1., stroke_color),
                 );
             }
+            ui.add_space(10.);
             ui.collapsing("Compare", |ui| {
 
                 if state.persistent_settings.max_cache == 0 {
@@ -714,19 +732,19 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
 pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_info {
-        egui::Grid::new("extended").show(ui, |ui| {
+        egui::Grid::new("extended").num_columns(2).show(ui, |ui| {
             ui.label("Number of colors");
-            ui.label(format!("{}", info.num_colors));
+            ui.label_right(format!("{}", info.num_colors));
             ui.end_row();
 
             ui.label("Fully transparent");
-            ui.label(format!(
+            ui.label_right(format!(
                 "{:.2}%",
                 (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
             ));
             ui.end_row();
             ui.label("Pixels");
-            ui.label(format!("{}", info.num_pixels));
+            ui.label_right(format!("{}", info.num_pixels));
             ui.end_row();
         });
 
