@@ -19,7 +19,7 @@ use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 const ICON_SIZE: f32 = 24.;
 
 // use egui_phosphor::regular::*;
-use egui_plot::{Plot, PlotPoints, Points};
+use egui_plot::{Line, Plot, PlotPoints, Points};
 use icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
@@ -746,42 +746,43 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         }
 
-        let red_vals = Points::new(
+        let red_vals = Line::new(
             info.red_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
                 .collect::<PlotPoints>(),
         )
-        .stems(0.0)
+        .fill(0.)
         .color(Color32::RED);
 
-        let green_vals = Points::new(
+        let green_vals = Line::new(
             info.green_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
                 .collect::<PlotPoints>(),
         )
-        .stems(0.0)
+        .fill(0.)
         .color(Color32::GREEN);
 
-        let blue_vals = Points::new(
+        let blue_vals = Line::new(
             info.blue_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
                 .collect::<PlotPoints>(),
         )
-        .stems(0.0)
+        .fill(0.)
         .color(Color32::BLUE);
 
         Plot::new("histogram")
             .allow_zoom(false)
             .allow_drag(false)
+            .show_axes(false)
+            .show_grid(false)
             .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
             .show(ui, |plot_ui| {
-                // plot_ui.line(grey_vals);
-                plot_ui.points(red_vals);
-                plot_ui.points(green_vals);
-                plot_ui.points(blue_vals);
+                plot_ui.line(red_vals);
+                plot_ui.line(green_vals);
+                plot_ui.line(blue_vals);
             });
     }
 }
