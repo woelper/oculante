@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use dirs;
-use egui_phosphor::variants::regular::*;
+use super::icons::*;
 use notan::egui::{self, *};
 use std::io::Write;
 

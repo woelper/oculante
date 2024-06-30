@@ -1958,19 +1958,30 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
 
-            ui.spacing_mut().button_padding = Vec2::new(10., 0.);
+            ui.spacing_mut().button_padding = Vec2::new(8., 2.);
+            // ui.spacing_mut().combo_height = 400.;
+            // ui.spacing_mut().item_spacing = Vec2::splat(100.);
             let combobox_text_size = 16.;
             egui::ComboBox::from_id_source("channels")
+                .height(16.)
+                .icon(blank_icon)
                 .selected_text(
-                    RichText::new(state.persistent_settings.current_channel.to_string())
-                        .size(combobox_text_size),
+                    RichText::new(
+                        state
+                            .persistent_settings
+                            .current_channel
+                            .to_string()
+                            .to_uppercase(),
+                    )
+                    .size(combobox_text_size),
                 )
                 .show_ui(ui, |ui| {
                     for channel in ColorChannel::iter() {
                         let r = ui.selectable_value(
                             &mut state.persistent_settings.current_channel,
                             channel,
-                            RichText::new(channel.to_string()).size(combobox_text_size),
+                            RichText::new(channel.to_string().to_uppercase())
+                                .size(combobox_text_size),
                         );
 
                         if tooltip(
@@ -2355,4 +2366,13 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
     );
     // ui.add(egui::Label::new(""))
     response
+}
+
+pub fn blank_icon(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    visuals: &egui::style::WidgetVisuals,
+    _is_open: bool,
+    _above_or_below: egui::AboveOrBelow,
+) {
 }
