@@ -47,7 +47,10 @@ quickraw = "0.1.6"
 rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.7"
-resvg = "0.33.0"
+# the next 3 belong together
+resvg = "0.42.0"
+tiny-skia = "0.11.4"
+usvg = "0.42.0"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
 self_update = { version = "0.40", default-features = false, features = [
@@ -57,9 +60,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
-tiny-skia = "0.9"
 turbojpeg = {version = "0.5.4", features = ["image"], optional = true}
-usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
 jxl-oxide = "0.8"
