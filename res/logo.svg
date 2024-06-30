@@ -25,15 +25,28 @@
      showgrid="false"
      inkscape:zoom="2.2066112"
      inkscape:cx="241.77345"
-     inkscape:cy="566.25291"
+     inkscape:cy="624.71359"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
      inkscape:window-y="32"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg8" />
+     inkscape:current-layer="svg8"
+     showguides="true" />
   <defs
      id="defs2">
+    <linearGradient
+       id="linearGradient1"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#ff006b;stop-opacity:0.1709089;"
+         offset="0"
+         id="stop1" />
+      <stop
+         style="stop-color:#00ffff;stop-opacity:0.0800001;"
+         offset="1"
+         id="stop2" />
+    </linearGradient>
     <linearGradient
        id="linearGradient13418">
       <stop
@@ -100,11 +113,20 @@
          in2="comp1"
          id="feComposite19" />
     </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1"
+       id="linearGradient2"
+       x1="39.416656"
+       y1="165.92194"
+       x2="39.285694"
+       y2="144.41847"
+       gradientUnits="userSpaceOnUse" />
   </defs>
   <metadata
      id="metadata5" />
   <circle
-     style="fill:#ffffff;stroke:none;stroke-width:0.243809;stroke-linecap:round;stroke-linejoin:bevel;opacity:0.4"
+     style="fill:url(#linearGradient2);stroke:none;stroke-width:0.243809;stroke-linecap:round;stroke-linejoin:bevel;opacity:1;fill-opacity:1"
      id="path1"
      cx="39.709866"
      cy="155.77286"
@@ -250,7 +272,7 @@
      d="m 149.51106,254.73731 -4.56854,5.24194" />
   <path
      id="path835-9-8-5-7"
-     style="font-variation-settings:normal;fill:url(#linearGradient13420);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:3.61465;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000"
+     style="font-variation-settings:normal;fill:#ff006b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:3.61465;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000"
      d="m 39.312329,127.49609 a 1,1 0 0 0 -0.999939,0.99994 v 6.95307 a 1,1 0 0 0 0.999939,0.99994 1,1 0 0 0 0.999939,-0.99994 v -6.95307 a 1,1 0 0 0 -0.999939,-0.99994 z m -17.611845,6.33967 a 1,1 0 0 0 -0.653707,0.2465 1,1 0 0 0 -0.09767,1.40973 l 4.568713,5.24257 a 1,1 0 0 0 1.4118,0.0956 1,1 0 0 0 0.0956,-1.41025 l -4.568197,-5.24205 a 1,1 0 0 0 -0.756543,-0.3421 z m 34.534843,0 a 1,1 0 0 0 -0.75706,0.3421 l -4.568196,5.24205 a 1,1 0 0 0 0.0956,1.41025 1,1 0 0 0 1.412317,-0.0956 l 4.568197,-5.24257 a 1,1 0 0 0 -0.09767,-1.40973 1,1 0 0 0 -0.65319,-0.2465 z m -16.968473,6.12986 c -14.562058,-0.15787 -18.157784,13.7716 -27.734225,15.88688 8.957291,1.69002 12.896402,14.58737 27.51305,14.76086 14.61664,0.17349 19.332805,-13.74512 27.993123,-14.86679 -8.928468,-1.61027 -13.209898,-15.62308 -27.771948,-15.78095 z m 0.187069,4.96714 a 10.226954,10.226954 0 0 1 10.227282,10.22676 10.226954,10.226954 0 0 1 -10.227282,10.22677 10.226954,10.226954 0 0 1 -10.226766,-10.22677 10.226954,10.226954 0 0 1 10.226766,-10.22676 z m 0.109554,6.8249 a 3.2310669,3.2310669 0 0 0 -3.231328,3.23133 3.2310669,3.2310669 0 0 0 3.231328,3.23081 3.2310669,3.2310669 0 0 0 3.23081,-3.23081 3.2310669,3.2310669 0 0 0 -3.23081,-3.23133 z m -13.288595,17.50178 a 1,1 0 0 0 -0.75706,0.34416 l -4.568713,5.24206 a 1,1 0 0 0 0.09767,1.41025 1,1 0 0 0 1.41025,-0.0977 l 4.568197,-5.24206 a 1,1 0 0 0 -0.0956,-1.41025 1,1 0 0 0 -0.65474,-0.24649 z m 25.386047,0 a 1,1 0 0 0 -0.655257,0.24649 1,1 0 0 0 -0.0956,1.41025 l 4.568196,5.24206 a 1,1 0 0 0 1.41025,0.0977 1,1 0 0 0 0.09767,-1.41025 l -4.568197,-5.24206 a 1,1 0 0 0 -0.75706,-0.34416 z m -13.037964,4.6271 a 1,1 0 0 0 -0.999938,0.99994 v 6.95358 a 1,1 0 0 0 0.999938,0.99994 1,1 0 0 0 0.999939,-0.99994 v -6.95358 a 1,1 0 0 0 -0.999939,-0.99994 z"
      inkscape:export-filename="oculante.png"
      inkscape:export-xdpi="58.573666"
@@ -260,9 +282,10 @@
      d="m 88.05239,160.32369 3.960467,-1.25156 -0.9989,7.53878 4.842461,-11.14541 -3.888989,1.39776 1.818926,-6.45576 z"
      style="font-variation-settings:normal;fill:#ff004b;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2.75885;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;stop-color:#000000" />
   <g
-     id="path952-3-6">
+     id="path952-3-6"
+     style="fill:#ff006b;fill-opacity:1">
     <path
-       style="color:#000000;fill:#ff0000;fill-rule:evenodd;stroke-width:2;stroke-linecap:round;stroke-linejoin:bevel"
+       style="color:#000000;fill:#ff006b;fill-rule:evenodd;stroke-width:2;stroke-linecap:round;stroke-linejoin:bevel;fill-opacity:1"
        id="path13307"
        d="m 21.703295,134.83523 4.56854,5.24194" />
   </g>
