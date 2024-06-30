@@ -526,22 +526,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     }
 
                     if r.changed() {
-                        match state.persistent_settings.theme {
-                            ColorTheme::Light =>
-                                ctx.set_visuals(Visuals::light()),
-                            ColorTheme::Dark =>
-                                ctx.set_visuals(Visuals::dark()),
-                            ColorTheme::System =>
-                                set_system_theme(ctx),
-                        }
-                        // Switching theme resets accent color, set it again
-                        let mut style: egui::Style = (*ctx.style()).clone();
-                        style.visuals.selection.bg_fill = Color32::from_rgb(
-                            state.persistent_settings.accent_color[0],
-                            state.persistent_settings.accent_color[1],
-                            state.persistent_settings.accent_color[2],
-                        );
-                        ctx.set_style(style);
+                        apply_theme(state, ctx);
                     }
                 }
                 );
@@ -553,13 +538,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                             .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
                             .changed()
                         {
-                            let mut style: egui::Style = (*ctx.style()).clone();
-                            style.visuals.selection.bg_fill = Color32::from_rgb(
-                                state.persistent_settings.accent_color[0],
-                                state.persistent_settings.accent_color[1],
-                                state.persistent_settings.accent_color[2],
-                            );
-                            ctx.set_style(style);
+                          apply_theme(state, ctx);
                         }
                         ui.label("Accent color");
                     });
@@ -719,6 +698,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
                     if ui.button("Reset all settings").clicked() {
                         state.persistent_settings = Default::default();
+                        apply_theme(state, ctx);
                     }
                 });
 
@@ -2369,10 +2349,26 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
 }
 
 pub fn blank_icon(
-    ui: &egui::Ui,
-    rect: egui::Rect,
-    visuals: &egui::style::WidgetVisuals,
+    _ui: &egui::Ui,
+    _rect: egui::Rect,
+    _visuals: &egui::style::WidgetVisuals,
     _is_open: bool,
     _above_or_below: egui::AboveOrBelow,
 ) {
+}
+
+fn apply_theme(state: &mut OculanteState, ctx: &Context) {
+    match state.persistent_settings.theme {
+        ColorTheme::Light => ctx.set_visuals(Visuals::light()),
+        ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+        ColorTheme::System => set_system_theme(ctx),
+    }
+    // Switching theme resets accent color, set it again
+    let mut style: egui::Style = (*ctx.style()).clone();
+    style.visuals.selection.bg_fill = Color32::from_rgb(
+        state.persistent_settings.accent_color[0],
+        state.persistent_settings.accent_color[1],
+        state.persistent_settings.accent_color[2],
+    );
+    ctx.set_style(style);
 }

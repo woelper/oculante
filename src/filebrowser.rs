@@ -1,6 +1,6 @@
+use super::icons::*;
 use anyhow::{Context, Result};
 use dirs;
-use super::icons::*;
 use notan::egui::{self, *};
 use std::io::Write;
 
