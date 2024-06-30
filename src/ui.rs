@@ -21,6 +21,7 @@ const ROUNDING: f32 = 8.;
 
 // use egui_phosphor::regular::*;
 use egui_plot::{Line, Plot, PlotPoints};
+use epaint::TextShape;
 use icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
@@ -70,6 +71,13 @@ pub trait EguiExt {
     ) -> Response {
         unimplemented!()
     }
+    fn styled_collapsing<R>(
+        &mut self,
+        _heading: impl Into<WidgetText>,
+        _add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R> {
+        todo!()
+    }
 }
 
 impl EguiExt for Ui {
@@ -112,6 +120,17 @@ impl EguiExt for Ui {
         .response
     }
 
+    fn styled_collapsing<R>(
+        &mut self,
+        heading: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) -> CollapsingResponse<R> {
+        CollapsingHeader::new(heading)
+        .show_background(true)
+            .icon(circle_icon)
+            .show_unindented(self, add_contents)
+    }
+
     /// Draw a justified icon from a string starting with an emoji
     fn label_i_selected(&mut self, selected: bool, text: &str) -> Response {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
@@ -145,22 +164,39 @@ impl EguiExt for Ui {
             // let color = Color32::RED;
             let available_width = ui.available_width() * 0.6;
             let style = ui.style_mut();
-            style.visuals.widgets.hovered.bg_fill = color;
-            style.visuals.widgets.hovered.fg_stroke.width = 0.;
+            // style.visuals.widgets.hovered.bg_fill = color;
+            // style.visuals.widgets.hovered.fg_stroke.width = 0.;
 
-            style.visuals.widgets.active.bg_fill = color;
-            style.visuals.widgets.active.fg_stroke.width = 0.;
+            // style.visuals.widgets.active.bg_fill = color;
+            // style.visuals.widgets.active.fg_stroke.width = 0.;
 
-            style.visuals.widgets.inactive.fg_stroke.width = 5.0;
+            style.visuals.widgets.inactive.fg_stroke.width = 7.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
             style.visuals.widgets.inactive.rounding =
-                style.visuals.widgets.inactive.rounding.at_least(20.);
-            style.visuals.widgets.inactive.expansion = -5.0;
+                style.visuals.widgets.inactive.rounding.at_least(18.);
+            style.visuals.widgets.inactive.expansion = -4.0;
+
+
+            style.visuals.widgets.hovered.fg_stroke.width = 9.0;
+            style.visuals.widgets.hovered.fg_stroke.color = color;
+            style.visuals.widgets.hovered.rounding =
+                style.visuals.widgets.hovered.rounding.at_least(18.);
+            style.visuals.widgets.hovered.expansion = -4.0;
+
+
+            style.visuals.widgets.active.fg_stroke.width = 9.0;
+            style.visuals.widgets.active.fg_stroke.color = color;
+            style.visuals.widgets.active.rounding =
+                style.visuals.widgets.active.rounding.at_least(18.);
+            style.visuals.widgets.active.expansion = -4.0;
 
             style.spacing.slider_width = available_width;
 
             ui.horizontal(|ui| {
-                let r = ui.add(Slider::new(value, range).show_value(false).integer());
+                let r = ui.add(Slider::new(value, range)
+                .trailing_fill(true)
+                .handle_shape(style::HandleShape::Rect { aspect_ratio: 2.1 })
+                .show_value(false).integer());
                 ui.monospace(format!("{:.0}", value.to_f64()));
                 r
             })
@@ -391,69 +427,75 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
             }
             ui.add_space(10.);
-            ui.collapsing("Compare", |ui| {
 
-                if state.persistent_settings.max_cache == 0 {
-                    ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
-                }
 
-                if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
-                    // TODO: Automatically insert image into compare list
-                    #[cfg(feature = "file_open")]
-                    crate::browse_for_image_path(state);
-                    #[cfg(not(feature = "file_open"))]
-                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
-                }
+            ui.vertical_centered_justified(|ui| {
 
-                ui.vertical_centered_justified(|ui| {
-                    let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-                    compare_list.sort_by(|a,b| a.0.cmp(&b.0));
 
-                    for (path, geo) in compare_list {
-
-                        ui.horizontal(|ui|{
-                            if ui.button(X).clicked() {
-                                state.compare_list.remove(&path);
-                            }
-
-                            ui.vertical_centered_justified(|ui| {
-                                if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
-                                    state.image_geometry = geo.clone();
-                                    state
-                                        .player
-                                        .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
-                                    ui.ctx().request_repaint();
-                                    ui.ctx().request_repaint_after(Duration::from_millis(500));
-                                    state.current_path = Some(path);
-                                    state.image_info = None;
-                                }
-                            });
-                        });
+                ui.styled_collapsing("Compare", |ui| {
+    
+                    if state.persistent_settings.max_cache == 0 {
+                        ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
-
-
-
-                    if let Some(path) = &state.current_path {
-                        if let Some(geo) = state.compare_list.get(path) {
-                            if state.image_geometry != *geo {
-                                if ui.button(RichText::new(format!("{ARROWS_CLOCKWISE} Update position")).color(Color32::YELLOW)).clicked() {
+    
+                    if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
+                        // TODO: Automatically insert image into compare list
+                        #[cfg(feature = "file_open")]
+                        crate::browse_for_image_path(state);
+                        #[cfg(not(feature = "file_open"))]
+                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                    }
+    
+                    ui.vertical_centered_justified(|ui| {
+                        let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
+                        compare_list.sort_by(|a,b| a.0.cmp(&b.0));
+    
+                        for (path, geo) in compare_list {
+    
+                            ui.horizontal(|ui|{
+                                if ui.button(X).clicked() {
+                                    state.compare_list.remove(&path);
+                                }
+    
+                                ui.vertical_centered_justified(|ui| {
+                                    if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        state.image_geometry = geo.clone();
+                                        state
+                                            .player
+                                            .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
+                                        ui.ctx().request_repaint();
+                                        ui.ctx().request_repaint_after(Duration::from_millis(500));
+                                        state.current_path = Some(path);
+                                        state.image_info = None;
+                                    }
+                                });
+                            });
+                        }
+    
+                        if let Some(path) = &state.current_path {
+                            if let Some(geo) = state.compare_list.get(path) {
+                                if state.image_geometry != *geo {
+                                    if ui.button(RichText::new(format!("{ARROWS_CLOCKWISE} Update position")).color(Color32::YELLOW)).clicked() {
+                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                    }
+                                }
+                            } else {
+                                if ui.button(format!("{PLUS} Add current image")).clicked() {
                                     state.compare_list.insert(path.clone(), state.image_geometry.clone());
                                 }
                             }
-                        } else {
-                            if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                        }
+    
+                        if !state.compare_list.is_empty() {
+                            if ui.button(format!("{TRASH} Clear all")).clicked() {
+                                state.compare_list.clear();
                             }
                         }
-                    }
-
-                    if !state.compare_list.is_empty() {
-                        if ui.button(format!("{TRASH} Clear all")).clicked() {
-                            state.compare_list.clear();
-                        }
-                    }
+                    });
                 });
             });
+      
+
 
             ui.collapsing("Alpha tools", |ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -488,13 +530,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 ui.slider_styled(&mut state.tiling, 1..=10);
             });
             advanced_ui(ui, state);
-
         });
-
-
-
-
-
     });
 }
 
@@ -1160,7 +1196,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 }
 
-                                debug!(
+                    debug!(
                     "Finished Pixel op stack in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
@@ -1307,9 +1343,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 }
 
                         });
-
                         ui.ctx().request_repaint();
-
                     }
                 }
 
@@ -1743,9 +1777,6 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             });
 
             ui.vertical_centered_justified(|ui| {
-
-
-
                 let crop_ops = state
                     .edit_state
                     .image_op_stack
@@ -1941,6 +1972,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             // ui.spacing_mut().combo_height = 400.;
             // ui.spacing_mut().item_spacing = Vec2::splat(100.);
             let combobox_text_size = 16.;
+            // TODO: Scale combobox
             egui::ComboBox::from_id_source("channels")
                 .height(16.)
                 .icon(blank_icon)
@@ -2370,4 +2402,35 @@ fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         state.persistent_settings.accent_color[2],
     );
     ctx.set_style(style);
+}
+
+fn circle_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
+    let stroke = ui.style().interact(&response).fg_stroke;
+
+    let galley = ui.ctx().fonts(|fonts| {
+        fonts.layout(
+            CARET_RIGHT.to_string(),
+            FontId::proportional(12.),
+            stroke.color,
+            10.,
+        )
+    });
+
+    let mut text_shape = TextShape::new(response.rect.left_top(), galley, Color32::RED);
+
+    text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
+    let mut text = egui::Shape::Text(text_shape);
+    let r = text.visual_bounding_rect();
+    text.translate(vec2(
+        egui::lerp(
+            -ui.style().spacing.icon_spacing..=r.size().x + ui.style().spacing.icon_spacing + 2.0,
+            openness,
+        ),
+        egui::lerp(
+            -ui.style().spacing.icon_spacing..=-ui.style().spacing.icon_spacing,
+            openness,
+        ),
+    ));
+
+    ui.painter().add(text);
 }
