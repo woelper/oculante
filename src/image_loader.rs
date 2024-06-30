@@ -20,7 +20,6 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
-use usvg::{TreeParsing, TreeTextToPath};
 use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
@@ -231,40 +230,37 @@ pub fn open_image(
 
             let render_scale = 2.;
             let mut opt = usvg::Options::default();
+            
+            let fontdb = opt.fontdb_mut();
+            fontdb.load_system_fonts();
+            fontdb.load_font_data(FONT.to_vec());
+            fontdb.set_cursive_family("Inter");
+            fontdb.set_sans_serif_family("Inter");
+            fontdb.set_serif_family("Inter");
+
             opt.font_family = "Inter".into();
             opt.font_size = 6.;
 
             let svg_data = std::fs::read(img_location)?;
-            if let Ok(mut tree) = usvg::Tree::from_data(&svg_data, &opt) {
-                let pixmap_size = resvg::IntSize::from_usvg(tree.size);
+            if let Ok(tree) = usvg::Tree::from_data(&svg_data, &opt) {
+                let pixmap_size = tree.size().to_int_size().scale_by(render_scale).context("Can't get SVG size")?;
 
-                let scaled_size = (
-                    (pixmap_size.width() as f32 * render_scale) as u32,
-                    (pixmap_size.height() as f32 * render_scale) as u32,
-                );
-
-                if let Some(mut pixmap) = tiny_skia::Pixmap::new(scaled_size.0, scaled_size.1) {
+                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
                     let mut fontdb = usvg::fontdb::Database::new();
                     fontdb.load_system_fonts();
                     fontdb.load_font_data(FONT.to_vec());
                     fontdb.set_cursive_family("Inter");
                     fontdb.set_sans_serif_family("Inter");
                     fontdb.set_serif_family("Inter");
-                    tree.convert_text(&fontdb);
-
-                    let rtree = resvg::Tree::from_usvg(&tree);
-
-                    rtree.render(
-                        tiny_skia::Transform::from_scale(render_scale, render_scale),
-                        &mut pixmap.as_mut(),
-                    );
+                 
+                    let render_ts = tiny_skia::Transform::from_scale(render_scale, render_scale);
+                    resvg::render(&tree, render_ts, &mut pixmap.as_mut());
                     let buf: RgbaImage = image::ImageBuffer::from_raw(
-                        scaled_size.0,
-                        scaled_size.1,
+                        pixmap_size.width(),
+                        pixmap_size.height(),
                         pixmap.data().to_vec(),
                     )
                     .context("Can't create image buffer from SVG render")?;
-
                     _ = sender.send(Frame::new_still(buf));
                     return Ok(receiver);
                 }
