@@ -20,7 +20,7 @@ const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
 
 // use egui_phosphor::regular::*;
-use egui_plot::{Line, Plot, PlotPoints, Points};
+use egui_plot::{Line, Plot, PlotPoints};
 use icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
@@ -1455,7 +1455,6 @@ pub fn unframed_button(text: impl Into<String>, ui: &mut Ui) -> Response {
 }
 
 pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &mut Ui) -> Response {
-    let scale = 0.8;
     if is_colored {
         ui.add(
             egui::Button::new(
