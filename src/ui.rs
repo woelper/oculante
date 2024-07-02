@@ -56,11 +56,15 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn slider_styled<Num: emath::Numeric>(
+    fn styled_slider<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
         _range: RangeInclusive<Num>,
     ) -> Response {
+        unimplemented!()
+    }
+
+    fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -81,6 +85,81 @@ pub trait EguiExt {
 }
 
 impl EguiExt for Ui {
+    fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
+        let color = self.style().visuals.selection.bg_fill;
+
+        let text = text.into();
+        let spacing = &self.spacing();
+        let icon_width = spacing.icon_width;
+        let icon_spacing = spacing.icon_spacing;
+
+        let (galley, mut desired_size) = if text.is_empty() {
+            (None, vec2(icon_width, 0.0))
+        } else {
+            let total_extra = vec2(icon_width + icon_spacing, 0.0);
+
+            let wrap_width = self.available_width() - total_extra.x;
+            let galley = text.into_galley(self, None, wrap_width, TextStyle::Button);
+
+            let mut desired_size = total_extra + galley.size();
+            desired_size = desired_size.at_least(spacing.interact_size);
+
+            (Some(galley), desired_size)
+        };
+
+        desired_size = desired_size.at_least(Vec2::splat(spacing.interact_size.y));
+        desired_size.y = desired_size.y.max(icon_width);
+        let (rect, mut response) = self.allocate_exact_size(desired_size, Sense::click());
+
+        if response.clicked() {
+            *checked = !*checked;
+            response.mark_changed();
+        }
+        response.widget_info(|| {
+            WidgetInfo::selected(
+                WidgetType::Checkbox,
+                *checked,
+                galley.as_ref().map_or("", |x| x.text()),
+            )
+        });
+
+        if self.is_rect_visible(rect) {
+            // let visuals = self.style().interact_selectable(&response, *checked); // too colorful
+            let visuals = self.style().interact(&response);
+            let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
+            self.painter().add(epaint::RectShape::new(
+                big_icon_rect.expand(visuals.expansion),
+                visuals.rounding,
+                if *checked {color.gamma_multiply(0.3)} else {visuals.bg_fill},
+                visuals.bg_stroke,
+            ));
+            if *checked {
+                // Check mark:
+
+                let mut stroke = visuals.fg_stroke;
+                stroke.color = color;
+                self.painter().add(Shape::line(
+                    vec![
+                        pos2(small_icon_rect.left(), small_icon_rect.center().y),
+                        pos2(small_icon_rect.center().x, small_icon_rect.bottom()),
+                        pos2(small_icon_rect.right(), small_icon_rect.top()),
+                    ],
+                    stroke,
+                ));
+            }
+            if let Some(galley) = galley {
+                let text_pos = pos2(
+                    rect.min.x + icon_width + icon_spacing,
+                    rect.center().y - 0.5 * galley.size().y,
+                );
+                self.painter()
+                    .galley(text_pos, galley, visuals.text_color());
+            }
+        }
+
+        response
+    }
+
     /// Draw a justified icon from a string starting with an emoji
     fn label_i(&mut self, text: &str) -> Response {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
@@ -125,10 +204,13 @@ impl EguiExt for Ui {
         heading: impl Into<WidgetText>,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> CollapsingResponse<R> {
+        self.style_mut().visuals.collapsing_header_frame = true;
+        self.style_mut().visuals.indent_has_left_vline = false;
+
         CollapsingHeader::new(heading)
-        .show_background(true)
-            .icon(circle_icon)
-            .show_unindented(self, add_contents)
+            // .show_background(true)
+            .icon(caret_icon)
+            .show(self, add_contents)
     }
 
     /// Draw a justified icon from a string starting with an emoji
@@ -154,7 +236,7 @@ impl EguiExt for Ui {
         .inner
     }
 
-    fn slider_styled<Num: emath::Numeric>(
+    fn styled_slider<Num: emath::Numeric>(
         &mut self,
         value: &mut Num,
         range: RangeInclusive<Num>,
@@ -176,13 +258,11 @@ impl EguiExt for Ui {
                 style.visuals.widgets.inactive.rounding.at_least(18.);
             style.visuals.widgets.inactive.expansion = -4.0;
 
-
             style.visuals.widgets.hovered.fg_stroke.width = 9.0;
             style.visuals.widgets.hovered.fg_stroke.color = color;
             style.visuals.widgets.hovered.rounding =
                 style.visuals.widgets.hovered.rounding.at_least(18.);
             style.visuals.widgets.hovered.expansion = -4.0;
-
 
             style.visuals.widgets.active.fg_stroke.width = 9.0;
             style.visuals.widgets.active.fg_stroke.color = color;
@@ -193,10 +273,13 @@ impl EguiExt for Ui {
             style.spacing.slider_width = available_width;
 
             ui.horizontal(|ui| {
-                let r = ui.add(Slider::new(value, range)
-                .trailing_fill(true)
-                .handle_shape(style::HandleShape::Rect { aspect_ratio: 2.1 })
-                .show_value(false).integer());
+                let r = ui.add(
+                    Slider::new(value, range)
+                        .trailing_fill(true)
+                        .handle_shape(style::HandleShape::Rect { aspect_ratio: 2.1 })
+                        .show_value(false)
+                        .integer(),
+                );
                 ui.monospace(format!("{:.0}", value.to_f64()));
                 r
             })
@@ -496,39 +579,42 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             });
       
 
-
-            ui.collapsing("Alpha tools", |ui| {
-                ui.vertical_centered_justified(|ui| {
-                    if let Some(img) = &state.current_image {
-                        if ui
-                            .button("Show alpha bleed")
-                            .on_hover_text("Highlight pixels with zero alpha and color information")
-                            .clicked()
-                        {
-                            state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+            if state.current_texture.is_some() {
+                ui.styled_collapsing("Alpha tools", |ui| {
+                    ui.vertical_centered_justified(|ui| {
+                        if let Some(img) = &state.current_image {
+                            if ui
+                                .button("Show alpha bleed")
+                                .on_hover_text("Highlight pixels with zero alpha and color information")
+                                .clicked()
+                            {
+                                state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+                            }
+                            if ui
+                                .button("Show semi-transparent pixels")
+                                .on_hover_text(
+                                    "Highlight pixels that are neither fully opaque nor fully transparent",
+                                )
+                                .clicked()
+                            {
+                                state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
+                            }
+                            if ui.button("Reset image").clicked() {
+                                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            }
                         }
-                        if ui
-                            .button("Show semi-transparent pixels")
-                            .on_hover_text(
-                                "Highlight pixels that are neither fully opaque nor fully transparent",
-                            )
-                            .clicked()
-                        {
-                            state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
-                        }
-                        if ui.button("Reset image").clicked() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
-                        }
-
-                    }
+                    });
                 });
-            });
-            // ui.add(egui::Slider::new(&mut state.tiling, 1..=10).text("Image tiling"));
+        }
 
-            ui.horizontal(|ui| {
-                ui.label("Tiling");
-                ui.slider_styled(&mut state.tiling, 1..=10);
-            });
+            if state.current_texture.is_some() {
+                ui.horizontal(|ui| {
+                    ui.label("Tiling");
+                    ui.styled_slider(&mut state.tiling, 1..=10);
+                });
+            }
+
+
             advanced_ui(ui, state);
         });
     });
@@ -587,19 +673,19 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     ui.end_row();
 
                     ui
-                    .checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
+                    .styled_checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
                     .on_hover_text(
                         "Vsync reduces tearing and saves CPU. Toggling it off will make some operations such as panning/zooming more snappy. This needs a restart to take effect.",
                     );
                 ui
-                .checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
+                .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
                 .on_hover_text(
                     "Enable an index slider to quickly scrub through lots of images",
                 );
                     ui.end_row();
 
                     if ui
-                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
+                    .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
                     .on_hover_text(
                         "When you move past the first or last image in a folder, should oculante continue or stop?",
                     )
@@ -624,39 +710,39 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
                 ui.end_row();
                 ui
-                    .checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
+                    .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
                     .on_hover_text(
                         "When a new image is loaded, keep current zoom and offset",
                     );
 
                 ui
-                    .checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
+                    .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
                     .on_hover_text(
                         "When a new image is loaded, keep current edits",
                     );
                 ui.end_row();
                 ui
-                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background where transparent")
+                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background where transparent")
                     .on_hover_text(
                         "Show checker pattern as backdrop.",
                     );
 
                 ui
-                    .checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
+                    .styled_checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
                     .on_hover_text(
                         "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
                     );
                     ui.end_row();
-                if ui.checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
                     set_title(app, state);
                 }
-                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires a restart. Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback, for example if new images come in or if modifications are made.").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires a restart. Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback, for example if new images come in or if modifications are made.").changed(){
                     app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
                 }
 
                 // ui.label(format!("lazy {}", app.window().lazy_loop()));
                 ui.end_row();
-                if ui.checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
                             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
@@ -665,7 +751,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                         }
                     }
                 }
-                if ui.checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
                             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
@@ -676,7 +762,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 }
                 ui.end_row();
 
-                if ui.checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
                             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
@@ -687,12 +773,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 }
 
 
-                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
+                ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
                 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                ui.checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
+                ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
                 ui.end_row();
 
                 ui.label("Minimum window size");
@@ -738,7 +824,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     }
                 });
 
-                ui.collapsing("Keybindings",|ui| {
+                ui.styled_collapsing("Keybindings",|ui| {
                     keybinding_ui(app, state, ui);
                 });
 
@@ -765,7 +851,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         });
 
         if !info.exif.is_empty() {
-            ui.collapsing("EXIF", |ui| {
+            ui.styled_collapsing("EXIF", |ui| {
                 egui::ScrollArea::new([true, false]).show(ui, |ui| {
                     egui::Grid::new("extended_exif")
                         .striped(true)
@@ -999,7 +1085,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             if state.edit_state.painting {
                 egui::Grid::new("paint").show(ui, |ui| {
                     ui.label("📜 Keep history");
-                    ui.checkbox(&mut state.edit_state.non_destructive_painting, "")
+                    ui.styled_checkbox(&mut state.edit_state.non_destructive_painting, "")
                         .on_hover_text("Keep all paint history and edit it. Slower.");
                     ui.end_row();
 
@@ -1518,7 +1604,7 @@ pub fn stroke_ui(
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
     let r = ui
-        .checkbox(&mut stroke.fade, "")
+        .styled_checkbox(&mut stroke.fade, "")
         .on_hover_text("Fade out the stroke over its path");
     if r.changed() {
         combined_response.changed = true;
@@ -1528,7 +1614,7 @@ pub fn stroke_ui(
     }
 
     let r = ui
-        .checkbox(&mut stroke.flip_random, "")
+        .styled_checkbox(&mut stroke.flip_random, "")
         .on_hover_text("Flip brush in X any Y randomly to make stroke less uniform");
     if r.changed() {
         combined_response.changed = true;
@@ -1698,7 +1784,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             return;
         }
 
-        ui.collapsing("Lossless Jpeg transforms", |ui| {
+        ui.styled_collapsing("Lossless Jpeg transforms", |ui| {
             ui.label("These operations will immediately write changes to disk.");
             let mut reload = false;
 
@@ -1968,13 +2054,15 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
 
-            ui.spacing_mut().button_padding = Vec2::new(8., 2.);
+            // ui.spacing_mut().button_padding = Vec2::new(0., -20.);
+            // ui.spacing_mut().combo_height = 100.;
+            ui.spacing_mut().icon_width = 30.;
             // ui.spacing_mut().combo_height = 400.;
             // ui.spacing_mut().item_spacing = Vec2::splat(100.);
             let combobox_text_size = 16.;
             // TODO: Scale combobox
             egui::ComboBox::from_id_source("channels")
-                .height(16.)
+                // .height(16.)
                 .icon(blank_icon)
                 .selected_text(
                     RichText::new(
@@ -2227,7 +2315,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             let copy_pressed = key_pressed(app, state, Copy);
             if let Some(img) = &state.current_image {
                 if ui
-                    .button("🗐 Copy")
+                    .button("Copy")
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
                     || copy_pressed
@@ -2238,7 +2326,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             if ui
-                .button("📋 Paste")
+                .button("Paste")
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
                 || key_pressed(app, state, Paste)
@@ -2260,7 +2348,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
-            if ui.button("⛭ Preferences").clicked() {
+            if ui.button("Preferences").clicked() {
                 state.settings_enabled = !state.settings_enabled;
                 ui.close_menu();
             }
@@ -2404,30 +2492,30 @@ fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     ctx.set_style(style);
 }
 
-fn circle_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
-    let stroke = ui.style().interact(&response).fg_stroke;
-
+fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let galley = ui.ctx().fonts(|fonts| {
         fonts.layout(
             CARET_RIGHT.to_string(),
             FontId::proportional(12.),
-            stroke.color,
+            ui.style().visuals.selection.bg_fill,
             10.,
         )
     });
-
     let mut text_shape = TextShape::new(response.rect.left_top(), galley, Color32::RED);
-
     text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
+    let x_offset = 2.0;
+    let y_offset = 2.0;
     text.translate(vec2(
         egui::lerp(
-            -ui.style().spacing.icon_spacing..=r.size().x + ui.style().spacing.icon_spacing + 2.0,
+            -ui.style().spacing.icon_spacing + x_offset
+                ..=r.size().x + ui.style().spacing.icon_spacing - 4.0 + x_offset,
             openness,
         ),
         egui::lerp(
-            -ui.style().spacing.icon_spacing..=-ui.style().spacing.icon_spacing,
+            -ui.style().spacing.icon_spacing + y_offset
+                ..=-ui.style().spacing.icon_spacing + y_offset,
             openness,
         ),
     ));

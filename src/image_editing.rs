@@ -204,9 +204,9 @@ impl ImageOperation {
     pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
-            Self::Brightness(val) => ui.slider_styled(val, -255..=255),
-            Self::Exposure(val) => ui.slider_styled(val, -100..=100),
-            Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::Brightness(val) => ui.styled_slider(val, -255..=255),
+            Self::Exposure(val) => ui.styled_slider(val, -100..=100),
+            Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
             Self::Filter3x3(val) => {
                 let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
 
@@ -234,7 +234,7 @@ impl ImageOperation {
                     });
                 x
             }
-            Self::Posterize(val) => ui.slider_styled(val, 1..=255),
+            Self::Posterize(val) => ui.styled_slider(val, 1..=255),
             Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::LUT(lut_name) => {
                 ui.scope(|ui| {
@@ -385,10 +385,10 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Blur(val) => ui.slider_styled(val, 0..=20),
+            Self::Blur(val) => ui.styled_slider(val, 0..=20),
             Self::Noise { amt, mono } => {
-                let mut r = ui.slider_styled(amt, 0..=100);
-                if ui.checkbox(mono, "Grey").changed() {
+                let mut r = ui.styled_slider(amt, 0..=100);
+                if ui.styled_checkbox(mono, "Grey").changed() {
                     r.changed = true
                 }
                 r
@@ -582,8 +582,8 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
-            Self::Contrast(val) => ui.slider_styled(val, -128..=128),
+            Self::Desaturate(val) => ui.styled_slider(val, 0..=100),
+            Self::Contrast(val) => ui.styled_slider(val, -128..=128),
             Self::CropPerspective {
                 points,
                 original_size,
@@ -854,7 +854,9 @@ impl ImageOperation {
                         }
                     }
 
-                    let r2 = ui.checkbox(aspect, "🔗").on_hover_text("Lock aspect ratio");
+                    let r2 = ui
+                        .styled_checkbox(aspect, "🔗")
+                        .on_hover_text("Lock aspect ratio");
 
                     if r2.changed() {
                         r0.changed = true;
