@@ -141,8 +141,8 @@ impl EguiExt for Ui {
                 self.painter().add(Shape::line(
                     vec![
                         pos2(small_icon_rect.left(), small_icon_rect.center().y),
-                        pos2(small_icon_rect.center().x, small_icon_rect.bottom()),
-                        pos2(small_icon_rect.right(), small_icon_rect.top()),
+                        pos2(small_icon_rect.center().x-1., small_icon_rect.bottom()-1.),
+                        pos2(small_icon_rect.right(), small_icon_rect.top()+1.),
                     ],
                     stroke,
                 ));
