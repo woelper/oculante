@@ -2054,9 +2054,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
 
-            // ui.spacing_mut().button_padding = Vec2::new(0., -20.);
+            ui.spacing_mut().button_padding = Vec2::new(10., -10.);
             // ui.spacing_mut().combo_height = 100.;
-            ui.spacing_mut().icon_width = 30.;
+            // ui.spacing_mut().icon_width = 30.;
             // ui.spacing_mut().combo_height = 400.;
             // ui.spacing_mut().item_spacing = Vec2::splat(100.);
             let combobox_text_size = 16.;
@@ -2505,8 +2505,8 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
-    let x_offset = 2.0;
-    let y_offset = 2.0;
+    let x_offset = 5.0;
+    let y_offset = 5.5;
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
