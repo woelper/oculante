@@ -1701,27 +1701,20 @@ fn modifier_stack_ui(
         // let op draw itself and check for response
 
         ui.push_id(i, |ui| {
-            // ui.end_row();
-
             // draw the image operator
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
             }
 
-            // now draw the ordering/delete ui
-            ui.add_space(45.);
+            ui.add_space(ui.style().spacing.icon_spacing);
 
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                // ui.add_space(size);
-
-                // ui.vertical(|ui| {
                 ui.style_mut().spacing.icon_spacing = 0.;
                 ui.style_mut().spacing.button_padding = Vec2::ZERO;
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-
-                if egui::Button::new("❌")
+                if egui::Button::new(X)
                     .small()
                     .frame(false)
                     .ui(ui)
@@ -1760,7 +1753,6 @@ fn modifier_stack_ui(
 
         ui.end_row();
     }
-    // });
 
     if let Some(delete) = delete {
         stack.remove(delete);
@@ -2197,21 +2189,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             {
                 delete_file(state);
             }
-
-            if !state.is_loaded {
-                ui.horizontal(|ui| {
-                    ui.add(egui::Spinner::default());
-                    ui.label(format!(
-                        "Loading {}",
-                        state
-                            .current_path
-                            .as_ref()
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                    ));
-                });
-                app.window().request_frame();
-            }
         }
 
         if state.current_texture.is_some() {
@@ -2251,6 +2228,24 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 next_image(state)
             }
         }
+
+        if state.current_path.is_some() {
+            if !state.is_loaded {
+                ui.horizontal(|ui| {
+                    ui.add(egui::Spinner::default());
+                    ui.label(format!(
+                        "Loading {}",
+                        state
+                            .current_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                    ));
+                });
+                app.window().request_frame();
+            }
+        }
+
 
         drag_area(ui, state, app);
 
