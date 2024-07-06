@@ -558,7 +558,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         if let Some(path) = &state.current_path {
                             if let Some(geo) = state.compare_list.get(path) {
                                 if state.image_geometry != *geo {
-                                    if ui.button(RichText::new(format!("{ARROWS_CLOCKWISE} Update position")).color(Color32::YELLOW)).clicked() {
+                                    if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
                                         state.compare_list.insert(path.clone(), state.image_geometry.clone());
                                     }
                                 }
@@ -1009,7 +1009,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui, &state.image_geometry, &mut state.edit_state.block_panning
                     );
 
-                    ui.label_i(&format!("{SYNC} Reset"));
+                    ui.label_i(&format!("Reset"));
                     ui.centered_and_justified(|ui| {
                         if ui.button("Reset all edits").clicked() {
                             state.edit_state = Default::default();
@@ -1018,7 +1018,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     });
                     ui.end_row();
 
-                    ui.label_i(&format!("{GIT_DIFF} Compare"));
+                    ui.label_i(&format!("Compare"));
                     let available_w_single_spacing =
                         ui.available_width() - ui.style().spacing.item_spacing.x;
                     ui.horizontal(|ui| {
@@ -1077,7 +1077,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     {
                         state.edit_state.painting = false;
                     }
-                } else if ui.button(format!("{PAINT_BRUSH_HOUSEHOLD} Paint mode")).clicked() {
+                } else if ui.button(format!("Paint mode")).clicked() {
                     state.edit_state.painting = true;
                 }
             });
@@ -1228,7 +1228,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button(format!("{STACK} Apply all edits"))
+                    .button(format!("Apply all edits"))
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                 {
@@ -1356,7 +1356,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
-                        .button(format!("{RECYCLE} Restore original"))
+                        .button(format!("Restore original"))
                         .on_hover_text("Completely reload image, destroying all edits.")
                         .clicked()
                     {
@@ -1384,7 +1384,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(feature = "file_open")]
                 if state.current_image.is_some() {
-                    if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
+                    if ui.button(format!("Save as...")).clicked() {
 
                         let start_directory = state.persistent_settings.last_open_directory.clone();
 
@@ -1435,7 +1435,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
-                    if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
+                    if ui.button(format!("Save as...")).clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
 
                     }
@@ -1487,9 +1487,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         // .with_extension(&state.edit_state.export_extension)
                         .exists()
                     {
-                        format!("{FLOPPY_DISK} Overwrite")
+                        format!("Overwrite")
                     } else {
-                        format!("{FLOPPY_DISK} Save")
+                        format!("Save")
                     };
 
                     if ui.button(text).on_hover_text("Save the image. This will create a new file or overwrite.").clicked() {
@@ -1521,12 +1521,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         }
                     }
 
-                    if ui.button(format!("{ARCHIVE_TRAY} Save edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button(format!("Save edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
-                    if ui.button(format!("{ARCHIVE_TRAY} Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button(format!("Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Some(parent) = p.parent() {
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
@@ -1714,7 +1714,7 @@ fn modifier_stack_ui(
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                if egui::Button::new(X)
+                if egui::Button::new("")
                     .small()
                     .frame(false)
                     .ui(ui)
@@ -1725,7 +1725,7 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("⏶")
+                if egui::Button::new("")
                     .small()
                     .frame(false)
                     .ui(ui)
@@ -1736,7 +1736,7 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("⏷")
+                if egui::Button::new("")
                     .small()
                     .frame(false)
                     .ui(ui)
