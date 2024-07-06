@@ -32,6 +32,7 @@ pub const SYNC: &str = "\u{E920}";
 pub const TRASH: &str = "\u{E908}";
 pub const TV: &str = "\u{E90F}";
 pub const X: &str = "\u{E91D}";
+pub const LOCATION_PIN: &str = "\u{E921}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.
