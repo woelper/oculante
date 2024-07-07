@@ -835,6 +835,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
+        state.is_loaded = true;
         let img = frame.buffer;
         debug!(
             "Received image buffer: {:?}, type: {:?}",
@@ -980,7 +981,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
         }
 
-        state.is_loaded = true;
+        
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
