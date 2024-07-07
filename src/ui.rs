@@ -2005,10 +2005,13 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 // }
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
+    
+    let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
+    
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
 
-        // ui.label("Channels");
+        // The Close button
         if state.persistent_settings.borderless {
             if unframed_button(X, ui).clicked() {
                 app.backend.exit();
@@ -2043,51 +2046,55 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             changed_channels = true;
         }
 
-        ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
-            // hack to center combo box in Y
 
-            ui.spacing_mut().button_padding = Vec2::new(10., -10.);
-            // ui.spacing_mut().combo_height = 100.;
-            // ui.spacing_mut().icon_width = 30.;
-            // ui.spacing_mut().combo_height = 400.;
-            // ui.spacing_mut().item_spacing = Vec2::splat(100.);
-            let combobox_text_size = 16.;
-            // TODO: Scale combobox
-            egui::ComboBox::from_id_source("channels")
-                // .height(16.)
-                .icon(blank_icon)
-                .selected_text(
-                    RichText::new(
-                        state
-                            .persistent_settings
-                            .current_channel
-                            .to_string()
-                            .to_uppercase(),
-                    )
-                    .size(combobox_text_size),
-                )
-                .show_ui(ui, |ui| {
-                    for channel in ColorChannel::iter() {
-                        let r = ui.selectable_value(
-                            &mut state.persistent_settings.current_channel,
-                            channel,
-                            RichText::new(channel.to_string().to_uppercase())
-                                .size(combobox_text_size),
-                        );
+        if window_x > ui.cursor().left() + 110. {
 
-                        if tooltip(
-                            r,
-                            &channel.to_string(),
-                            &channel.hotkey(&state.persistent_settings.shortcuts),
-                            ui,
+            ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
+                // hack to center combo box in Y
+
+                ui.spacing_mut().button_padding = Vec2::new(10., -10.);
+                // ui.spacing_mut().combo_height = 100.;
+                // ui.spacing_mut().icon_width = 30.;
+                // ui.spacing_mut().combo_height = 400.;
+                // ui.spacing_mut().item_spacing = Vec2::splat(100.);
+                let combobox_text_size = 16.;
+                // TODO: Scale combobox
+                egui::ComboBox::from_id_source("channels")
+                    // .height(16.)
+                    .icon(blank_icon)
+                    .selected_text(
+                        RichText::new(
+                            state
+                                .persistent_settings
+                                .current_channel
+                                .to_string()
+                                .to_uppercase(),
                         )
-                        .clicked()
-                        {
-                            changed_channels = true;
+                        .size(combobox_text_size),
+                    )
+                    .show_ui(ui, |ui| {
+                        for channel in ColorChannel::iter() {
+                            let r = ui.selectable_value(
+                                &mut state.persistent_settings.current_channel,
+                                channel,
+                                RichText::new(channel.to_string().to_uppercase())
+                                    .size(combobox_text_size),
+                            );
+
+                            if tooltip(
+                                r,
+                                &channel.to_string(),
+                                &channel.hotkey(&state.persistent_settings.shortcuts),
+                                ui,
+                            )
+                            .clicked()
+                            {
+                                changed_channels = true;
+                            }
                         }
-                    }
-                });
-        });
+                    });
+            });
+        }
 
         // TODO: remove redundancy
         if changed_channels {
@@ -2109,7 +2116,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_image.is_some() {
+        if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
                 unframed_button_colored(INFO, state.persistent_settings.info_enabled, ui),
@@ -2126,59 +2133,54 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     &state.extended_info_channel,
                 );
             }
+            if window_x > ui.cursor().left() + 80. {
 
-            if tooltip(
-                unframed_button_colored(
-                    PENCIL_SIMPLE_LINE,
-                    state.persistent_settings.edit_enabled,
+                if tooltip(
+                    unframed_button_colored(
+                        PENCIL_SIMPLE_LINE,
+                        state.persistent_settings.edit_enabled,
+                        ui,
+                    ),
+                    "Edit the image",
+                    &lookup(&state.persistent_settings.shortcuts, &EditMode),
                     ui,
-                ),
-                "Edit the image",
-                &lookup(&state.persistent_settings.shortcuts, &EditMode),
+                )
+                .clicked()
+                {
+                    state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                }
+            }
+        }
+
+        if window_x > ui.cursor().left() + 80.  {
+            if tooltip(
+                unframed_button(ARROWS_OUT_SIMPLE, ui),
+                "Toggle fullscreen",
+                &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
                 ui,
             )
             .clicked()
             {
-                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                toggle_fullscreen(app, state);
             }
         }
 
-        // FIXME This crashes/freezes!
-        // if tooltip(
-        //     unframed_button("⛶", ui),
-        //     "Full Screen",
-        //     &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
-        //     ui,
-        // )
-        // .clicked()
-        // {
-        //     toggle_fullscreen(app, state);
-        // }
+        if window_x > ui.cursor().left() + 80. {
 
-        if tooltip(
-            unframed_button(ARROWS_OUT_SIMPLE, ui),
-            "Toggle fullscreen",
-            &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
-            ui,
-        )
-        .clicked()
-        {
-            toggle_fullscreen(app, state);
+            if tooltip(
+                unframed_button_colored(ARROW_LINE_UP, state.always_on_top, ui),
+                "Always on top",
+                &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
+                ui,
+            )
+            .clicked()
+            {
+                state.always_on_top = !state.always_on_top;
+                app.window().set_always_on_top(state.always_on_top);
+            }
         }
 
-        if tooltip(
-            unframed_button_colored(ARROW_LINE_UP, state.always_on_top, ui),
-            "Always on top",
-            &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
-            ui,
-        )
-        .clicked()
-        {
-            state.always_on_top = !state.always_on_top;
-            app.window().set_always_on_top(state.always_on_top);
-        }
-
-        if state.current_path.is_some() {
+        if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -2191,7 +2193,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.is_some() {
+        if state.current_texture.is_some() && window_x > ui.cursor().left() + 80.  {
             if tooltip(
                 unframed_button(PLACEHOLDER, ui),
                 "Clear image",
@@ -2204,7 +2206,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.scrubber.len() > 1 {
+
+        if state.scrubber.len() > 1 && window_x > ui.cursor().left() {
             // TODO: Check if wrap is off and we are at fisrt image
             if tooltip(
                 unframed_button(CARET_LEFT, ui),
@@ -2238,6 +2241,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         state
                             .current_path
                             .as_ref()
+                            .map(|p| p.file_name().unwrap_or_default())
                             .map(|p| p.to_string_lossy().to_string())
                             .unwrap_or_default()
                     ));
