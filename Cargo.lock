@@ -2877,9 +2877,9 @@ checksum = "f5d4a7da358eff58addd2877a45865158f0d78c911d43a5784ceb7bbf52833b0"
 
 [[package]]
 name = "jpeg2k"
-version = "0.7.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61b77dca605ffd2a64351ed48beac80cf54b4d7dac61be8815bf73757c108b63"
+checksum = "f5b1c0ab2091b7044e98ec1910d63f68cc51358ec0dfde83f0b1d7aab654adb9"
 dependencies = [
  "anyhow",
  "log",

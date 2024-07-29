@@ -86,7 +86,7 @@ imageproc = { version = "0.25", features = ["rayon"] }
 num-traits = "0.2.18"
 zerocopy = "0.7.34"
 icns = "0.3.1"
-jpeg2k = { version = "0.7.0", optional = true, default-features = false, features = [
+jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
   "threads",
   "file-io",
   "openjpeg-sys",

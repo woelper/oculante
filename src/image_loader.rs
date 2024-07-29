@@ -118,14 +118,30 @@ pub fn open_image(
         "jp2" => {
             let jp2_image = jpeg2k::Image::from_file(img_location)?;
 
-            let image_buffer = RgbaImage::from_raw(
-                jp2_image.width(),
-                jp2_image.height(),
-                jp2_image.get_pixels(Some(255))?.data,
-            )
-            .context("Can't decode jp2k buffer")?;
-            _ = sender.send(Frame::new_still(image_buffer));
-            return Ok(receiver);
+            match jp2_image.get_pixels(Some(255))?.data {
+                jpeg2k::ImagePixelData::L8(_) => bail!("jpeg2k L8 unsupported"),
+                jpeg2k::ImagePixelData::La8(_) => bail!("jpeg2k La8 unsupported"),
+                jpeg2k::ImagePixelData::Rgb8(data) => {
+                    let image_buffer =
+                        RgbImage::from_raw(jp2_image.width(), jp2_image.height(), data)
+                            .context("Can't decode jp2k buffer")?;
+                    _ = sender.send(Frame::new_still(
+                        DynamicImage::ImageRgb8(image_buffer).to_rgba8(),
+                    ));
+                    return Ok(receiver);
+                }
+                jpeg2k::ImagePixelData::Rgba8(data) => {
+                    let image_buffer =
+                        RgbaImage::from_raw(jp2_image.width(), jp2_image.height(), data)
+                            .context("Can't decode jp2k buffer")?;
+                    _ = sender.send(Frame::new_still(image_buffer));
+                    return Ok(receiver);
+                }
+                jpeg2k::ImagePixelData::L16(_) => bail!("jpeg2k L16 unsupported"),
+                jpeg2k::ImagePixelData::La16(_) => bail!("jpeg2k La16 unsupported"),
+                jpeg2k::ImagePixelData::Rgb16(_) => bail!("jpeg2k Rgb16 unsupported"),
+                jpeg2k::ImagePixelData::Rgba16(_) => bail!("jpeg2k Rgba16 unsupported"),
+            }
         }
         #[cfg(feature = "heif")]
         "heif" | "heic" => {
@@ -230,7 +246,7 @@ pub fn open_image(
 
             let render_scale = 2.;
             let mut opt = usvg::Options::default();
-            
+
             let fontdb = opt.fontdb_mut();
             fontdb.load_system_fonts();
             fontdb.load_font_data(FONT.to_vec());
@@ -243,16 +259,22 @@ pub fn open_image(
 
             let svg_data = std::fs::read(img_location)?;
             if let Ok(tree) = usvg::Tree::from_data(&svg_data, &opt) {
-                let pixmap_size = tree.size().to_int_size().scale_by(render_scale).context("Can't get SVG size")?;
+                let pixmap_size = tree
+                    .size()
+                    .to_int_size()
+                    .scale_by(render_scale)
+                    .context("Can't get SVG size")?;
 
-                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
+                if let Some(mut pixmap) =
+                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
+                {
                     let mut fontdb = usvg::fontdb::Database::new();
                     fontdb.load_system_fonts();
                     fontdb.load_font_data(FONT.to_vec());
                     fontdb.set_cursive_family("Inter");
                     fontdb.set_sans_serif_family("Inter");
                     fontdb.set_serif_family("Inter");
-                 
+
                     let render_ts = tiny_skia::Transform::from_scale(render_scale, render_scale);
                     resvg::render(&tree, render_ts, &mut pixmap.as_mut());
                     let buf: RgbaImage = image::ImageBuffer::from_raw(
