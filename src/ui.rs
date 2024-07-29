@@ -1672,10 +1672,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[0].button("➡ Rotate 90°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot90,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)
                     )
                     .is_ok()
                     {
@@ -1686,10 +1683,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[1].button("⬅ Rotate -90°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot270,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)
                     )
                     .is_ok()
                     {
@@ -1700,10 +1694,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[2].button("⬇ Rotate 180°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot180,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot180)
                     )
                     .is_ok()
                     {
@@ -1716,10 +1707,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[0].button("Flip H").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Hflip,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Hflip)
                     )
                     .is_ok()
                     {
@@ -1730,10 +1718,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[1].button("Flip V").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Vflip,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Vflip)
                     )
                     .is_ok()
                     {
@@ -1787,18 +1772,17 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
 
                                 let crop_range = cropped_range(&amt, &dim);
 
+                                let mut crop = turbojpeg::Transform::default();
+                                crop.crop = Some(turbojpeg::TransformCrop {
+                                    x: crop_range[0] as usize,
+                                    y: crop_range[1] as usize,
+                                    width: Some(crop_range[2] as usize),
+                                    height: Some(crop_range[3] as usize),
+                                });
+
                                 match lossless_tx(
                                     p,
-                                    turbojpeg::Transform {
-                                        op: turbojpeg::TransformOp::None,
-                                        crop: Some(turbojpeg::TransformCrop {
-                                            x: crop_range[0] as usize,
-                                            y: crop_range[1] as usize,
-                                            width: Some(crop_range[2] as usize),
-                                            height: Some(crop_range[3] as usize),
-                                        }),
-                                        ..turbojpeg::Transform::default()
-                                    },
+                                    crop
                                 ) {
                                     Ok(_) => reload = true,
                                     Err(e) => log::warn!("{e}"),

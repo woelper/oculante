@@ -760,10 +760,20 @@ pub fn open_image(
         "jpg" | "jpeg" => {
             debug!("Loading jpeg using turbojpeg");
             let jpeg_data = std::fs::read(img_location)?;
-            let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
-            let d = DynamicImage::ImageRgb8(buf);
-
-            _ = sender.send(Frame::new_still(d.to_rgba8()));
+            let mut decompressor = turbojpeg::Decompressor::new()?;
+            let header = decompressor.read_header(&jpeg_data)?;
+            let (width, height) = (header.width, header.height);
+            let mut image = turbojpeg::Image {
+                pixels: vec![0; 3 * width * height],
+                width: width,
+                pitch: 3 * width, // we use no padding between rows
+                height: height,
+                format: turbojpeg::PixelFormat::RGB,
+            };
+            decompressor.decompress(&jpeg_data, image.as_deref_mut())?;
+            let i = RgbImage::from_raw(width as u32, height as u32, image.pixels)
+                .context("Can't load RgbImage from decompressed TurboJPEG")?;
+            _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).to_rgba8()));
             return Ok(receiver);
         }
         "icns" => {

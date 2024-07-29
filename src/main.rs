@@ -471,14 +471,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 debug!("Lossless rotate right");
 
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot90,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
@@ -491,14 +485,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot270,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
