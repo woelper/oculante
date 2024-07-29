@@ -105,6 +105,7 @@ pub fn open_image(
         }
         #[cfg(feature = "dav1d")]
         "avif" | "avifs" => {
+            use std::io::Read;
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;

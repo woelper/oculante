@@ -25,13 +25,13 @@ dirs = "5.0"
 env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
-fast_image_resize = "2.7"
+fast_image_resize = "4.0"
 gif = "0.12"
 gif-dispose = "4"
-image = {version = "0.25.2", features = ["hdr"]}
+image = { version = "0.25.2", features = ["hdr"] }
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
-libavif-image = { version = "0.11", optional = true }
+libavif-image = { version = "0.14", optional = true }
 log = "0.4"
 nalgebra = "0.33"
 notan = { version = "0.12", default-features = false, features = [
@@ -53,14 +53,14 @@ tiny-skia = "0.11.4"
 usvg = "0.42.0"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
-self_update = { version = "0.40", default-features = false, features = [
+self_update = { version = "0.41", default-features = false, features = [
   "rustls",
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
-turbojpeg = {version = "0.5.4", features = ["image"], optional = true}
+turbojpeg = { version = "0.5.4", features = ["image"], optional = true }
 webbrowser = "1.0"
 tiff = "0.9"
 jxl-oxide = "0.8"
@@ -69,7 +69,7 @@ img-parts = "0.3"
 dark-light = "1.0"
 trash = "5.0"
 lutgen = { version ="0.10.0", features = ["lutgen-palettes"] }
-libheif-rs = { version = "0.22.0", default-features = false, optional = true}
+libheif-rs = { version = "1.0", default-features = false, optional = true}
 egui-phosphor = "0.5"
 egui-notify = "0.14"
 ktx2 = "0.3.0"

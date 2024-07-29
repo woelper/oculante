@@ -208,12 +208,6 @@ dependencies = [
 
 [[package]]
 name = "arbitrary"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db55d72333851e17d572bec876e390cd3b11eb1ef53ae821dd9f3b653d2b4569"
-
-[[package]]
-name = "arbitrary"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d5a26814d8dcb93b0e5a0ff3c6d80a8843bafb21b39e8e18a6f05471870e110"
@@ -259,9 +253,6 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "ash"
@@ -479,7 +470,6 @@ dependencies = [
  "log",
  "nom",
  "num-rational",
- "serde",
  "v_frame",
 ]
 
@@ -623,12 +613,6 @@ dependencies = [
 
 [[package]]
 name = "bitstream-io"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e445576659fd04a57b44cbd00aa37aaa815ebefa0aa3cb677a6b5e63d883074f"
-
-[[package]]
-name = "bitstream-io"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3dcde5f311c85b8ca30c2e4198d4326bc342c76541590106f5fa4a50946ea499"
@@ -711,15 +695,6 @@ dependencies = [
 
 [[package]]
 name = "built"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b9c056b9ed43aee5e064b683aa1ec783e19c6acec7559e3ae931b7490472fbe"
-dependencies = [
- "cargo-lock",
-]
-
-[[package]]
-name = "built"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "236e6289eda5a812bc6b53c3b024039382a2895fbbeef2d748b2931546d392c4"
@@ -792,18 +767,6 @@ dependencies = [
  "slotmap",
  "thiserror",
  "vec_map",
-]
-
-[[package]]
-name = "cargo-lock"
-version = "8.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "031718ddb8f78aa5def78a09e90defe30151d1f6c672f937af4dd916429ed996"
-dependencies = [
- "semver",
- "serde",
- "toml 0.5.11",
- "url",
 ]
 
 [[package]]
@@ -1706,10 +1669,12 @@ checksum = "dd2e7510819d6fbf51a5545c8f922716ecfb14df168a3242f7d33e0239efe6a1"
 
 [[package]]
 name = "fast_image_resize"
-version = "2.7.3"
+version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc789a40040e11bbe4ba31ca319406805a12fe3f8d71314bbc4bd076602ad55a"
+checksum = "2ca4b58827213977eabab8ee8d8258db8441338f3a1832a1c0f2de3372175531"
 dependencies = [
+ "cfg-if 1.0.0",
+ "document-features",
  "num-traits 0.2.19",
  "thiserror",
 ]
@@ -2686,7 +2651,7 @@ dependencies = [
  "approx",
  "getrandom",
  "image 0.25.2",
- "itertools 0.12.1",
+ "itertools",
  "nalgebra 0.32.6",
  "num",
  "rand",
@@ -2811,15 +2776,6 @@ name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
-
-[[package]]
-name = "itertools"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -3075,7 +3031,7 @@ dependencies = [
  "fixed",
  "generator",
  "init_with",
- "itertools 0.12.1",
+ "itertools",
  "log",
  "num-traits 0.2.19",
  "ordered-float",
@@ -3136,33 +3092,33 @@ dependencies = [
 
 [[package]]
 name = "libavif"
-version = "0.12.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de9e3e4b3d7207b3e3a5e88292b304d4daf2d018e4cdc57ec28a6757ab75235c"
+checksum = "0b710faf0de92da0e32a9a9c89bbf849e37277fd447b4f17b0f0f798796ae1f2"
 dependencies = [
  "libavif-sys",
 ]
 
 [[package]]
 name = "libavif-image"
-version = "0.11.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00adf2185dbfd6555c2a428b6ab13d1839c58dd9fdf409569ed244c2f54f99a5"
+checksum = "b0a6b5ea7c9d9260fa57daa8f238992de5d9c7a3c82a78e8dbc4d1367e7c28be"
 dependencies = [
- "image 0.24.9",
+ "image 0.25.2",
  "libavif",
 ]
 
 [[package]]
 name = "libavif-sys"
-version = "0.15.0"
+version = "0.17.0+libavif.1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baaae0ec93359268f49b6659a7505ba224f0e8f7885535f6a8d14c4aa2a544da"
+checksum = "490ca74b61e773140bebb086c81facb23273a99364a9ab0c92ab1532b90ade35"
 dependencies = [
  "cmake",
  "libc",
  "libdav1d-sys",
- "rav1e 0.6.6",
+ "rav1e",
 ]
 
 [[package]]
@@ -3173,21 +3129,11 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libdav1d-sys"
-version = "0.6.0"
+version = "0.7.1+libdav1d.1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12c9cc342dc258130a727ad15f48d01ebb181aafec30dd65338d8e51db930572"
+checksum = "3d875e9669d116a603412a126de599b7bf47789a365b79fcf461fbf9c18d141f"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "libfuzzer-sys"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcf184a4b6b274f82a5df6b357da6055d3e82272327bba281c28bbba6f1664ef"
-dependencies = [
- "arbitrary 0.4.7",
- "cc",
 ]
 
 [[package]]
@@ -3196,16 +3142,16 @@ version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96cfd5557eb82f2b83fed4955246c988d331975a002961b07c81584d107e7f7"
 dependencies = [
- "arbitrary 1.3.2",
+ "arbitrary",
  "cc",
  "once_cell",
 ]
 
 [[package]]
 name = "libheif-rs"
-version = "0.22.0"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f644fa9c774f17b545fb3c09f8f1a29cc09385a5504c03c6a158878e9522acd"
+checksum = "40c32c0a0c970782707070f11c8612bced800b916af4ddaf6229161dc3ceb907"
 dependencies = [
  "enumn",
  "four-cc",
@@ -4086,17 +4032,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "num-traits 0.2.19",
-]
-
-[[package]]
-name = "num-derive"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -5160,70 +5095,35 @@ checksum = "9c8a99fddc9f0ba0a85884b8d14e3592853e787d581ca1816c91349b10e4eeab"
 
 [[package]]
 name = "rav1e"
-version = "0.6.6"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16c383692a5e7abd9f6d1eddb1a5e0269f859392387883361bb09e5555852ec1"
+checksum = "cd87ce80a7665b1cce111f8a16c1f3929f6547ce91ade6addf4ec86a8dda5ce9"
 dependencies = [
- "arbitrary 0.4.7",
+ "arbitrary",
  "arg_enum_proc_macro",
  "arrayvec",
  "av1-grain",
- "bitstream-io 1.10.0",
- "built 0.5.2",
+ "bitstream-io",
+ "built",
  "cc",
  "cfg-if 1.0.0",
  "interpolate_name",
- "itertools 0.10.5",
+ "itertools",
  "libc",
- "libfuzzer-sys 0.3.5",
+ "libfuzzer-sys",
  "log",
  "maybe-rayon",
  "nasm-rs",
  "new_debug_unreachable",
  "noop_proc_macro",
- "num-derive 0.3.3",
- "num-traits 0.2.19",
- "once_cell",
- "paste",
- "rand",
- "rand_chacha",
- "rust_hawktracer",
- "rustc_version",
- "scan_fmt",
- "simd_helpers",
- "system-deps",
- "thiserror",
- "v_frame",
-]
-
-[[package]]
-name = "rav1e"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd87ce80a7665b1cce111f8a16c1f3929f6547ce91ade6addf4ec86a8dda5ce9"
-dependencies = [
- "arbitrary 1.3.2",
- "arg_enum_proc_macro",
- "arrayvec",
- "av1-grain",
- "bitstream-io 2.5.0",
- "built 0.7.4",
- "cfg-if 1.0.0",
- "interpolate_name",
- "itertools 0.12.1",
- "libc",
- "libfuzzer-sys 0.4.7",
- "log",
- "maybe-rayon",
- "new_debug_unreachable",
- "noop_proc_macro",
- "num-derive 0.4.2",
+ "num-derive",
  "num-traits 0.2.19",
  "once_cell",
  "paste",
  "profiling",
  "rand",
  "rand_chacha",
+ "scan_fmt",
  "simd_helpers",
  "system-deps",
  "thiserror",
@@ -5241,7 +5141,7 @@ dependencies = [
  "imgref",
  "loop9",
  "quick-error",
- "rav1e 0.7.1",
+ "rav1e",
  "rgb",
 ]
 
@@ -5485,28 +5385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust_hawktracer"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3480a29b927f66c6e06527be7f49ef4d291a01d694ec1fe85b0de71d6b02ac1"
-dependencies = [
- "rust_hawktracer_normal_macro",
- "rust_hawktracer_proc_macro",
-]
-
-[[package]]
-name = "rust_hawktracer_normal_macro"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a570059949e1dcdc6f35228fa389f54c2c84dfe0c94c05022baacd56eacd2e9"
-
-[[package]]
-name = "rust_hawktracer_proc_macro"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb626abdbed5e93f031baae60d72032f56bc964e11ac2ff65f2ba3ed98d6d3e1"
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5523,15 +5401,6 @@ name = "rustc-hash"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
-
-[[package]]
-name = "rustc_version"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
-dependencies = [
- "semver",
-]
 
 [[package]]
 name = "rustix"
@@ -5687,9 +5556,9 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.40.0"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e4997484b55df069a4773d822715695b2cc27b23829eca2a4b41690e948bdeb"
+checksum = "469a3970061380c19852269f393e74c0fe607a4e23d85267382cf25486aa8de5"
 dependencies = [
  "hyper",
  "indicatif",
@@ -5709,9 +5578,6 @@ name = "semver"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "serde"
