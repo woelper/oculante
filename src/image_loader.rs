@@ -491,7 +491,7 @@ pub fn open_image(
             let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&contents))?;
             if !decoder.has_animation() {
                 //force this to webp
-                let img = image::io::Reader::with_format(
+                let img = image::ImageReader::with_format(
                     std::io::Cursor::new(contents),
                     image::ImageFormat::WebP,
                 )
