@@ -2047,16 +2047,6 @@ dependencies = [
 
 [[package]]
 name = "gif"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80792593675e051cf94a4b111980da2ba60d4a83e43e0048c5693baab3977045"
-dependencies = [
- "color_quant",
- "weezl",
-]
-
-[[package]]
-name = "gif"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fb2d69b19215e18bb912fa30f7ce15846e301408695e44e0ef719f1da9e19f2"
@@ -2067,11 +2057,11 @@ dependencies = [
 
 [[package]]
 name = "gif-dispose"
-version = "4.0.1"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "347afae04a03ca25a3a76d130abb63e7e6e7367b895470fdc3d996aec916c3d7"
+checksum = "5e1aa07391f3d9c279f388cea6faf291555dd891df59bed01d4378583df946ac"
 dependencies = [
- "gif 0.12.0",
+ "gif",
  "imgref",
  "rgb",
 ]
@@ -2618,7 +2608,7 @@ dependencies = [
  "byteorder-lite",
  "color_quant",
  "exr",
- "gif 0.13.1",
+ "gif",
  "image-webp",
  "num-traits 0.2.19",
  "png 0.17.13",
@@ -4343,7 +4333,7 @@ dependencies = [
  "flate2",
  "fluent-uri",
  "fruitbasket",
- "gif 0.12.0",
+ "gif",
  "gif-dispose",
  "icns",
  "image 0.25.2",
@@ -5305,7 +5295,7 @@ version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "944d052815156ac8fa77eaac055220e95ba0b01fa8887108ca710c03805d9051"
 dependencies = [
- "gif 0.13.1",
+ "gif",
  "jpeg-decoder",
  "log",
  "pico-args",

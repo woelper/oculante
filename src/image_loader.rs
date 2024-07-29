@@ -728,7 +728,7 @@ pub fn open_image(
                         let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
                             dim.0,
                             dim.1,
-                            screen.pixels.buf().as_bytes().to_vec(),
+                            screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
                         _ = sender.send(Frame::new(
                             buf.context("Can't read gif frame")?,

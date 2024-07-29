@@ -17,8 +17,8 @@ name = "oculante"
 
 [dependencies]
 anyhow = "1.0"
-arboard = {version="3.2", features = ["wayland-data-control"]}
-avif-decode = {version = "1.0", optional = true}
+arboard = { version = "3.2", features = ["wayland-data-control"] }
+avif-decode = { version = "1.0", optional = true }
 clap = "3.2"
 dds-rs = "0.7"
 dirs = "5.0"
@@ -26,8 +26,8 @@ env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
 fast_image_resize = "4.0"
-gif = "0.12"
-gif-dispose = "4"
+gif = "0.13.1"
+gif-dispose = "5.0.1"
 image = { version = "0.25.2", features = ["hdr"] }
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
@@ -68,8 +68,8 @@ zune-png = "0.5.0-rc1"
 img-parts = "0.3"
 dark-light = "1.0"
 trash = "5.0"
-lutgen = { version ="0.10.0", features = ["lutgen-palettes"] }
-libheif-rs = { version = "1.0", default-features = false, optional = true}
+lutgen = { version = "0.10.0", features = ["lutgen-palettes"] }
+libheif-rs = { version = "1.0", default-features = false, optional = true }
 egui-phosphor = "0.5"
 egui-notify = "0.14"
 ktx2 = "0.3.0"
@@ -94,7 +94,14 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
 file-format = "0.25.0"
 
 [features]
-default = ["turbo", "avif_native", "file_open", "update", "notan/glsl-to-spirv", "j2k"]
+default = [
+  "turbo",
+  "avif_native",
+  "file_open",
+  "update",
+  "notan/glsl-to-spirv",
+  "j2k",
+]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
