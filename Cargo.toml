@@ -1,7 +1,7 @@
 [package]
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
-edition = "2018"
+edition = "2021"
 exclude = ["res/*.gif", "tests/*"]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
@@ -28,12 +28,12 @@ exr = "1.72"
 fast_image_resize = "2.7"
 gif = "0.12"
 gif-dispose = "4"
-image = {version = "0.25.1", features = ["hdr"]}
+image = {version = "0.25.2", features = ["hdr"]}
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = { version = "0.11", optional = true }
 log = "0.4"
-nalgebra = "0.32"
+nalgebra = "0.33"
 notan = { version = "0.12", default-features = false, features = [
   "backend",
   "draw",
