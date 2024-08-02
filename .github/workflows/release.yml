@@ -104,7 +104,7 @@ jobs:
       if: matrix.os == 'windows-2019'
 
     - name: Build Windows Application
-      run: cargo build --release --features heif --features notan/shaderc
+      run: cargo build --release --features heif --features notan/glsl-to-spirv
       if: matrix.os == 'windows-2019'
 
 
