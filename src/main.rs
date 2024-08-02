@@ -64,7 +64,9 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "debug");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "debug");
+        }
     }
     let _ = env_logger::try_init();
 
@@ -608,6 +610,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             state.persistent_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
+            trace!("Mouse wheel event");
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
                     // Change image to next/prev
@@ -643,6 +646,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
 
         Event::Drop(file) => {
+            trace!("File drop event");
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
                     if SUPPORTED_EXTENSIONS
@@ -658,26 +662,23 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::MouseDown { button, .. } => {
-            state.drag_enabled = true;
-            match button {
-                MouseButton::Left => {
-                    if !state.mouse_grab {
-                        state.drag_enabled = true;
-                    }
-                }
-                MouseButton::Middle => {
+        Event::MouseDown { button, .. } => match button {
+            MouseButton::Left => {
+                if !state.mouse_grab {
                     state.drag_enabled = true;
                 }
-                _ => {}
             }
-        }
+            MouseButton::Middle => {
+                state.drag_enabled = true;
+            }
+            _ => {}
+        },
         Event::MouseUp { button, .. } => match button {
             MouseButton::Left | MouseButton::Middle => state.drag_enabled = false,
             _ => {}
         },
         _ => {
-            // debug!("{:?}", evt);
+            trace!("Event: {:?}", evt);
         }
     }
 }

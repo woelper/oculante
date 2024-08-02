@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 // use hashbrown::{HashMap, HashSet};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 // use std::collections::HashMap;
 
 use crate::OculanteState;
@@ -169,6 +169,10 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // let mut alternates: HashMap<String, String>;
     // alternates.insert("+", v)
 
+    if !app.keyboard.down.is_empty() {
+        trace!("Keyboard down: {:?}", app.keyboard.down);
+    }
+
     // don't do anything if keyboard is grabbed (typing in textbox etc)
     if state.key_grab {
         return false;
@@ -182,7 +186,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // early out if just one key is pressed, and it's a modifier
     if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
         if app.keyboard.down.len() == 1 {
-            log::trace!("alt/shift/ctrl modifier down");
+            trace!("alt/shift/ctrl modifier down");
             return false;
         }
     }
