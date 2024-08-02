@@ -105,6 +105,7 @@ pub fn open_image(
         }
         #[cfg(feature = "dav1d")]
         "avif" | "avifs" => {
+            use std::io::Read;
             let mut file = File::open(img_location)?;
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
@@ -118,14 +119,30 @@ pub fn open_image(
         "jp2" => {
             let jp2_image = jpeg2k::Image::from_file(img_location)?;
 
-            let image_buffer = RgbaImage::from_raw(
-                jp2_image.width(),
-                jp2_image.height(),
-                jp2_image.get_pixels(Some(255))?.data,
-            )
-            .context("Can't decode jp2k buffer")?;
-            _ = sender.send(Frame::new_still(image_buffer));
-            return Ok(receiver);
+            match jp2_image.get_pixels(Some(255))?.data {
+                jpeg2k::ImagePixelData::L8(_) => bail!("jpeg2k L8 unsupported"),
+                jpeg2k::ImagePixelData::La8(_) => bail!("jpeg2k La8 unsupported"),
+                jpeg2k::ImagePixelData::Rgb8(data) => {
+                    let image_buffer =
+                        RgbImage::from_raw(jp2_image.width(), jp2_image.height(), data)
+                            .context("Can't decode jp2k buffer")?;
+                    _ = sender.send(Frame::new_still(
+                        DynamicImage::ImageRgb8(image_buffer).to_rgba8(),
+                    ));
+                    return Ok(receiver);
+                }
+                jpeg2k::ImagePixelData::Rgba8(data) => {
+                    let image_buffer =
+                        RgbaImage::from_raw(jp2_image.width(), jp2_image.height(), data)
+                            .context("Can't decode jp2k buffer")?;
+                    _ = sender.send(Frame::new_still(image_buffer));
+                    return Ok(receiver);
+                }
+                jpeg2k::ImagePixelData::L16(_) => bail!("jpeg2k L16 unsupported"),
+                jpeg2k::ImagePixelData::La16(_) => bail!("jpeg2k La16 unsupported"),
+                jpeg2k::ImagePixelData::Rgb16(_) => bail!("jpeg2k Rgb16 unsupported"),
+                jpeg2k::ImagePixelData::Rgba16(_) => bail!("jpeg2k Rgba16 unsupported"),
+            }
         }
         #[cfg(feature = "heif")]
         "heif" | "heic" => {
@@ -230,7 +247,7 @@ pub fn open_image(
 
             let render_scale = 2.;
             let mut opt = usvg::Options::default();
-            
+
             let fontdb = opt.fontdb_mut();
             fontdb.load_system_fonts();
             fontdb.load_font_data(FONT.to_vec());
@@ -243,16 +260,22 @@ pub fn open_image(
 
             let svg_data = std::fs::read(img_location)?;
             if let Ok(tree) = usvg::Tree::from_data(&svg_data, &opt) {
-                let pixmap_size = tree.size().to_int_size().scale_by(render_scale).context("Can't get SVG size")?;
+                let pixmap_size = tree
+                    .size()
+                    .to_int_size()
+                    .scale_by(render_scale)
+                    .context("Can't get SVG size")?;
 
-                if let Some(mut pixmap) = tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()) {
+                if let Some(mut pixmap) =
+                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
+                {
                     let mut fontdb = usvg::fontdb::Database::new();
                     fontdb.load_system_fonts();
                     fontdb.load_font_data(FONT.to_vec());
                     fontdb.set_cursive_family("Inter");
                     fontdb.set_sans_serif_family("Inter");
                     fontdb.set_serif_family("Inter");
-                 
+
                     let render_ts = tiny_skia::Transform::from_scale(render_scale, render_scale);
                     resvg::render(&tree, render_ts, &mut pixmap.as_mut());
                     let buf: RgbaImage = image::ImageBuffer::from_raw(
@@ -491,7 +514,7 @@ pub fn open_image(
             let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&contents))?;
             if !decoder.has_animation() {
                 //force this to webp
-                let img = image::io::Reader::with_format(
+                let img = image::ImageReader::with_format(
                     std::io::Cursor::new(contents),
                     image::ImageFormat::WebP,
                 )
@@ -705,7 +728,7 @@ pub fn open_image(
                         let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
                             dim.0,
                             dim.1,
-                            screen.pixels.buf().as_bytes().to_vec(),
+                            screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
                         _ = sender.send(Frame::new(
                             buf.context("Can't read gif frame")?,
@@ -737,10 +760,20 @@ pub fn open_image(
         "jpg" | "jpeg" => {
             debug!("Loading jpeg using turbojpeg");
             let jpeg_data = std::fs::read(img_location)?;
-            let buf: RgbImage = turbojpeg::decompress_image(&jpeg_data)?;
-            let d = DynamicImage::ImageRgb8(buf);
-
-            _ = sender.send(Frame::new_still(d.to_rgba8()));
+            let mut decompressor = turbojpeg::Decompressor::new()?;
+            let header = decompressor.read_header(&jpeg_data)?;
+            let (width, height) = (header.width, header.height);
+            let mut image = turbojpeg::Image {
+                pixels: vec![0; 3 * width * height],
+                width: width,
+                pitch: 3 * width, // we use no padding between rows
+                height: height,
+                format: turbojpeg::PixelFormat::RGB,
+            };
+            decompressor.decompress(&jpeg_data, image.as_deref_mut())?;
+            let i = RgbImage::from_raw(width as u32, height as u32, image.pixels)
+                .context("Can't load RgbImage from decompressed TurboJPEG")?;
+            _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).to_rgba8()));
             return Ok(receiver);
         }
         "icns" => {
