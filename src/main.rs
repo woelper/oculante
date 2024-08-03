@@ -65,7 +65,9 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "debug");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "debug");
+        }
     }
     let _ = env_logger::try_init();
 
@@ -489,14 +491,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 debug!("Lossless rotate right");
 
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot90,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
@@ -509,14 +505,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot270,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
@@ -638,6 +628,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             state.persistent_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
+            trace!("Mouse wheel event");
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
                     // Change image to next/prev
@@ -673,6 +664,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
 
         Event::Drop(file) => {
+            trace!("File drop event");
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
                     if SUPPORTED_EXTENSIONS
@@ -688,26 +680,23 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::MouseDown { button, .. } => {
-            state.drag_enabled = true;
-            match button {
-                MouseButton::Left => {
-                    if !state.mouse_grab {
-                        state.drag_enabled = true;
-                    }
-                }
-                MouseButton::Middle => {
+        Event::MouseDown { button, .. } => match button {
+            MouseButton::Left => {
+                if !state.mouse_grab {
                     state.drag_enabled = true;
                 }
-                _ => {}
             }
-        }
+            MouseButton::Middle => {
+                state.drag_enabled = true;
+            }
+            _ => {}
+        },
         Event::MouseUp { button, .. } => match button {
             MouseButton::Left | MouseButton::Middle => state.drag_enabled = false,
             _ => {}
         },
         _ => {
-            // debug!("{:?}", evt);
+            trace!("Event: {:?}", evt);
         }
     }
 }

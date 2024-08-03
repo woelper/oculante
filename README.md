@@ -247,6 +247,8 @@ Mac
 
 <kbd>Delete</kbd> = DeleteFile
 
+<kbd>LShift</kbd> + <kbd>Delete</kbd> = ClearImage
+
 <kbd>RBracket</kbd> = LosslessRotateRight
 
 <kbd>LBracket</kbd> = LosslessRotateLeft
