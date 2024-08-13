@@ -326,7 +326,15 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
         fonts
             .font_data
-            .insert("inter".to_owned(), FontData::from_static(FONT));
+            .insert(
+                "inter".to_owned(), 
+                FontData::from_static(FONT).tweak(FontTweak {
+                    scale: 1.0,
+                    y_offset_factor: 0.0,
+                    y_offset: -2.2,
+                    baseline_offset_factor: 0.0,
+                })
+            );
 
         fonts.font_data.insert(
             "icons".to_owned(),
@@ -356,14 +364,14 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
         let mut style: egui::Style = (*ctx.style()).clone();
         style.interaction.tooltip_delay = 0.0;
-        let font_scale = 0.80;
+        // let font_scale = 0.80;
         style.spacing.icon_width = 20.;
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
 
-        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
+        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15. ;
+        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15. ;
+        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12. ;
+        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18. ;
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
