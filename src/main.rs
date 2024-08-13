@@ -324,17 +324,15 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
-        fonts
-            .font_data
-            .insert(
-                "inter".to_owned(), 
-                FontData::from_static(FONT).tweak(FontTweak {
-                    scale: 1.0,
-                    y_offset_factor: 0.0,
-                    y_offset: -2.2,
-                    baseline_offset_factor: 0.0,
-                })
-            );
+        fonts.font_data.insert(
+            "inter".to_owned(),
+            FontData::from_static(FONT).tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: -2.2,
+                baseline_offset_factor: 0.0,
+            }),
+        );
 
         fonts.font_data.insert(
             "icons".to_owned(),
@@ -368,10 +366,10 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.spacing.icon_width = 20.;
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
 
-        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15. ;
-        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15. ;
-        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12. ;
-        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18. ;
+        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
+        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
+        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12.;
+        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18.;
         style.visuals.selection.bg_fill = Color32::from_rgb(
             state.persistent_settings.accent_color[0],
             state.persistent_settings.accent_color[1],
@@ -388,6 +386,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
+        // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
         ctx.set_fonts(fonts);
 
         ctx.set_style(style);
@@ -978,8 +977,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
         }
 
-        
-
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => {
@@ -1042,9 +1039,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if !state.persistent_settings.zen_mode {
+            let menu_height = 42.0;
             egui::TopBottomPanel::top("menu")
-                .min_height(30.)
-                .default_height(30.)
+                .exact_height(menu_height)
+                .show_separator_line(false)
                 .show(ctx, |ui| {
                     main_menu(ui, state, app, gfx);
                 });

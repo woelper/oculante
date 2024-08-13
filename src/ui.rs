@@ -202,10 +202,11 @@ fn styled_button(&mut self, text: &str) -> Response {
 
     self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
 
+    let spacing = if icon.len() == 0 {""} else {"   "};
     let r = self.add(
-        egui::Button::new(format!("   {description}"))
+        egui::Button::new(format!("{spacing}{description}"))
         .rounding(5.)
-        .min_size(vec2(10., 32.))
+        .min_size(vec2(140., 32.))
         // .shortcut_text("sds")
     );
 
@@ -2065,7 +2066,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             state.persistent_settings.current_channel = ColorChannel::Alpha;
             changed_channels = true;
         }
-
         if key_pressed(app, state, RGBChannel) {
             state.persistent_settings.current_channel = ColorChannel::Rgb;
             changed_channels = true;
@@ -2076,29 +2076,19 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
 
-        let mut selected = "sdsd".to_string();
-
-        egui::ComboBox::from_label("Select one!")
-    .selected_text(format!("{:?}", selected))
-    .show_ui(ui, |ui| {
-    }
-);
-
 
         if window_x > ui.cursor().left() + 110. {
 
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
-                // hack to center combo box in Y
+                ui.spacing_mut().button_padding = Vec2::new(10., 0.);
+                ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
+                ui.spacing_mut().combo_width = 1.;
+                ui.spacing_mut().icon_width = 0.;
 
-                ui.spacing_mut().button_padding = Vec2::new(10., -30.);
-                ui.spacing_mut().combo_height = 100.;
-                // ui.spacing_mut().icon_width = 30.;
-                // ui.spacing_mut().combo_height = 400.;
-                // ui.spacing_mut().item_spacing = Vec2::splat(100.);
-                // let combobox_text_size = 16.;
-                // TODO: Scale combobox
+        // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+                ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+
                 egui::ComboBox::from_id_source("channels")
-                    // .height(16.)
                     .icon(blank_icon)
                     .selected_text(
                         RichText::new(
