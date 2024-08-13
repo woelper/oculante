@@ -1,9 +1,9 @@
 use super::icons::*;
+use crate::ui::EguiExt;
 use anyhow::{Context, Result};
 use dirs;
 use notan::egui::{self, *};
 use std::io::Write;
-use crate::ui::EguiExt;
 use std::{
     fs::{self, read_to_string, File},
     path::{Path, PathBuf},
@@ -65,7 +65,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 ui,
             );
 
-            if ui.button("Cancel").clicked() {
+            if ui.styled_button(&format!("{EXIT} Cancel")).clicked() {
                 ui.ctx().memory_mut(|w| w.close_popup());
             }
 
@@ -99,12 +99,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
         let mut ancestors = cp.ancestors().collect::<Vec<_>>();
         ancestors.reverse();
 
-    ui.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
-
-
+        ui.ctx()
+            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
         for c in ancestors {
-            // ui.selectable_label(format!("{}", c.as_os_str().to_string_lossy()));
-
             if ui
                 .add(egui::SelectableLabel::new(
                     &current_dir == &c,
@@ -119,7 +116,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
             {
                 *path = PathBuf::from(c);
             }
-            // ui.label(format!("{}", c.as_os_str().to_string_lossy()));
         }
     });
 
@@ -140,17 +136,26 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 }
                 if let Some(d) = dirs::document_dir() {
-                    if ui.styled_button(&format!("{FILE} Documents")).clicked() {
+                    if ui
+                        .styled_button(&format!("{FOLDERDOCUMENT} Documents"))
+                        .clicked()
+                    {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::download_dir() {
-                    if ui.styled_button(&format!("{DOWNLOAD} Downloads")).clicked() {
+                    if ui
+                        .styled_button(&format!("{FOLDERDOWNLOAD} Downloads"))
+                        .clicked()
+                    {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::picture_dir() {
-                    if ui.styled_button(&format!("{IMAGES} Pictures")).clicked() {
+                    if ui
+                        .styled_button(&format!("{FOLDERIMAGE} Pictures"))
+                        .clicked()
+                    {
                         *path = d;
                     }
                 }
