@@ -2037,7 +2037,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
     
 
-    ui.ctx().input(|i| i.viewport().)
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
 
