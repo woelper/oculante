@@ -68,6 +68,10 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn styled_button(&mut self, text: &str) -> Response {
+        unimplemented!()
+    }
+
     fn slider_timeline<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
@@ -188,6 +192,46 @@ impl EguiExt for Ui {
         })
         .response
     }
+
+/// Draw a justified icon from a string starting with an emoji
+fn styled_button(&mut self, text: &str) -> Response {
+    let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+    let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+    
+    
+
+    self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+
+    let r = self.add(
+        egui::Button::new(format!("   {description}"))
+        .rounding(5.)
+        .min_size(vec2(10., 32.))
+        // .shortcut_text("sds")
+    );
+
+    let mut icon_pos = r.rect.left_center();
+    icon_pos.x += 16.;
+
+    self.painter().text(icon_pos, Align2::CENTER_CENTER, icon, FontId::proportional(16.), self.style().visuals.selection.bg_fill);
+
+
+    r
+
+
+
+    // self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
+    //     // self.horizontal(|ui| {
+    //     ui.add_sized(
+    //         egui::Vec2::new(8., ui.available_height()),
+    //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
+    //     );
+    //     ui.label(
+    //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
+    //     );
+    // })
+    // .response
+}
+
 
     /// Draw a justified icon from a string starting with an emoji
     fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
@@ -1992,6 +2036,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
     
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
     
+
+    ui.ctx().input(|i| i.viewport().)
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
 
@@ -2031,17 +2077,26 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
 
+        let mut selected = "sdsd".to_string();
+
+        egui::ComboBox::from_label("Select one!")
+    .selected_text(format!("{:?}", selected))
+    .show_ui(ui, |ui| {
+    }
+);
+
+
         if window_x > ui.cursor().left() + 110. {
 
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 // hack to center combo box in Y
 
-                ui.spacing_mut().button_padding = Vec2::new(10., -10.);
-                // ui.spacing_mut().combo_height = 100.;
+                ui.spacing_mut().button_padding = Vec2::new(10., -30.);
+                ui.spacing_mut().combo_height = 100.;
                 // ui.spacing_mut().icon_width = 30.;
                 // ui.spacing_mut().combo_height = 400.;
                 // ui.spacing_mut().item_spacing = Vec2::splat(100.);
-                let combobox_text_size = 16.;
+                // let combobox_text_size = 16.;
                 // TODO: Scale combobox
                 egui::ComboBox::from_id_source("channels")
                     // .height(16.)
@@ -2054,7 +2109,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 .to_string()
                                 .to_uppercase(),
                         )
-                        .size(combobox_text_size),
+                        // .size(combobox_text_size),
                     )
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
@@ -2062,7 +2117,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 &mut state.persistent_settings.current_channel,
                                 channel,
                                 RichText::new(channel.to_string().to_uppercase())
-                                    .size(combobox_text_size),
+                                    // .size(combobox_text_size),
                             );
 
                             if tooltip(

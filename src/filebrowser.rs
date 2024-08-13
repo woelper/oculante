@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use dirs;
 use notan::egui::{self, *};
 use std::io::Write;
-
+use crate::ui::EguiExt;
 use std::{
     fs::{self, read_to_string, File},
     path::{Path, PathBuf},
@@ -88,6 +88,41 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    ui.horizontal(|ui| {
+        let current_dir = if path.is_dir() {
+            path.clone()
+        } else {
+            path.parent().map(|p| p.to_path_buf()).unwrap_or_default()
+        };
+
+        let cp = path.clone();
+        let mut ancestors = cp.ancestors().collect::<Vec<_>>();
+        ancestors.reverse();
+
+    ui.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+
+
+        for c in ancestors {
+            // ui.selectable_label(format!("{}", c.as_os_str().to_string_lossy()));
+
+            if ui
+                .add(egui::SelectableLabel::new(
+                    &current_dir == &c,
+                    format!(
+                        "{} >",
+                        c.file_name()
+                            .map(|f| f.to_string_lossy())
+                            .unwrap_or_default()
+                    ),
+                ))
+                .clicked()
+            {
+                *path = PathBuf::from(c);
+            }
+            // ui.label(format!("{}", c.as_os_str().to_string_lossy()));
+        }
+    });
+
     let d = fs::read_dir(&path).ok();
     ui.horizontal(|ui| {
         ui.allocate_ui_with_layout(
@@ -95,27 +130,27 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Layout::top_down_justified(Align::LEFT),
             |ui| {
                 if let Some(d) = dirs::desktop_dir() {
-                    if ui.button(format!("{DESKTOP} Desktop")).clicked() {
+                    if ui.styled_button(&format!("{DESKTOP} Desktop")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::home_dir() {
-                    if ui.button(format!("{HOUSE} Home")).clicked() {
+                    if ui.styled_button(&format!("{HOUSE} Home")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::document_dir() {
-                    if ui.button(format!("{FILE} Documents")).clicked() {
+                    if ui.styled_button(&format!("{FILE} Documents")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::download_dir() {
-                    if ui.button(format!("{DOWNLOAD} Downloads")).clicked() {
+                    if ui.styled_button(&format!("{DOWNLOAD} Downloads")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::picture_dir() {
-                    if ui.button(format!("{IMAGES} Pictures")).clicked() {
+                    if ui.styled_button(&format!("{IMAGES} Pictures")).clicked() {
                         *path = d;
                     }
                 }
@@ -134,9 +169,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
             ui.separator();
 
             egui::ScrollArea::new([false, true])
-                .max_width(100.)
+                // .max_width(100.)
                 .min_scrolled_height(400.)
-                .auto_shrink([true, false])
+                .auto_shrink([false, false])
                 .show(ui, |ui| match d {
                     Some(contents) => {
                         egui::Grid::new("browser")
