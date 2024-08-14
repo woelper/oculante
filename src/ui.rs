@@ -72,7 +72,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn styled_label(&mut self,  active: bool, text: &str) -> Response {
+    fn styled_label(&mut self, active: bool, text: &str) -> Response {
         unimplemented!()
     }
 
@@ -198,8 +198,9 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-        self.ctx()
-            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+        // self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+
+        self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
         let spacing = if icon.len() == 0 { "" } else { "   " };
         let r = self.add(
@@ -226,9 +227,9 @@ impl EguiExt for Ui {
         let icon_size = 12.;
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.ctx()
-            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+        // self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
         self.spacing_mut().button_padding = Vec2::new(28., 0.);
+        self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
         let spacing = if icon.len() == 0 { "" } else { "   " };
         let r = self.add(
@@ -471,10 +472,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     }
 
     egui::SidePanel::left("side_panel")
+    .show_separator_line(false)
+    .exact_width(PANEL_WIDTH)
     .max_width(PANEL_WIDTH)
     .min_width(PANEL_WIDTH/2.)
     .show(ctx, |ui| {
-
 
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
@@ -984,6 +986,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
+        .show_separator_line(false)
         .show(ctx, |ui| {
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
@@ -2108,7 +2111,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 ui.spacing_mut().icon_width = 0.;
 
                 // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
-                ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+                let color = if ui.style().visuals.dark_mode {
+                    Color32::WHITE
+                } else {
+                    Color32::BLACK
+                };
+                ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., color);
 
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)

@@ -120,8 +120,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
         let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
         ancestors.reverse();
 
-        ui.ctx()
-            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
         for c in ancestors {
             let label = c
                 .file_name()
@@ -277,7 +275,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 });
             ui.spacing();
-            ui.separator();
 
             if save {
                 ui.horizontal(|ui| {

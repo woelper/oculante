@@ -354,18 +354,24 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             .unwrap()
             .insert(0, "icons".to_owned());
 
+        let mut style: egui::Style = (*ctx.style()).clone();
         match state.persistent_settings.theme {
             ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-            ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+            ColorTheme::Dark => {
+                style.visuals.panel_fill = Color32::from_gray(25);
+                ctx.set_visuals(Visuals::dark())
+            },
             ColorTheme::System => set_system_theme(ctx),
         }
 
-        let mut style: egui::Style = (*ctx.style()).clone();
         style.interaction.tooltip_delay = 0.0;
         // let font_scale = 0.80;
         style.spacing.icon_width = 20.;
         style.spacing.item_spacing = vec2(8., 6.);
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
+        style.visuals.widgets.inactive.rounding = Rounding::same(4.);
+        style.visuals.widgets.active.rounding = Rounding::same(4.);
+        style.visuals.widgets.hovered.rounding = Rounding::same(4.);
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
