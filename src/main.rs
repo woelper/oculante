@@ -1046,7 +1046,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if !state.persistent_settings.zen_mode {
-            let menu_height = 42.0;
+            let menu_height = 36.0;
             egui::TopBottomPanel::top("menu")
                 .exact_height(menu_height)
                 .show_separator_line(false)
