@@ -364,6 +364,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.interaction.tooltip_delay = 0.0;
         // let font_scale = 0.80;
         style.spacing.icon_width = 20.;
+        style.spacing.item_spacing = vec2(8., 6.);
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;

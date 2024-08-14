@@ -88,7 +88,26 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    let item_spacing = 6.;
+    ui.add_space(item_spacing);
+
+    // The navigation bar
     ui.horizontal(|ui| {
+        ui.add_space(item_spacing);
+        if ui
+            .add(
+                egui::Button::new(format!("{CHEVRON_UP}"))
+                    .rounding(5.)
+                    .min_size(vec2(0., 32.)), // .shortcut_text("sds")
+            )
+            .clicked()
+        {
+            if let Some(d) = path.parent() {
+                let p = d.to_path_buf();
+                *path = p;
+            }
+        }
+
         let current_dir = if path.is_dir() {
             path.clone()
         } else {
@@ -96,22 +115,20 @@ pub fn browse<F: FnMut(&PathBuf)>(
         };
 
         let cp = path.clone();
-        let mut ancestors = cp.ancestors().collect::<Vec<_>>();
+        // Too  many folders make the dialog too large, cap them at this amount
+        let max_nav_items = 6;
+        let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
         ancestors.reverse();
 
         ui.ctx()
             .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
         for c in ancestors {
+            let label = c
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or("Computer".into());
             if ui
-                .add(egui::SelectableLabel::new(
-                    &current_dir == &c,
-                    format!(
-                        "{} >",
-                        c.file_name()
-                            .map(|f| f.to_string_lossy())
-                            .unwrap_or_default()
-                    ),
-                ))
+                .styled_label(&current_dir == &c, &format!("{label}{CARET_RIGHT}"))
                 .clicked()
             {
                 *path = PathBuf::from(c);
@@ -121,6 +138,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
     let d = fs::read_dir(&path).ok();
     ui.horizontal(|ui| {
+        ui.add_space(item_spacing);
         ui.allocate_ui_with_layout(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
@@ -161,20 +179,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
             },
         );
-        ui.separator();
 
         ui.vertical(|ui| {
-            if ui.button(ARROW_BEND_LEFT_UP).clicked() {
-                if let Some(d) = path.parent() {
-                    let p = d.to_path_buf();
-                    *path = p;
-                }
-            }
-
-            ui.separator();
-
             egui::ScrollArea::new([false, true])
-                // .max_width(100.)
                 .min_scrolled_height(400.)
                 .auto_shrink([false, false])
                 .show(ui, |ui| match d {

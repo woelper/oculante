@@ -72,6 +72,10 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn styled_label(&mut self,  active: bool, text: &str) -> Response {
+        unimplemented!()
+    }
+
     fn slider_timeline<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
@@ -134,7 +138,11 @@ impl EguiExt for Ui {
             self.painter().add(epaint::RectShape::new(
                 big_icon_rect.expand(visuals.expansion),
                 visuals.rounding,
-                if *checked {color.gamma_multiply(0.3)} else {visuals.bg_fill},
+                if *checked {
+                    color.gamma_multiply(0.3)
+                } else {
+                    visuals.bg_fill
+                },
                 visuals.bg_stroke,
             ));
             if *checked {
@@ -145,8 +153,11 @@ impl EguiExt for Ui {
                 self.painter().add(Shape::line(
                     vec![
                         pos2(small_icon_rect.left(), small_icon_rect.center().y),
-                        pos2(small_icon_rect.center().x-1., small_icon_rect.bottom()-1.),
-                        pos2(small_icon_rect.right(), small_icon_rect.top()+1.),
+                        pos2(
+                            small_icon_rect.center().x - 1.,
+                            small_icon_rect.bottom() - 1.,
+                        ),
+                        pos2(small_icon_rect.right(), small_icon_rect.top() + 1.),
                     ],
                     stroke,
                 ));
@@ -168,17 +179,6 @@ impl EguiExt for Ui {
     fn label_i(&mut self, text: &str) -> Response {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        // self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-        //     // self.horizontal(|ui| {
-        //     ui.add_sized(
-        //         egui::Vec2::new(28., ui.available_height()),
-        //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-        //     );
-        //     ui.label(
-        //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
-        //     );
-        // })
-        // .response
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             // self.horizontal(|ui| {
@@ -193,46 +193,81 @@ impl EguiExt for Ui {
         .response
     }
 
-/// Draw a justified icon from a string starting with an emoji
-fn styled_button(&mut self, text: &str) -> Response {
-    let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-    let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-    
-    
+    /// Draw a justified icon from a string starting with an emoji
+    fn styled_button(&mut self, text: &str) -> Response {
+        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-    self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+        self.ctx()
+            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
 
-    let spacing = if icon.len() == 0 {""} else {"   "};
-    let r = self.add(
-        egui::Button::new(format!("{spacing}{description}"))
-        .rounding(5.)
-        .min_size(vec2(140., 32.))
-        // .shortcut_text("sds")
-    );
+        let spacing = if icon.len() == 0 { "" } else { "   " };
+        let r = self.add(
+            egui::Button::new(format!("{spacing}{description}"))
+                .rounding(5.)
+                .min_size(vec2(140., 32.)), // .shortcut_text("sds")
+        );
 
-    let mut icon_pos = r.rect.left_center();
-    icon_pos.x += 16.;
+        let mut icon_pos = r.rect.left_center();
+        icon_pos.x += 16.;
 
-    self.painter().text(icon_pos, Align2::CENTER_CENTER, icon, FontId::proportional(16.), self.style().visuals.selection.bg_fill);
+        self.painter().text(
+            icon_pos,
+            Align2::CENTER_CENTER,
+            icon,
+            FontId::proportional(16.),
+            self.style().visuals.selection.bg_fill,
+        );
+        r
+    }
 
+    /// Draw a justified icon from a string starting with an emoji
+    fn styled_label(&mut self, active: bool, text: &str) -> Response {
+        let icon_size = 12.;
+        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        self.ctx()
+            .style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
+        self.spacing_mut().button_padding = Vec2::new(28., 0.);
 
-    r
+        let spacing = if icon.len() == 0 { "" } else { "   " };
+        let r = self.add(
+            egui::Button::new(format!("{description}"))
+                .rounding(5.)
+                .min_size(vec2(0., 32.)), // .shortcut_text("sds")
+        );
 
+        // let r = self.add(
+        //     egui::SelectableLabel::new(format!("{spacing}{description}"), true)
+        //         // .rounding(5.)
+        //         // .min_size(vec2(140., 32.)), // .shortcut_text("sds")
+        // );
 
+        let mut icon_pos = r.rect.right_center();
+        icon_pos.x -= icon_size;
 
-    // self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-    //     // self.horizontal(|ui| {
-    //     ui.add_sized(
-    //         egui::Vec2::new(8., ui.available_height()),
-    //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-    //     );
-    //     ui.label(
-    //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
-    //     );
-    // })
-    // .response
-}
+        self.painter().text(
+            icon_pos,
+            Align2::CENTER_CENTER,
+            icon,
+            FontId::proportional(icon_size),
+            self.style().visuals.selection.bg_fill,
+        );
 
+        r
+
+        // self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
+        //     // self.horizontal(|ui| {
+        //     ui.add_sized(
+        //         egui::Vec2::new(8., ui.available_height()),
+        //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
+        //     );
+        //     ui.label(
+        //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
+        //     );
+        // })
+        // .response
+    }
 
     /// Draw a justified icon from a string starting with an emoji
     fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
@@ -556,16 +591,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.add_space(10.);
 
-
             ui.vertical_centered_justified(|ui| {
 
-
                 ui.styled_collapsing("Compare", |ui| {
-    
+
                     if state.persistent_settings.max_cache == 0 {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
-    
                     if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
                         // TODO: Automatically insert image into compare list
                         #[cfg(feature = "file_open")]
@@ -573,18 +605,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         #[cfg(not(feature = "file_open"))]
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
                     }
-    
                     ui.vertical_centered_justified(|ui| {
                         let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
                         compare_list.sort_by(|a,b| a.0.cmp(&b.0));
-    
+
                         for (path, geo) in compare_list {
-    
+
                             ui.horizontal(|ui|{
                                 if ui.button(X).clicked() {
                                     state.compare_list.remove(&path);
                                 }
-    
                                 ui.vertical_centered_justified(|ui| {
                                     if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                                         state.image_geometry = geo.clone();
@@ -599,7 +629,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 });
                             });
                         }
-    
                         if let Some(path) = &state.current_path {
                             if let Some(geo) = state.compare_list.get(path) {
                                 if state.image_geometry != *geo {
@@ -613,7 +642,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                 }
                             }
                         }
-    
                         if !state.compare_list.is_empty() {
                             if ui.button(format!("{TRASH} Clear all")).clicked() {
                                 state.compare_list.clear();
@@ -622,7 +650,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     });
                 });
             });
-      
 
             if state.current_texture.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
@@ -2034,9 +2061,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 // }
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
-    
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
-    
 
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
@@ -2075,17 +2100,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             changed_channels = true;
         }
 
-
-
         if window_x > ui.cursor().left() + 110. {
-
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(10., 0.);
                 ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
                 ui.spacing_mut().combo_width = 1.;
                 ui.spacing_mut().icon_width = 0.;
 
-        // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+                // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
                 ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
 
                 egui::ComboBox::from_id_source("channels")
@@ -2097,16 +2119,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 .current_channel
                                 .to_string()
                                 .to_uppercase(),
-                        )
-                        // .size(combobox_text_size),
+                        ), // .size(combobox_text_size),
                     )
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
                             let r = ui.selectable_value(
                                 &mut state.persistent_settings.current_channel,
                                 channel,
-                                RichText::new(channel.to_string().to_uppercase())
-                                    // .size(combobox_text_size),
+                                RichText::new(channel.to_string().to_uppercase()), // .size(combobox_text_size),
                             );
 
                             if tooltip(
@@ -2162,7 +2182,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 );
             }
             if window_x > ui.cursor().left() + 80. {
-
                 if tooltip(
                     unframed_button_colored(
                         PENCIL_SIMPLE_LINE,
@@ -2175,12 +2194,13 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 )
                 .clicked()
                 {
-                    state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
+                    state.persistent_settings.edit_enabled =
+                        !state.persistent_settings.edit_enabled;
                 }
             }
         }
 
-        if window_x > ui.cursor().left() + 80.  {
+        if window_x > ui.cursor().left() + 80. {
             if tooltip(
                 unframed_button(ARROWS_OUT_SIMPLE, ui),
                 "Toggle fullscreen",
@@ -2194,7 +2214,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if window_x > ui.cursor().left() + 80. {
-
             if tooltip(
                 unframed_button_colored(ARROW_LINE_UP, state.always_on_top, ui),
                 "Always on top",
@@ -2221,7 +2240,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.is_some() && window_x > ui.cursor().left() + 80.  {
+        if state.current_texture.is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 unframed_button(PLACEHOLDER, ui),
                 "Clear image",
@@ -2233,7 +2252,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 clear_image(state);
             }
         }
-
 
         if state.scrubber.len() > 1 && window_x > ui.cursor().left() {
             // TODO: Check if wrap is off and we are at fisrt image
@@ -2277,7 +2295,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 app.window().request_frame();
             }
         }
-
 
         drag_area(ui, state, app);
 
