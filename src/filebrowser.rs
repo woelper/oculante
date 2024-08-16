@@ -126,7 +126,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or("Computer".into());
             if ui
-                .styled_label(&current_dir == &c, &format!("{label}{CARET_RIGHT}"))
+                .styled_selectable_label(&current_dir == &c, &format!("{label}{CARET_RIGHT}"))
                 .clicked()
             {
                 *path = PathBuf::from(c);

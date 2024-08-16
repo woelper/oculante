@@ -44,7 +44,7 @@ const PANEL_WIDGET_OFFSET: f32 = 10.0;
 #[cfg(feature = "turbo")]
 use crate::image_editing::{cropped_range, lossless_tx};
 pub trait EguiExt {
-    fn label_i(&mut self, _text: &str) -> Response {
+    fn label_i(&mut self, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -52,7 +52,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn label_i_selected(&mut self, _selected: bool, _text: &str) -> Response {
+    fn label_i_selected(&mut self, _selected: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -68,11 +68,23 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn styled_button(&mut self, text: &str) -> Response {
+    fn styled_button(&mut self, text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
-    fn styled_label(&mut self, active: bool, text: &str) -> Response {
+    fn styled_menu_button(
+        &mut self,
+        title: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui),
+    ) -> Response {
+        unimplemented!()
+    }
+
+    fn styled_selectable_label(&mut self, active: bool, text: impl Into<WidgetText>) -> Response {
+        unimplemented!()
+    }
+
+    fn styled_label(&mut self, text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -176,7 +188,10 @@ impl EguiExt for Ui {
     }
 
     /// Draw a justified icon from a string starting with an emoji
-    fn label_i(&mut self, text: &str) -> Response {
+    fn label_i(&mut self, text: impl Into<WidgetText>) -> Response {
+        let text: WidgetText = text.into();
+        let text = text.text();
+
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
@@ -193,14 +208,44 @@ impl EguiExt for Ui {
         .response
     }
 
+    fn styled_menu_button(
+        &mut self,
+        title: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui),
+    ) -> Response {
+        let text: WidgetText = title.into();
+        let text = text.text();
+
+
+        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
+        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let spacing = if icon.len() == 0 { "" } else { "   " };
+        self.spacing_mut().button_padding = Vec2::new(0., 8.);
+
+        let r = self.menu_button(format!("{spacing}{description}"), add_contents);
+
+        let mut icon_pos = r.response.rect.left_center();
+        icon_pos.x += 16.;
+
+        self.painter().text(
+            icon_pos,
+            Align2::CENTER_CENTER,
+            icon,
+            FontId::proportional(16.),
+            self.style().visuals.selection.bg_fill,
+        );
+
+        r.response
+    }
+
     /// Draw a justified icon from a string starting with an emoji
-    fn styled_button(&mut self, text: &str) -> Response {
+    fn styled_button(&mut self, text: impl Into<WidgetText>) -> Response {
+        let text: WidgetText = text.into();
+        let text = text.text();
+
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-        // self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
-
-        self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
         let spacing = if icon.len() == 0 { "" } else { "   " };
         let r = self.add(
@@ -223,26 +268,22 @@ impl EguiExt for Ui {
     }
 
     /// Draw a justified icon from a string starting with an emoji
-    fn styled_label(&mut self, active: bool, text: &str) -> Response {
+    fn styled_selectable_label(&mut self, active: bool, text: impl Into<WidgetText>) -> Response {
+        let text: WidgetText = text.into();
+        let text = text.text();
+
         let icon_size = 12.;
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        // self.ctx().style_mut(|s| s.visuals.widgets.inactive.rounding = Rounding::same(6.));
-        self.spacing_mut().button_padding = Vec2::new(28., 0.);
+        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        self.spacing_mut().button_padding = Vec2::new(8., 0.);
         self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
-        let spacing = if icon.len() == 0 { "" } else { "   " };
+        let spacing = if icon.len() == 0 { "" } else { "  " };
         let r = self.add(
-            egui::Button::new(format!("{description}"))
+            egui::Button::new(format!("{description}{spacing}"))
                 .rounding(5.)
                 .min_size(vec2(0., 32.)), // .shortcut_text("sds")
         );
-
-        // let r = self.add(
-        //     egui::SelectableLabel::new(format!("{spacing}{description}"), true)
-        //         // .rounding(5.)
-        //         // .min_size(vec2(140., 32.)), // .shortcut_text("sds")
-        // );
 
         let mut icon_pos = r.rect.right_center();
         icon_pos.x -= icon_size;
@@ -295,7 +336,10 @@ impl EguiExt for Ui {
     }
 
     /// Draw a justified icon from a string starting with an emoji
-    fn label_i_selected(&mut self, selected: bool, text: &str) -> Response {
+    fn label_i_selected(&mut self, selected: bool, text: impl Into<WidgetText>) -> Response {
+        let text: WidgetText = text.into();
+        let text = text.text();
+
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.horizontal(|ui| {
@@ -2344,15 +2388,17 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         // maybe override font size?
         ui.style_mut().visuals.button_frame = false;
         ui.style_mut().visuals.widgets.inactive.expansion = 20.;
-
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
-            if ui.button("Reset view").clicked() {
+            if ui
+                .styled_button(format!("{ARROWS_OUT} Reset view"))
+                .clicked()
+            {
                 state.reset_image = true;
                 ui.close_menu();
             }
-            if ui.button("View 1:1").clicked() {
+            if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
                 set_zoom(
                     1.0,
                     Some(nalgebra::Vector2::new(
@@ -2367,7 +2413,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             let copy_pressed = key_pressed(app, state, Copy);
             if let Some(img) = &state.current_image {
                 if ui
-                    .button("Copy")
+                    .styled_button(format!("{COPY} Copy"))
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
                     || copy_pressed
@@ -2378,7 +2424,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             if ui
-                .button("Paste")
+                .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
                 || key_pressed(app, state, Paste)
@@ -2400,16 +2446,16 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
-            if ui.button("Preferences").clicked() {
+            if ui.styled_button(format!("{GEAR} Preferences")).clicked() {
                 state.settings_enabled = !state.settings_enabled;
                 ui.close_menu();
             }
 
-            if ui.button("Quit").clicked() {
+            if ui.styled_button(format!("{EXIT} Quit")).clicked() {
                 app.backend.exit();
             }
 
-            ui.menu_button("Recent", |ui| {
+            ui.styled_menu_button(format!("{CLOCK} Recent"), |ui| {
                 let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
