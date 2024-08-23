@@ -1,9 +1,9 @@
 use super::icons::*;
-use crate::ui::EguiExt;
 use anyhow::{Context, Result};
 use dirs;
 use notan::egui::{self, *};
 use std::io::Write;
+
 use std::{
     fs::{self, read_to_string, File},
     path::{Path, PathBuf},
@@ -65,7 +65,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 ui,
             );
 
-            if ui.styled_button(&format!("{EXIT} Cancel")).clicked() {
+            if ui.button("Cancel").clicked() {
                 ui.ctx().memory_mut(|w| w.close_popup());
             }
 
@@ -88,100 +88,67 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
-    let item_spacing = 6.;
-    ui.add_space(item_spacing);
-
-    // The navigation bar
     ui.horizontal(|ui| {
-        ui.add_space(item_spacing);
-        if ui
-            .add(
-                egui::Button::new(format!("{CHEVRON_UP}"))
-                    .rounding(5.)
-                    .min_size(vec2(0., 32.)), // .shortcut_text("sds")
-            )
-            .clicked()
-        {
-            if let Some(d) = path.parent() {
-                let p = d.to_path_buf();
-                *path = p;
-            }
-        }
+        // let current_dir = if path.
+        for c in path.components() {
+            // ui.selectable_label(format!("{}", c.as_os_str().to_string_lossy()));
 
-        let current_dir = if path.is_dir() {
-            path.clone()
-        } else {
-            path.parent().map(|p| p.to_path_buf()).unwrap_or_default()
-        };
+            // if ui.add(egui::SelectableLabel::new(path, "First")).clicked() {
 
-        let cp = path.clone();
-        // Too  many folders make the dialog too large, cap them at this amount
-        let max_nav_items = 6;
-        let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
-        ancestors.reverse();
-
-        for c in ancestors {
-            let label = c
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or("Computer".into());
-            if ui
-                .styled_selectable_label(&current_dir == &c, &format!("{label}{CARET_RIGHT}"))
-                .clicked()
-            {
-                *path = PathBuf::from(c);
-            }
+            // }
+            ui.label(format!("{}", c.as_os_str().to_string_lossy()));
         }
     });
 
     let d = fs::read_dir(&path).ok();
     ui.horizontal(|ui| {
-        ui.add_space(item_spacing);
         ui.allocate_ui_with_layout(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
             |ui| {
                 if let Some(d) = dirs::desktop_dir() {
-                    if ui.styled_button(&format!("{DESKTOP} Desktop")).clicked() {
+                    if ui.button(format!("{DESKTOP} Desktop")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::home_dir() {
-                    if ui.styled_button(&format!("{HOUSE} Home")).clicked() {
+                    if ui.button(format!("{HOUSE} Home")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::document_dir() {
-                    if ui
-                        .styled_button(&format!("{FOLDERDOCUMENT} Documents"))
-                        .clicked()
-                    {
+                    if ui.button(format!("{FILE} Documents")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::download_dir() {
-                    if ui
-                        .styled_button(&format!("{FOLDERDOWNLOAD} Downloads"))
-                        .clicked()
-                    {
+                    if ui.button(format!("{DOWNLOAD} Downloads")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(d) = dirs::picture_dir() {
-                    if ui
-                        .styled_button(&format!("{FOLDERIMAGE} Pictures"))
-                        .clicked()
-                    {
+                    if ui.button(format!("{IMAGES} Pictures")).clicked() {
                         *path = d;
                     }
                 }
             },
         );
+        ui.separator();
 
         ui.vertical(|ui| {
+            if ui.button(ARROW_BEND_LEFT_UP).clicked() {
+                if let Some(d) = path.parent() {
+                    let p = d.to_path_buf();
+                    *path = p;
+                }
+            }
+
+            ui.separator();
+
             egui::ScrollArea::new([false, true])
+                .max_width(100.)
                 .min_scrolled_height(400.)
-                .auto_shrink([false, false])
+                .auto_shrink([true, false])
                 .show(ui, |ui| match d {
                     Some(contents) => {
                         egui::Grid::new("browser")
@@ -275,6 +242,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 });
             ui.spacing();
+            ui.separator();
 
             if save {
                 ui.horizontal(|ui| {
