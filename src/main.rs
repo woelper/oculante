@@ -329,7 +329,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -2.2,
+                y_offset: -2.4,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -338,7 +338,12 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             "icons".to_owned(),
             FontData::from_static(include_bytes!(
                 "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
-            )),
+            )), // .tweak(FontTweak {
+                //     scale: 1.0,
+                //     y_offset_factor: 0.0,
+                //     y_offset: -3.0,
+                //     baseline_offset_factor: 0.0,
+                // }),
         );
 
         fonts
@@ -360,7 +365,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             ColorTheme::Dark => {
                 style.visuals.panel_fill = Color32::from_gray(25);
                 ctx.set_visuals(Visuals::dark())
-            },
+            }
             ColorTheme::System => set_system_theme(ctx),
         }
 
@@ -369,6 +374,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.spacing.icon_width = 20.;
         style.spacing.item_spacing = vec2(8., 6.);
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
+        style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
         style.visuals.widgets.inactive.rounding = Rounding::same(4.);
         style.visuals.widgets.active.rounding = Rounding::same(4.);
         style.visuals.widgets.hovered.rounding = Rounding::same(4.);

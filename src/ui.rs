@@ -18,6 +18,8 @@ use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
+const BUTTON_HEIGHT_LARGE: f32 = 35.;
+pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 // use egui_phosphor::regular::*;
 use egui_plot::{Line, Plot, PlotPoints};
@@ -216,16 +218,16 @@ impl EguiExt for Ui {
         let text: WidgetText = title.into();
         let text = text.text();
 
-
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         let spacing = if icon.len() == 0 { "" } else { "   " };
-        self.spacing_mut().button_padding = Vec2::new(0., 8.);
+        self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
         let r = self.menu_button(format!("{spacing}{description}"), add_contents);
 
         let mut icon_pos = r.response.rect.left_center();
         icon_pos.x += 16.;
+        icon_pos.y += 1.;
 
         self.painter().text(
             icon_pos,
@@ -244,18 +246,18 @@ impl EguiExt for Ui {
         let text = text.text();
 
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-
+        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
         let spacing = if icon.len() == 0 { "" } else { "   " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(5.)
-                .min_size(vec2(140., 32.)), // .shortcut_text("sds")
+                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
         );
 
         let mut icon_pos = r.rect.left_center();
         icon_pos.x += 16.;
+        icon_pos.y += 1.;
 
         self.painter().text(
             icon_pos,
@@ -282,7 +284,7 @@ impl EguiExt for Ui {
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
                 .rounding(5.)
-                .min_size(vec2(0., 32.)), // .shortcut_text("sds")
+                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
         );
 
         let mut icon_pos = r.rect.right_center();
@@ -367,15 +369,12 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
+            ui.style_mut().spacing.interact_size.y = 18.;
+
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
             let available_width = ui.available_width() * 0.6;
             let style = ui.style_mut();
-            // style.visuals.widgets.hovered.bg_fill = color;
-            // style.visuals.widgets.hovered.fg_stroke.width = 0.;
-
-            // style.visuals.widgets.active.bg_fill = color;
-            // style.visuals.widgets.active.fg_stroke.width = 0.;
 
             style.visuals.widgets.inactive.fg_stroke.width = 7.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
@@ -420,14 +419,17 @@ impl EguiExt for Ui {
     ) -> Response {
         self.scope(|ui| {
             let color = ui.style().visuals.selection.bg_fill;
-            // let color = Color32::RED;
             let available_width = ui.available_width() * 1. - 60.;
             let style = ui.style_mut();
+            style.spacing.interact_size.y = 18.;
+
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
+            style.visuals.widgets.hovered.expansion = -1.5;
 
             style.visuals.widgets.active.bg_fill = color;
             style.visuals.widgets.active.fg_stroke.width = 0.;
+            style.visuals.widgets.active.expansion = -2.5;
 
             style.visuals.widgets.inactive.fg_stroke.width = 5.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
@@ -440,6 +442,7 @@ impl EguiExt for Ui {
             ui.horizontal(|ui| {
                 let r = ui.add(
                     Slider::new(value, range.clone())
+                        .handle_shape(style::HandleShape::Rect { aspect_ratio: 2.1 })
                         .show_value(false)
                         .integer(),
                 );
@@ -2150,7 +2153,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if window_x > ui.cursor().left() + 110. {
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(10., 0.);
-                ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
+                // ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
+                ui.spacing_mut().interact_size.y = BUTTON_HEIGHT_SMALL;
                 ui.spacing_mut().combo_width = 1.;
                 ui.spacing_mut().icon_width = 0.;
 
@@ -2390,11 +2394,20 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         ui.style_mut().visuals.widgets.inactive.expansion = 20.;
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
+        // let stroke = Stroke::new(10., Color32::RED);
+
+        // ui.style_mut().visuals.window_stroke = Stroke::new(10., Color32::RED);
+        // ui.style_mut().visuals.widgets.open.bg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.open.fg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.active.fg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.active.bg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.inactive.fg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.inactive.bg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.noninteractive.bg_stroke = stroke;
+        // ui.style_mut().visuals.widgets.noninteractive.fg_stroke = stroke;
+
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
-            if ui
-                .styled_button(format!("{ARROWS_OUT} Reset view"))
-                .clicked()
-            {
+            if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
                 state.reset_image = true;
                 ui.close_menu();
             }
@@ -2550,7 +2563,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
     let size = 30.;
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
     ui.painter()
-        .rect_filled(rect, Rounding::same(size / 4.), Color32::LIGHT_BLUE);
+        .rect_filled(rect, Rounding::same(size / 4.), Color32::GRAY);
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,
@@ -2604,7 +2617,7 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
     let x_offset = 5.0;
-    let y_offset = 5.5;
+    let y_offset = 6.0;
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
