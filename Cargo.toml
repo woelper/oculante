@@ -11,7 +11,7 @@ repository = "https://github.com/woelper/oculante/"
 version = "0.8.23"
 
 [package.metadata.bundle]
-icon = ["res/oculante.png"]
+icon = ["icon.ico"]
 identifier = "com.github.woelper.oculante"
 name = "oculante"
 
