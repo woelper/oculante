@@ -11,7 +11,7 @@ fi
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
-cargo check --no-default-features
+cargo check --no-default-features --features notan/glsl-to-spirv
 cargo test shortcuts
 cargo bump patch
 cargo build

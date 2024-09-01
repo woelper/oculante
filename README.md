@@ -13,7 +13,7 @@
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
 - Free of charge, bloat-free, ad-free, privacy-respecting open source application
 - Fast opening of images, fast startup
-- Available for Win, Mac, Linux and NetBSD
+- Available for Win, Mac, Linux, FreeBSD and NetBSD
 - Supports a wide range of images and SVG
 - Caches images for faster reloading
 - Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
@@ -21,6 +21,7 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 - Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...
 - SIMD-accelerated image editing
 
+[![](https://dcbadge.limes.pink/api/server/https://discord.gg/2Q6cF5ZWe7)](https://discord.gg/https://discord.gg/2Q6cF5ZWe7)
 ---
 [![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
 [![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
@@ -30,7 +31,6 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide 
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
-
 ![Screenshot](res/screenshot_1.png "Screenshot")
 
 ## Flipbook
@@ -65,7 +65,9 @@ pkgin install oculante
 - gif (animation support and correct timing)
 - hdr, tonemapped
 - ico
+- icns (via `rust-icns`)
 - jpeg
+- jpeg2000 (via `jpeg2k`, feature "j2k", on by default)
 - png
 - pnm
 - tga
@@ -169,8 +171,15 @@ Mac
 `brew install nasm`
 
 ### Cargo Features
-If you disable `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
-The feature `file_open` will enable/disable a file open dialog. This pulls in additional dependencies and is enabled by default.
+- `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
+
+- `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
+
+- `notan/glsl-to-spirv` (default) uses the spirv shader compiler
+
+- `notan/shaderc` uses shaderc as a shader compiler. Longer build time.
+
+- `update` (default) enable app updating.
 
 ### Shortcuts:
 `mouse wheel` = zoom
@@ -237,6 +246,8 @@ The feature `file_open` will enable/disable a file open dialog. This pulls in ad
 <kbd>LShift</kbd> + <kbd>Down</kbd> = PanDown
 
 <kbd>Delete</kbd> = DeleteFile
+
+<kbd>LShift</kbd> + <kbd>Delete</kbd> = ClearImage
 
 <kbd>RBracket</kbd> = LosslessRotateRight
 

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::num::NonZeroU32;
 use std::path::Path;
 
 use crate::paint::PaintStroke;
@@ -11,7 +10,7 @@ use crate::{pos_from_coord, ImageGeometry};
 
 use anyhow::Result;
 use evalexpr::*;
-use fast_image_resize as fr;
+use fast_image_resize::{self as fr, ResizeOptions};
 use image::{imageops, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error};
@@ -868,7 +867,7 @@ impl ImageOperation {
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
-                    r0.changed = r0.drag_released() || r1.drag_released() || r2.changed();
+                    r0.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
@@ -985,39 +984,32 @@ impl ImageOperation {
                         ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
                     };
 
-                    let width = NonZeroU32::new(img.width()).unwrap_or(anyhow::Context::context(
-                        NonZeroU32::new(1),
-                        "Can't create nonzero",
-                    )?);
-                    let height = NonZeroU32::new(img.height()).unwrap_or(anyhow::Context::context(
-                        NonZeroU32::new(1),
-                        "Can't create nonzero",
-                    )?);
-                    let mut src_image = fr::Image::from_vec_u8(
-                        width,
-                        height,
+                    let src_image = fr::images::Image::from_vec_u8(
+                        img.width(),
+                        img.height(),
                         img.clone().into_raw(),
                         fr::PixelType::U8x4,
                     )?;
 
-                    let mapper = fr::create_gamma_22_mapper();
-                    mapper.forward_map_inplace(&mut src_image.view_mut())?;
+                    // let mapper = fr::create_gamma_22_mapper();
+                    // mapper.forward_map_inplace(&mut src_image.image_view_mut())?;
 
                     // Create container for data of destination image
-                    let dst_width = NonZeroU32::new(dimensions.0).unwrap_or(
-                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
-                    );
-                    let dst_height = NonZeroU32::new(dimensions.1).unwrap_or(
-                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
-                    );
                     let mut dst_image =
-                        fr::Image::new(dst_width, dst_height, src_image.pixel_type());
+                        fr::images::Image::new(dimensions.0, dimensions.1, src_image.pixel_type());
 
-                    let mut resizer = fr::Resizer::new(fr::ResizeAlg::Convolution(filter));
+                    let mut resizer = fr::Resizer::new();
 
-                    resizer.resize(&src_image.view(), &mut dst_image.view_mut())?;
+                    resizer.resize(
+                        &src_image,
+                        &mut dst_image,
+                        Some(
+                            &ResizeOptions::new()
+                                .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                        ),
+                    )?;
 
-                    mapper.backward_map_inplace(&mut dst_image.view_mut())?;
+                    // mapper.backward_map_inplace(&mut dst_image.view_mut())?;
 
                     *img = anyhow::Context::context(
                         image::RgbaImage::from_raw(

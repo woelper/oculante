@@ -1,3 +1,95 @@
+# 0.8.23 (2024-07-29)
+
+### :beetle: Bug Fixes
+
+* Display image path for loading errors (fixes #387) (9bc72095)
+* Prevent panic for scrubber index being out of range and allow opening images without path prefic correctly (7a9a99c1)
+* update index when image in same folder is loaded (fixes #377) (f2297402)
+* Switching theme removes accent color (fixes #375) (e35dea4d)
+* Preserve scubber index (d9146d08)
+* Prevent image removal going out of bounds (fixes #379) (9b69076f)
+* Clearing and deleting an image removes it from the virtual scrubber and advances to the next according to the scrubber direction (a0b7dc5a)
+* Fix issue where SVG files were detected as XML (fixes #371) (d2ce9f17)
+* Compare menu works without image loaded (46a8218f)
+* ClearImage can be assigned to a shortcut (b9b00aca)
+* extend BSD variants (f716dfc5)
+
+### :sparkles: Features
+
+* Allow configuring mipmaps and linear mag/min filters (58da0b26)
+* Allow passing multiple images on the command line (0a2e918a)
+* Enhance scrubber experience to provide a virtual file list. (e3c45a8e)
+* Detect file types by content instead of extension. Warn if mismatch happens. (59138263)
+* More love for compare mode ui, option to remove current image (68a5a483)
+* Allow configuring the minimum window size (1787a14f)
+
+### :green_apple: Chore
+
+* **deps**: bump zerovec from 0.10.2 to 0.10.4 (4cf7959e)
+* update resvg (be6a67f6)
+* Update Notan and Egui (fc1fccef)
+* update deps (031e83ce)
+
+# 0.8.22 (2024-05-19)
+
+### :beetle: Bug Fixes
+
+* Ensure spirv is not used when only using shaderc (03f9167e)
+* Allow loading huge webp images and handle still frames differently (e4ebc2dc)
+* Set window min size to 100x100 to prevent super tiny window (fixes #325) (d63d971c)
+
+### :sparkles: Features
+
+* add icns image support (internal png data only, load largest contained image) (0703d220)
+
+### :green_apple: Chore
+
+* update avif-decode, evalexpr, exr, rfd, self_update, jxl-oxide, imageproc (a6c98436)
+* Clean up warnings (ab2b03fe)
+
+# 0.8.21 (2024-05-10)
+
+### :green_apple: Chore
+
+* Disable AUR publishing: This package has been moved to the official [extra] repository. (55245529)
+
+# 0.8.20 (2024-05-10)
+
+### :sparkles: Features
+
+* Support EXR with single layers (non-rgba) (d22e78c4)
+
+### :green_apple: Chore
+
+* update deps and use new HDR support from `image` (bd7cbf89)
+
+# 0.8.19 (2024-04-29)
+
+### :beetle: Bug Fixes
+
+* prevent zoom with keyboard (fixes #304) (2de35ed6)
+
+### :sparkles: Features
+
+* Map float TIFF images to min-max range (52f87f82)
+
+### :green_apple: Chore
+
+* Update logo (1783609d)
+* update icon (716f6e9c)
+* **deps**: bump rustls from 0.21.10 to 0.21.11 (f0c1743b)
+
+# 0.8.18 (2024-04-06)
+
+### :sparkles: Features
+
+* APNG support (c633764d)
+
+### :green_apple: Chore
+
+* **deps**: bump h2 from 0.3.24 to 0.3.26 (59c559ac)
+* update logo (6ae3bc03)
+
 # 0.8.17 (2024-03-29)
 
 ### :beetle: Bug Fixes
