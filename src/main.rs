@@ -116,6 +116,18 @@ fn main() -> Result<(), String> {
         let _ = mac::launch();
     }
 
+    // Unfortunately we need to load the volatile settings here, too - the window settings need
+    // to be set before window creation
+    match settings::VolatileSettings::load() {
+        Ok(volatile_settings) => {
+            if volatile_settings.window_geometry != Default::default() {
+                window_config.width = volatile_settings.window_geometry.1 .0 as u32;
+                window_config.height = volatile_settings.window_geometry.1 .1 as u32;
+            }
+        }
+        Err(e) => error!("Could not load volatile settings: {e}"),
+    }
+
     // Unfortunately we need to load the persistent settings here, too - the window settings need
     // to be set before window creation
     match settings::PersistentSettings::load() {
@@ -123,11 +135,8 @@ fn main() -> Result<(), String> {
             window_config.vsync = settings.vsync;
             window_config.lazy_loop = !settings.force_redraw;
             window_config.decorations = !settings.borderless;
-            if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1 .0 as u32;
-                window_config.height = settings.window_geometry.1 .1 as u32;
-            }
-            debug!("Loaded settings.");
+
+            trace!("Loaded settings.");
             if settings.zen_mode {
                 let mut title_string = window_config.title.clone();
                 title_string.push_str(&format!(
@@ -139,7 +148,7 @@ fn main() -> Result<(), String> {
             window_config.min_size = Some(settings.min_window_size);
         }
         Err(e) => {
-            error!("Could not load settings: {e}");
+            error!("Could not load persistent settings: {e}");
         }
     }
     window_config.always_on_top = true;
@@ -197,18 +206,6 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         // current_path: maybe_img_location.cloned(/),
         ..Default::default()
     };
-
-    match settings::PersistentSettings::load() {
-        Ok(settings) => {
-            state.persistent_settings = settings;
-            info!("Successfully loaded previous settings.")
-        }
-        Err(e) => {
-            warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
-            state.persistent_settings = Default::default();
-            state.persistent_settings.save_blocking();
-        }
-    }
 
     state.player = Player::new(
         state.texture_channel.0.clone(),
@@ -466,6 +463,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
+                _ = state.volatile_settings.save_blocking();
                 app.backend.exit();
             }
             #[cfg(feature = "turbo")]
@@ -608,6 +606,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 app.window().size(),
             );
             state.persistent_settings.save_blocking();
+            _ = state.volatile_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
             trace!("Mouse wheel event");
@@ -711,6 +710,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             app.window().size(),
         );
         state.persistent_settings.save_blocking();
+        _ = state.volatile_settings.save_blocking();
         trace!("Save {t}");
     }
 
@@ -847,12 +847,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             | FrameSource::Still
             | FrameSource::ImageCollectionMember => {
                 if let Some(path) = &state.current_path {
-                    if !state.persistent_settings.recent_images.contains(path) {
+                    if !state.volatile_settings.recent_images.contains(path) {
                         state
-                            .persistent_settings
+                            .volatile_settings
                             .recent_images
                             .insert(0, path.clone());
-                        state.persistent_settings.recent_images.truncate(10);
+                        state.volatile_settings.recent_images.truncate(10);
                     }
                 }
             }
@@ -1216,7 +1216,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.persistent_settings.last_open_directory.clone();
+    let start_directory = state.volatile_settings.last_open_directory.clone();
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

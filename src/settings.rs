@@ -1,5 +1,6 @@
 use crate::{shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
+use log::{info, trace};
 use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -125,16 +126,17 @@ impl PersistentSettings {
     }
 }
 
-fn save(s: &PersistentSettings) -> Result<()> {
+fn save(ps: &PersistentSettings) -> Result<()> {
     let local_dir = dirs::config_local_dir()
         .ok_or(anyhow!("Can't get local dir"))?
         .join("oculante");
     if !local_dir.exists() {
         _ = create_dir_all(&local_dir);
     }
-
     let f = File::create(local_dir.join("config.json"))?;
-    Ok(serde_json::to_writer_pretty(f, s)?)
+    _ = serde_json::to_writer_pretty(f, ps)?;
+    trace!("Saved to {}", local_dir.display());
+    Ok(())
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -148,7 +150,6 @@ pub struct VolatileSettings {
 
 impl VolatileSettings {
     pub fn load() -> Result<Self> {
-        //data_local_dir
         let config_path = dirs::config_local_dir()
             .ok_or(anyhow!("Can't get config_local dir"))?
             .join("oculante")
@@ -157,9 +158,9 @@ impl VolatileSettings {
             // migrate old config
             ?;
 
-        Ok(serde_json::from_reader::<_, VolatileSettings>(File::open(
-            config_path,
-        )?)?)
+        let s = serde_json::from_reader::<_, VolatileSettings>(File::open(config_path)?)?;
+        info!("Loaded volatile settings.");
+        Ok(s)
     }
 
     pub fn save_blocking(&self) -> Result<()> {
@@ -171,7 +172,9 @@ impl VolatileSettings {
         }
 
         let f = File::create(local_dir.join("config_volatile.json"))?;
-        Ok(serde_json::to_writer_pretty(f, self)?)
+        let _res = serde_json::to_writer_pretty(f, self)?;
+        trace!("Saved volatile settings");
+        Ok(())
     }
 }
 
