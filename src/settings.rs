@@ -143,7 +143,7 @@ fn save(s: &PersistentSettings) -> Result<()> {
     }
 
     let f = File::create(local_dir.join("config.json"))?;
-    Ok(serde_json::to_writer(f, s)?)
+    Ok(serde_json::to_writer_pretty(f, s)?)
 }
 
 pub fn set_system_theme(ctx: &Context) {
