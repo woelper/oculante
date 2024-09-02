@@ -98,7 +98,6 @@ egui_extras = { version = "0.27.2", features = ["image", "file"] }
 default = [
   "turbo",
   "avif_native",
-  "file_open",
   "update",
   "notan/glsl-to-spirv",
   "j2k",
