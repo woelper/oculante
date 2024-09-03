@@ -1253,7 +1253,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     #[cfg(not(feature = "file_open"))]
                     {
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
-                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
                             set_title(app, state);
                         }
