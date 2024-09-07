@@ -96,15 +96,15 @@ impl Default for PersistentSettings {
 impl PersistentSettings {
     pub fn load() -> Result<Self> {
         //data_local_dir
-        let config_path = dirs::config_local_dir()
-            .ok_or(anyhow!("Can't get config_local dir"))?
+        let config_path = dirs::data_local_dir()
+            .ok_or(anyhow!("Can't get data_local_dir"))?
             .join("oculante")
             .join("config.json")
             .canonicalize()
             // migrate old config
             .unwrap_or(
                 dirs::data_local_dir()
-                    .ok_or(anyhow!("Can't get data_local dir"))?
+                    .ok_or(anyhow!("Can't get data_local_dir"))?
                     .join(".oculante"),
             );
 
@@ -127,7 +127,7 @@ impl PersistentSettings {
 }
 
 fn save(ps: &PersistentSettings) -> Result<()> {
-    let local_dir = dirs::config_local_dir()
+    let local_dir = dirs::data_local_dir()
         .ok_or(anyhow!("Can't get local dir"))?
         .join("oculante");
     if !local_dir.exists() {
@@ -150,7 +150,7 @@ pub struct VolatileSettings {
 
 impl VolatileSettings {
     pub fn load() -> Result<Self> {
-        let config_path = dirs::config_local_dir()
+        let config_path = dirs::data_local_dir()
             .ok_or(anyhow!("Can't get config_local dir"))?
             .join("oculante")
             .join("config_volatile.json")
@@ -164,7 +164,7 @@ impl VolatileSettings {
     }
 
     pub fn save_blocking(&self) -> Result<()> {
-        let local_dir = dirs::config_local_dir()
+        let local_dir = dirs::data_local_dir()
             .ok_or(anyhow!("Can't get local dir"))?
             .join("oculante");
         if !local_dir.exists() {
