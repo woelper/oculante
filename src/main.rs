@@ -1083,14 +1083,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.image_geometry.offset.y,
                 state.image_geometry.scale);            
         } else {
-            //TODO: How to implement this efficient?
-            draw.pattern(&texture.texture_array[0])
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                .size(
-                    texture.texture_array[0].width() * state.tiling as f32,
-                    texture.texture_array[0].height() * state.tiling as f32,
-                );
+
+            for yi in 0..state.tiling {
+                for xi in  0..state.tiling {
+                    //The "old" version used only a static offset, is this correct?
+                    let translate_x = xi as f32* texture.width()*state.image_geometry.scale   + state.image_geometry.offset.x;
+                    let translate_y = yi as f32* texture.height()*state.image_geometry.scale + state.image_geometry.offset.y;
+
+                    texture.draw_textures(&mut draw,
+                        translate_x,
+                        translate_y,
+                        state.image_geometry.scale);
+                }
+            }            
         }
 
         if state.persistent_settings.show_frame {
