@@ -1253,7 +1253,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     #[cfg(not(feature = "file_open"))]
                     {
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
-                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
                             set_title(app, state);
                         }
@@ -1264,7 +1264,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
 
-                        let start_directory = state.persistent_settings.last_open_directory.clone();
+                        let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
@@ -2207,7 +2207,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             ui.menu_button("Recent", |ui| {
-                for r in &state.persistent_settings.recent_images.clone() {
+                for r in &state.volatile_settings.recent_images.clone() {
                     if let Some(filename) = r.file_name() {
                         if ui.button(filename.to_string_lossy()).clicked() {
                             load_image_from_path(r, state);
