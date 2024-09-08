@@ -35,6 +35,7 @@ mod image_loader;
 use appstate::*;
 #[cfg(not(feature = "file_open"))]
 mod filebrowser;
+mod texture_wrapper;
 
 pub mod ktx2_loader;
 // mod events;
@@ -218,8 +219,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     state.player = Player::new(
         state.texture_channel.0.clone(),
-        state.persistent_settings.max_cache,
-        gfx.limits().max_texture_size,
+        state.persistent_settings.max_cache        
     );
 
     debug!("Image is: {:?}", maybe_img_location);

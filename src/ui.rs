@@ -26,9 +26,9 @@ use log::{debug, error, info};
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
-    prelude::{App, Graphics, BlendMode},
+    prelude::{App, Graphics},
 };
-use notan::draw::*;
+
 use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
@@ -358,7 +358,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let mut curr_ui_curs = base_ui_curs; //our start position
                 
                 let mut counter_v = 0; //Safety measure...
-                while(curr_cursor_v<end_cursor_v && counter_v<100){
+                while curr_cursor_v<end_cursor_v && counter_v<100 {
                     counter_v += 1;
                     let mut counter_u = 0; //Safety measure...
                     let mut curr_cursor_u = uv_center.0 - uv_size.0;                    
@@ -367,7 +367,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     
                     curr_ui_curs.x = base_ui_curs.x;
                     
-                    while(curr_cursor_u<end_cursor_u && counter_u<100){
+                    while curr_cursor_u<end_cursor_u && counter_u<100 {
                         counter_u += 1;
                         
                         //Get Texure at current cursor position
@@ -403,13 +403,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         let curr_ui_curs_after = curr_ui_curs+nalgebra::Vector2::new(u_size, 0.0);
 
                         //Safety measure: the cursor could perfectly hit the boundary between tiles
-                        if(u_size<=f64::EPSILON)
+                        if u_size<=f64::EPSILON
                         {                        
                             curr_cursor_u += f64::EPSILON;
                             continue;
                         }
 
-                        if(v_size<=f64::EPSILON)
+                        if v_size<=f64::EPSILON
                         {                        
                             curr_cursor_v += f64::EPSILON;
                             continue;

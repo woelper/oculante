@@ -4,7 +4,7 @@ use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
-use notan::prelude::{App, Graphics, TextureFilter};
+use notan::prelude::{App, Graphics};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
@@ -26,12 +26,9 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
-use crate::TexWrap;
-
-use crate::utils::image::imageops;
+use crate::texture_wrapper::TexWrap;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -186,13 +183,12 @@ pub struct Player {
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
     pub cache: Cache,
-    pub max_texture_size: u32,
     watcher: HashMap<PathBuf, SystemTime>,
 }
 
 impl Player {
     /// Create a new Player
-    pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
             image_sender,
@@ -201,7 +197,6 @@ impl Player {
                 data: Default::default(),
                 cache_size,
             },
-            max_texture_size,
             watcher: Default::default(),
         }
     }
@@ -250,7 +245,6 @@ impl Player {
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
-            self.max_texture_size,
             forced_frame_source,
         );
 
@@ -275,7 +269,6 @@ pub fn send_image_threaded(
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
-    max_texture_size: u32,
     forced_frame_source: Option<FrameSource>,
 ) {
     let loc = img_location.to_owned();
