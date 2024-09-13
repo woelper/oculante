@@ -1109,13 +1109,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     });
 
     if let Some(texture) = &state.current_texture {
+        // align to pixel to prevent distortion
+        let aligned_offset_x = state.image_geometry.offset.x.trunc();
+        let aligned_offset_y = state.image_geometry.offset.y.trunc();
+
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
                     // .size(texture.width() as f32, texture.height() as f32)
                     .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
                     .blend_mode(BlendMode::ADD)
-                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                    .translate(aligned_offset_x, aligned_offset_y)
                     // .scale(state.image_geometry.scale, state.image_geometry.scale)
                     ;
             }
@@ -1124,11 +1128,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+                .translate(aligned_offset_x, aligned_offset_y);
         } else {
             draw.pattern(texture)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                .translate(aligned_offset_x, aligned_offset_y)
                 .size(
                     texture.width() * state.tiling as f32,
                     texture.height() * state.tiling as f32,
@@ -1146,7 +1150,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 })
                 .blend_mode(BlendMode::ADD)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+                .translate(aligned_offset_x, aligned_offset_y);
         }
 
         if state.persistent_settings.show_minimap {
