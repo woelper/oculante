@@ -384,7 +384,7 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Blur(val) => ui.styled_slider(val, 0..=20),
+            Self::Blur(val) => ui.styled_slider(val, 0..=254),
             Self::Noise { amt, mono } => {
                 let mut r = ui.styled_slider(amt, 0..=100);
                 if ui.styled_checkbox(mono, "Grey").changed() {
@@ -901,7 +901,20 @@ impl ImageOperation {
         match self {
             Self::Blur(amt) => {
                 if *amt != 0 {
-                    *img = imageops::blur(img, *amt as f32);
+                    let i = img.clone();
+                    let mut data = i.into_raw();
+                    libblur::stack_blur(
+                        data.as_mut_slice(),
+                        img.width() * 4,
+                        img.width(),
+                        img.height(),
+                        (*amt as u32).clamp(2, 254),
+                        libblur::FastBlurChannels::Channels4,
+                        libblur::ThreadingPolicy::Adaptive,
+                    );
+                    use anyhow::Context;
+                    *img = RgbaImage::from_raw(img.width(), img.height(), data)
+                        .context("Can't construct image from blur result")?;
                 }
             }
             Self::Filter3x3(amt) => {

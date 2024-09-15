@@ -991,6 +991,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
+name = "colorutils-rs"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e748b823f7a786157bc11a361fd7e36d5182b6139ee44e4499ea0c4fd5e2c15"
+dependencies = [
+ "erydanos",
+ "half",
+]
+
+[[package]]
 name = "com"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1633,6 +1643,15 @@ name = "error-code"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0474425d51df81997e2f90a21591180b38eccf27292d755f3e30750225c175b"
+
+[[package]]
+name = "erydanos"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be3ce2ff34323f7dfdbc720a54ce2158825f199fc9edc2657e8ce8fce162f0ef"
+dependencies = [
+ "num-traits 0.2.19",
+]
 
 [[package]]
 name = "euclid"
@@ -2374,6 +2393,7 @@ checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 dependencies = [
  "cfg-if 1.0.0",
  "crunchy",
+ "num-traits 0.2.19",
 ]
 
 [[package]]
@@ -3163,10 +3183,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "libc"
-version = "0.2.155"
+name = "libblur"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
+checksum = "5fb36c566b6591e4c1ebe9fc214e93ef4fbf47c9d50c919225d1d3992fecd187"
+dependencies = [
+ "colorutils-rs",
+ "erydanos",
+ "half",
+ "libc",
+ "num-traits 0.2.19",
+ "rayon",
+]
+
+[[package]]
+name = "libc"
+version = "0.2.158"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "libdav1d-sys"
@@ -4407,6 +4441,7 @@ dependencies = [
  "ktx2",
  "lexical-sort",
  "libavif-image",
+ "libblur",
  "libheif-rs",
  "log",
  "lutgen",
@@ -5066,14 +5101,14 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.3"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddf517c03a109db8100448a4be38d498df8a210a99fe0e1b9eaf39e78c640efe"
+checksum = "fadfaed2cd7f389d0161bb73eeb07b7b78f8691047a6f3e73caaeae55310a4a6"
 dependencies = [
  "bytes",
  "rand",
  "ring",
- "rustc-hash 1.1.0",
+ "rustc-hash 2.0.0",
  "rustls",
  "slab",
  "thiserror",
@@ -5654,6 +5689,7 @@ version = "1.0.122"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "784b6203951c57ff748476b126ccb5e8e2959a5c19e5c617ab1956be3dbc68da"
 dependencies = [
+ "indexmap 2.3.0",
  "itoa",
  "memchr",
  "ryu",

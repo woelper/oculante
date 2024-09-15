@@ -1125,6 +1125,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     ui.end_row();
 
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+
+                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                        ui.separator();
+                        ui.separator();
+                        ui.end_row();
+                    }
+
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
@@ -1497,7 +1504,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     #[cfg(not(feature = "file_open"))]
                     {
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
-                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
                             set_title(app, state);
                         }
@@ -1508,7 +1515,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("Save as...")).clicked() {
 
-                        let start_directory = state.persistent_settings.last_open_directory.clone();
+                        let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
@@ -1816,7 +1823,8 @@ fn modifier_stack_ui(
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
+    let stack_len = stack.len();
+
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{operation}"));
 
@@ -1847,27 +1855,34 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move up")
-                    .clicked()
-                {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
+                let up = i != 0;
+                let down = i != stack_len - 1;
 
-                if egui::Button::new("")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move down")
-                    .clicked()
-                {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
+                ui.add_enabled_ui(up, |ui| {
+                    if egui::Button::new("")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move up")
+                        .clicked()
+                    {
+                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        *image_changed = true;
+                    }
+                });
+
+                ui.add_enabled_ui(down, |ui| {
+                    if egui::Button::new("")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move down")
+                        .clicked()
+                    {
+                        swap = Some((i, i + 1));
+                        *image_changed = true;
+                    }
+                });
             });
 
             ui.end_row();
@@ -2480,7 +2495,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 );
 
                 ui.allocate_ui_at_rect(recent_rect, |ui| {
-                    for r in &state.persistent_settings.recent_images.clone() {
+                    for r in &state.volatile_settings.recent_images.clone() {
                         ui.horizontal(|ui| {
                             render_file_icon(&r, ui);
                             // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
