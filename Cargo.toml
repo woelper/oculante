@@ -92,6 +92,7 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
   "openjpeg-sys",
 ] }
 file-format = "0.25.0"
+libblur = "0.13.5"
 
 [features]
 default = [
