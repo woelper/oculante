@@ -1,6 +1,6 @@
 
 <h1 align="center">
-    <img alt="banner" src="res/banner.png">
+    <img alt="banner" src="res/banner.avif">
 </h1>
 
  _A no-nonsense hardware-accelerated image viewer_
