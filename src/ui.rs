@@ -881,6 +881,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     ui.end_row();
 
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+
+                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                        ui.separator();
+                        ui.separator();
+                        ui.end_row();
+                    }
+
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
@@ -1253,7 +1260,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     #[cfg(not(feature = "file_open"))]
                     {
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
-                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
                             set_title(app, state);
                         }
@@ -1264,7 +1271,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
 
-                        let start_directory = state.persistent_settings.last_open_directory.clone();
+                        let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
@@ -1574,15 +1581,14 @@ fn modifier_stack_ui(
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
+    let stack_len = stack.len();
+
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{operation}"));
 
         // let op draw itself and check for response
 
         ui.push_id(i, |ui| {
-            // ui.end_row();
-
             // draw the image operator
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
@@ -1592,9 +1598,6 @@ fn modifier_stack_ui(
             ui.add_space(45.);
 
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                // ui.add_space(size);
-
-                // ui.vertical(|ui| {
                 ui.style_mut().spacing.icon_spacing = 0.;
                 ui.style_mut().spacing.button_padding = Vec2::ZERO;
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
@@ -1612,27 +1615,34 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("⏶")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move up")
-                    .clicked()
-                {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
+                let up = i != 0;
+                let down = i != stack_len - 1;
 
-                if egui::Button::new("⏷")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move down")
-                    .clicked()
-                {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
+                ui.add_enabled_ui(up, |ui| {
+                    if egui::Button::new("⏶")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move up")
+                        .clicked()
+                    {
+                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        *image_changed = true;
+                    }
+                });
+
+                ui.add_enabled_ui(down, |ui| {
+                    if egui::Button::new("⏷")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move down")
+                        .clicked()
+                    {
+                        swap = Some((i, i + 1));
+                        *image_changed = true;
+                    }
+                });
             });
 
             ui.end_row();
@@ -1640,7 +1650,6 @@ fn modifier_stack_ui(
 
         ui.end_row();
     }
-    // });
 
     if let Some(delete) = delete {
         stack.remove(delete);
@@ -2207,7 +2216,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             ui.menu_button("Recent", |ui| {
-                for r in &state.persistent_settings.recent_images.clone() {
+                for r in &state.volatile_settings.recent_images.clone() {
                     if let Some(filename) = r.file_name() {
                         if ui.button(filename.to_string_lossy()).clicked() {
                             load_image_from_path(r, state);

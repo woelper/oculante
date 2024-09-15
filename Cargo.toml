@@ -57,7 +57,7 @@ self_update = { version = "0.41", default-features = false, features = [
   "rustls",
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
 turbojpeg = { version = "1.1.0", optional = true }
@@ -92,6 +92,7 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
   "openjpeg-sys",
 ] }
 file-format = "0.25.0"
+libblur = "0.13.5"
 
 [features]
 default = [
