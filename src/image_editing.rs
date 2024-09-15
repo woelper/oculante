@@ -186,7 +186,6 @@ impl ImageOperation {
         match self {
             Self::Blur(_) => false,
             Self::Resize { .. } => false,
-            // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
             Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
@@ -1027,15 +1026,15 @@ impl ImageOperation {
                     -90 => *img = image::imageops::rotate270(img),
                     270 => *img = image::imageops::rotate270(img),
                     180 => *img = image::imageops::rotate180(img),
-                    // 270 => *img = image::imageops::rotate270(img),
                     _ => (),
                 }
             }
             Self::Flip(vert) => {
                 if *vert {
                     *img = image::imageops::flip_vertical(img);
+                } else {
+                    *img = image::imageops::flip_horizontal(img);
                 }
-                *img = image::imageops::flip_horizontal(img);
             }
             Self::ScaleImageMinMax => {
                 //Step 0: Get color channel min and max values
