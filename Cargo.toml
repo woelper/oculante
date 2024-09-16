@@ -94,15 +94,10 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
 file-format = "0.25.0"
 egui_extras = { version = "0.27.2", features = ["image", "file"] }
 libblur = "0.13.5"
+egui-modal = "0.3.6"
 
 [features]
-default = [
-  "turbo",
-  "avif_native",
-  "update",
-  "notan/glsl-to-spirv",
-  "j2k",
-]
+default = ["turbo", "avif_native", "update", "notan/glsl-to-spirv", "j2k"]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]

@@ -1443,6 +1443,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-modal"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "738cdffefd15dbb6a5fff75d118eee82a9e894bbfa45e41c24d7de42519fa673"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-notify"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4417,6 +4426,7 @@ dependencies = [
  "dark-light",
  "dds-rs",
  "dirs 5.0.1",
+ "egui-modal",
  "egui-notify",
  "egui-phosphor",
  "egui_extras",

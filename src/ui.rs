@@ -2299,6 +2299,54 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
+            let modal = egui_modal::Modal::new(ui.ctx(), "delete");
+
+            // What goes inside the modal
+            modal.show(|ui| {
+
+                ui.style_mut().spacing.window_margin = 50.0.into();
+
+
+                ui.horizontal(|ui| {
+
+                    ui.vertical_centered_justified(|ui| {
+                        ui.label(RichText::new("ℹ").size(100.).color(Color32::YELLOW));
+
+                        ui.add_space(20.);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(format!(
+                                "Are you sure you want to delete {}?",
+                                state
+                                    .current_path
+                                    .clone()
+                                    .unwrap_or_default()
+                                    .file_name()
+                                    .map(|s| s.to_string_lossy())
+                                    .unwrap_or_default()
+                            ));
+                        });
+                        ui.add_space(20.);
+
+                        ui.scope(|ui| {
+                            let warn_color = Color32::from_rgb(255, 76, 76);
+                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                            ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                                Stroke::new(1., Color32::WHITE);
+                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                warn_color.linear_multiply(0.8);
+                            if ui.styled_button("Yes").clicked() {
+                                delete_file(state);
+                                modal.close();
+                            }
+                        });
+
+                        if ui.styled_button("Cancel").clicked() {
+                            modal.close();
+                        }
+                    });
+                });
+            });
+
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -2307,7 +2355,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                delete_file(state);
+                modal.open();
+                // delete_file(state);
             }
         }
 
