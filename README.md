@@ -117,7 +117,7 @@ Oculante only gets updated when it improves something for you. You'll still see 
 Uninstalling Oculante is a quick process, just delete the executable and delete the data folder. You can find the data folder in the relevant location for your operating system below.
 
 - Windows: `~/AppData/Local/.oculante`
-- Mac: `~/Library/Saved Application State/com.github.woelper.oculante.savedState`
+- Mac: `~/Library/Application Support/oculante`
 - Linux & BSD: `~/.local/share/oculante`
 
 ## Features
