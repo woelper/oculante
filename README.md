@@ -57,7 +57,7 @@ For those looking to manage Oculante through a package manager, please see the o
 ### Cargo
 
 ```sh
-$ cargo install oculante
+cargo install oculante
 ```
 
 ### Linux
@@ -65,7 +65,7 @@ $ cargo install oculante
 - Arch Linux 
 
 ```sh
-# pacman -S oculante
+pacman -S oculante
 ```
 
 - NixOS
@@ -79,7 +79,7 @@ environment.systemPackages = [
 - openSUSE
 
 ```sh
-# zypper install oculante
+zypper install oculante
 ```
 
 ### BSD
@@ -87,13 +87,13 @@ environment.systemPackages = [
 - FreeBSD
 
 ```sh
-# pkg install oculante
+pkg install oculante
 ```
 
 - NetBSD
 
 ```sh
-# pkgin install oculante
+pkgin install oculante
 ```
 
 ## Build Dependencies
