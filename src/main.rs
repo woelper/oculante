@@ -369,12 +369,15 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         style.interaction.tooltip_delay = 0.0;
         // let font_scale = 0.80;
         style.spacing.icon_width = 20.;
+        style.spacing.window_margin = 20.0.into();
         style.spacing.item_spacing = vec2(8., 6.);
         style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
         style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
         style.visuals.widgets.inactive.rounding = Rounding::same(4.);
         style.visuals.widgets.active.rounding = Rounding::same(4.);
         style.visuals.widgets.hovered.rounding = Rounding::same(4.);
+        style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
+        style.visuals.warn_fg_color = Color32::from_rgb(255, 204, 0);
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
         style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
