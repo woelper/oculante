@@ -66,27 +66,27 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
+    fn styled_checkbox(&mut self, _checked: &mut bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
-    fn styled_button(&mut self, text: impl Into<WidgetText>) -> Response {
+    fn styled_button(&mut self, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
     fn styled_menu_button(
         &mut self,
-        title: impl Into<WidgetText>,
-        add_contents: impl FnOnce(&mut Ui),
+        _title: impl Into<WidgetText>,
+        _add_contents: impl FnOnce(&mut Ui),
     ) -> Response {
         unimplemented!()
     }
 
-    fn styled_selectable_label(&mut self, active: bool, text: impl Into<WidgetText>) -> Response {
+    fn styled_selectable_label(&mut self, _active: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
-    fn styled_label(&mut self, text: impl Into<WidgetText>) -> Response {
+    fn _styled_label(&mut self, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -219,7 +219,7 @@ impl EguiExt for Ui {
         let text = text.text();
 
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let mut description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         let spacing = if icon.len() == 0 { "" } else { "   " };
         self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
@@ -270,7 +270,7 @@ impl EguiExt for Ui {
     }
 
     /// Draw a justified icon from a string starting with an emoji
-    fn styled_selectable_label(&mut self, active: bool, text: impl Into<WidgetText>) -> Response {
+    fn styled_selectable_label(&mut self, _active: bool, text: impl Into<WidgetText>) -> Response {
         let text: WidgetText = text.into();
         let text = text.text();
 
@@ -334,7 +334,7 @@ impl EguiExt for Ui {
         CollapsingHeader::new(heading)
             // .show_background(true)
             .icon(caret_icon)
-            .show(self, add_contents)
+            .show_unindented(self, add_contents)
     }
 
     /// Draw a justified icon from a string starting with an emoji
@@ -521,8 +521,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::left("side_panel")
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
-    .max_width(PANEL_WIDTH)
-    .min_width(PANEL_WIDTH/2.)
+    .resizable(false)
     .show(ctx, |ui| {
 
         egui::ScrollArea::vertical().auto_shrink([false,true])
@@ -553,23 +552,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
-
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
-                        let max_chars = 18;
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        let skip_symbol = if file_name.chars().count() > max_chars {".."} else {""};
-
                         ui.label_i(&format!("{} File", IMAGE));
                         let path_label = egui::Label::new(
-                            RichText::new(format!(
-                                "{skip_symbol}{}",
-                                file_name.chars().rev().take(max_chars).collect::<String>().chars().rev().collect::<String>()
-                            ))
+                            RichText::new(file_name)
                         ).truncate(true);
-
-                        ui.add(path_label)
-                        .on_hover_text(format!("{}", path.display()));
+                        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                            ui.add(path_label)
+                            .on_hover_text(format!("{}", path.display()));
+                        });
                         ui.end_row();
                     }
 
@@ -647,55 +640,68 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     if state.persistent_settings.max_cache == 0 {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
-                    if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
-                        // TODO: Automatically insert image into compare list
-                        #[cfg(feature = "file_open")]
-                        crate::browse_for_image_path(state);
-                        #[cfg(not(feature = "file_open"))]
-                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
-                    }
                     ui.vertical_centered_justified(|ui| {
-                        let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-                        compare_list.sort_by(|a,b| a.0.cmp(&b.0));
 
-                        for (path, geo) in compare_list {
+                        egui::Frame::none()
+                        .fill(egui::Color32::from_gray(13))
+                        .rounding(ui.style().visuals.widgets.active.rounding)
+                        .inner_margin(Margin::same(6.))
+                        .show(ui, |ui| {
 
-                            ui.horizontal(|ui|{
-                                if ui.button(X).clicked() {
-                                    state.compare_list.remove(&path);
-                                }
-                                ui.vertical_centered_justified(|ui| {
-                                    if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
-                                        state.image_geometry = geo.clone();
-                                        state
-                                            .player
-                                            .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
-                                        ui.ctx().request_repaint();
-                                        ui.ctx().request_repaint_after(Duration::from_millis(500));
-                                        state.current_path = Some(path);
-                                        state.image_info = None;
+                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(35, 35, 35);
+
+                            if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
+                                // TODO: Automatically insert image into compare list
+                                #[cfg(feature = "file_open")]
+                                crate::browse_for_image_path(state);
+                                #[cfg(not(feature = "file_open"))]
+                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                            }
+                            let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
+                            compare_list.sort_by(|a,b| a.0.cmp(&b.0));
+
+                            for (path, geo) in compare_list {
+                                ui.horizontal(|ui|{
+                                    if ui.button(X).clicked() {
+                                        state.compare_list.remove(&path);
                                     }
+                                    ui.vertical_centered_justified(|ui| {
+                                        if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                            state.image_geometry = geo.clone();
+                                            state
+                                                .player
+                                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
+                                            ui.ctx().request_repaint();
+                                            ui.ctx().request_repaint_after(Duration::from_millis(500));
+                                            state.current_path = Some(path);
+                                            state.image_info = None;
+                                        }
+                                    });
                                 });
-                            });
-                        }
-                        if let Some(path) = &state.current_path {
-                            if let Some(geo) = state.compare_list.get(path) {
-                                if state.image_geometry != *geo {
-                                    if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
+                            }
+                            if let Some(path) = &state.current_path {
+                                if let Some(geo) = state.compare_list.get(path) {
+                                    if state.image_geometry != *geo {
+                                        if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
+                                            state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        }
+                                    }
+                                } else {
+                                    if ui.button(format!("{PLUS} Add current image")).clicked() {
                                         state.compare_list.insert(path.clone(), state.image_geometry.clone());
                                     }
                                 }
-                            } else {
-                                if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                    state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                            }
+                            if !state.compare_list.is_empty() {
+                                if ui.button(format!("{TRASH} Clear all")).clicked() {
+                                    state.compare_list.clear();
                                 }
                             }
-                        }
-                        if !state.compare_list.is_empty() {
-                            if ui.button(format!("{TRASH} Clear all")).clicked() {
-                                state.compare_list.clear();
-                            }
-                        }
+
+
+                        });
+
+
                     });
                 });
             });
@@ -703,27 +709,42 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if state.current_texture.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
-                        if let Some(img) = &state.current_image {
-                            if ui
-                                .button("Show alpha bleed")
-                                .on_hover_text("Highlight pixels with zero alpha and color information")
-                                .clicked()
-                            {
-                                state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+
+
+                        egui::Frame::none()
+                        .fill(egui::Color32::from_gray(13))
+                        .rounding(ui.style().visuals.widgets.active.rounding)
+                        .inner_margin(Margin::same(6.))
+                        .show(ui, |ui| {
+
+                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(35, 35, 35);
+
+                            if let Some(img) = &state.current_image {
+                                if ui
+                                    .button("Show alpha bleed")
+                                    .on_hover_text("Highlight pixels with zero alpha and color information")
+                                    .clicked()
+                                {
+                                    state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+                                }
+                                if ui
+                                    .button("Show semi-transparent pixels")
+                                    .on_hover_text(
+                                        "Highlight pixels that are neither fully opaque nor fully transparent",
+                                    )
+                                    .clicked()
+                                {
+                                    state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
+                                }
+                                if ui.button("Reset image").clicked() {
+                                    state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                                }
                             }
-                            if ui
-                                .button("Show semi-transparent pixels")
-                                .on_hover_text(
-                                    "Highlight pixels that are neither fully opaque nor fully transparent",
-                                )
-                                .clicked()
-                            {
-                                state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
-                            }
-                            if ui.button("Reset image").clicked() {
-                                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
-                            }
-                        }
+
+
+                        });
+
+
                     });
                 });
         }
@@ -1035,6 +1056,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .min_width(100.)
         .show_separator_line(false)
         .show(ctx, |ui| {
+
+            ctx.style_ui(ui);
+
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
             let mut pixels_changed = false;
@@ -2300,22 +2324,18 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
             let modal = egui_modal::Modal::new(ui.ctx(), "delete");
-
-            // What goes inside the modal
             modal.show(|ui| {
-
-                ui.style_mut().spacing.window_margin = 50.0.into();
-
-
                 ui.horizontal(|ui| {
-
                     ui.vertical_centered_justified(|ui| {
-                        ui.label(RichText::new("ℹ").size(100.).color(Color32::YELLOW));
-
+                        ui.label(
+                            RichText::new("ℹ")
+                                .size(100.)
+                                .color(ui.style().visuals.warn_fg_color),
+                        );
                         ui.add_space(20.);
                         ui.horizontal_wrapped(|ui| {
                             ui.label(format!(
-                                "Are you sure you want to delete {}?",
+                                "Are you sure you want to move {} to the trash?",
                                 state
                                     .current_path
                                     .clone()
@@ -2326,7 +2346,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                             ));
                         });
                         ui.add_space(20.);
-
                         ui.scope(|ui| {
                             let warn_color = Color32::from_rgb(255, 76, 76);
                             ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
@@ -2334,6 +2353,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 Stroke::new(1., Color32::WHITE);
                             ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
                                 warn_color.linear_multiply(0.8);
+
                             if ui.styled_button("Yes").clicked() {
                                 delete_file(state);
                                 modal.close();
@@ -2680,8 +2700,11 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
-    let x_offset = 5.0;
+    let mut x_offset = 5.0;
     let y_offset = 6.0;
+    if ui.style().spacing.indent == 0.0 {
+        x_offset += 8.0;
+    }
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
