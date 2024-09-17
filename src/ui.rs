@@ -881,6 +881,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     ui.end_row();
 
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+
+                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                        ui.separator();
+                        ui.separator();
+                        ui.end_row();
+                    }
+
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
@@ -1574,15 +1581,14 @@ fn modifier_stack_ui(
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
+    let stack_len = stack.len();
+
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{operation}"));
 
         // let op draw itself and check for response
 
         ui.push_id(i, |ui| {
-            // ui.end_row();
-
             // draw the image operator
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
@@ -1592,9 +1598,6 @@ fn modifier_stack_ui(
             ui.add_space(45.);
 
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                // ui.add_space(size);
-
-                // ui.vertical(|ui| {
                 ui.style_mut().spacing.icon_spacing = 0.;
                 ui.style_mut().spacing.button_padding = Vec2::ZERO;
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
@@ -1612,27 +1615,34 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("⏶")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move up")
-                    .clicked()
-                {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
+                let up = i != 0;
+                let down = i != stack_len - 1;
 
-                if egui::Button::new("⏷")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move down")
-                    .clicked()
-                {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
+                ui.add_enabled_ui(up, |ui| {
+                    if egui::Button::new("⏶")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move up")
+                        .clicked()
+                    {
+                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        *image_changed = true;
+                    }
+                });
+
+                ui.add_enabled_ui(down, |ui| {
+                    if egui::Button::new("⏷")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move down")
+                        .clicked()
+                    {
+                        swap = Some((i, i + 1));
+                        *image_changed = true;
+                    }
+                });
             });
 
             ui.end_row();
@@ -1640,7 +1650,6 @@ fn modifier_stack_ui(
 
         ui.end_row();
     }
-    // });
 
     if let Some(delete) = delete {
         stack.remove(delete);

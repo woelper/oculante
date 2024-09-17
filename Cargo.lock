@@ -980,6 +980,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
+name = "colorutils-rs"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e748b823f7a786157bc11a361fd7e36d5182b6139ee44e4499ea0c4fd5e2c15"
+dependencies = [
+ "erydanos",
+ "half",
+]
+
+[[package]]
 name = "com"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1582,6 +1592,15 @@ name = "error-code"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0474425d51df81997e2f90a21591180b38eccf27292d755f3e30750225c175b"
+
+[[package]]
+name = "erydanos"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be3ce2ff34323f7dfdbc720a54ce2158825f199fc9edc2657e8ce8fce162f0ef"
+dependencies = [
+ "num-traits 0.2.19",
+]
 
 [[package]]
 name = "euclid"
@@ -2323,6 +2342,7 @@ checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
 dependencies = [
  "cfg-if 1.0.0",
  "crunchy",
+ "num-traits 0.2.19",
 ]
 
 [[package]]
@@ -3112,10 +3132,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "libc"
-version = "0.2.155"
+name = "libblur"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
+checksum = "5fb36c566b6591e4c1ebe9fc214e93ef4fbf47c9d50c919225d1d3992fecd187"
+dependencies = [
+ "colorutils-rs",
+ "erydanos",
+ "half",
+ "libc",
+ "num-traits 0.2.19",
+ "rayon",
+]
+
+[[package]]
+name = "libc"
+version = "0.2.158"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "libdav1d-sys"
@@ -3178,7 +3212,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -4345,6 +4379,7 @@ dependencies = [
  "ktx2",
  "lexical-sort",
  "libavif-image",
+ "libblur",
  "libheif-rs",
  "log",
  "lutgen",
@@ -6404,7 +6439,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "rand",
  "static_assertions",
 ]
