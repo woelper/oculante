@@ -2326,7 +2326,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 ui.horizontal(|ui| {
                     ui.vertical_centered_justified(|ui| {
                         ui.label(
-                            RichText::new("ℹ")
+                            RichText::new(WARNING_CIRCLE)
                                 .size(100.)
                                 .color(ui.style().visuals.warn_fg_color),
                         );
