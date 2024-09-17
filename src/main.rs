@@ -661,7 +661,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(macos) { 0.1 } else { 10. };
+                    let divisor = if cfg!(target_os = "macos") { 0.1 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
