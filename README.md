@@ -96,6 +96,14 @@ pkg install oculante
 pkgin install oculante
 ```
 
+### Windows
+
+- Scoop
+
+```sh
+scoop install extras/oculante
+```
+
 ## Build Dependencies
 
 Linux (Debian):
