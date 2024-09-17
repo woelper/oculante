@@ -78,7 +78,7 @@ fn main() {
     // #[cfg(windows)]
     match std::process::Command::new("convert")
         .args(vec![
-            "res/oculante.png",
+            "res/icons/icon.png",
             "-define",
             "icon:auto-resize=16,32,48,64,128,256",
             "icon.ico",
