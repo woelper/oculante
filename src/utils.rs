@@ -166,10 +166,8 @@ impl ExtendedImageInfo {
         const FIXED_RGB_SIZE: usize = 24;
         const SUB_INDEX_SIZE: usize = 5;
         const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE-SUB_INDEX_SIZE);
-        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
+        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];        
         
-        use std::time::Instant;
-        let now = Instant::now();
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
                 num_transparent_pixels += 1;
@@ -191,10 +189,7 @@ impl ExtendedImageInfo {
         let mut full_colors = 0u32;
         for &intensity in color_map.iter() {
             full_colors += intensity.count_ones();
-        }
-
-        let elapsed = now.elapsed();
-        println!("Elapsed hist: {:.2?}", elapsed);       
+        }     
         
 
         let green_histogram: Vec<(i32, i32)> = hist_g
