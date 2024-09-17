@@ -44,6 +44,8 @@ pub const FOLDERDOCUMENT: &str = "\u{E929}";
 pub const FOLDERDOWNLOAD: &str = "\u{E92a}";
 pub const OPTIONS: &str = "\u{E92b}";
 pub const BOOKMARK_OFF: &str = "\u{E92c}";
+pub const WARNING_CIRCLE: &str = "\u{E92d}";
+pub const ERROR_CIRCLE: &str = "\u{E92e}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.

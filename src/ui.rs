@@ -2345,7 +2345,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         });
                         ui.add_space(20.);
                         ui.scope(|ui| {
-                            let warn_color = Color32::from_rgb(255, 76, 76);
+                            let warn_color = Color32::from_rgb(255, 77, 77);
                             ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
                             ui.style_mut().visuals.widgets.inactive.fg_stroke =
                                 Stroke::new(1., Color32::WHITE);
