@@ -1057,8 +1057,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .show_separator_line(false)
         .show(ctx, |ui| {
 
-            ctx.style_ui(ui);
-
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
             let mut pixels_changed = false;
