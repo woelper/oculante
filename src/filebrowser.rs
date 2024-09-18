@@ -98,7 +98,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             .add(
                 egui::Button::new(format!("{CHEVRON_UP}"))
                     .rounding(5.)
-                    .min_size(vec2(0., 32.)), // .shortcut_text("sds")
+                    .min_size(vec2(0., 35.)), // .shortcut_text("sds")
             )
             .clicked()
         {
