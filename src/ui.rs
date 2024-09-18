@@ -370,8 +370,6 @@ impl EguiExt for Ui {
             ui.style_mut().spacing.interact_size.y = 18.;
 
             let color = ui.style().visuals.selection.bg_fill;
-            // let color = Color32::RED;
-            let available_width = ui.available_width() * 0.6;
             let style = ui.style_mut();
 
             style.visuals.widgets.inactive.fg_stroke.width = 7.0;
@@ -391,8 +389,6 @@ impl EguiExt for Ui {
             style.visuals.widgets.active.rounding =
                 style.visuals.widgets.active.rounding.at_least(18.);
             style.visuals.widgets.active.expansion = -4.0;
-
-            style.spacing.slider_width = available_width;
 
             ui.horizontal(|ui| {
                 let r = ui.add(
@@ -641,9 +637,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             };
 
             ui.vertical_centered_justified(|ui| {
-
-
-
                 ui.styled_collapsing("Compare", |ui| {
 
                     if state.persistent_settings.max_cache == 0 {
@@ -705,11 +698,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     state.compare_list.clear();
                                 }
                             }
-
-
                         });
-
-
                     });
                 });
             });
@@ -717,16 +706,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if state.current_texture.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
-
-
                         egui::Frame::none()
                         .fill(panel_bg_color)
                         .rounding(ui.style().visuals.widgets.active.rounding)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
-
                             ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
-
                             if let Some(img) = &state.current_image {
                                 if ui
                                     .button("Show alpha bleed")
@@ -748,23 +733,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     state.current_texture = img.to_texture(gfx, &state.persistent_settings);
                                 }
                             }
-
-
                         });
-
-
                     });
                 });
-        }
+            }
 
             if state.current_texture.is_some() {
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
+                    ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
-
-
             advanced_ui(ui, state);
         });
     });
@@ -1862,6 +1842,7 @@ fn modifier_stack_ui(
 
         ui.push_id(i, |ui| {
             // draw the image operator
+            ui.style_mut().spacing.slider_width = ui.available_width() - 76.;
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
             }
