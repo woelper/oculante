@@ -2,7 +2,6 @@
 
 use clap::Arg;
 use clap::Command;
-// use fluent_uri::Uri;
 use log::debug;
 use log::error;
 use log::info;
@@ -26,8 +25,6 @@ pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
-use crate::settings::set_system_theme;
-use crate::settings::ColorTheme;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
@@ -65,9 +62,8 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "debug");
-        }
+        println!("Debug");
+        std::env::set_var("RUST_LOG", "debug");
     }
     let _ = env_logger::try_init();
 
@@ -166,7 +162,7 @@ fn main() -> Result<(), String> {
         .build()
 }
 
-fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
+fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     debug!("Now matching arguments {:?}", std::env::args());
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
@@ -314,7 +310,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
     // Set up egui style
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
-        ctx.set_pixels_per_point(app.window().dpi() as f32);
+        // ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
         egui_extras::install_image_loaders(ctx);
@@ -326,7 +322,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -2.4,
+                y_offset: -1.4,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -335,13 +331,20 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             "icons".to_owned(),
             FontData::from_static(include_bytes!(
                 "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
-            )), // .tweak(FontTweak {
-                //     scale: 1.0,
-                //     y_offset_factor: 0.0,
-                //     y_offset: -3.0,
-                //     baseline_offset_factor: 0.0,
-                // }),
+            ))
+            .tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: 1.0,
+                baseline_offset_factor: 0.0,
+            }),
         );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "icons".to_owned());
 
         fonts
             .families
@@ -349,60 +352,9 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
             .unwrap()
             .insert(0, "inter".to_owned());
 
-        // egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "icons".to_owned());
-
-        let mut style: egui::Style = (*ctx.style()).clone();
-        match state.persistent_settings.theme {
-            ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-            ColorTheme::Dark => {
-                style.visuals.panel_fill = Color32::from_gray(25);
-                ctx.set_visuals(Visuals::dark())
-            }
-            ColorTheme::System => set_system_theme(ctx),
-        }
-
-        style.interaction.tooltip_delay = 0.0;
-        // let font_scale = 0.80;
-        style.spacing.icon_width = 20.;
-        style.spacing.window_margin = 20.0.into();
-        style.spacing.item_spacing = vec2(8., 6.);
-        style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
-        style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
-        style.visuals.widgets.inactive.rounding = Rounding::same(4.);
-        style.visuals.widgets.active.rounding = Rounding::same(4.);
-        style.visuals.widgets.hovered.rounding = Rounding::same(4.);
-        style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
-        style.visuals.warn_fg_color = Color32::from_rgb(255, 204, 0);
-
-        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
-        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
-        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12.;
-        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18.;
-        style.visuals.selection.bg_fill = Color32::from_rgb(
-            state.persistent_settings.accent_color[0],
-            state.persistent_settings.accent_color[1],
-            state.persistent_settings.accent_color[2],
-        );
-
-        let accent_color = style.visuals.selection.bg_fill.to_array();
-
-        let accent_color_luma = (accent_color[0] as f32 * 0.299
-            + accent_color[1] as f32 * 0.587
-            + accent_color[2] as f32 * 0.114)
-            .max(0.)
-            .min(255.) as u8;
-        let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
-        // Set text on highlighted elements
-        style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-        // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+        debug!("Theme {:?}", state.persistent_settings.theme);
+        apply_theme(&state, ctx);
         ctx.set_fonts(fonts);
-
-        ctx.set_style(style);
     });
 
     // load checker texture
@@ -503,7 +455,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
             if key_pressed(app, state, Quit) {
-                state.persistent_settings.save_blocking();
+                _ = state.persistent_settings.save_blocking();
                 _ = state.volatile_settings.save_blocking();
                 app.backend.exit();
             }
@@ -646,7 +598,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 ),
                 app.window().size(),
             );
-            state.persistent_settings.save_blocking();
+            _ = state.persistent_settings.save_blocking();
             _ = state.volatile_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
@@ -728,8 +680,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
-    // dbg!(format!("upg {}", app.timer.elapsed_f32()));
-
     if let Some(p) = &state.current_path {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
@@ -750,7 +700,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             ),
             app.window().size(),
         );
-        state.persistent_settings.save_blocking();
+        _ = state.persistent_settings.save_blocking();
         _ = state.volatile_settings.save_blocking();
         trace!("Save {t}");
     }

@@ -41,7 +41,7 @@ use std::{
 };
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
-const PANEL_WIDGET_OFFSET: f32 = 10.0;
+const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 #[cfg(feature = "turbo")]
 use crate::image_editing::{cropped_range, lossless_tx};
@@ -220,14 +220,13 @@ impl EguiExt for Ui {
 
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        let spacing = if icon.len() == 0 { "" } else { "   " };
+        let spacing = if icon.len() == 0 { "" } else { "       " };
         self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
         let r = self.menu_button(format!("{spacing}{description}"), add_contents);
 
         let mut icon_pos = r.response.rect.left_center();
         icon_pos.x += 16.;
-        icon_pos.y += 1.;
 
         self.painter().text(
             icon_pos,
@@ -248,16 +247,15 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-        let spacing = if icon.len() == 0 { "" } else { "   " };
+        let spacing = if icon.len() == 0 { "" } else { "      " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
-                .rounding(5.)
+                .rounding(self.style().visuals.widgets.inactive.rounding)
                 .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
         );
 
         let mut icon_pos = r.rect.left_center();
         icon_pos.x += 16.;
-        icon_pos.y += 1.;
 
         self.painter().text(
             icon_pos,
@@ -540,7 +538,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
 
                 egui::Grid::new("info")
-
                     .num_columns(2)
                     .show(ui, |ui| {
                     ui.label_i(&format!("{ARROWS_OUT} Size",));
@@ -633,7 +630,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             }
             ui.add_space(10.);
 
+            let panel_bg_color = match ui.style().visuals.dark_mode {
+                true => Color32::from_gray(13),
+                false => Color32::from_gray(216)
+            };
+
+            let button_color = match ui.style().visuals.dark_mode {
+                true => Color32::from_gray(35),
+                false => Color32::from_gray(190)
+            };
+
             ui.vertical_centered_justified(|ui| {
+
+
 
                 ui.styled_collapsing("Compare", |ui| {
 
@@ -641,14 +650,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
                     ui.vertical_centered_justified(|ui| {
-
                         egui::Frame::none()
-                        .fill(egui::Color32::from_gray(13))
-                        .rounding(ui.style().visuals.widgets.active.rounding)
+                        .fill(panel_bg_color)
+                        .rounding(ui.style().visuals.widgets.active.rounding*1.5)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
 
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(35, 35, 35);
+                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
 
                             if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
                                 // TODO: Automatically insert image into compare list
@@ -712,12 +720,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
 
                         egui::Frame::none()
-                        .fill(egui::Color32::from_gray(13))
+                        .fill(panel_bg_color)
                         .rounding(ui.style().visuals.widgets.active.rounding)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
 
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(35, 35, 35);
+                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
 
                             if let Some(img) = &state.current_image {
                                 if ui
@@ -786,7 +794,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     }
                     if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
                         r.mark_changed();
-
                     }
 
                     if r.changed() {
@@ -933,6 +940,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
             });
 
+                // TODO: add more options here
                 ui.horizontal(|ui| {
                     ui.label("Configure window title");
                     if ui
@@ -2325,6 +2333,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             modal.show(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical_centered_justified(|ui| {
+                        ui.add_space(10.);
+
                         ui.label(
                             RichText::new(WARNING_CIRCLE)
                                 .size(100.)
@@ -2374,7 +2384,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
             {
                 modal.open();
-                // delete_file(state);
             }
         }
 
@@ -2392,7 +2401,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.scrubber.len() > 1 && window_x > ui.cursor().left() {
-            // TODO: Check if wrap is off and we are at fisrt image
+            // TODO: Check if wrap is off and we are at first image
             if tooltip(
                 unframed_button(CARET_LEFT, ui),
                 "Previous image",
@@ -2470,23 +2479,10 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
     use crate::shortcuts::InputEvent::*;
 
     ui.scope(|ui| {
-        // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
         // maybe override font size?
         ui.style_mut().visuals.button_frame = false;
         ui.style_mut().visuals.widgets.inactive.expansion = 20.;
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
-
-        // let stroke = Stroke::new(10., Color32::RED);
-
-        // ui.style_mut().visuals.window_stroke = Stroke::new(10., Color32::RED);
-        // ui.style_mut().visuals.widgets.open.bg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.open.fg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.active.fg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.active.bg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.inactive.fg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.inactive.bg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.noninteractive.bg_stroke = stroke;
-        // ui.style_mut().visuals.widgets.noninteractive.fg_stroke = stroke;
 
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
             if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
@@ -2527,7 +2523,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 match clipboard_to_image() {
                     Ok(img) => {
                         state.current_path = None;
-                        // Stop in the even that an animation is running
+                        // Stop in the event that an animation is running
                         state.player.stop();
                         _ = state
                             .player
@@ -2669,7 +2665,7 @@ pub fn blank_icon(
 ) {
 }
 
-fn apply_theme(state: &mut OculanteState, ctx: &Context) {
+pub fn apply_theme(state: &OculanteState, ctx: &Context) {
     match state.persistent_settings.theme {
         ColorTheme::Light => ctx.set_visuals(Visuals::light()),
         ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
@@ -2677,11 +2673,38 @@ fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     }
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
+    style.interaction.tooltip_delay = 0.0;
+    style.spacing.icon_width = 20.;
+    style.spacing.window_margin = 5.0.into();
+    style.spacing.item_spacing = vec2(8., 6.);
+    style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
+    style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
+    style.visuals.widgets.inactive.rounding = Rounding::same(4.);
+    style.visuals.widgets.active.rounding = Rounding::same(4.);
+    style.visuals.widgets.hovered.rounding = Rounding::same(4.);
+    style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
+    style.visuals.warn_fg_color = Color32::from_rgb(255, 204, 0);
+
+    style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
+    style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
+    style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12.;
+    style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18.;
     style.visuals.selection.bg_fill = Color32::from_rgb(
         state.persistent_settings.accent_color[0],
         state.persistent_settings.accent_color[1],
         state.persistent_settings.accent_color[2],
     );
+
+    let accent_color = style.visuals.selection.bg_fill.to_array();
+
+    let accent_color_luma = (accent_color[0] as f32 * 0.299
+        + accent_color[1] as f32 * 0.587
+        + accent_color[2] as f32 * 0.114)
+        .max(0.)
+        .min(255.) as u8;
+    let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
+    // Set text on highlighted elements
+    style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
     ctx.set_style(style);
 }
 
@@ -2698,11 +2721,9 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
-    let mut x_offset = 5.0;
-    let y_offset = 6.0;
-    if ui.style().spacing.indent == 0.0 {
-        x_offset += 8.0;
-    }
+    let x_offset = 5.0;
+    let y_offset = 4.0;
+
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
