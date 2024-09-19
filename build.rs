@@ -76,18 +76,18 @@ fn setup_heif() {
 fn main() {
     println!("Build script");
     // #[cfg(windows)]
-    match std::process::Command::new("convert")
-        .args(vec![
-            "res/icons/icon.png",
-            "-define",
-            "icon:auto-resize=16,32,48,64,128,256",
-            "icon.ico",
-        ])
-        .spawn()
-    {
-        Ok(_b) => println!("Converted icon"),
-        Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
-    }
+    // match std::process::Command::new("convert")
+    //     .args(vec![
+    //         "res/icons/icon.png",
+    //         "-define",
+    //         "icon:auto-resize=16,32,48,64,128,256",
+    //         "icon.ico",
+    //     ])
+    //     .spawn()
+    // {
+    //     Ok(_b) => println!("Converted icon"),
+    //     Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
+    // }
 
     // insert version into plist
     let mut plist: String = "".into();
