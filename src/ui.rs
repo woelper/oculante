@@ -628,12 +628,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
             let panel_bg_color = match ui.style().visuals.dark_mode {
                 true => Color32::from_gray(13),
-                false => Color32::from_gray(216)
+                false => Color32::from_gray(217)
             };
 
             let button_color = match ui.style().visuals.dark_mode {
-                true => Color32::from_gray(35),
-                false => Color32::from_gray(190)
+                true => Color32::from_gray(25),
+                false => Color32::from_gray(191)
             };
 
             ui.vertical_centered_justified(|ui| {
