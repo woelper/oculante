@@ -5,10 +5,10 @@ use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::{App, Graphics};
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ffi::OsStr;
 
 use std::io::Cursor;
@@ -151,50 +151,69 @@ impl ExtendedImageInfo {
         Ok(())
     }
 
+    
+
+    
     pub fn from_image(img: &RgbaImage) -> Self {
-        let mut colors: HashSet<Rgba<u8>> = Default::default();
-        let mut red_histogram: HashMap<u8, usize> = Default::default();
-        let mut green_histogram: HashMap<u8, usize> = Default::default();
-        let mut blue_histogram: HashMap<u8, usize> = Default::default();
+        let mut hist_r: [u32; 256] = [0; 256];
+        let mut hist_g: [u32; 256] = [0; 256];
+        let mut hist_b: [u32; 256] = [0; 256];
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
+
+        //Colors counting
+        const FIXED_RGB_SIZE: usize = 24;
+        const SUB_INDEX_SIZE: usize = 5;
+        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE-SUB_INDEX_SIZE);
+        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];        
+        
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
                 num_transparent_pixels += 1;
             }
 
-            *red_histogram.entry(p.0[0]).or_default() += 1;
-            *green_histogram.entry(p.0[1]).or_default() += 1;
-            *blue_histogram.entry(p.0[2]).or_default() += 1;
+            hist_r[p.0[0] as usize] += 1;
+            hist_g[p.0[1] as usize] += 1;
+            hist_b[p.0[2] as usize] += 1;
 
-            let mut p = *p;
-            p.0[3] = 255;
-            colors.insert(p);
+            //Store every existing color combination in a bit
+            //Therefore we use a 24 bit index, splitted into a main and a sub index.
+            let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
+            let pos_main = pos>>SUB_INDEX_SIZE;
+            let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
+            color_map[pos_main as usize] |= 1 << pos_sub;
+            
         }
 
-        let mut green_histogram: Vec<(i32, i32)> = green_histogram
-            .par_iter()
-            .map(|(k, v)| (*k as i32, *v as i32))
-            .collect();
-        green_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
+        let mut full_colors = 0u32;
+        for &intensity in color_map.iter() {
+            full_colors += intensity.count_ones();
+        }     
+        
 
-        let mut red_histogram: Vec<(i32, i32)> = red_histogram
-            .par_iter()
-            .map(|(k, v)| (*k as i32, *v as i32))
+        let green_histogram: Vec<(i32, i32)> = hist_g
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (k as i32, *v as i32))
             .collect();
-        red_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
 
-        let mut blue_histogram: Vec<(i32, i32)> = blue_histogram
-            .par_iter()
-            .map(|(k, v)| (*k as i32, *v as i32))
+        let red_histogram: Vec<(i32, i32)> = hist_r
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (k as i32, *v as i32))
             .collect();
-        blue_histogram.par_sort_by(|a, b| a.0.cmp(&b.0));
+
+        let blue_histogram: Vec<(i32, i32)> = hist_b
+            .iter()
+            .enumerate()
+            .map(|(k, v)| (k as i32, *v as i32))
+            .collect();
 
         Self {
             num_pixels,
             num_transparent_pixels,
-            num_colors: colors.len(),
+            num_colors: full_colors as usize,
             blue_histogram,
             green_histogram,
             red_histogram,
