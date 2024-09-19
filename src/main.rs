@@ -2,7 +2,6 @@
 
 use clap::Arg;
 use clap::Command;
-// use fluent_uri::Uri;
 use log::debug;
 use log::error;
 use log::info;
@@ -19,14 +18,13 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod icons;
 pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 use crate::scrubber::find_first_image_in_directory;
-use crate::settings::set_system_theme;
-use crate::settings::ColorTheme;
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
@@ -64,9 +62,8 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "debug");
-        }
+        println!("Debug");
+        std::env::set_var("RUST_LOG", "debug");
     }
     let _ = env_logger::try_init();
 
@@ -165,7 +162,7 @@ fn main() -> Result<(), String> {
         .build()
 }
 
-fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
+fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     debug!("Now matching arguments {:?}", std::env::args());
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
@@ -313,55 +310,50 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
     // Set up egui style
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
-        ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
+
+        egui_extras::install_image_loaders(ctx);
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
-        fonts
-            .font_data
-            .insert("my_font".to_owned(), FontData::from_static(FONT));
+        fonts.font_data.insert(
+            "inter".to_owned(),
+            FontData::from_static(FONT).tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: -1.4,
+                baseline_offset_factor: 0.0,
+            }),
+        );
+
+        fonts.font_data.insert(
+            "icons".to_owned(),
+            FontData::from_static(include_bytes!(
+                "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
+            ))
+            .tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: 1.0,
+                baseline_offset_factor: 0.0,
+            }),
+        );
 
         fonts
             .families
             .get_mut(&FontFamily::Proportional)
             .unwrap()
-            .insert(0, "my_font".to_owned());
+            .insert(0, "icons".to_owned());
 
-        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
-        match state.persistent_settings.theme {
-            ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-            ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
-            ColorTheme::System => set_system_theme(ctx),
-        }
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "inter".to_owned());
 
-        let mut style: egui::Style = (*ctx.style()).clone();
-        style.interaction.tooltip_delay = 0.0;
-        let font_scale = 0.80;
-
-        style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 18. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 15. * font_scale;
-        style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 22. * font_scale;
-        style.visuals.selection.bg_fill = Color32::from_rgb(
-            state.persistent_settings.accent_color[0],
-            state.persistent_settings.accent_color[1],
-            state.persistent_settings.accent_color[2],
-        );
-
-        let accent_color = style.visuals.selection.bg_fill.to_array();
-
-        let accent_color_luma = (accent_color[0] as f32 * 0.299
-            + accent_color[1] as f32 * 0.587
-            + accent_color[2] as f32 * 0.114)
-            .max(0.)
-            .min(255.) as u8;
-        let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
-        // Set text on highlighted elements
-        style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
+        debug!("Theme {:?}", state.persistent_settings.theme);
+        apply_theme(&state, ctx);
         ctx.set_fonts(fonts);
-
-        ctx.set_style(style);
     });
 
     // load checker texture
@@ -462,7 +454,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
             if key_pressed(app, state, Quit) {
-                state.persistent_settings.save_blocking();
+                _ = state.persistent_settings.save_blocking();
                 _ = state.volatile_settings.save_blocking();
                 app.backend.exit();
             }
@@ -605,7 +597,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 ),
                 app.window().size(),
             );
-            state.persistent_settings.save_blocking();
+            _ = state.persistent_settings.save_blocking();
             _ = state.volatile_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
@@ -620,7 +612,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(macos) { 0.1 } else { 10. };
+                    let divisor = if cfg!(target_os = "macos") { 0.1 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
@@ -687,8 +679,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
-    // dbg!(format!("upg {}", app.timer.elapsed_f32()));
-
     if let Some(p) = &state.current_path {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
@@ -709,7 +699,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             ),
             app.window().size(),
         );
-        state.persistent_settings.save_blocking();
+        _ = state.persistent_settings.save_blocking();
         _ = state.volatile_settings.save_blocking();
         trace!("Save {t}");
     }
@@ -806,6 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
+        state.is_loaded = true;
         let img = frame.buffer;
         debug!(
             "Received image buffer: {:?}, type: {:?}",
@@ -951,8 +942,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.current_texture = img.to_texture(gfx, &state.persistent_settings);
         }
 
-        state.is_loaded = true;
-
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => {
@@ -996,7 +985,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // the top menu bar
         // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
-
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
         }
@@ -1015,9 +1003,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if !state.persistent_settings.zen_mode {
+            let menu_height = 36.0;
             egui::TopBottomPanel::top("menu")
-                .min_height(30.)
-                .default_height(30.)
+                .exact_height(menu_height)
+                .show_separator_line(false)
                 .show(ctx, |ui| {
                     main_menu(ui, state, app, gfx);
                 });

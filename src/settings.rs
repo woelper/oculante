@@ -1,6 +1,6 @@
 use crate::{shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
-use log::{info, trace};
+use log::{debug, info, trace};
 use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -8,6 +8,12 @@ use std::{
     fs::{create_dir_all, File},
     path::PathBuf,
 };
+
+fn get_config_dir() -> Result<PathBuf> {
+    Ok(dirs::data_local_dir()
+        .ok_or(anyhow!("Can't get local dir"))?
+        .join("oculante"))
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ColorTheme {
@@ -63,7 +69,7 @@ impl Default for PersistentSettings {
     fn default() -> Self {
         PersistentSettings {
             accent_color: [255, 0, 75],
-            background_color: [51, 51, 51],
+            background_color: [30, 30, 30],
             vsync: true,
             force_redraw: false,
             shortcuts: Shortcuts::default_keys(),
@@ -95,48 +101,34 @@ impl Default for PersistentSettings {
 
 impl PersistentSettings {
     pub fn load() -> Result<Self> {
-        //data_local_dir
-        let config_path = dirs::data_local_dir()
-            .ok_or(anyhow!("Can't get data_local_dir"))?
-            .join("oculante")
+        let config_path = get_config_dir()?
             .join("config.json")
             .canonicalize()
             // migrate old config
             .unwrap_or(
-                dirs::data_local_dir()
-                    .ok_or(anyhow!("Can't get data_local_dir"))?
+                dirs::config_local_dir()
+                    .ok_or(anyhow!("Can't get config_local_dir"))?
                     .join(".oculante"),
             );
+        debug!("Loaded persistent settings: {}", config_path.display());
 
         Ok(serde_json::from_reader::<_, PersistentSettings>(
             File::open(config_path)?,
         )?)
     }
 
-    // save settings in a thread so we don't block
-    pub fn save_threaded(&self) {
-        let settings = self.clone();
-        std::thread::spawn(move || {
-            _ = save(&settings);
-        });
+    pub fn save_blocking(&self) -> Result<()> {
+        let config_dir = get_config_dir()?;
+        if !config_dir.exists() {
+            info!("Created {}", config_dir.display());
+            _ = create_dir_all(&config_dir);
+        }
+        let config_path = config_dir.join("config.json");
+        let f = File::create(&config_path)?;
+        serde_json::to_writer_pretty(f, self)?;
+        debug!("Saved to {}", config_path.display());
+        Ok(())
     }
-
-    pub fn save_blocking(&self) {
-        _ = save(&self);
-    }
-}
-
-fn save(ps: &PersistentSettings) -> Result<()> {
-    let local_dir = dirs::data_local_dir()
-        .ok_or(anyhow!("Can't get local dir"))?
-        .join("oculante");
-    if !local_dir.exists() {
-        _ = create_dir_all(&local_dir);
-    }
-    let f = File::create(local_dir.join("config.json"))?;
-    _ = serde_json::to_writer_pretty(f, ps)?;
-    trace!("Saved to {}", local_dir.display());
-    Ok(())
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -150,9 +142,7 @@ pub struct VolatileSettings {
 
 impl VolatileSettings {
     pub fn load() -> Result<Self> {
-        let config_path = dirs::data_local_dir()
-            .ok_or(anyhow!("Can't get config_local dir"))?
-            .join("oculante")
+        let config_path = get_config_dir()?
             .join("config_volatile.json")
             .canonicalize()
             // migrate old config
@@ -164,9 +154,7 @@ impl VolatileSettings {
     }
 
     pub fn save_blocking(&self) -> Result<()> {
-        let local_dir = dirs::data_local_dir()
-            .ok_or(anyhow!("Can't get local dir"))?
-            .join("oculante");
+        let local_dir = get_config_dir()?;
         if !local_dir.exists() {
             _ = create_dir_all(&local_dir);
         }
