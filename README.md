@@ -85,7 +85,7 @@ zypper install oculante
 - Flatpak
 
 ```sh
-flatpak install io.github.woelper.Oculante
+flatpak install flathub io.github.woelper.Oculante
 ```
 
 ### BSD
