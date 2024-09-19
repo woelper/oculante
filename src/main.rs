@@ -65,7 +65,9 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "debug");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "debug");
+        }
     }
     let _ = env_logger::try_init();
 
@@ -96,7 +98,7 @@ fn main() -> Result<(), String> {
             .set_high_dpi(true);
     }
 
-    #[cfg(target_os = "netbsd")]
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
     {
         window_config = window_config.set_lazy_loop(true).set_vsync(true);
     }
@@ -115,6 +117,18 @@ fn main() -> Result<(), String> {
         let _ = mac::launch();
     }
 
+    // Unfortunately we need to load the volatile settings here, too - the window settings need
+    // to be set before window creation
+    match settings::VolatileSettings::load() {
+        Ok(volatile_settings) => {
+            if volatile_settings.window_geometry != Default::default() {
+                window_config.width = volatile_settings.window_geometry.1 .0 as u32;
+                window_config.height = volatile_settings.window_geometry.1 .1 as u32;
+            }
+        }
+        Err(e) => error!("Could not load volatile settings: {e}"),
+    }
+
     // Unfortunately we need to load the persistent settings here, too - the window settings need
     // to be set before window creation
     match settings::PersistentSettings::load() {
@@ -122,11 +136,8 @@ fn main() -> Result<(), String> {
             window_config.vsync = settings.vsync;
             window_config.lazy_loop = !settings.force_redraw;
             window_config.decorations = !settings.borderless;
-            if settings.window_geometry != Default::default() {
-                window_config.width = settings.window_geometry.1 .0 as u32;
-                window_config.height = settings.window_geometry.1 .1 as u32;
-            }
-            debug!("Loaded settings.");
+
+            trace!("Loaded settings.");
             if settings.zen_mode {
                 let mut title_string = window_config.title.clone();
                 title_string.push_str(&format!(
@@ -135,13 +146,13 @@ fn main() -> Result<(), String> {
                 ));
                 window_config = window_config.set_title(&title_string);
             }
+            window_config.min_size = Some(settings.min_window_size);
         }
         Err(e) => {
-            error!("Could not load settings: {e}");
+            error!("Could not load persistent settings: {e}");
         }
     }
     window_config.always_on_top = true;
-    window_config.min_size = Some((1, 1));
     window_config.max_size = None;
 
     debug!("Starting oculante.");
@@ -161,7 +172,12 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
     let matches = Command::new("Oculante")
-        .arg(Arg::new("INPUT").help("Display this image").index(1))
+        .arg(
+            Arg::new("INPUT")
+                .help("Display this image")
+                .multiple_values(true), // .index(1)
+                                        // )
+        )
         .arg(
             Arg::new("l")
                 .short('l')
@@ -186,74 +202,77 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
 
     debug!("Completed argument parsing.");
 
-    // #[cfg(target_os = "windows")]
-    let maybe_img_location = matches.value_of("INPUT").map(PathBuf::from);
-
-    // #[cfg(not(target_os = "windows"))]
-    // let maybe_img_location = matches
-    //     .value_of("INPUT")
-    //     .map(Uri::parse)
-    //     .and_then(|uri_result| {
-    //         uri_result
-    //             .ok()
-    //             .map(|uri| PathBuf::from(uri.path().as_str()))
-    //     });
-
     let mut state = OculanteState {
         texture_channel: mpsc::channel(),
         // current_path: maybe_img_location.cloned(/),
         ..Default::default()
     };
 
-    match settings::PersistentSettings::load() {
-        Ok(settings) => {
-            state.persistent_settings = settings;
-            info!("Successfully loaded previous settings.")
-        }
-        Err(e) => {
-            warn!("Settings failed to load: {e}. This may happen after application updates. Generating a fresh file.");
-            state.persistent_settings = Default::default();
-            state.persistent_settings.save_blocking();
-        }
-    }
-
     state.player = Player::new(
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache        
     );
 
-    debug!("Image is: {:?}", maybe_img_location);
+    debug!("matches {:?}", matches);
 
-    if let Some(ref location) = maybe_img_location {
-        // Check if path is a directory or a file (and that it even exists)
-        let mut start_img_location: Option<PathBuf> = None;
+    let paths_to_open = matches
+        .get_many("INPUT")
+        .unwrap_or_default()
+        .cloned()
+        .collect::<Vec<String>>()
+        .into_iter()
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
 
-        if let Ok(maybe_location_metadata) = location.metadata() {
-            if maybe_location_metadata.is_dir() {
-                // Folder - Pick first image from the folder...
-                if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                    start_img_location = Some(first_img_location);
-                }
-            } else if is_ext_compatible(location) {
-                // Image File with a usable extension
-                start_img_location = Some(location.clone());
-            } else {
-                // Unsupported extension
-                state.send_message_err(&format!("ERROR: Unsupported file: {} - Open Github issue if you think this should not happen.", location.display()));
+    debug!("Image is: {:?}", paths_to_open);
+
+    if paths_to_open.len() == 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be tested already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state
+                    .player
+                    .load(&first_img_location, state.message_channel.0.clone());
             }
         } else {
-            // Not a valid path, or user doesn't have permission to access?
-            state.send_message_err(&format!("ERROR: Can't open file: {}", location.display()));
-        }
-
-        // Assign image path if we have a valid one here
-        if let Some(img_location) = start_img_location {
             state.is_loaded = false;
-            state.current_path = Some(img_location.clone());
+            state.current_path = Some(location.clone().clone());
             state
                 .player
-                .load(&img_location, state.message_channel.0.clone());
-        }
+                .load(&location, state.message_channel.0.clone());
+        };
+    }
+
+    if paths_to_open.len() > 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be verified already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state.player.load_advanced(
+                    &first_img_location,
+                    Some(FrameSource::ImageCollectionMember),
+                    state.message_channel.0.clone(),
+                );
+            }
+        } else {
+            state.is_loaded = false;
+            state.current_path = Some(location.clone().clone());
+            state.player.load_advanced(
+                &location,
+                Some(FrameSource::ImageCollectionMember),
+                state.message_channel.0.clone(),
+            );
+        };
+        state.scrubber.entries = paths_to_open.clone();
     }
 
     if matches.contains_id("stdin") {
@@ -297,7 +316,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         ctx.set_pixels_per_point(app.window().dpi() as f32);
         let mut fonts = FontDefinitions::default();
 
-        ctx.options_mut(|o|o.zoom_with_keyboard = false);
+        ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         fonts
             .font_data
@@ -317,6 +336,7 @@ fn init(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSta
         }
 
         let mut style: egui::Style = (*ctx.style()).clone();
+        style.interaction.tooltip_delay = 0.0;
         let font_scale = 0.80;
 
         style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 18. * font_scale;
@@ -443,6 +463,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
+                _ = state.volatile_settings.save_blocking();
                 app.backend.exit();
             }
             #[cfg(feature = "turbo")]
@@ -450,14 +471,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 debug!("Lossless rotate right");
 
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot90,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
@@ -470,14 +485,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
                 if let Some(p) = &state.current_path {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot270,
-                            ..turbojpeg::Transform::default()
-                        },
-                    )
-                    .is_ok()
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
+                        .is_ok()
                     {
                         state.is_loaded = false;
                         // This needs "deep" reload
@@ -499,14 +508,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
 
             if key_pressed(app, state, NextImage) {
-                if state.is_loaded {
-                    next_image(state)
-                }
+                next_image(state)
             }
             if key_pressed(app, state, PreviousImage) {
-                if state.is_loaded {
-                    prev_image(state)
-                }
+                prev_image(state)
             }
             if key_pressed(app, state, FirstImage) {
                 first_image(state)
@@ -529,12 +534,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(not(target_os = "netbsd"))]
             if key_pressed(app, state, DeleteFile) {
-                if let Some(p) = &state.current_path {
-                    _ = trash::delete(p);
-                    state.send_message_info("Deleted image");
-                }
+                delete_file(state);
+            }
+            if key_pressed(app, state, ClearImage) {
+                clear_image(state);
             }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
@@ -577,8 +581,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
-            state.persistent_settings.window_geometry.1 = (width, height);
-            state.persistent_settings.window_geometry.0 = (
+            state.volatile_settings.window_geometry.1 = (width, height);
+            state.volatile_settings.window_geometry.0 = (
                 app.backend.window().position().0 as u32,
                 app.backend.window().position().1 as u32,
             );
@@ -594,7 +598,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::Exit => {
             info!("About to exit");
             // save position
-            state.persistent_settings.window_geometry = (
+            state.volatile_settings.window_geometry = (
                 (
                     app.window().position().0 as u32,
                     app.window().position().1 as u32,
@@ -602,8 +606,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 app.window().size(),
             );
             state.persistent_settings.save_blocking();
+            _ = state.volatile_settings.save_blocking();
         }
         Event::MouseWheel { delta_y, .. } => {
+            trace!("Mouse wheel event");
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
                     // Change image to next/prev
@@ -639,9 +645,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
 
         Event::Drop(file) => {
+            trace!("File drop event");
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
-                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().as_str()) {
+                    if SUPPORTED_EXTENSIONS
+                        .contains(&ext.to_string_lossy().to_string().to_lowercase().as_str())
+                    {
                         state.is_loaded = false;
                         state.current_image = None;
                         state.player.load(&p, state.message_channel.0.clone());
@@ -652,26 +661,23 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
         }
-        Event::MouseDown { button, .. } => {
-            state.drag_enabled = true;
-            match button {
-                MouseButton::Left => {
-                    if !state.mouse_grab {
-                        state.drag_enabled = true;
-                    }
-                }
-                MouseButton::Middle => {
+        Event::MouseDown { button, .. } => match button {
+            MouseButton::Left => {
+                if !state.mouse_grab {
                     state.drag_enabled = true;
                 }
-                _ => {}
             }
-        }
+            MouseButton::Middle => {
+                state.drag_enabled = true;
+            }
+            _ => {}
+        },
         Event::MouseUp { button, .. } => match button {
             MouseButton::Left | MouseButton::Middle => state.drag_enabled = false,
             _ => {}
         },
         _ => {
-            // debug!("{:?}", evt);
+            trace!("Event: {:?}", evt);
         }
     }
 }
@@ -696,7 +702,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Save every 1.5 secs
     let t = app.timer.elapsed_f32() % 1.5;
     if t <= 0.01 {
-        state.persistent_settings.window_geometry = (
+        state.volatile_settings.window_geometry = (
             (
                 app.window().position().0 as u32,
                 app.window().position().1 as u32,
@@ -704,6 +710,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
             app.window().size(),
         );
         state.persistent_settings.save_blocking();
+        _ = state.volatile_settings.save_blocking();
         trace!("Save {t}");
     }
 
@@ -792,7 +799,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_image = None;
         state.player.load(&p, state.message_channel.0.clone());
         if let Some(dir) = p.parent() {
-            state.persistent_settings.last_open_directory = dir.to_path_buf();
+            state.volatile_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
     }
@@ -800,7 +807,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         let img = frame.buffer;
-        debug!("Received image buffer: {:?}", img.dimensions());
+        debug!(
+            "Received image buffer: {:?}, type: {:?}",
+            img.dimensions(),
+            frame.source
+        );
         state.image_geometry.dimensions = img.dimensions();
         // state.current_texture = img.to_texture(gfx);
 
@@ -808,20 +819,48 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         set_title(app, state);
 
-        // fill image sequence
-        if let Some(p) = &state.current_path {
-            state.scrubber = scrubber::Scrubber::new(p);
-            state.scrubber.wrap = state.persistent_settings.wrap_folder;
-
-            // debug!("{:#?} from {}", &state.scrubber, p.display());
-            if !state.persistent_settings.recent_images.contains(p) {
-                state.persistent_settings.recent_images.insert(0, p.clone());
-                state.persistent_settings.recent_images.truncate(10);
+        match &frame.source {
+            FrameSource::AnimationStart | FrameSource::Still => {
+                if let Some(path) = &state.current_path {
+                    if state.scrubber.has_folder_changed(&path) {
+                        debug!("Folder has changed, creating new scrubber");
+                        state.scrubber = scrubber::Scrubber::new(path);
+                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                    } else {
+                        let index = state
+                            .scrubber
+                            .entries
+                            .iter()
+                            .position(|p| p == path)
+                            .unwrap_or_default();
+                        if index < state.scrubber.entries.len() {
+                            state.scrubber.index = index;
+                        }
+                    }
+                }
             }
+            _ => {}
+        }
+
+        match &frame.source {
+            FrameSource::AnimationStart
+            | FrameSource::Still
+            | FrameSource::ImageCollectionMember => {
+                if let Some(path) = &state.current_path {
+                    if !state.volatile_settings.recent_images.contains(path) {
+                        state
+                            .volatile_settings
+                            .recent_images
+                            .insert(0, path.clone());
+                        state.volatile_settings.recent_images.truncate(10);
+                    }
+                }
+            }
+            _ => {}
         }
 
         match frame.source {
-            FrameSource::Still => {
+            FrameSource::Still | FrameSource::ImageCollectionMember => {
                 debug!("Received still");
                 state.edit_state.result_image_op = Default::default();
                 state.edit_state.result_pixel_op = Default::default();
@@ -842,9 +881,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if !state.persistent_settings.keep_edits {
                     state.edit_state = Default::default();
-                } else {
-                    state.edit_state.result_pixel_op = Default::default();
-                    state.edit_state.result_image_op = Default::default();
+                    state.persistent_settings.edit_enabled = false;
+                    state.edit_state = Default::default();
                 }
 
                 // Load edit information if any
@@ -891,6 +929,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.redraw = true;
             }
             FrameSource::CompareResult => {
+                debug!("Received compare result");
+
+                // always reset if first image
+                if state.current_texture.is_none() {
+                    state.reset_image = true;
+                }
+
                 state.redraw = false;
             }
         }
@@ -899,12 +944,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture_with_texwrap(gfx, tex);
             } else {                
-                state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
             }
         } else {
             debug!("Setting texture");
-            state.current_texture =
-                img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
         }
 
         state.is_loaded = true;
@@ -912,8 +956,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => {
-                state.current_texture =
-                    unpremult(&img).to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                state.current_texture = unpremult(&img).to_texture(gfx, &state.persistent_settings)
             }
             // Do nuttin'
             ColorChannel::Rgba => (),
@@ -921,7 +964,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {
                 state.current_texture =
                     solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                        .to_texture(gfx, &state.persistent_settings)
             }
         }
         state.current_image = Some(img);
@@ -1066,36 +1109,40 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     });
 
     if let Some(texture) = &state.current_texture {
+        // align to pixel to prevent distortion
+        let aligned_offset_x = state.image_geometry.offset.x.trunc();
+        let aligned_offset_y = state.image_geometry.offset.y.trunc();
+
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
                     // .size(texture.width() as f32, texture.height() as f32)
                     .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
                     .blend_mode(BlendMode::ADD)
-                    .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
+                    .translate(aligned_offset_x, aligned_offset_y)
                     // .scale(state.image_geometry.scale, state.image_geometry.scale)
                     ;
             }
         }
         if state.tiling < 2 {
             texture.draw_textures(&mut draw,
-                state.image_geometry.offset.x,
-                state.image_geometry.offset.y,
+                aligned_offset_x,
+                aligned_offset_y,
                 state.image_geometry.scale);            
         } else {
 
             for yi in 0..state.tiling {
                 for xi in  0..state.tiling {
                     //The "old" version used only a static offset, is this correct?
-                    let translate_x = xi as f32* texture.width()*state.image_geometry.scale   + state.image_geometry.offset.x;
-                    let translate_y = yi as f32* texture.height()*state.image_geometry.scale + state.image_geometry.offset.y;
+                    let translate_x = (xi as f32* texture.width()*state.image_geometry.scale   + state.image_geometry.offset.x).trunc();
+                    let translate_y = (yi as f32* texture.height()*state.image_geometry.scale + state.image_geometry.offset.y).trunc();
 
                     texture.draw_textures(&mut draw,
                         translate_x,
                         translate_y,
                         state.image_geometry.scale);
                 }
-            }            
+            }
         }
 
         if state.persistent_settings.show_frame {
@@ -1109,7 +1156,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 })
                 .blend_mode(BlendMode::ADD)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
+                .translate(aligned_offset_x, aligned_offset_y);
         }
 
         if state.persistent_settings.show_minimap {
@@ -1179,7 +1226,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.persistent_settings.last_open_directory.clone();
+    let start_directory = state.volatile_settings.last_open_directory.clone();
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

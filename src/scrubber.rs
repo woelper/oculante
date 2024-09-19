@@ -1,13 +1,21 @@
 use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
-use log::debug;
+use log::{debug, warn};
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Default)]
+pub enum Direction {
+    #[default]
+    Forward,
+    Backward,
+}
 
 #[derive(Debug, Default)]
 pub struct Scrubber {
     pub index: usize,
     pub entries: Vec<PathBuf>,
     pub wrap: bool,
+    pub direction: Direction,
 }
 
 impl Scrubber {
@@ -18,21 +26,31 @@ impl Scrubber {
             index,
             entries,
             wrap: true,
+            direction: Direction::Forward,
         }
     }
+
+    pub fn has_next(&self) -> bool {
+        self.entries.len() > self.index
+    }
+
+    /// Move scrubber forward
     pub fn next(&mut self) -> PathBuf {
         self.index += 1;
-        if self.index > self.entries.len().saturating_sub(1) {
+        if self.index == self.entries.len() {
             if self.wrap {
                 self.index = 0;
             } else {
-                self.index = self.entries.len().saturating_sub(1);
+                self.index = self.entries.len() - 1;
             }
         }
-        // debug!("{:?}", self.entries.get(self.index));
+
+        debug!("Next image in scrubber. Index is now {}", self.index);
+        self.direction = Direction::Forward;
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
+    /// Move scrubber back
     pub fn prev(&mut self) -> PathBuf {
         if self.index == 0 {
             if self.wrap {
@@ -41,8 +59,27 @@ impl Scrubber {
         } else {
             self.index = self.index.saturating_sub(1);
         }
-        // debug!("{:?}", self.entries.get(self.index));
+        debug!("Next image in scrubber. Index is now {}", self.index);
+
+        self.direction = Direction::Backward;
         self.entries.get(self.index).cloned().unwrap_or_default()
+    }
+
+    pub fn remove_current(&mut self) -> PathBuf {
+        debug!("Removing index {}", self.index);
+        if self.entries.get(self.index).is_some() {
+            self.entries.remove(self.index);
+            match self.direction {
+                Direction::Forward => {
+                    self.index = self.index.saturating_sub(1);
+                    self.next()
+                }
+                Direction::Backward => self.prev(),
+            }
+        } else {
+            warn!("This index can't be removed.");
+            Default::default()
+        }
     }
 
     pub fn set(&mut self, index: usize) -> PathBuf {
@@ -53,8 +90,15 @@ impl Scrubber {
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
-    pub fn len(&mut self) -> usize {
+    pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn has_folder_changed(&self, path_to_check: &Path) -> bool {
+        self.entries
+            .get(0)
+            .map(|e| e.parent() != path_to_check.parent())
+            .unwrap_or(true)
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
-    settings::PersistentSettings,
+    settings::{PersistentSettings, VolatileSettings},
     utils::{ExtendedImageInfo, Frame, Player},
     texture_wrapper::TexWrap
 };
@@ -15,7 +15,7 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ImageGeometry {
     /// The scale of the displayed image
     pub scale: f32,
@@ -81,6 +81,7 @@ pub struct OculanteState {
     pub pointer_over_ui: bool,
     /// Things that perisist between launches
     pub persistent_settings: PersistentSettings,
+    pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
     /// how long the toast message appears
@@ -142,7 +143,8 @@ impl Default for OculanteState {
             key_grab: Default::default(),
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
-            persistent_settings: Default::default(),
+            persistent_settings: PersistentSettings::load().unwrap_or_default(),
+            volatile_settings: VolatileSettings::load().unwrap_or_default(),
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),

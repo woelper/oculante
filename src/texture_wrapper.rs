@@ -1,6 +1,7 @@
 use notan::draw::*;
 
 use crate::Draw;
+use crate::settings::PersistentSettings;
 use image::imageops;
 
 
@@ -40,56 +41,64 @@ impl TexWrap{
 
     //pub fn from_rgba_image_premult(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{}
 
-    pub fn from_rgbaimage(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{
-        Self::gen_from_rgbaimage(gfx, linear_mag_filter, image, Self::gen_texture_standard)
+    pub fn from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage) -> Option<TexWrap>{
+        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
     }
 
-    pub fn from_rgbaimage_premult(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{
-        Self::gen_from_rgbaimage(gfx, linear_mag_filter, image, Self::gen_texture_premult)
+    pub fn from_rgbaimage_premult(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage) -> Option<TexWrap>{
+        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_premult)
     }
 
-    fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, linear_mag_filter:bool)-> Option<Texture>
+    fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings)-> Option<Texture>
     {
         gfx.create_texture()
                     .from_bytes(bytes, width, height)
-                    .with_mipmaps(true)
-                    // .with_format(notan::prelude::TextureFormat::SRgba8)
-                    // .with_premultiplied_alpha()
-                    .with_filter(
-                        TextureFilter::Linear,
-                        if linear_mag_filter {
-                            TextureFilter::Linear
-                        } else {
-                            TextureFilter::Nearest
-                        },
-                    )
+                    .with_mipmaps(settings.use_mipmaps)
+            // .with_format(notan::prelude::TextureFormat::SRgba8)
+            // .with_premultiplied_alpha()
+            .with_filter(
+                if settings.linear_min_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+                if settings.linear_mag_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+            )
                     // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
                     .build()
                     .ok()    
     }
 
-    fn gen_texture_premult(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, linear_mag_filter:bool)-> Option<Texture>
+    fn gen_texture_premult(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings)-> Option<Texture>
     {
         gfx.create_texture()
                     .from_bytes(bytes, width, height)
                     .with_premultiplied_alpha()
-                    .with_mipmaps(true)
-                    // .with_format(notan::prelude::TextureFormat::SRgba8)
-                    // .with_premultiplied_alpha()
-                    .with_filter(
-                        TextureFilter::Linear,
-                        if linear_mag_filter {
-                            TextureFilter::Linear
-                        } else {
-                            TextureFilter::Nearest
-                        },
-                    )
+                    .with_mipmaps(settings.use_mipmaps)
+            // .with_format(notan::prelude::TextureFormat::SRgba8)
+            // .with_premultiplied_alpha()
+            .with_filter(
+                if settings.linear_min_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+                if settings.linear_mag_filter {
+                    TextureFilter::Linear
+                } else {
+                    TextureFilter::Nearest
+                },
+            )
                     // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
                     .build()
                     .ok()    
     }
 
-    fn gen_from_rgbaimage(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage, fuuun: fn (&mut Graphics, &[u8], u32, u32, bool)-> Option<Texture>) -> Option<TexWrap>{
+    fn gen_from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage, fuuun: fn (&mut Graphics, &[u8], u32, u32, &PersistentSettings)-> Option<Texture>) -> Option<TexWrap>{
         
         let im_w = image.width();
         let im_h = image.height();
@@ -118,10 +127,10 @@ impl TexWrap{
                 
                 let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                 let my_img = sub_img.to_image();
-                let tex = fuuun(gfx, my_img.as_ref(), my_img.width(), my_img.height(), linear_mag_filter);
+                let tex = fuuun(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings);
                 
                     if let Some(t) = tex {
-                        a.push(t);                        
+                        a.push(t);
                     }
                     else{
                         a.clear();
@@ -153,7 +162,7 @@ impl TexWrap{
                     draw.image(&self.texture_array[tex_idx])
                         .blend_mode(BlendMode::NORMAL)
                         .scale(scale, scale)
-                        .translate(translate_x, translate_y);
+                        .translate(translate_x.trunc(), translate_y.trunc()); //truncation to avoid artifacts
                     tex_idx += 1;
                 }
             }

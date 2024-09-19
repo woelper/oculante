@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 // use hashbrown::{HashMap, HashSet};
-use log::{debug, error};
+use log::{debug, error, info, trace, warn};
 // use std::collections::HashMap;
 
 use crate::OculanteState;
@@ -37,6 +37,7 @@ pub enum InputEvent {
     PanUp,
     PanDown,
     DeleteFile,
+    ClearImage,
     LosslessRotateRight,
     LosslessRotateLeft,
     Copy,
@@ -131,6 +132,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
             .add_key(InputEvent::ZenMode, "Z")
             .add_key(InputEvent::DeleteFile, "Delete")
+            .add_keys(InputEvent::ClearImage, &["LShift", "Delete"])
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
@@ -167,6 +169,10 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // let mut alternates: HashMap<String, String>;
     // alternates.insert("+", v)
 
+    if !app.keyboard.down.is_empty() {
+        trace!("Keyboard down: {:?}", app.keyboard.down);
+    }
+
     // don't do anything if keyboard is grabbed (typing in textbox etc)
     if state.key_grab {
         return false;
@@ -180,7 +186,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // early out if just one key is pressed, and it's a modifier
     if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
         if app.keyboard.down.len() == 1 {
-            debug!("just modifier down");
+            trace!("alt/shift/ctrl modifier down");
             return false;
         }
     }
@@ -264,13 +270,16 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             }
         }
     } else {
-        error!("Command not registered: '{:?}'. Inserting new.", command);
+        warn!("Command not registered: '{:?}'", command);
         // update missing shortcut
         if let Some(default_shortcut) = Shortcuts::default_keys().get(&command) {
+            info!("Inserted command: {:?}", default_shortcut);
             state
                 .persistent_settings
                 .shortcuts
                 .insert(command, default_shortcut.clone());
+        } else {
+            error!("Failed to insert command. Please report this as a bug.")
         }
     }
     false

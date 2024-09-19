@@ -1,6 +1,6 @@
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
-    clipboard_to_image,
+    clear_image, clipboard_to_image, delete_file,
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -22,14 +22,18 @@ use egui_phosphor::regular::*;
 use egui_plot::{Plot, PlotPoints, Points};
 use image::RgbaImage;
 use log::{debug, error, info};
-#[cfg(not(target_os = "netbsd"))]
+#[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
-
-use std::{collections::BTreeSet, ops::RangeInclusive, path::PathBuf, time::Instant};
+use std::{
+    collections::BTreeSet,
+    ops::RangeInclusive,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use strum::IntoEnumIterator;
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 10.0;
@@ -96,7 +100,7 @@ impl EguiExt for Ui {
                 )
                 .clicked()
             {
-                r.clicked = [true, true, true, true, true];
+                r.clicked = true;
             }
             r
         })
@@ -484,30 +488,67 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
             }
             ui.collapsing("Compare", |ui| {
-                ui.vertical_centered_justified(|ui| {
-                if let Some(p) = &(state.current_path).clone() {
-                    if ui.button("Add/update current image").clicked() {
-                        state.compare_list.insert(p.clone(), state.image_geometry.clone());
-                    }
 
-
-        let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-        compare_list.sort_by(|a,b| a.0.cmp(&b.0));
-                    for (path, geo) in compare_list {
-                        if ui.selectable_label(p==&path, path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
-                            state.image_geometry = geo.clone();
-                            state
-                                .player
-                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
-                            state.current_path = Some(path);
-                        }
-                    }
-                    if ui.button("Clear").clicked() {
-                        state.compare_list.clear();
-                    }
+                if state.persistent_settings.max_cache == 0 {
+                    ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                 }
 
-            });
+                if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
+                    // TODO: Automatically insert image into compare list
+                    #[cfg(feature = "file_open")]
+                    crate::browse_for_image_path(state);
+                    #[cfg(not(feature = "file_open"))]
+                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                }
+
+                ui.vertical_centered_justified(|ui| {
+                    let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
+                    compare_list.sort_by(|a,b| a.0.cmp(&b.0));
+
+                    for (path, geo) in compare_list {
+
+                        ui.horizontal(|ui|{
+                            if ui.button(X).clicked() {
+                                state.compare_list.remove(&path);
+                            }
+
+                            ui.vertical_centered_justified(|ui| {
+                                if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                    state.image_geometry = geo.clone();
+                                    state
+                                        .player
+                                        .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
+                                    ui.ctx().request_repaint();
+                                    ui.ctx().request_repaint_after(Duration::from_millis(500));
+                                    state.current_path = Some(path);
+                                    state.image_info = None;
+                                }
+                            });
+                        });
+                    }
+
+
+
+                    if let Some(path) = &state.current_path {
+                        if let Some(geo) = state.compare_list.get(path) {
+                            if state.image_geometry != *geo {
+                                if ui.button(RichText::new(format!("{ARROWS_CLOCKWISE} Update position")).color(Color32::YELLOW)).clicked() {
+                                    state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                }
+                            }
+                        } else {
+                            if ui.button(format!("{PLUS} Add current image")).clicked() {
+                                state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                            }
+                        }
+                    }
+
+                    if !state.compare_list.is_empty() {
+                        if ui.button(format!("{TRASH} Clear all")).clicked() {
+                            state.compare_list.clear();
+                        }
+                    }
+                });
             });
 
             ui.collapsing("Alpha tools", |ui| {
@@ -518,7 +559,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             .on_hover_text("Highlight pixels with zero alpha and color information")
                             .clicked()
                         {
-                            state.current_texture = highlight_bleed(img).to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                            state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
                         }
                         if ui
                             .button("Show semi-transparent pixels")
@@ -527,10 +568,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                             )
                             .clicked()
                         {
-                            state.current_texture = highlight_semitrans(img).to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                            state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
                         }
                         if ui.button("Reset image").clicked() {
-                            state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
                         }
 
                     }
@@ -589,11 +630,17 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                             ColorTheme::System =>
                                 set_system_theme(ctx),
                         }
+                        // Switching theme resets accent color, set it again
+                        let mut style: egui::Style = (*ctx.style()).clone();
+                        style.visuals.selection.bg_fill = Color32::from_rgb(
+                            state.persistent_settings.accent_color[0],
+                            state.persistent_settings.accent_color[1],
+                            state.persistent_settings.accent_color[2],
+                        );
+                        ctx.set_style(style);
                     }
                 }
                 );
-
-
 
 
                 egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
@@ -633,7 +680,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     ui.end_row();
 
                     if ui
-                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundary")
+                    .checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
                     .on_hover_text(
                         "When you move past the first or last image in a folder, should oculante continue or stop?",
                     )
@@ -642,12 +689,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
                 }
                 ui.horizontal(|ui| {
-                    ui.label("Number of image to cache");
+                    ui.label("Number of images to cache");
                     if ui
                     .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
 
                     .on_hover_text(
-                        "Keep this many images in memory for faster opening.",
+                        "Keeps this many images in memory for faster opening.",
                     )
                     .changed()
                 {
@@ -670,9 +717,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                     );
                 ui.end_row();
                 ui
-                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background")
+                    .checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background where transparent")
                     .on_hover_text(
-                        "Show a checker pattern as backdrop.",
+                        "Show checker pattern as backdrop.",
                     );
 
                 ui
@@ -684,28 +731,56 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
                     set_title(app, state);
                 }
-                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires restart. Turn off optimisations and redraw everything each frame. This will consume more CPU but give you instant feedback, for example if new images come in or modifications are made.").changed(){
+                if ui.checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires a restart. Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback, for example if new images come in or if modifications are made.").changed(){
                     app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
                 }
 
                 // ui.label(format!("lazy {}", app.window().lazy_loop()));
                 ui.end_row();
-                if ui.checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate pixels on zoom").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
+                if ui.checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                        }
+                    }
+                }
+                if ui.checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
+                    if let Some(img) = &state.current_image {
+                        if state.edit_state.result_image_op.is_empty() {
+                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                        } else {
+                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                        }
+                    }
+                }
+                ui.end_row();
+
+                if ui.checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
+                    if let Some(img) = &state.current_image {
+                        if state.edit_state.result_image_op.is_empty() {
+                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                        } else {
+                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
                         }
                     }
                 }
 
-                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, fir the image with it?");
+
+                ui.checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
                 ui.end_row();
 
                 ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
-                #[cfg(not(target_os = "netbsd"))]
+                #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
                 ui.checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
+                ui.end_row();
+
+                ui.label("Minimum window size");
+                ui.horizontal(|ui| {
+                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
+                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                });
                 ui.end_row();
 
 
@@ -921,6 +996,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     ui.end_row();
 
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+
+                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                        ui.separator();
+                        ui.separator();
+                        ui.end_row();
+                    }
+
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
@@ -949,7 +1031,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture = img.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
                             }
                         }
                         if ui
@@ -1224,7 +1306,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
                         } else {
                             state.current_texture =
-                                state.edit_state.result_pixel_op.to_texture(gfx, state.persistent_settings.linear_mag_filter);
+                                state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
                         }
                     }
                 }
@@ -1293,7 +1375,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     #[cfg(not(feature = "file_open"))]
                     {
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
-                            let dest = state.persistent_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
+                            let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
                             set_title(app, state);
                         }
@@ -1304,7 +1386,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("{FLOPPY_DISK} Save as...")).clicked() {
 
-                        let start_directory = state.persistent_settings.last_open_directory.clone();
+                        let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
@@ -1614,15 +1696,14 @@ fn modifier_stack_ui(
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    // egui::Grid::new("dfdfd").num_columns(2).show(ui, |ui| {
+    let stack_len = stack.len();
+
     for (i, operation) in stack.iter_mut().enumerate() {
         ui.label_i(&format!("{operation}"));
 
         // let op draw itself and check for response
 
         ui.push_id(i, |ui| {
-            // ui.end_row();
-
             // draw the image operator
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
@@ -1632,9 +1713,6 @@ fn modifier_stack_ui(
             ui.add_space(45.);
 
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                // ui.add_space(size);
-
-                // ui.vertical(|ui| {
                 ui.style_mut().spacing.icon_spacing = 0.;
                 ui.style_mut().spacing.button_padding = Vec2::ZERO;
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
@@ -1652,27 +1730,34 @@ fn modifier_stack_ui(
                     *image_changed = true;
                 }
 
-                if egui::Button::new("⏶")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move up")
-                    .clicked()
-                {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
+                let up = i != 0;
+                let down = i != stack_len - 1;
 
-                if egui::Button::new("⏷")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Move down")
-                    .clicked()
-                {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
+                ui.add_enabled_ui(up, |ui| {
+                    if egui::Button::new("⏶")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move up")
+                        .clicked()
+                    {
+                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        *image_changed = true;
+                    }
+                });
+
+                ui.add_enabled_ui(down, |ui| {
+                    if egui::Button::new("⏷")
+                        .small()
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Move down")
+                        .clicked()
+                    {
+                        swap = Some((i, i + 1));
+                        *image_changed = true;
+                    }
+                });
             });
 
             ui.end_row();
@@ -1680,7 +1765,6 @@ fn modifier_stack_ui(
 
         ui.end_row();
     }
-    // });
 
     if let Some(delete) = delete {
         stack.remove(delete);
@@ -1712,10 +1796,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[0].button("➡ Rotate 90°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot90,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)
                     )
                     .is_ok()
                     {
@@ -1726,10 +1807,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[1].button("⬅ Rotate -90°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot270,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)
                     )
                     .is_ok()
                     {
@@ -1740,10 +1818,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[2].button("⬇ Rotate 180°").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Rot180,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot180)
                     )
                     .is_ok()
                     {
@@ -1756,10 +1831,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[0].button("Flip H").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Hflip,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Hflip)
                     )
                     .is_ok()
                     {
@@ -1770,10 +1842,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 if col[1].button("Flip V").clicked() {
                     if lossless_tx(
                         p,
-                        turbojpeg::Transform {
-                            op: turbojpeg::TransformOp::Vflip,
-                            ..turbojpeg::Transform::default()
-                        },
+                        turbojpeg::Transform::op(turbojpeg::TransformOp::Vflip)
                     )
                     .is_ok()
                     {
@@ -1827,18 +1896,17 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
 
                                 let crop_range = cropped_range(&amt, &dim);
 
+                                let mut crop = turbojpeg::Transform::default();
+                                crop.crop = Some(turbojpeg::TransformCrop {
+                                    x: crop_range[0] as usize,
+                                    y: crop_range[1] as usize,
+                                    width: Some(crop_range[2] as usize),
+                                    height: Some(crop_range[3] as usize),
+                                });
+
                                 match lossless_tx(
                                     p,
-                                    turbojpeg::Transform {
-                                        op: turbojpeg::TransformOp::None,
-                                        crop: Some(turbojpeg::TransformCrop {
-                                            x: crop_range[0] as usize,
-                                            y: crop_range[1] as usize,
-                                            width: Some(crop_range[2] as usize),
-                                            height: Some(crop_range[3] as usize),
-                                        }),
-                                        ..turbojpeg::Transform::default()
-                                    },
+                                    crop
                                 ) {
                                     Ok(_) => reload = true,
                                     Err(e) => log::warn!("{e}"),
@@ -2036,23 +2104,23 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture = unpremult(img)
-                            .to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                        state.current_texture =
+                            unpremult(img).to_texture(gfx, &state.persistent_settings)
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture =
-                            img.to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                        state.current_texture = img.to_texture(gfx, &state.persistent_settings)
                     }
                     _ => {
                         state.current_texture =
                             solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx, state.persistent_settings.linear_mag_filter)
+                                .to_texture(gfx, &state.persistent_settings)
                     }
                 }
             }
         }
 
-        if state.current_path.is_some() {
+        if state.scrubber.len() > 1 {
+            // TODO: Check if wrap is off and we are at fisrt image
             if tooltip(
                 unframed_button(CARET_LEFT, ui),
                 "Previous image",
@@ -2063,6 +2131,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             {
                 prev_image(state)
             }
+            // TODO: Check if wrap is off and we are at last image
             if tooltip(
                 unframed_button(CARET_RIGHT, ui),
                 "Next image",
@@ -2146,7 +2215,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             app.window().set_always_on_top(state.always_on_top);
         }
 
-        if let Some(p) = &state.current_path {
+        if state.current_path.is_some() {
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -2155,26 +2224,38 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                _ = trash::delete(p);
-                state.send_message_info(&format!(
-                    "Deleted {}",
-                    p.file_name()
-                        .map(|f| f.to_string_lossy().to_string())
-                        .unwrap_or_default()
-                ));
+                delete_file(state);
             }
 
             if !state.is_loaded {
                 ui.horizontal(|ui| {
                     ui.add(egui::Spinner::default());
-                    ui.label(format!("Loading {}", p.display()));
+                    ui.label(format!(
+                        "Loading {}",
+                        state
+                            .current_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                    ));
                 });
                 app.window().request_frame();
             }
         }
 
+        if state.current_texture.is_some() {
+            if tooltip(
+                unframed_button(PLACEHOLDER, ui),
+                "Clear image",
+                &lookup(&state.persistent_settings.shortcuts, &ClearImage),
+                ui,
+            )
+            .clicked()
+            {
+                clear_image(state);
+            }
+        }
         drag_area(ui, state, app);
-
         ui.add_space(ui.available_width() - 32.);
         draw_hamburger_menu(ui, state, app);
     });
@@ -2250,7 +2331,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             ui.menu_button("Recent", |ui| {
-                for r in &state.persistent_settings.recent_images.clone() {
+                for r in &state.volatile_settings.recent_images.clone() {
                     if let Some(filename) = r.file_name() {
                         if ui.button(filename.to_string_lossy()).clicked() {
                             load_image_from_path(r, state);
@@ -2283,7 +2364,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
 }
 
 pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
-    #[cfg(not(target_os = "netbsd"))]
+    #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
             ui.available_rect_before_wrap(),
@@ -2320,7 +2401,7 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
                 Mouse::Error => error!("Error getting mouse position"),
             }
         }
-        if r.drag_released() {
+        if r.drag_stopped() {
             ui.ctx()
                 .memory_mut(|w| w.data.remove::<(i32, i32)>("offset".into()))
         }
