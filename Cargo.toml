@@ -70,7 +70,6 @@ dark-light = "1.0"
 trash = "5.0"
 lutgen = { version = "0.10.0", features = ["lutgen-palettes"] }
 libheif-rs = { version = "1.0", default-features = false, optional = true }
-egui-phosphor = "0.5"
 egui-notify = "0.14"
 ktx2 = "0.3.0"
 thiserror = "1.0.51"

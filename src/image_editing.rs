@@ -7,7 +7,7 @@ use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 use crate::{pos_from_coord, ImageGeometry};
-
+use crate::icons::*;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
@@ -23,7 +23,6 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 
-use egui_phosphor::variants::regular::*;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {

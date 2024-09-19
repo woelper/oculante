@@ -21,7 +21,6 @@ const ROUNDING: f32 = 8.;
 const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
-// use egui_phosphor::regular::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use icons::*;
