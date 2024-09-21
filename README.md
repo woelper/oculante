@@ -82,6 +82,12 @@ environment.systemPackages = [
 zypper install oculante
 ```
 
+- Flatpak
+
+```sh
+flatpak install flathub io.github.woelper.Oculante
+```
+
 ### BSD
 
 - FreeBSD
