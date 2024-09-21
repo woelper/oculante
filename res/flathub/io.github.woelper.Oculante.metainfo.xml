@@ -33,25 +33,40 @@
   <launchable type="desktop-id">io.github.woelper.Oculante.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://github.com/woelper/oculante/blob/637c622b3384502f5c58ae295d5cc51549d5cfd3/res/screenshot_1.png</image>
+      <image>https://raw.githubusercontent.com/woelper/oculante/637c622b3384502f5c58ae295d5cc51549d5cfd3/res/screenshot_1.png</image>
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.8.23" date="2024-07-29">
-      <url type="details">https://github.com/woelper/oculante/releases/tag/0.8.23</url>
+    <release version="0.9.0" date="2024-09-21">
+      <url type="details">https://github.com/woelper/oculante/blob/9b4f48294ea210af4ad8081b083c633c70866acb/CHANGELOG.md#090-2024-09-21</url>
       <description>
         <p>Bug Fixes</p>
         <ul>
-          <li>Display image path for loading errors</li>
-          <li>Prevent panic for scrubber index being out of range and allow opening images without path prefic correctly</li>
-          <li>Update index when image in same folder is loaded</li>
-          <li>Switching theme removes accent color</li>
-          <li>Preserve scubber index</li>
-          <li>Prevent image removal going out of bounds</li>
-          <li>Clearing and deleting an image removes it from the virtual scrubber and advances to the next according to the scrubber direction</li>
-          <li>Fix issue where SVG files were detected as XML</li>
-          <li>Compare menu works without image loaded</li>
-          <li>ClearImage can be assigned to a shortcut</li>
+          <li>Flip operation would always flip horizontal</li>
+          <li>Mac build broke because of icon. Switched image format</li>
+          <li>When pressing right mouse, panning operation got stuck. Panning is now only possible using left or middle mouse</li>
+        </ul>
+        <p>Features</p>
+        <ul>
+          <li>Show confirmation dialog when deleting a file</li>
+          <li>Stack Blur provides much faster blur performance for the blur filter</li>
+          <li>Visually indicate difference between operator types with a separator</li>
+          <li>Persistent and volatile settings are now split for easier versioning of configuration files</li>
+          <li>Enable version control friendly settings</li>
+          <li>Use built in file browser (35f9b9ea)</li>
+        </ul>
+        <p>Chore</p>
+        <ul>
+          <li>Update deps</li>
+          <li>Deps: bump quinn-proto from 0.11.3 to 0.11.8</li>
+          <li>Update turbojpeg and remove image dependency</li>
+          <li>Update `gif`/ `gif-dispose`</li>
+          <li>Update `fast_image_resize`, `libavif-image`, `self_update`, `libheif-rs`</li>
+          <li>Update `trash`</li>
+          <li>Update webbrowser, wgpu, ruzstd</li>
+          <li>Update jpg2000 and add test image</li>
+          <li>Update image and nalgebra</li>
+          <li>Cargo update</li>
         </ul>
       </description>
     </release>
