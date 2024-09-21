@@ -337,3 +337,85 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 <kbd>Z</kbd> = ZenMode
 
 </details>
+### Shortcuts:
+`mouse wheel` = zoom
+
+`left mouse`,`middle mouse` = pan
+
+`ctrl + mouse wheel` = prev/next image in folder
+
+`Right mouse` pick color from image (in paint mode)
+
+
+<kbd>T</kbd> = AlwaysOnTop
+
+<kbd>F</kbd> = Fullscreen
+
+<kbd>I</kbd> = InfoMode
+
+<kbd>E</kbd> = EditMode
+
+<kbd>Right</kbd> = NextImage
+
+<kbd>Home</kbd> = FirstImage
+
+<kbd>End</kbd> = LastImage
+
+<kbd>Left</kbd> = PreviousImage
+
+<kbd>R</kbd> = RedChannel
+
+<kbd>G</kbd> = GreenChannel
+
+<kbd>B</kbd> = BlueChannel
+
+<kbd>A</kbd> = AlphaChannel
+
+<kbd>U</kbd> = RGBChannel
+
+<kbd>C</kbd> = RGBAChannel
+
+<kbd>V</kbd> = ResetView
+
+<kbd>Minus</kbd> = ZoomOut
+
+<kbd>Equals</kbd> = ZoomIn
+
+<kbd>Key1</kbd> = ZoomActualSize
+
+<kbd>Key2</kbd> = ZoomDouble
+
+<kbd>Key3</kbd> = ZoomThree
+
+<kbd>Key4</kbd> = ZoomFour
+
+<kbd>Key5</kbd> = ZoomFive
+
+<kbd>LShift</kbd> + <kbd>C</kbd> = CompareNext
+
+<kbd>LShift</kbd> + <kbd>Left</kbd> = PanLeft
+
+<kbd>LShift</kbd> + <kbd>Right</kbd> = PanRight
+
+<kbd>LShift</kbd> + <kbd>Up</kbd> = PanUp
+
+<kbd>LShift</kbd> + <kbd>Down</kbd> = PanDown
+
+<kbd>Delete</kbd> = DeleteFile
+
+<kbd>LShift</kbd> + <kbd>Delete</kbd> = ClearImage
+
+<kbd>RBracket</kbd> = LosslessRotateRight
+
+<kbd>LBracket</kbd> = LosslessRotateLeft
+
+<kbd>LControl</kbd> + <kbd>C</kbd> = Copy
+
+<kbd>LControl</kbd> + <kbd>V</kbd> = Paste
+
+<kbd>LControl</kbd> + <kbd>O</kbd> = Browse
+
+<kbd>Q</kbd> = Quit
+
+<kbd>Z</kbd> = ZenMode
+

@@ -8,7 +8,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.8.23"
+version = "0.9.0"
 
 [package.metadata.bundle]
 icon = ["icon.ico"]
@@ -35,10 +35,10 @@ libavif-image = { version = "0.14", optional = true }
 log = "0.4"
 nalgebra = "0.33"
 notan = { version = "0.12", default-features = false, features = [
-  "backend",
-  "draw",
-  "drop_files",
-  "egui",
+    "backend",
+    "draw",
+    "drop_files",
+    "egui",
 ] }
 egui_plot = "0.27"
 palette = "0.7"
@@ -54,7 +54,7 @@ usvg = "0.42.0"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
 self_update = { version = "0.41", default-features = false, features = [
-  "rustls",
+    "rustls",
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -86,9 +86,9 @@ num-traits = "0.2.18"
 zerocopy = "0.7.34"
 icns = "0.3.1"
 jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
-  "threads",
-  "file-io",
-  "openjpeg-sys",
+    "threads",
+    "file-io",
+    "openjpeg-sys",
 ] }
 file-format = "0.25.0"
 egui_extras = { version = "0.27.2", features = ["image", "file"] }
