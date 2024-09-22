@@ -168,6 +168,73 @@ fn dump_shortcuts() {
 }
 
 #[test]
+/// Generate / update flathub meta
+fn flathub() {
+    use chrono::offset::Utc;
+    use chrono::DateTime;
+    use std::time::SystemTime;
+    use xmltree::Element;
+    use xmltree::{EmitterConfig, XMLNode};
+
+    let kokai_result = std::process::Command::new("kokai")
+        .args(&["release", "--ref", "HEAD"])
+        .output()
+        .unwrap()
+        .stdout;
+    let release_notes = String::from_utf8_lossy(&kokai_result);
+
+    let metafile = "res/flathub/io.github.woelper.Oculante.metainfo.xml";
+    let s = std::fs::read_to_string(metafile).unwrap();
+    let mut doc = Element::parse(s.as_bytes()).unwrap();
+    let releases = doc.get_mut_child("releases").unwrap();
+    // check if this version is already present, we don't want duplicates
+    for c in &releases.children {
+        if c.as_element().unwrap().attributes.get("version").unwrap() == env!("CARGO_PKG_VERSION") {
+            panic!("This release already exists!");
+        }
+    }
+    let mut new_release = Element::new("release");
+
+    new_release
+        .attributes
+        .insert("version".into(), env!("CARGO_PKG_VERSION").into());
+
+    let datetime: DateTime<Utc> = SystemTime::now().into();
+    let date = format!("{}", datetime.format("%Y-%m-%d"));
+    new_release.attributes.insert("date".into(), date);
+    let mut url = Element::new("url");
+    let mut description = Element::new("description");
+    let mut changelog = Element::new("p");
+    changelog
+        .children
+        .insert(0, XMLNode::Text(format!("{release_notes}")));
+    description.children.insert(0, XMLNode::Element(changelog));
+
+    url.attributes.insert("type".into(), "details".into());
+    url.children.insert(
+        0,
+        XMLNode::Text(format!(
+            "https://github.com/woelper/oculante/releases/tag/{}",
+            env!("CARGO_PKG_VERSION")
+        )),
+    );
+
+    new_release.children.insert(0, XMLNode::Element(url));
+    new_release
+        .children
+        .insert(0, XMLNode::Element(description));
+    releases.children.insert(0, XMLNode::Element(new_release));
+    let config = EmitterConfig::new()
+        .autopad_comments(true)
+        .perform_indent(true);
+
+    // doc.write_with_config(File::create("result.xml").unwrap(), config)
+    //     .unwrap();
+    doc.write_with_config(File::create(metafile).unwrap(), config)
+        .unwrap();
+}
+
+#[test]
 fn bench_process_all() {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();

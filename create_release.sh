@@ -15,11 +15,13 @@ cargo check --no-default-features --features notan/glsl-to-spirv
 cargo test shortcuts
 cargo bump patch
 cargo build
+cargo test flathub
 VERSION=`cargo pkgid | cut -d# -f2 | cut -d: -f2`
 git add README.md
 git add Cargo.toml
 git add Cargo.lock
 git add PKGBUILD
+git add res/flathub/io.github.woelper.Oculante.metainfo.xml
 # tag the commit with current version
 git commit -m "Release version $VERSION"
 git tag $VERSION
