@@ -1853,7 +1853,7 @@ fn modifier_stack_ui(
 
         ui.push_id(i, |ui| {
             // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() - 76.;
+            ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
             }
