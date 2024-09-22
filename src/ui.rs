@@ -617,7 +617,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     let mut y_c_i = 0;
                     let mut x_c = xy_center.0-xy_size.0;
                     curr_ui_curs.x = base_ui_curs.x;
-                    let mut last_v_size: f64 = 0.0;
+                    let mut last_display_size_y: f64 = 0.0;
                     while(x_c<=x_e){
                         let curr_tex_response = texture.get_texture_at_xy(x_c as i32, y_c as i32);
                         let x_c_o = x_c;
@@ -635,31 +635,22 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
                         //Handling positive overflow
                         if(curr_tex_response.x_tex_right_global as f32>= texture.width()-1.0f32){
-                            println!("End X!");
                             x_c = x_e+1;                           
                             curr_tex_end.x += (x_e-curr_tex_response.x_tex_right_global).max(0);
                         }
-// 
+
                         if(curr_tex_response.y_tex_bottom_global as f32>= texture.height()-1.0f32){
-                            println!("End Y!");                            
                             y_c_i = y_e-y_c+1;
                             curr_tex_end.y += (y_e-curr_tex_response.y_tex_bottom_global).max(0);
                         }
-                        println!("curr_tex_x_end {0} curr_tex_y_end {1} ", curr_tex_end.x, curr_tex_end.y);
-
-                        
+                        println!("curr_tex_x_end {0} curr_tex_y_end {1} ", curr_tex_end.x, curr_tex_end.y);                        
 
                         //End of texture, display width 
                         let tile_size = nalgebra::Vector2::new(curr_tex_end.x-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+1,
-                            curr_tex_end.y-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1);
-
-                        
+                            curr_tex_end.y-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1);                        
 
                         //Display size
-                        let display_size = nalgebra::Vector2::new(tile_size.x as f64/sc1.0,tile_size.y as f64/sc1.1);                        
-
-                        
-                        let curr_ui_curs_after = curr_ui_curs+nalgebra::Vector2::new(display_size.x, 0.0);
+                        let display_size = nalgebra::Vector2::new(tile_size.x as f64/sc1.0,tile_size.y as f64/sc1.1);
 
                         //Texture display range
                         let uv_start = nalgebra::Vector2::new(curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
@@ -675,11 +666,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
 
                         let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
-                        let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-                        let draw_br_64 = curr_ui_curs_after+nalgebra::Vector2::new(0.0, display_size.y);
-                        let draw_br_32 = Pos2::new(draw_br_64.x as f32, draw_br_64.y as f32);
-                        let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);
-                        
+                        let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);                        
+                        let draw_br_32 = Pos2::new((curr_ui_curs.x+display_size.x) as f32, (curr_ui_curs.y+display_size.y) as f32);
+                        let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);                       
 
                         egui::Image::new(tex_id2)
                         .maintain_aspect_ratio(false)
@@ -691,148 +680,24 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         )
                         )
                         .paint_at(ui, r_ret);
-
                         
-                        curr_ui_curs = curr_ui_curs_after;
-                        last_v_size = display_size.y;
+                        //Update display cursor
+                        curr_ui_curs.x += display_size.x;
+                        last_display_size_y = display_size.y;
+                        
                         //Update coordinates for preview rectangle                       
                         bbox_tl.x = bbox_tl.x.min(r_ret.left());
                         bbox_tl.y = bbox_tl.y.min(r_ret.top());
-
                         bbox_br.x = bbox_br.x.max(r_ret.right());
                         bbox_br.y = bbox_br.y.max(r_ret.bottom());
 
                     }
                     y_c += y_c_i;
-                    curr_ui_curs += nalgebra::Vector2::new(0.0, last_v_size);
+                    curr_ui_curs.y += last_display_size_y;
                 }
 
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
-
-                /*let preview_rect = ui
-                ui.add_space(10.);
-                let preview_rect = ui
-                    .add(
-                        egui::Image::new(tex_id)
-                        .maintain_aspect_ratio(false)
-                        .fit_to_exact_size(egui::Vec2::splat(desired_width))
-                        .rounding(ROUNDING)
-                        .uv(egui::Rect::from_x_y_ranges(
-                            uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                            uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                        )),
-                    )
-                    .rect;*/
-
-                //Pre initialize the rectangle coordinates of the preview window
-                
-
-                /*//The uv positions in the image, we iterate over
-                let mut curr_cursor_v = uv_center.1 - uv_size.1;
-                let end_cursor_u = uv_center.0 + uv_size.0;
-                let end_cursor_v = uv_center.1 + uv_size.1;
-
-                //Ui position to start at
-                let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
-                let mut curr_ui_curs = base_ui_curs; //our start position
-                
-                let mut counter_v = 0; //Safety measure...
-                while curr_cursor_v<end_cursor_v && counter_v<100 {
-                    counter_v += 1;
-                    let mut counter_u = 0; //Safety measure...
-                    let mut curr_cursor_u = uv_center.0 - uv_size.0;                    
-                    let mut next_tex_v_begin:f64 = 0.0;
-                    let mut last_v_size: f64 = 0.0;
-                    
-                    curr_ui_curs.x = base_ui_curs.x;
-                    
-                    while curr_cursor_u<end_cursor_u && counter_u<100 {
-                        counter_u += 1;
-                        
-                        //Get Texure at current cursor position
-                        let curr_tex = texture.get_texture_at_uv(curr_cursor_u, curr_cursor_v);
-                        
-                        //Where does the picked texture end globally?
-                        let mut curr_tex_u_end = f64::min(curr_tex.u_tex_right_global, end_cursor_u);
-                        let mut curr_tex_v_end = f64::min(curr_tex.v_tex_bottom_global, end_cursor_v);
-                        let mut next_tex_u_begin = f64::min(curr_tex.u_tex_next_right_global, end_cursor_u);
-                        next_tex_v_begin = f64::min(curr_tex.v_tex_next_bottom_global, end_cursor_v);
-
-                        if end_cursor_u>1.0 && f64::abs(curr_tex.u_tex_right_global-1.0)< f64::EPSILON  {
-                            curr_tex_u_end = end_cursor_u;
-                            next_tex_u_begin = end_cursor_u;
-                        }
-
-                        if end_cursor_v>1.0 && f64::abs(curr_tex.v_tex_bottom_global-1.0)< f64::EPSILON {
-                            curr_tex_v_end = end_cursor_v;
-                            next_tex_v_begin = end_cursor_v;
-                        }
-
-                        //The uv coordinates to draw the picked texture                        
-                        let u_offset_texture_snipped = curr_tex.u_offset_texture;
-                        let v_offset_texture_snipped = curr_tex.v_offset_texture;
-                        let curr_tex_u_end_texture = (curr_tex_u_end-curr_tex.u_tex_left_global)/curr_tex.u_scale;
-                        let curr_tex_v_end_texture = (curr_tex_v_end-curr_tex.v_tex_top_global)/curr_tex.v_scale;
-
-                        //Display size
-                        let u_size = desired_width*(curr_tex_u_end-curr_cursor_u)/(2.0*uv_size.0);
-                        let v_size = desired_width*(curr_tex_v_end-curr_cursor_v)/(2.0*uv_size.1);
-                                                
-                        last_v_size = v_size;
-                        let curr_ui_curs_after = curr_ui_curs+nalgebra::Vector2::new(u_size, 0.0);
-
-                        //Safety measure: the cursor could perfectly hit the boundary between tiles
-                        if u_size<=f64::EPSILON
-                        {                        
-                            curr_cursor_u += f64::EPSILON;
-                            continue;
-                        }
-
-                        if v_size<=f64::EPSILON
-                        {                        
-                            curr_cursor_v += f64::EPSILON;
-                            continue;
-                        }
-
-                    
-                        let tex_id2 = gfx.egui_register_texture(curr_tex.texture);
-                        let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-                        let draw_br_64 = curr_ui_curs_after+nalgebra::Vector2::new(0.0, v_size);
-                        let draw_br_32 = Pos2::new(draw_br_64.x as f32, draw_br_64.y as f32);
-                        let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);
-                        
-                        egui::Image::new(tex_id2)
-                        .maintain_aspect_ratio(false)
-                        
-                        .fit_to_exact_size(egui::Vec2::new(u_size as f32, v_size as f32))
-                        .uv(egui::Rect::from_x_y_ranges(
-                            u_offset_texture_snipped as f32 ..=curr_tex_u_end_texture as f32,
-                            v_offset_texture_snipped as f32 ..=curr_tex_v_end_texture as f32,
-                        )
-                        )
-                        .paint_at(ui, r_ret);
-                            
-                            
-                                           
-
-                        //Update coordinates for preview rectangle                       
-                        bbox_tl.x = bbox_tl.x.min(r_ret.left());
-                        bbox_tl.y = bbox_tl.y.min(r_ret.top());
-
-                        bbox_br.x = bbox_br.x.max(r_ret.right());
-                        bbox_br.y = bbox_br.y.max(r_ret.bottom());
-
-                        curr_ui_curs = curr_ui_curs_after;
-                        curr_cursor_u = next_tex_u_begin;                    
-                        }
-                
-                curr_ui_curs += nalgebra::Vector2::new(0.0, last_v_size);
-                curr_cursor_v = next_tex_v_begin;                    
-            }*/
-
-                
-                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
-               
+                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);               
                 ui.advance_cursor_after_rect(preview_rect);
                 
 
