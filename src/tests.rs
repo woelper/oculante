@@ -186,6 +186,7 @@ fn flathub() {
         .lines()
         .into_iter()
         .filter(|l| !l.contains("# HEAD"))
+        .map(|l| format!("{l}\n"))
         .collect();
 
     let metafile = "res/flathub/io.github.woelper.Oculante.metainfo.xml";
@@ -208,13 +209,6 @@ fn flathub() {
     let date = format!("{}", datetime.format("%Y-%m-%d"));
     new_release.attributes.insert("date".into(), date);
     let mut url = Element::new("url");
-    let mut description = Element::new("description");
-    let mut changelog = Element::new("p");
-    changelog
-        .children
-        .insert(0, XMLNode::Text(format!("{release_notes}")));
-    description.children.insert(0, XMLNode::Element(changelog));
-
     url.attributes.insert("type".into(), "details".into());
     url.children.insert(
         0,
@@ -223,11 +217,52 @@ fn flathub() {
             env!("CARGO_PKG_VERSION")
         )),
     );
+    let mut description = Element::new("description");
+    let mut lines = release_notes.lines().into_iter();
+    loop {
+        if let Some(l) = lines.next() {
+            if l.starts_with("###") {
+                let mut paragraph = Element::new("p");
+                paragraph.children.insert(
+                    0,
+                    XMLNode::Text(
+                        l.replace("### ", "")
+                            .replace(":sparkles:", "")
+                            .replace(":beetle:", "")
+                            .replace(":green_apple:", "")
+                            .trim()
+                            .into(),
+                    ),
+                );
+                description.children.insert(0, XMLNode::Element(paragraph));
 
-    new_release.children.insert(0, XMLNode::Element(url));
+                let mut list = Element::new("ul");
+
+                // skip next empty line
+                _ = lines.next();
+                while let Some(commit) = lines.next() {
+                    dbg!(commit);
+
+                    if commit.starts_with("*") {
+                        let mut item = Element::new("li");
+                        item.children
+                            .insert(0, XMLNode::Text(commit.replace("* ", "")));
+                        list.children.insert(0, XMLNode::Element(item));
+                    } else {
+                        break;
+                    }
+                }
+                description.children.insert(1, XMLNode::Element(list));
+            }
+        } else {
+            break;
+        }
+    }
+
     new_release
         .children
         .insert(0, XMLNode::Element(description));
+    new_release.children.insert(0, XMLNode::Element(url));
     releases.children.insert(0, XMLNode::Element(new_release));
     let config = EmitterConfig::new()
         .autopad_comments(true)
