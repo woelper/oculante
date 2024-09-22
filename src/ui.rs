@@ -32,6 +32,7 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
+use wgpu::TextureUsages;
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
@@ -530,6 +531,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
+                let xy_center = ((texture.width() as f64*uv_center.0) as i32, (texture.height() as f64*uv_center.1) as i32); //(16384,1024);//
+
+
+
                 egui::Grid::new("info")
                     .num_columns(2)
                     .show(ui, |ui| {
@@ -585,9 +590,113 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
 
 
+                
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 / texture.size().1;
                 let uv_size = (scale, scale * ratio as f64);
+                let xy_size = ((texture.width()as f64*uv_size.0) as i32,
+                                            (texture.height()as f64*uv_size.1) as i32);
+                let sc1 = xy_size.0 as f64 / desired_width;
+                println!("image x:{0} y:{1} w:{2} h:{3}", xy_center.0, xy_center.1, xy_size.0, xy_size.1);
+
+                //coordinates of the image-view
+                let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
+                let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
+
+                //Ui position to start at
+                let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
+                let mut curr_ui_curs = base_ui_curs; //our start position
+                
+                //Loop control variables
+                let x_e = (xy_center.0+xy_size.0)-1 as i32;
+                let mut y_c = xy_center.1-xy_size.1;
+                let y_e = (xy_center.1+xy_size.1)-1 as i32;
+
+                while(y_c<y_e){
+                    let mut y_c_i = 0;
+                    let mut x_c = xy_center.0-xy_size.0;
+                    curr_ui_curs.x = base_ui_curs.x;
+                    let mut last_v_size: f64 = 0.0;
+                    while(x_c<x_e){
+                        let curr_tex_response = texture.get_texture_at_xy(x_c as i32, y_c as i32);
+                        let my_width =  curr_tex_response.x_tex_right_global-curr_tex_response.x_tex_left_global-curr_tex_response.x_offset_texture;
+                        let my_height =  curr_tex_response.y_tex_bottom_global-curr_tex_response.y_tex_top_global-curr_tex_response.y_offset_texture;
+                        y_c_i = my_height+1; // We want to end up in the next tile, so add 1!
+                        x_c += my_width+1;
+
+                        let mut extra_width = (0, 0);
+                        //Handling positive overflow
+                        //
+                        if(curr_tex_response.x_tex_right_global as f32>= texture.width()-1.0f32){
+                            println!("End X!");
+                            x_c = x_e;
+                            extra_width.0 = (x_e-curr_tex_response.x_tex_right_global-1).max(0);
+                        }
+// 
+                        if(curr_tex_response.y_tex_bottom_global as f32>= texture.height()-1.0f32){
+                            println!("End Y!");
+                            y_c = y_e;
+                            y_c_i = 0;
+                            extra_width.1 = (y_e-curr_tex_response.y_tex_bottom_global-1).max(0);
+                        }
+
+                        println!("{0}, {1}, {2}, {3}", y_c, y_e, my_height, my_width);
+
+                        //End of texture, display width
+                        let mut curr_tex_x_end = i32::min(curr_tex_response.x_tex_right_global, x_e);
+                        let mut curr_tex_y_end = i32::min(curr_tex_response.y_tex_bottom_global, y_e);
+                        let display_width = curr_tex_x_end-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+extra_width.0;
+                        let display_height = curr_tex_y_end-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+extra_width.1;
+//y: 1 px fehlt in erster textur!
+//x: 1 px fehlt in erster textur!
+                        //Display size
+                        let u_size = 0.5*display_width as f64/sc1;
+                        let v_size = 0.5*display_height as f64/sc1;
+
+                        
+                        let curr_ui_curs_after = curr_ui_curs+nalgebra::Vector2::new(u_size, 0.0);
+
+                        //Texture display range
+                        let u_offset_texture_snipped = curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64;
+                        let v_offset_texture_snipped = curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64;
+                        
+                        let curr_tex_u_end_texture = (curr_tex_x_end-curr_tex_response.x_tex_left_global +extra_width.0) as f64 / curr_tex_response.texture_width as f64;
+                        let curr_tex_v_end_texture = (curr_tex_y_end-curr_tex_response.y_tex_top_global+extra_width.1) as f64 / curr_tex_response.texture_height as f64;
+
+
+                        let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
+                        let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
+                        let draw_br_64 = curr_ui_curs_after+nalgebra::Vector2::new(0.0, v_size);
+                        let draw_br_32 = Pos2::new(draw_br_64.x as f32, draw_br_64.y as f32);
+                        let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);
+                        println!("{0} {1}",r_ret.width(), r_ret.height());
+
+                        egui::Image::new(tex_id2)
+                        .maintain_aspect_ratio(false)
+                        
+                        .fit_to_exact_size(egui::Vec2::new(u_size as f32, v_size as f32))
+                        .uv(egui::Rect::from_x_y_ranges(
+                            u_offset_texture_snipped as f32 ..=curr_tex_u_end_texture as f32,
+                            v_offset_texture_snipped as f32 ..=curr_tex_v_end_texture as f32,
+                        )
+                        )
+                        .paint_at(ui, r_ret);
+
+                        
+                        curr_ui_curs = curr_ui_curs_after;
+                        last_v_size = v_size;
+                        //Update coordinates for preview rectangle                       
+                        bbox_tl.x = bbox_tl.x.min(r_ret.left());
+                        bbox_tl.y = bbox_tl.y.min(r_ret.top());
+
+                        bbox_br.x = bbox_br.x.max(r_ret.right());
+                        bbox_br.y = bbox_br.y.max(r_ret.bottom());
+
+                    }
+                    y_c += y_c_i;
+                    curr_ui_curs += nalgebra::Vector2::new(0.0, last_v_size);
+                }
+
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
 
                 /*let preview_rect = ui
@@ -606,10 +715,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     .rect;*/
 
                 //Pre initialize the rectangle coordinates of the preview window
-                let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
-                let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
+                
 
-                //The uv positions in the image, we iterate over
+                /*//The uv positions in the image, we iterate over
                 let mut curr_cursor_v = uv_center.1 - uv_size.1;
                 let end_cursor_u = uv_center.0 + uv_size.0;
                 let end_cursor_v = uv_center.1 + uv_size.1;
@@ -695,14 +803,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         .paint_at(ui, r_ret);
                             
                             
-                            //.texture_options(TextureOptions::LINEAR)
-                        //).rect;
-
-                        /*draw.image(&curr_tex.texture)
-                        .blend_mode(BlendMode::NORMAL)
-                        //.scale(u_size, scale)
-                        .size(u_size, v_size)
-                        .translate(curr_ui_curs.x, curr_ui_curs.y);*/                       
+                                           
 
                         //Update coordinates for preview rectangle                       
                         bbox_tl.x = bbox_tl.x.min(r_ret.left());
@@ -717,7 +818,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 
                 curr_ui_curs += nalgebra::Vector2::new(0.0, last_v_size);
                 curr_cursor_v = next_tex_v_begin;                    
-            }
+            }*/
 
                 
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);

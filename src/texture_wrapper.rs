@@ -22,11 +22,41 @@ pub struct TexWrap{
 pub struct TextureResponse<'a>{
     pub texture: &'a Texture,
     pub u_tex_left_global : f64, 
-    pub v_tex_top_global : f64, 
+    pub v_tex_top_global : f64,
     pub u_offset_texture : f64, 
     pub v_offset_texture : f64, 
     pub u_tex_right_global : f64, 
     pub v_tex_bottom_global : f64,
+    pub u_tex_next_right_global : f64, 
+    pub v_tex_next_bottom_global : f64,
+    pub u_scale:f64,
+    pub v_scale:f64
+}
+
+pub struct TextureResponse2<'a>{
+    pub texture: &'a Texture,
+    pub u_tex_left_global : f64, 
+    pub v_tex_top_global : f64,
+    pub u_tex_right_global : f64, 
+    pub v_tex_bottom_global : f64,
+
+    pub x_offset_texture: i32, 
+    pub y_offset_texture: i32,
+
+    pub texture_width:i32,
+    pub texture_height:i32,
+
+    pub x_tex_left_global : i32, 
+    pub y_tex_top_global : i32,
+    pub x_tex_right_global : i32, 
+    pub y_tex_bottom_global : i32,
+
+    pub x_tex_right_local : i32, 
+    pub y_tex_bottom_local : i32,
+
+    pub u_offset_texture : f64, 
+    pub v_offset_texture : f64, 
+    
     pub u_tex_next_right_global : f64, 
     pub v_tex_next_bottom_global : f64,
     pub u_scale:f64,
@@ -197,6 +227,68 @@ impl TexWrap{
                 }
             }
         }
+    }
+
+    pub fn get_texture_at_xy(&self, xa:i32, ya:i32)->TextureResponse2{
+        let x = xa.max(0).min(self.width() as i32-1);
+        let y = ya.max(0).min(self.height() as i32-1);
+
+        let x_idx = (x /self.col_translation as i32);
+        let y_idx = (y /self.row_translation as i32);
+        let tex_idx = (y_idx*self.col_count as i32+x_idx).min(self.texture_array.len() as i32 -1);
+        let my_tex = &self.texture_array[tex_idx as usize];
+
+        let tex_left = x_idx*self.col_translation as i32;
+        let tex_top = y_idx*self.row_translation as i32;
+        let tex_right = tex_left+self.col_translation as i32-1;
+        let tex_bottom = tex_top+self.row_translation as i32-1;
+        let tex_right_next = tex_right+1;
+        let tex_bottom_next = tex_bottom+1;
+
+        let u_tex_left_global = tex_left as f64/self.width() as f64;
+        let v_tex_top_global = tex_top as f64/self.height() as f64;
+        
+        let x_offset_texture = xa-tex_left;
+        let y_offset_texture = ya-tex_top;
+
+        let u_offset = (xa as f64-tex_left as f64)/my_tex.width()as f64;
+        let v_offset = (ya as f64-tex_top as f64)/my_tex.height()as f64;
+        
+        let u_tex_right = tex_right as f64 /self.width()as f64;
+        let v_tex_bottom = tex_bottom as f64 /self.height()as f64;
+        
+
+        let u_tex_next_right_global = tex_right_next as f64 /self.width()as f64;
+        let v_tex_next_bottom_global = tex_bottom_next as f64 /self.height()as f64;
+
+        let u_scale = my_tex.width() as f64/self.width() as f64;
+        let v_scale = my_tex.height() as f64/self.height() as f64;
+
+        TextureResponse2 {texture: my_tex, 
+            u_tex_left_global,
+            v_tex_top_global,
+            x_offset_texture: x_offset_texture, 
+            y_offset_texture: y_offset_texture,
+
+            texture_width: self.col_translation as i32,
+            texture_height: self.row_translation as i32,
+
+            x_tex_left_global: tex_left,
+            y_tex_top_global: tex_top,
+            x_tex_right_global: tex_right,
+            y_tex_bottom_global: tex_bottom,
+
+            x_tex_right_local: self.col_translation as i32-1,
+            y_tex_bottom_local: self.row_translation as i32-1,
+
+            u_offset_texture:u_offset, 
+            v_offset_texture:v_offset, 
+            u_tex_right_global:u_tex_right, 
+            v_tex_bottom_global:v_tex_bottom,
+            u_tex_next_right_global,
+            v_tex_next_bottom_global,
+            u_scale:u_scale,
+            v_scale:v_scale }
     }
 
     pub fn get_texture_at_uv(&self, ua:f64, va:f64)->TextureResponse {

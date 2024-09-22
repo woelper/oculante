@@ -133,6 +133,6 @@ opt-level = 3
 panic = "abort"
 
 [profile.dev]
-debug = false
+debug = true
 incremental = true
-opt-level = 1
+opt-level = 0
