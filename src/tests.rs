@@ -181,7 +181,12 @@ fn flathub() {
         .output()
         .unwrap()
         .stdout;
-    let release_notes = String::from_utf8_lossy(&kokai_result);
+    let release_notes = String::from_utf8_lossy(&kokai_result).to_string();
+    let release_notes: String = release_notes
+        .lines()
+        .into_iter()
+        .filter(|l| !l.contains("# HEAD"))
+        .collect();
 
     let metafile = "res/flathub/io.github.woelper.Oculante.metainfo.xml";
     let s = std::fs::read_to_string(metafile).unwrap();
