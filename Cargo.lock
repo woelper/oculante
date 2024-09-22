@@ -853,7 +853,9 @@ checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits 0.2.19",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -4436,6 +4438,7 @@ dependencies = [
  "basis-universal",
  "bitflags 2.6.0",
  "cc",
+ "chrono",
  "clap 3.2.25",
  "cmake",
  "cmd_lib",
@@ -4500,6 +4503,7 @@ dependencies = [
  "wgpu",
  "windres",
  "winres",
+ "xmltree",
  "zerocopy",
  "zune-png",
 ]
@@ -7770,6 +7774,15 @@ name = "xml-rs"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af4e2e2f7cba5a093896c1e150fbfe177d1883e7448200efb81d40b9d339ef26"
+
+[[package]]
+name = "xmltree"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b619f8c85654798007fb10afa5125590b43b088c225a25fc2fec100a9fad0fc6"
+dependencies = [
+ "xml-rs",
+]
 
 [[package]]
 name = "xmlwriter"

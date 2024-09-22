@@ -2,7 +2,7 @@
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2021"
-exclude = ["res/*.gif", "tests/*"]
+exclude = ["res/*.gif", "tests/*", "res/screenshots/*"]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
 name = "oculante"
@@ -123,6 +123,8 @@ cmake = "0.1"
 
 [dev-dependencies]
 cmd_lib = "1.3.0"
+xmltree = "0.11.0"
+chrono = "0.4.38"
 
 [profile.release]
 codegen-units = 1
