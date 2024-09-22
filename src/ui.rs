@@ -629,30 +629,32 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         x_c += curr_tex_response.offset_width;
 
 
-                        let mut curr_tex_x_end = i32::min(curr_tex_response.x_tex_right_global, x_e);
-                        let mut curr_tex_y_end = i32::min(curr_tex_response.y_tex_bottom_global, y_e);
+                        //let mut curr_tex_x_end = ;
+                        //let mut curr_tex_y_end = i32::min(curr_tex_response.y_tex_bottom_global, y_e);
 
-                        print!("curr_tex_x_end {0} curr_tex_y_end {1} ", curr_tex_x_end, curr_tex_y_end);
+                        let mut cutt_tex_end = nalgebra::Vector2::new(i32::min(curr_tex_response.x_tex_right_global, x_e), i32::min(curr_tex_response.y_tex_bottom_global, y_e));
+
+                        print!("curr_tex_x_end {0} curr_tex_y_end {1} ", cutt_tex_end.x, cutt_tex_end.y);
 
                         //Handling positive overflow
                         if(curr_tex_response.x_tex_right_global as f32>= texture.width()-1.0f32){
                             println!("End X!");
                             x_c = x_e+1;                           
-                            curr_tex_x_end += (x_e-curr_tex_response.x_tex_right_global).max(0);
+                            cutt_tex_end.x += (x_e-curr_tex_response.x_tex_right_global).max(0);
                         }
 // 
                         if(curr_tex_response.y_tex_bottom_global as f32>= texture.height()-1.0f32){
                             println!("End Y!");                            
                             y_c_i = y_e-y_c+1;
-                            curr_tex_y_end += (y_e-curr_tex_response.y_tex_bottom_global).max(0);
+                            cutt_tex_end.y += (y_e-curr_tex_response.y_tex_bottom_global).max(0);
                         }
-                        println!("curr_tex_x_end {0} curr_tex_y_end {1} ", curr_tex_x_end, curr_tex_y_end);
+                        println!("curr_tex_x_end {0} curr_tex_y_end {1} ", cutt_tex_end.x, cutt_tex_end.y);
 
                         
 
                         //End of texture, display width                        
-                        let display_width = curr_tex_x_end-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+1;
-                        let display_height = curr_tex_y_end-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1;
+                        let display_width = cutt_tex_end.x-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+1;
+                        let display_height = cutt_tex_end.y-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1;
 
                         
 
@@ -670,11 +672,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         
 
 
-                        let curr_tex_u_end_texture = (curr_tex_x_end-curr_tex_response.x_tex_left_global+1) as f64 / curr_tex_response.texture_width as f64;
-                        let curr_tex_v_end_texture = (curr_tex_y_end-curr_tex_response.y_tex_top_global+1) as f64 / curr_tex_response.texture_height as f64;
+                        let curr_tex_u_end_texture = (cutt_tex_end.x-curr_tex_response.x_tex_left_global+1) as f64 / curr_tex_response.texture_width as f64;
+                        let curr_tex_v_end_texture = (cutt_tex_end.y-curr_tex_response.y_tex_top_global+1) as f64 / curr_tex_response.texture_height as f64;
 
                         println!("Using Texture x_c {0} y_c {1} {2} {3} xe {4} ye {5} tex bo {6} wx {7} wy {8} u-b{9} v-b{10} u-e{11} v-b{12} y_c after {13}]", 
-                        x_c_o, y_c_o, curr_tex_x_end, curr_tex_y_end, x_e, y_e, curr_tex_response.y_tex_bottom_global, 
+                        x_c_o, y_c_o, cutt_tex_end.x, cutt_tex_end.y, x_e, y_e, curr_tex_response.y_tex_bottom_global, 
                         display_width, display_height, u_offset_texture_snipped, v_offset_texture_snipped, curr_tex_u_end_texture, 
                         curr_tex_v_end_texture, y_c_o+y_c_i);
 
