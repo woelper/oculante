@@ -1153,17 +1153,50 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 .striped(true)
                 .show(ui, |ui| {
                     let mut ops = [
+
+                        // General Image Adjustments
                         ImageOperation::Brightness(0),
                         ImageOperation::Contrast(0),
                         ImageOperation::Exposure(20),
                         ImageOperation::Desaturate(0),
-                        ImageOperation::LUT("Lomography Redscale 100".into()),
-                        ImageOperation::Equalize((0, 255)),
-                        ImageOperation::ScaleImageMinMax,
-                        ImageOperation::Posterize(8),
+                        ImageOperation::Invert,
+
+                        // Colour and Hue
                         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-                        ImageOperation::Rotate(90),
+                        ImageOperation::Equalize((0, 255)),
                         ImageOperation::HSV((0, 100, 100)),
+                        ImageOperation::Add([0, 0, 0]),
+                        ImageOperation::Mult([255, 255, 255]),
+                        ImageOperation::Fill([255, 255, 255, 255]),
+
+                        // Colour Mapping and Conversion
+                        ImageOperation::LUT("Lomography Redscale 100".into()),
+                        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
+                        ImageOperation::Posterize(8),
+                        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
+
+                        // Mathematical
+                        ImageOperation::MMult,
+                        ImageOperation::MDiv,
+                        ImageOperation::Expression("r = 1.0".into()),
+                        ImageOperation::ScaleImageMinMax,
+
+                        // Effects
+                        ImageOperation::Blur(0),
+                        ImageOperation::Noise {
+                            amt: 50,
+                            mono: false,
+                        },
+                        ImageOperation::ChromaticAberration(15),
+
+                        // Geometry and Transformations
+                        ImageOperation::Flip(false),
+                        ImageOperation::Rotate(90),
+                        ImageOperation::Resize {
+                            dimensions: state.image_geometry.dimensions,
+                            aspect: true,
+                            filter: ScaleFilter::Hamming,
+                        },
                         ImageOperation::Crop([0, 0, 0, 0]),
                         ImageOperation::CropPerspective{points: [
                             (0,0),
@@ -1173,27 +1206,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             ]
                         , original_size : state.image_geometry.dimensions
                         },
-                        ImageOperation::Mult([255, 255, 255]),
-                        ImageOperation::Fill([255, 255, 255, 255]),
-                        ImageOperation::Blur(0),
-                        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
-                        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
-                        ImageOperation::MMult,
-                        ImageOperation::MDiv,
-                        ImageOperation::Expression("r = 1.0".into()),
-                        ImageOperation::Noise {
-                            amt: 50,
-                            mono: false,
-                        },
-                        ImageOperation::Add([0, 0, 0]),
-                        ImageOperation::Resize {
-                            dimensions: state.image_geometry.dimensions,
-                            aspect: true,
-                            filter: ScaleFilter::Hamming,
-                        },
-                        ImageOperation::Invert,
-                        ImageOperation::Flip(false),
-                        ImageOperation::ChromaticAberration(15),
                     ];
 
                     ui.label_i("➕ Filter");
@@ -1927,7 +1939,7 @@ fn modifier_stack_ui(
 
         ui.push_id(i, |ui| {
             // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() - 76.;
+            ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
             if operation.ui(ui, geo, mouse_grab).changed() {
                 *image_changed = true;
             }

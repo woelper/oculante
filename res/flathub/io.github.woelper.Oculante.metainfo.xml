@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.woelper.Oculante</id>
+  <name>Oculante</name>
+  <summary>A fast and simple image viewer/editor</summary>
+  <developer id="io.github.woelper">
+    <name>Johann Woelper</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/woelper/oculante</url>
+  <url type="bugtracker">https://github.com/woelper/oculante/issues</url>
+  <content_rating type="oars-1.1"/>
+  <description>
+    <p>
+      A no-nonsense hardware-accelerated image viewer. Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
+    </p>
+    <ul>
+      <li>Free of charge, bloat-free, ad-free, privacy-respecting open source application</li>
+      <li>Fast opening of images, fast startup</li>
+      <li>Available for Win, Mac, Linux, FreeBSD and NetBSD</li>
+      <li>Supports a wide range of images and SVG</li>
+      <li>Caches images for faster reloading</li>
+      <li>Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)</li>
+      <li>Lets you pick pixels, display location and color values</li>
+      <li>Offers basic nondestructive editing: Crop, resize, paint, contrast, HSV, rotate, blur, noise, ...</li>
+      <li>SIMD-accelerated image editing</li>
+    </ul>
+  </description>
+  <categories>
+    <category>Graphics</category>
+  </categories>
+  <launchable type="desktop-id">io.github.woelper.Oculante.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/woelper/oculante/ec33f6a7041c89f640573f1a39464e6f0d14410b/res/previews/front.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/woelper/oculante/ec33f6a7041c89f640573f1a39464e6f0d14410b/res/previews/file_manager.png</image>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.8.23" date="2024-07-29">
+      <url type="details">https://github.com/woelper/oculante/releases/tag/0.8.23</url>
+      <description>
+        <p>Bug Fixes</p>
+        <ul>
+          <li>Display image path for loading errors</li>
+          <li>Prevent panic for scrubber index being out of range and allow opening images without path prefic correctly</li>
+          <li>Update index when image in same folder is loaded</li>
+          <li>Switching theme removes accent color</li>
+          <li>Preserve scubber index</li>
+          <li>Prevent image removal going out of bounds</li>
+          <li>Clearing and deleting an image removes it from the virtual scrubber and advances to the next according to the scrubber direction</li>
+          <li>Fix issue where SVG files were detected as XML</li>
+          <li>Compare menu works without image loaded</li>
+          <li>ClearImage can be assigned to a shortcut</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>
