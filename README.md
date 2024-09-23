@@ -27,22 +27,22 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with a wid
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
-![Screenshot](res/screenshot_1.png "Screenshot")
+![Screenshot](res/previews/front.png "Screenshot")
 
 ## Flipbook
 With configurable caching, Oculante can quickly step through image sequences:
 
-![Screenshot](res/flipbook.gif "Screenshot")
+![Screenshot](res/previews/flipbook.avif "Screenshot")
 
 ## Inspection
 Get information about pixel values and position, with precise picking:
 
 ![Screenshot](res/picker.gif "Screenshot")
 
-## Network
-Oculante can load raw image data no matter the format and will display it if possible, streams of images will be played like a video. This makes it perfect for sending images from cameras or headless devices like a Raspberry Pi.
+## Management
+You can use the File Manager built into Oculante to do basic tasks such as finding your favourite images or setting bookmarks to directories! There's even some more advanced features such as changing the files format!
 
-![Screenshot](res/net.gif "Screenshot")
+![Screenshot](res/previews/file_manager.png "Screenshot")
 
 ## Correct color channel display:
 Images may contain color information that is masked by the alpha channel. Although it is present you will not see it since usually RGB values are multiplied with the A channel when displayed. Oculante allows you to inspect all channels individually and see color data without transparency applied.
