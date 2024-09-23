@@ -39,8 +39,8 @@ Get information about pixel values and position, with precise picking:
 
 ![Screenshot](res/picker.gif "Screenshot")
 
-## Management
-You can use the File Manager built into Oculante to do basic tasks such as finding your favourite images or setting bookmarks to directories! There's even some more advanced features such as changing the files format!
+## File Management
+You can use the File Manager built into Oculante to do basic tasks such as accessing recent images or stepping through a virtual list of files so you can compare easily. There is also a dedicated compare option to flip between images, remembering zoom level and position.
 
 ![Screenshot](res/previews/file_manager.png "Screenshot")
 
@@ -209,11 +209,13 @@ Extracting a signature
 
 ## Attribution
 
-Test / benchmark pictures:
+Test / benchmark / screenshot pictures:
 
 https://unsplash.com/@mohsen_karimi
 
 https://unsplash.com/@frstvisuals
+
+https://unsplash.com/@eberhardgross
 
 ## Privacy pledge
 
