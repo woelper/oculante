@@ -1,3 +1,21 @@
+# 0.9.1 (2024-09-21)
+
+### :beetle: Bug Fixes
+
+* Prevent scrollbars from occluding info panel (19d3be85)
+* Remove duplicated shortcuts entry in Readme and fix build script to auto-generate keymaps (99e9d9ef)
+* Noise filter ui would extend panel too much (063df9d6)
+
+### :sparkles: Features
+
+* Generate flathub meta for a release (77e43596)
+
+### :green_apple: Chore
+
+* Improved changelog generation (1665cd3c)
+* Exclude screenshots from cates.io build to save space (c80df685)
+* Fix wronf icon for Rotate operator (5f564b46)
+
 # 0.9.0 (2024-09-21)
 
 ### :beetle: Bug Fixes

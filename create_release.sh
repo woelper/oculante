@@ -22,7 +22,8 @@ git add Cargo.toml
 git add Cargo.lock
 git add PKGBUILD
 git add res/flathub/io.github.woelper.Oculante.metainfo.xml
-kokai release --ref HEAD | grep -Ev '^(# HEAD)' > tmp
+echo "\# $VERSION" > tmp
+kokai release --ref HEAD | grep -Ev '^(# HEAD)' >> tmp
 cat CHANGELOG.md >> tmp
 mv tmp CHANGELOG.md
 git add CHANGELOG.md
