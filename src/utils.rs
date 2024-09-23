@@ -87,9 +87,9 @@ pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
     pub num_colors: usize,
-    pub red_histogram: Vec<(i32, i32)>,
-    pub green_histogram: Vec<(i32, i32)>,
-    pub blue_histogram: Vec<(i32, i32)>,
+    pub red_histogram: Vec<(i32, u64)>,
+    pub green_histogram: Vec<(i32, u64)>,
+    pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
     pub raw_exif: Option<Bytes>,
     pub name: String,
@@ -155,9 +155,9 @@ impl ExtendedImageInfo {
 
     
     pub fn from_image(img: &RgbaImage) -> Self {
-        let mut hist_r: [u32; 256] = [0; 256];
-        let mut hist_g: [u32; 256] = [0; 256];
-        let mut hist_b: [u32; 256] = [0; 256];
+        let mut hist_r: [u64; 256] = [0; 256];
+        let mut hist_g: [u64; 256] = [0; 256];
+        let mut hist_b: [u64; 256] = [0; 256];
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
@@ -192,22 +192,22 @@ impl ExtendedImageInfo {
         }     
         
 
-        let green_histogram: Vec<(i32, i32)> = hist_g
+        let green_histogram: Vec<(i32, u64)> = hist_g
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
-        let red_histogram: Vec<(i32, i32)> = hist_r
+        let red_histogram: Vec<(i32, u64)> = hist_r
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
-        let blue_histogram: Vec<(i32, i32)> = hist_b
+        let blue_histogram: Vec<(i32, u64)> = hist_b
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
         Self {

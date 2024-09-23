@@ -606,46 +606,43 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
                 let mut curr_ui_curs = base_ui_curs; //our start position
                 
-                //Loop control variables
-                let x_e = (xy_center.0+xy_size.0) as i32;
-                let mut y_c = xy_center.1-xy_size.1;
-                let y_e = (xy_center.1+xy_size.1) as i32;
+                //Loop control variables, start end end coordinates of interest
+                let x_coordinate_end = (xy_center.0+xy_size.0) as i32;
+                let mut y_coordinate = xy_center.1-xy_size.1;
+                let y_coordinate_end = (xy_center.1+xy_size.1) as i32;
 
-                while y_c<=y_e {
-                    let mut y_c_i = 0;
-                    let mut x_c = xy_center.0-xy_size.0;
+                while y_coordinate<=y_coordinate_end {
+                    let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
+                    let mut x_coordinate = xy_center.0-xy_size.0;
                     curr_ui_curs.x = base_ui_curs.x;
                     let mut last_display_size_y: f64 = 0.0;
-                    while x_c<=x_e {
-                        let curr_tex_response = texture.get_texture_at_xy(x_c as i32, y_c as i32);
-
-                        y_c_i = curr_tex_response.offset_height;
+                    while x_coordinate<=x_coordinate_end {
+                        //get texture tile
+                        let curr_tex_response = texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
                         
-                        
-                        x_c += curr_tex_response.offset_width;
+                        //increment coordinates by usable width/height
+                        y_coordinate_increment = curr_tex_response.offset_height;
+                        x_coordinate += curr_tex_response.offset_width;
 
                         //Handling last texture in a row or col
-                        let mut curr_tex_end = nalgebra::Vector2::new(i32::min(curr_tex_response.x_tex_right_global, x_e), i32::min(curr_tex_response.y_tex_bottom_global, y_e));
+                        let mut curr_tex_end = nalgebra::Vector2::new(i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end), i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end));                        
 
-                        
-
-                        //Handling positive overflow
+                        //Handling positive coordinate overflow
                         if curr_tex_response.x_tex_right_global as f32>= texture.width()-1.0f32 {
-                            x_c = x_e+1;                           
-                            curr_tex_end.x += (x_e-curr_tex_response.x_tex_right_global).max(0);
+                            x_coordinate = x_coordinate_end+1;                           
+                            curr_tex_end.x += (x_coordinate_end-curr_tex_response.x_tex_right_global).max(0);
                         }
 
                         if curr_tex_response.y_tex_bottom_global as f32>= texture.height()-1.0f32 {
-                            y_c_i = y_e-y_c+1;
-                            curr_tex_end.y += (y_e-curr_tex_response.y_tex_bottom_global).max(0);
-                        }
-                        
+                            y_coordinate_increment = y_coordinate_end-y_coordinate+1;
+                            curr_tex_end.y += (y_coordinate_end-curr_tex_response.y_tex_bottom_global).max(0);
+                        }                        
 
-                        //End of texture, display width 
+                        //Usable tile size, depending on offsets
                         let tile_size = nalgebra::Vector2::new(curr_tex_end.x-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+1,
                             curr_tex_end.y-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1);                        
 
-                        //Display size
+                        //Display size - tile size scaled
                         let display_size = nalgebra::Vector2::new(tile_size.x as f64/sc1.0,tile_size.y as f64/sc1.1);
 
                         //Texture display range
@@ -681,7 +678,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         bbox_br.y = bbox_br.y.max(r_ret.bottom());
 
                     }
-                    y_c += y_c_i;
+                    //Update y coordinates
+                    y_coordinate += y_coordinate_increment;
                     curr_ui_curs.y += last_display_size_y;
                 }
 
