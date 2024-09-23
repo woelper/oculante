@@ -10,7 +10,7 @@
   <project_license>MIT</project_license>
   <url type="homepage">https://github.com/woelper/oculante</url>
   <url type="bugtracker">https://github.com/woelper/oculante/issues</url>
-  <content_rating type="oars-1.1"/>
+  <content_rating type="oars-1.1" />
   <description>
     <p>
       A no-nonsense hardware-accelerated image viewer. Oculante's vision is to be a fast, unobtrusive, portable image viewer with wide image format support, offering image analysis and basic editing tools.
@@ -40,6 +40,27 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release date="2024-09-23" version="0.9.1">
+      <url type="details">https://github.com/woelper/oculante/releases/tag/0.9.1</url>
+      <description>
+        <p>Chore</p>
+        <ul>
+          <li>Fix wronf icon for Rotate operator (5f564b46)</li>
+          <li>Exclude screenshots from cates.io build to save space (c80df685)</li>
+          <li>Improved changelog generation (1665cd3c)</li>
+        </ul>
+        <p>Features</p>
+        <ul>
+          <li>Generate flathub meta for a release (77e43596)</li>
+        </ul>
+        <p>Bug Fixes</p>
+        <ul>
+          <li>Noise filter ui would extend panel too much (063df9d6)</li>
+          <li>Remove duplicated shortcuts entry in Readme and fix build script to auto-generate keymaps (99e9d9ef)</li>
+          <li>Prevent scrollbars from occluding info panel (19d3be85)</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.23" date="2024-07-29">
       <url type="details">https://github.com/woelper/oculante/releases/tag/0.8.23</url>
       <description>
