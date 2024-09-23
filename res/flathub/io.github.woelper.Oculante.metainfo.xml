@@ -33,7 +33,10 @@
   <launchable type="desktop-id">io.github.woelper.Oculante.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://github.com/woelper/oculante/blob/637c622b3384502f5c58ae295d5cc51549d5cfd3/res/screenshot_1.png</image>
+      <image>https://raw.githubusercontent.com/woelper/oculante/ec33f6a7041c89f640573f1a39464e6f0d14410b/res/previews/front.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/woelper/oculante/ec33f6a7041c89f640573f1a39464e6f0d14410b/res/previews/file_manager.png</image>
     </screenshot>
   </screenshots>
   <releases>
