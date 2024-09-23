@@ -2665,7 +2665,7 @@ pub fn apply_theme(state: &OculanteState, ctx: &Context) {
     }
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
-    style.spacing.scroll = egui::style::ScrollStyle::thin();
+    style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
     style.spacing.window_margin = 5.0.into();
