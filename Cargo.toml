@@ -2,7 +2,7 @@
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2021"
-exclude = ["res/*.gif", "tests/*", "res/screenshots/*"]
+exclude = ["res/*.gif", "tests/*", "res/screenshots/*", "res/previews/*"]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
 name = "oculante"
