@@ -336,7 +336,7 @@ pub fn send_image_threaded(
                 // .send(Frame::new_reset(f.buffer.clone()));              
 
                 let mut first = true;
-                for mut f in frame_receiver.iter() {
+                for f in frame_receiver.iter() {
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
                         return;

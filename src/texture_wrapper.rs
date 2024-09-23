@@ -38,13 +38,6 @@ pub struct TextureResponse2<'a>{
 }
 
 impl TexWrap{
-    /*pub fn new(texture: Texture) -> Self{
-        let s = texture.size();
-        TexWrap { tex: texture, size_vec:s }        
-    }*/
-
-    //pub fn from_rgba_image_premult(gfx: &mut Graphics, linear_mag_filter: bool, image: &RgbaImage) -> Option<TexWrap>{}
-
     pub fn from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage) -> Option<TexWrap>{
         Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
     }
@@ -102,7 +95,7 @@ impl TexWrap{
                     .ok()    
     }
 
-    fn gen_from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage, fuuun: fn (&mut Graphics, &[u8], u32, u32, &PersistentSettings)-> Option<Texture>) -> Option<TexWrap>{
+    fn gen_from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage, texture_generator_function: fn (&mut Graphics, &[u8], u32, u32, &PersistentSettings)-> Option<Texture>) -> Option<TexWrap>{
         
         let im_w = image.width();
         let im_h = image.height();
@@ -131,7 +124,7 @@ impl TexWrap{
                 
                 let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                 let my_img = sub_img.to_image();
-                let tex = fuuun(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings);
+                let tex = texture_generator_function(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings);
                 
                     if let Some(t) = tex {
                         a.push(t);
