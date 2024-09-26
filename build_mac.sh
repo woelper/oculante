@@ -1,6 +1,7 @@
 
 rustup target list | grep installed
-
+TOOLCHAIN=$(rustc --version --verbose | grep host | cut -f2 -d":" | tr -d "[:space:]")
+echo we are using $TOOLCHAIN
 export MACOSX_DEPLOYMENT_TARGET=10.15
 cargo install cargo-bundle
 cargo bundle --release --features notan/shaderc
