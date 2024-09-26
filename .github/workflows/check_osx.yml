@@ -22,7 +22,7 @@ jobs:
       - name: intel heif test
         run: |
           brew install libheif
-          cargo bundle --release --features notan/shaderc --features heif
+          cargo bundle --release --features "notan/shaderc heif"
           mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
           install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
