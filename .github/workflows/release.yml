@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest]
+        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v2
@@ -119,12 +119,27 @@ jobs:
       if: matrix.os == 'ubuntu-20.04'
 
 
-    - name: Build Mac Bundle
+    - name: Build Mac Silicon Bundle
       run: ./build_mac.sh
+      if: matrix.os == 'macos-14'
+
+    - name: Zip Mac Silicon Bundle
+      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
+      if: matrix.os == 'macos-14'
+
+    - name: Build Mac Intel Bundle
+      # run: ./build_mac.sh
+      run: |
+        brew install libheif
+        cargo bundle --release --features notan/shaderc --features heif
+        mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
+        cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+        install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+        otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
       if: matrix.os == 'macos-latest'
 
-    - name: Zip Mac Bundle
-      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
+    - name: Zip Mac Intel Bundle
+      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
       if: matrix.os == 'macos-latest'
 
     - name: Upload Linux 20.04 Release
@@ -200,7 +215,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
       id: upload-release-asset-mac
       uses: actions/upload-release-asset@v1
       env:
@@ -209,6 +224,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_app.zip
         asset_name: oculante_mac.zip
+        asset_content_type: application/zip
+
+    - name: Upload Mac Release
+      if: matrix.os == 'macos-latest'
+      id: upload-release-asset-macintel
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_app_intel.zip
+        asset_name: oculante_mac_intel.zip
         asset_content_type: application/zip
 
     - name: Upload Windows 2019 Release exe
