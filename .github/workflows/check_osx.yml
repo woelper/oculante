@@ -5,7 +5,7 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [macos-14]
+        os: [macos-14, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -15,8 +15,16 @@ jobs:
       - name: Check without default features
         run: cargo check --no-default-features --features notan/shaderc
 
-      # - name: Check with build features
-      #   run: cargo check --features heif
+      - name: Run arm build
+        run: cargo build
+        if: matrix.os == 'ubuntu-latest'
 
-      - name: Run buildscript
-        run: ./build_mac.sh
+      - name: intel heif test
+        run: |
+          brew install libheif
+          cargo bundle --release --features notan/shaderc --features heif
+          mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+        if: matrix.os == 'macos-latest'
