@@ -5,19 +5,20 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [macos-14, macos-latest]
+        os: [macos-14, macos-12]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
-      - uses: Swatinem/rust-cache@v2
+      # - uses: Swatinem/rust-cache@v2
         
       - name: Check without default features
         run: cargo check --no-default-features --features notan/shaderc
+        if: matrix.os == 'macos-14'
 
       - name: Run arm build
         run: cargo build
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-14'
 
       - name: intel heif test
         run: |
@@ -27,16 +28,16 @@ jobs:
           cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
           install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-12'
 
       - name: Zip Mac Intel Bundle
         run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-12'
 
       - name: Archive intel build
         uses: actions/upload-artifact@v4
         with:
           name: intel_build
           path: oculante_app_intel.zip
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-12'
         
