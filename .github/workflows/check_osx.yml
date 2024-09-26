@@ -28,3 +28,15 @@ jobs:
           install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
         if: matrix.os == 'macos-latest'
+
+      - name: Zip Mac Intel Bundle
+        run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
+        if: matrix.os == 'macos-latest'
+
+      - name: Archive intel build
+        uses: actions/upload-artifact@v4
+        with:
+          name: intel_build
+          path: oculante_app_intel.zip
+        if: matrix.os == 'macos-latest'
+        
