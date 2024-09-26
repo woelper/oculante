@@ -17,7 +17,7 @@ jobs:
 
       - name: Run arm build
         run: cargo build
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'macos-latest'
 
       - name: intel heif test
         run: |

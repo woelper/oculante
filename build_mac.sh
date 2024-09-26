@@ -17,7 +17,7 @@ cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/ocula
 
 
 
-cargo build --release --target aarch64-apple-darwin --features notan/shaderc --features heif
+cargo build --release --target aarch64-apple-darwin --features "notan/shaderc heif"
 install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/aarch64-apple-darwin/release/oculante
 # install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/oculante
 cargo build --release --target x86_64-apple-darwin --features notan/shaderc
