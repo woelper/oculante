@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
-      # - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         
       - name: Check without default features
         run: cargo check --no-default-features --features notan/shaderc
@@ -22,9 +22,11 @@ jobs:
 
       - name: intel heif test
         run: |
+          rustc --version --verbose
           brew install libheif
           cargo install cargo-bundle
           cargo bundle --release --features "notan/shaderc heif"
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
           install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
