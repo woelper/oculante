@@ -28,8 +28,8 @@ jobs:
           cargo bundle --release --features "notan/shaderc heif"
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
-          cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
-          install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          install_name_tool -change /usr/local/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
         if: matrix.os == 'macos-12'
 
