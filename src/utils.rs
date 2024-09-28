@@ -294,8 +294,7 @@ impl Player {
             img_location,
             self.image_sender.clone(),
             message_sender,
-            stop_receiver,
-            forced_frame_source,
+            stop_receiver            
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -318,8 +317,7 @@ pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
-    stop_receiver: Receiver<()>,
-    forced_frame_source: Option<FrameSource>,
+    stop_receiver: Receiver<()>
 ) {
     let loc = img_location.to_owned();
 
@@ -340,7 +338,7 @@ pub fn send_image_threaded(
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
                         return;
-                    }
+                    }                    
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());

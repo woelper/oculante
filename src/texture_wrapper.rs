@@ -1,3 +1,4 @@
+use log::warn;
 use notan::draw::*;
 
 use crate::Draw;
@@ -16,7 +17,8 @@ pub struct TexWrap{
     pub row_count:u32,
     pub col_translation:u32,
     pub row_translation:u32,
-    pub size_vec:(f32,f32) // The whole Texture Array size
+    pub size_vec:(f32,f32), // The whole Texture Array size
+    pub texture_count:usize
 }
 
 
@@ -46,11 +48,11 @@ impl TexWrap{
         Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_premult)
     }
 
-    fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings)-> Option<Texture>
+    fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings, size_ok: bool)-> Option<Texture>
     {
         gfx.create_texture()
                     .from_bytes(bytes, width, height)
-                    .with_mipmaps(settings.use_mipmaps)
+                    .with_mipmaps(settings.use_mipmaps&&size_ok)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
             .with_filter(
@@ -70,12 +72,12 @@ impl TexWrap{
                     .ok()    
     }
 
-    fn gen_texture_premult(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings)-> Option<Texture>
+    fn gen_texture_premult(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings, size_ok: bool)-> Option<Texture>
     {
         gfx.create_texture()
                     .from_bytes(bytes, width, height)
                     .with_premultiplied_alpha()
-                    .with_mipmaps(settings.use_mipmaps)
+                    .with_mipmaps(settings.use_mipmaps&&size_ok)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
             .with_filter(
@@ -95,16 +97,24 @@ impl TexWrap{
                     .ok()    
     }
 
-    fn gen_from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage, texture_generator_function: fn (&mut Graphics, &[u8], u32, u32, &PersistentSettings)-> Option<Texture>) -> Option<TexWrap>{
-        
+    fn gen_from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage, texture_generator_function: fn (&mut Graphics, &[u8], u32, u32, &PersistentSettings, bool)-> Option<Texture>) -> Option<TexWrap>{        
+        const MAX_PIXEL_COUNT:usize = 8192*8192;
+
         let im_w = image.width();
         let im_h = image.height();
+        let im_sz = (im_w*im_h) as usize;
+        let allow_mipmap = im_sz < MAX_PIXEL_COUNT;
+
+        if !allow_mipmap {
+            warn!("Image with {0} pixels too large (max {1} pixels), disabling mipmaps", im_sz, MAX_PIXEL_COUNT);
+        }
+
         let s = (im_w as f32, im_h as f32);
         let max_texture_size =  gfx.limits().max_texture_size;
         let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
         let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;        
 
-        let mut a:Vec<Texture> = Vec::new();
+        let mut texture_vec:Vec<Texture> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);
         let col_increment = std::cmp::min(max_texture_size, im_w);
         let mut fine = true;
@@ -124,13 +134,13 @@ impl TexWrap{
                 
                 let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                 let my_img = sub_img.to_image();
-                let tex = texture_generator_function(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings);
+                let tex = texture_generator_function(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings, allow_mipmap);
                 
                     if let Some(t) = tex {
-                        a.push(t);
+                        texture_vec.push(t);
                     }
                     else{
-                        a.clear();
+                        texture_vec.clear();
                         fine = false;
                         break;
                     }                  
@@ -141,7 +151,8 @@ impl TexWrap{
         }
         
         if fine {
-        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texture_array:a, col_translation:col_increment, row_translation:row_increment })
+        let texture_count =  texture_vec.len();
+        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texture_array:texture_vec, col_translation:col_increment, row_translation:row_increment, texture_count})
     }
     else {
         None
@@ -165,7 +176,7 @@ impl TexWrap{
             }
     }
 
-    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage){
+    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage){        
         if self.col_count==1 && self.row_count==1 {
             if let Err(e) = gfx.update_texture(&mut self.texture_array[0]).with_data(image).update() {
                 error!("{e}");
