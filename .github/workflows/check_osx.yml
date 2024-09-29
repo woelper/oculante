@@ -34,6 +34,7 @@ jobs:
           cp /usr/local/opt/aom/lib/libaom.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /usr/local/opt/webp/lib/libsharpyuv.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /usr/local/opt/libvmaf/lib/libvmaf.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          ls /release/bundle/osx/oculante.app/Contents/Frameworks/
           install_name_tool -change /usr/local/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           install_name_tool -add_rpath "@executable_path/../Frameworks/libx265.209.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           install_name_tool -add_rpath "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
@@ -44,7 +45,7 @@ jobs:
           install_name_tool -change /usr/local/opt/libde265/lib/libde265.0.dylib "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /usr/local/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /usr/local/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
-          install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" oculante.app/Contents/Frameworks/libaom.3.dylib
+          install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
         if: matrix.os == 'macos-12'
 
