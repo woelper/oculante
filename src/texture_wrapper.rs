@@ -102,14 +102,14 @@ impl TexWrap{
 
         let im_w = image.width();
         let im_h = image.height();
-        let im_sz = (im_w*im_h) as usize;
-        let allow_mipmap = im_sz < MAX_PIXEL_COUNT;
+        let im_pixel_count = (im_w*im_h) as usize;
+        let allow_mipmap = im_pixel_count < MAX_PIXEL_COUNT;
 
         if !allow_mipmap {
-            warn!("Image with {0} pixels too large (max {1} pixels), disabling mipmaps", im_sz, MAX_PIXEL_COUNT);
+            warn!("Image with {0} pixels too large (max {1} pixels), disabling mipmaps", im_pixel_count, MAX_PIXEL_COUNT);
         }
 
-        let s = (im_w as f32, im_h as f32);
+        let im_size = (im_w as f32, im_h as f32);
         let max_texture_size =  gfx.limits().max_texture_size;
         let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
         let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;        
@@ -139,20 +139,20 @@ impl TexWrap{
                     if let Some(t) = tex {
                         texture_vec.push(t);
                     }
-                    else{
+                    else{ //On error
                         texture_vec.clear();
                         fine = false;
                         break;
                     }                  
             }
-            if fine == false {
+            if !fine{//early exit if we failed
                 break;
             }
         }
         
         if fine {
         let texture_count =  texture_vec.len();
-        Some(TexWrap {size_vec:s, col_count:col_count, row_count:row_count,texture_array:texture_vec, col_translation:col_increment, row_translation:row_increment, texture_count})
+        Some(TexWrap {size_vec:im_size, col_count:col_count, row_count:row_count,texture_array:texture_vec, col_translation:col_increment, row_translation:row_increment, texture_count})
     }
     else {
         None
