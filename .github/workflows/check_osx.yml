@@ -16,9 +16,9 @@ jobs:
         run: cargo check --no-default-features --features notan/shaderc
         if: matrix.os == 'macos-14'
 
-      - name: Run arm build
-        run: cargo build
-        if: matrix.os == 'macos-14'
+      # - name: Run arm build
+      #   run: cargo build
+      #   if: matrix.os == 'macos-14'
 
       - name: intel heif test
         run: |
@@ -91,9 +91,27 @@ jobs:
         run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_arm.zip oculante.app
         if: matrix.os == 'macos-14'
 
-      - name: Archive intel build
+      - name: Archive arm build
         uses: actions/upload-artifact@v4
         with:
           name: arm_build
           path: oculante_app_arm.zip
+        if: matrix.os == 'macos-14'
+        
+      - name: arm  test
+        run: |
+          rustc --version --verbose
+          cargo install cargo-bundle
+          cargo bundle --release --features "notan/shaderc"
+        if: matrix.os == 'macos-14'
+        
+      - name: Zip Mac Arm Bundle
+        run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_arm_noheif.zip oculante.app
+        if: matrix.os == 'macos-14'
+
+      - name: Archive arm build
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm_build2
+          path: oculante_app_arm_noheif.zip
         if: matrix.os == 'macos-14'
