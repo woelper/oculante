@@ -691,6 +691,7 @@ impl ImageExt for RgbaImage {
     }
 
     fn to_texture(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<Texture> {
+        gfx.clean();
         gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
             .with_mipmaps(settings.use_mipmaps)
@@ -714,6 +715,8 @@ impl ImageExt for RgbaImage {
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.clean();
+
         gfx.create_texture()
             .from_bytes(self, self.width(), self.height())
             .with_premultiplied_alpha()

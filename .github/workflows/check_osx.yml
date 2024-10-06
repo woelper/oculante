@@ -1,5 +1,9 @@
 on: [push]
 
+env:
+  CARGO_TERM_COLOR: always
+  MACOS_DEPLOYMENT_TARGET: 10.15
+
 name: Check OSX
 jobs:
   check:
@@ -8,7 +12,7 @@ jobs:
         os: [macos-14, macos-12]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
         

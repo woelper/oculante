@@ -17,7 +17,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: '0'
     - name: Install kokai
@@ -45,7 +45,7 @@ jobs:
         os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-latest]
         rust: [stable]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: ilammy/setup-nasm@v1
 
     - name: Install latest rust
@@ -269,7 +269,7 @@ jobs:
   # aur-publish:
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v2
+  #     - uses: actions/checkout@v4
   #     - name: Publish AUR package
   #       uses: KSXGitHub/github-actions-deploy-aur@v2.7.0
   #       with:
