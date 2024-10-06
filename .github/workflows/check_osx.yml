@@ -50,6 +50,7 @@ jobs:
           install_name_tool -change /usr/local/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
         if: matrix.os == 'macos-12'
 
       - name: Zip Mac Intel Bundle
@@ -89,6 +90,7 @@ jobs:
           install_name_tool -change /opt/homebrew/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /opt/homebrew/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
         if: matrix.os == 'macos-14'
         
       - name: Zip Mac Arm Bundle
