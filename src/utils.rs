@@ -289,7 +289,7 @@ impl Player {
             img_location,
             self.image_sender.clone(),
             message_sender,
-            stop_receiver            
+            stop_receiver,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -312,7 +312,7 @@ pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
-    stop_receiver: Receiver<()>
+    stop_receiver: Receiver<()>,
 ) {
     let loc = img_location.to_owned();
 
@@ -326,14 +326,14 @@ pub fn send_image_threaded(
                 debug!("Got a frame receiver from opening image");
                 // _ = texture_sender
                 // .clone()
-                // .send(Frame::new_reset(f.buffer.clone()));              
+                // .send(Frame::new_reset(f.buffer.clone()));
 
                 let mut first = true;
                 for f in frame_receiver.iter() {
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
                         return;
-                    }                    
+                    }
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
@@ -651,8 +651,7 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-
-    fn to_texture(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<TexWrap> {        
+    fn to_texture(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<TexWrap> {
         TexWrap::from_rgbaimage(gfx, settings, self)
     }
 
@@ -673,7 +672,7 @@ impl ImageExt for RgbaImage {
     }
 
     fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
-        texture.update_textures(gfx,self);
+        texture.update_textures(gfx, self);
     }
 }
 

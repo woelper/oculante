@@ -207,7 +207,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     state.player = Player::new(
         state.texture_channel.0.clone(),
-        state.persistent_settings.max_cache        
+        state.persistent_settings.max_cache,
     );
 
     debug!("matches {:?}", matches);
@@ -678,7 +678,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if state.first_start {
         app.window().set_always_on_top(false);
     }
-    
+
     if let Some(p) = &state.current_path {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
@@ -930,30 +930,37 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.redraw = false;
             }
         }
-       
+
         if let Some(tex) = &mut state.current_texture.get() {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture_with_texwrap(gfx, tex);
             } else {
-                state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                state
+                    .current_texture
+                    .set(img.to_texture(gfx, &state.persistent_settings), gfx);
             }
         } else {
             debug!("Setting texture");
-            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+            state
+                .current_texture
+                .set(img.to_texture(gfx, &state.persistent_settings), gfx);
         }
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
-            ColorChannel::Rgb => {
-                state.current_texture.set(unpremult(&img).to_texture(gfx, &state.persistent_settings), gfx)
-            }
+            ColorChannel::Rgb => state.current_texture.set(
+                unpremult(&img).to_texture(gfx, &state.persistent_settings),
+                gfx,
+            ),
             // Do nuttin'
             ColorChannel::Rgba => (),
             // Display the channel
             _ => {
-                
-                state.current_texture.set(solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, &state.persistent_settings),gfx);
+                state.current_texture.set(
+                    solo_channel(&img, state.persistent_settings.current_channel as usize)
+                        .to_texture(gfx, &state.persistent_settings),
+                    gfx,
+                );
             }
         }
         state.current_image = Some(img);
@@ -1114,22 +1121,29 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         if state.tiling < 2 {
-            texture.draw_textures(&mut draw,
+            texture.draw_textures(
+                &mut draw,
                 aligned_offset_x,
                 aligned_offset_y,
-                state.image_geometry.scale);            
+                state.image_geometry.scale,
+            );
         } else {
-
             for yi in 0..state.tiling {
-                for xi in  0..state.tiling {
+                for xi in 0..state.tiling {
                     //The "old" version used only a static offset, is this correct?
-                    let translate_x = (xi as f32* texture.width()*state.image_geometry.scale   + state.image_geometry.offset.x).trunc();
-                    let translate_y = (yi as f32* texture.height()*state.image_geometry.scale + state.image_geometry.offset.y).trunc();
+                    let translate_x = (xi as f32 * texture.width() * state.image_geometry.scale
+                        + state.image_geometry.offset.x)
+                        .trunc();
+                    let translate_y = (yi as f32 * texture.height() * state.image_geometry.scale
+                        + state.image_geometry.offset.y)
+                        .trunc();
 
-                    texture.draw_textures(&mut draw,
+                    texture.draw_textures(
+                        &mut draw,
                         translate_x,
                         translate_y,
-                        state.image_geometry.scale);
+                        state.image_geometry.scale,
+                    );
                 }
             }
         }
@@ -1158,10 +1172,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 > app.window().size().0 as f32;
 
             if show_minimap {
-                texture.draw_textures(&mut draw,
-                    offset_x,
-                    100.,
-                    scale);
+                texture.draw_textures(&mut draw, offset_x, 100., scale);
             }
         }
 

@@ -520,7 +520,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture.get() {
-                
+
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
 
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
@@ -583,14 +583,14 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
                 });
-                
+
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                let uv_size = (scale, scale * ratio);                
+                let uv_size = (scale, scale * ratio);
                 let bbox_tl: Pos2;
                 let bbox_br: Pos2;
                 if texture.texture_count==1 {
-                    let texture_resonse = texture.get_texture_at_xy(0,0);                    
+                    let texture_resonse = texture.get_texture_at_xy(0,0);
                     ui.add_space(10.);
                     let preview_rect = ui
                         .add(
@@ -612,12 +612,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 }
 
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
-                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);               
+                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
-                
+
 
                 let stroke_color = Color32::from_white_alpha(240);
-                
+
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
@@ -762,13 +762,26 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     });
 }
 
-fn render_info_image_tiled(ui: &mut Ui, uv_center: (f64, f64), uv_size: (f64, f64), desired_width: f64, texture: &crate::texture_wrapper::TexWrap) -> (Pos2, Pos2) {
-    let xy_size = ((texture.width()as f64*uv_size.0) as i32,
-                                            (texture.height()as f64*uv_size.1) as i32);
+fn render_info_image_tiled(
+    ui: &mut Ui,
+    uv_center: (f64, f64),
+    uv_size: (f64, f64),
+    desired_width: f64,
+    texture: &crate::texture_wrapper::TexWrap,
+) -> (Pos2, Pos2) {
+    let xy_size = (
+        (texture.width() as f64 * uv_size.0) as i32,
+        (texture.height() as f64 * uv_size.1) as i32,
+    );
 
-    let xy_center = ((texture.width() as f64*uv_center.0) as i32, (texture.height() as f64*uv_center.1) as i32); //(16384,1024);//
-    let sc1 = (2.0*xy_size.0 as f64 / desired_width,
-        2.0*xy_size.1 as f64 / desired_width);
+    let xy_center = (
+        (texture.width() as f64 * uv_center.0) as i32,
+        (texture.height() as f64 * uv_center.1) as i32,
+    ); //(16384,1024);//
+    let sc1 = (
+        2.0 * xy_size.0 as f64 / desired_width,
+        2.0 * xy_size.1 as f64 / desired_width,
+    );
 
     //coordinates of the image-view
     let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
@@ -778,78 +791,101 @@ fn render_info_image_tiled(ui: &mut Ui, uv_center: (f64, f64), uv_size: (f64, f6
     let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
     let mut curr_ui_curs = base_ui_curs;
     //our start position
-                
-    //Loop control variables, start end end coordinates of interest
-    let x_coordinate_end = (xy_center.0+xy_size.0) as i32;
-    let mut y_coordinate = xy_center.1-xy_size.1;
-    let y_coordinate_end = (xy_center.1+xy_size.1) as i32;
 
-    while y_coordinate<=y_coordinate_end {
+    //Loop control variables, start end end coordinates of interest
+    let x_coordinate_end = (xy_center.0 + xy_size.0) as i32;
+    let mut y_coordinate = xy_center.1 - xy_size.1;
+    let y_coordinate_end = (xy_center.1 + xy_size.1) as i32;
+
+    while y_coordinate <= y_coordinate_end {
         let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
-        let mut x_coordinate = xy_center.0-xy_size.0;
+        let mut x_coordinate = xy_center.0 - xy_size.0;
         curr_ui_curs.x = base_ui_curs.x;
         let mut last_display_size_y: f64 = 0.0;
-        while x_coordinate<=x_coordinate_end {
+        while x_coordinate <= x_coordinate_end {
             //get texture tile
-            let curr_tex_response = texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-        
+            let curr_tex_response =
+                texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+
             //increment coordinates by usable width/height
             y_coordinate_increment = curr_tex_response.offset_height;
             x_coordinate += curr_tex_response.offset_width;
 
             //Handling last texture in a row or col
-            let mut curr_tex_end = nalgebra::Vector2::new(i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end), i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end));                        
+            let mut curr_tex_end = nalgebra::Vector2::new(
+                i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
+                i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
+            );
 
             //Handling positive coordinate overflow
-            if curr_tex_response.x_tex_right_global as f32>= texture.width()-1.0f32 {
-                x_coordinate = x_coordinate_end+1;                           
-                curr_tex_end.x += (x_coordinate_end-curr_tex_response.x_tex_right_global).max(0);
+            if curr_tex_response.x_tex_right_global as f32 >= texture.width() - 1.0f32 {
+                x_coordinate = x_coordinate_end + 1;
+                curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
             }
 
-            if curr_tex_response.y_tex_bottom_global as f32>= texture.height()-1.0f32 {
-                y_coordinate_increment = y_coordinate_end-y_coordinate+1;
-                curr_tex_end.y += (y_coordinate_end-curr_tex_response.y_tex_bottom_global).max(0);
-            }                        
+            if curr_tex_response.y_tex_bottom_global as f32 >= texture.height() - 1.0f32 {
+                y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
+                curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
+            }
 
             //Usable tile size, depending on offsets
-            let tile_size = nalgebra::Vector2::new(curr_tex_end.x-curr_tex_response.x_offset_texture-curr_tex_response.x_tex_left_global+1,
-                curr_tex_end.y-curr_tex_response.y_offset_texture-curr_tex_response.y_tex_top_global+1);                        
+            let tile_size = nalgebra::Vector2::new(
+                curr_tex_end.x
+                    - curr_tex_response.x_offset_texture
+                    - curr_tex_response.x_tex_left_global
+                    + 1,
+                curr_tex_end.y
+                    - curr_tex_response.y_offset_texture
+                    - curr_tex_response.y_tex_top_global
+                    + 1,
+            );
 
             //Display size - tile size scaled
-            let display_size = nalgebra::Vector2::new(tile_size.x as f64/sc1.0,tile_size.y as f64/sc1.1);
+            let display_size =
+                nalgebra::Vector2::new(tile_size.x as f64 / sc1.0, tile_size.y as f64 / sc1.1);
 
             //Texture display range
-            let uv_start = nalgebra::Vector2::new(curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
-                curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64);
+            let uv_start = nalgebra::Vector2::new(
+                curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
+                curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64,
+            );
 
-            let uv_end = nalgebra::Vector2::new((curr_tex_end.x-curr_tex_response.x_tex_left_global+1) as f64 / curr_tex_response.texture_width as f64,
-            (curr_tex_end.y-curr_tex_response.y_tex_top_global+1) as f64 / curr_tex_response.texture_height as f64);
-
+            let uv_end = nalgebra::Vector2::new(
+                (curr_tex_end.x - curr_tex_response.x_tex_left_global + 1) as f64
+                    / curr_tex_response.texture_width as f64,
+                (curr_tex_end.y - curr_tex_response.y_tex_top_global + 1) as f64
+                    / curr_tex_response.texture_height as f64,
+            );
 
             //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
-            let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);                        
-            let draw_br_32 = Pos2::new((curr_ui_curs.x+display_size.x) as f32, (curr_ui_curs.y+display_size.y) as f32);
-            let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);                       
+            let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
+            let draw_br_32 = Pos2::new(
+                (curr_ui_curs.x + display_size.x) as f32,
+                (curr_ui_curs.y + display_size.y) as f32,
+            );
+            let r_ret = egui::Rect::from_min_max(draw_tl_32, draw_br_32);
 
             egui::Image::new(curr_tex_response.texture.texture_egui)
-            .maintain_aspect_ratio(false)                        
-            .fit_to_exact_size(egui::Vec2::new(display_size.x as f32, display_size.y as f32))
-            .uv(egui::Rect::from_x_y_ranges(
-                uv_start.x as f32 ..=uv_end.x as f32,
-                uv_start.y as f32 ..=uv_end.y as f32)
-            )
-            .paint_at(ui, r_ret);
-        
+                .maintain_aspect_ratio(false)
+                .fit_to_exact_size(egui::Vec2::new(
+                    display_size.x as f32,
+                    display_size.y as f32,
+                ))
+                .uv(egui::Rect::from_x_y_ranges(
+                    uv_start.x as f32..=uv_end.x as f32,
+                    uv_start.y as f32..=uv_end.y as f32,
+                ))
+                .paint_at(ui, r_ret);
+
             //Update display cursor
             curr_ui_curs.x += display_size.x;
             last_display_size_y = display_size.y;
-        
-            //Update coordinates for preview rectangle                       
+
+            //Update coordinates for preview rectangle
             bbox_tl.x = bbox_tl.x.min(r_ret.left());
             bbox_tl.y = bbox_tl.y.min(r_ret.top());
             bbox_br.x = bbox_br.x.max(r_ret.right());
             bbox_br.y = bbox_br.y.max(r_ret.bottom());
-
         }
         //Update y coordinates
         y_coordinate += y_coordinate_increment;
@@ -1563,7 +1599,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
                             state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
-                        } else {                            
+                        } else {
                             state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
                         }
                     }
@@ -2350,14 +2386,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture.set(unpremult(img).to_texture(gfx, &state.persistent_settings), gfx);
+                        state.current_texture.set(
+                            unpremult(img).to_texture(gfx, &state.persistent_settings),
+                            gfx,
+                        );
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                        state
+                            .current_texture
+                            .set(img.to_texture(gfx, &state.persistent_settings), gfx);
                     }
                     _ => {
-                        state.current_texture.set(solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx, &state.persistent_settings), gfx);
+                        state.current_texture.set(
+                            solo_channel(img, state.persistent_settings.current_channel as usize)
+                                .to_texture(gfx, &state.persistent_settings),
+                            gfx,
+                        );
                     }
                 }
             }

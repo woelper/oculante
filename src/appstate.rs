@@ -1,5 +1,9 @@
 use crate::{
-    image_editing::EditState, scrubber::Scrubber, settings::{PersistentSettings, VolatileSettings}, texture_wrapper::TextureWrapperManager, utils::{ExtendedImageInfo, Frame, Player}
+    image_editing::EditState,
+    scrubber::Scrubber,
+    settings::{PersistentSettings, VolatileSettings},
+    texture_wrapper::TextureWrapperManager,
+    utils::{ExtendedImageInfo, Frame, Player},
 };
 
 use egui_notify::Toasts;
@@ -41,11 +45,9 @@ impl Message {
     }
 }
 
-
-
 /// The state of the application
 #[derive(AppState)]
-pub struct OculanteState{
+pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: HashMap<PathBuf, ImageGeometry>,
     pub drag_enabled: bool,
@@ -93,7 +95,7 @@ pub struct OculanteState{
     pub filebrowser_id: Option<String>,
 }
 
-impl<'b> OculanteState{
+impl<'b> OculanteState {
     pub fn send_message_info(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::info(msg));
     }
@@ -107,8 +109,8 @@ impl<'b> OculanteState{
     }
 }
 
-impl<'b> Default for OculanteState{
-    fn default() -> OculanteState{
+impl<'b> Default for OculanteState {
+    fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
         OculanteState {
             image_geometry: ImageGeometry {
