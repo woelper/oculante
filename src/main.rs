@@ -678,7 +678,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if state.first_start {
         app.window().set_always_on_top(false);
     }
-
+    
     if let Some(p) = &state.current_path {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
@@ -759,7 +759,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.toasts.error(e);
                 state.current_image = None;
                 state.is_loaded = true;
-                state.current_texture = None;
+                state.current_texture.clear();
             }
             Message::Info(m) => {
                 state
@@ -866,7 +866,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 }
                 // always reset if first image
-                if state.current_texture.is_none() {
+                if state.current_texture.get().is_none() {
                     state.reset_image = true;
                 }
 
@@ -923,7 +923,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received compare result");
 
                 // always reset if first image
-                if state.current_texture.is_none() {
+                if state.current_texture.get().is_none() {
                     state.reset_image = true;
                 }
 
@@ -931,29 +931,29 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
        
-        if let Some(tex) = &mut state.current_texture {
+        if let Some(tex) = &mut state.current_texture.get() {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture_with_texwrap(gfx, tex);
-            } else {                
-                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+            } else {
+                state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
             }
         } else {
             debug!("Setting texture");
-            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
         }
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => {
-                state.current_texture = unpremult(&img).to_texture(gfx, &state.persistent_settings)
+                state.current_texture.set(unpremult(&img).to_texture(gfx, &state.persistent_settings), gfx)
             }
             // Do nuttin'
             ColorChannel::Rgba => (),
             // Display the channel
             _ => {
-                state.current_texture =
-                    solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, &state.persistent_settings)
+                
+                state.current_texture.set(solo_channel(&img, state.persistent_settings.current_channel as usize)
+                        .to_texture(gfx, &state.persistent_settings),gfx);
             }
         }
         state.current_image = Some(img);
@@ -1097,7 +1097,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         settings_ui(app, ctx, state, gfx);
     });
 
-    if let Some(texture) = &state.current_texture {
+    if let Some(texture) = &state.current_texture.get() {
         // align to pixel to prevent distortion
         let aligned_offset_x = state.image_geometry.offset.x.trunc();
         let aligned_offset_y = state.image_geometry.offset.y.trunc();

@@ -751,7 +751,7 @@ pub fn clear_image(state: &mut OculanteState) {
     debug!("Clearing image. Next is {}", next_img.display());
     if state.scrubber.entries.len() == 0 {
         state.current_image = None;
-        state.current_texture = None;
+        state.current_texture.clear();
         state.current_path = None;
         state.image_info = None;
         return;

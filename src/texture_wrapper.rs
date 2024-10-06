@@ -1,5 +1,7 @@
 use log::warn;
 use notan::draw::*;
+use notan::egui::EguiRegisterTexture;
+use notan::egui::SizedTexture;
 
 use crate::Draw;
 use crate::settings::PersistentSettings;
@@ -12,7 +14,7 @@ use notan::prelude::{Graphics, Texture, TextureFilter, BlendMode};
 use log::error;
 
 pub struct TexWrap{
-    texture_array:Vec<Texture>,
+    texture_array:Vec<TexturePair>,
     pub col_count:u32,
     pub row_count:u32,
     pub col_translation:u32,
@@ -21,9 +23,36 @@ pub struct TexWrap{
     pub texture_count:usize
 }
 
+#[derive(Default)]
+pub struct TextureWrapperManager{
+    current_texture: Option<TexWrap>
+}
 
-pub struct TextureResponse2<'a>{
-    pub texture: &'a Texture,
+impl TextureWrapperManager{
+
+    pub fn set(&mut self, tex: Option<TexWrap>,gfx: &mut Graphics){
+        if let Some(texture) = &mut self.current_texture {
+            texture.unregister_textures(gfx);
+        }
+        self.current_texture = tex;
+    }
+
+    pub fn get(&mut self) -> &mut Option<TexWrap>{
+        &mut self.current_texture
+    }
+
+    //TODO: Extend for clearing textures
+    pub fn clear(&mut self/*, gfx: &mut Graphics */){
+        /*if let Some(texture) = &mut self.current_texture {
+            texture.unregister_textures(gfx);
+        }*/
+        self.current_texture = None;
+    }
+}
+
+
+pub struct TextureResponse<'a>{
+    pub texture: &'a TexturePair,
 
     pub x_offset_texture: i32, 
     pub y_offset_texture: i32,
@@ -39,7 +68,13 @@ pub struct TextureResponse2<'a>{
     pub y_tex_bottom_global : i32
 }
 
+pub struct TexturePair{
+    pub texture:Texture,
+    pub texture_egui: SizedTexture
+}
+
 impl TexWrap{
+
     pub fn from_rgbaimage(gfx: &mut Graphics, settings: &PersistentSettings, image: &RgbaImage) -> Option<TexWrap>{
         Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
     }
@@ -49,7 +84,7 @@ impl TexWrap{
     }
 
     fn gen_texture_standard(gfx: &mut Graphics, bytes:&[u8], width:u32, height:u32, settings: &PersistentSettings, size_ok: bool)-> Option<Texture>
-    {
+    {        
         gfx.create_texture()
                     .from_bytes(bytes, width, height)
                     .with_mipmaps(settings.use_mipmaps&&size_ok)
@@ -114,7 +149,7 @@ impl TexWrap{
         let col_count = (im_w as f32/max_texture_size as f32).ceil() as u32;       
         let row_count = (im_h as f32/max_texture_size as f32).ceil() as u32;        
 
-        let mut texture_vec:Vec<Texture> = Vec::new();
+        let mut texture_vec:Vec<TexturePair> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);
         let col_increment = std::cmp::min(max_texture_size, im_w);
         let mut fine = true;
@@ -137,7 +172,11 @@ impl TexWrap{
                 let tex = texture_generator_function(gfx, my_img.as_ref(), my_img.width(), my_img.height(), settings, allow_mipmap);
                 
                     if let Some(t) = tex {
-                        texture_vec.push(t);
+                        let egt = gfx.egui_register_texture(&t);
+                        let te = TexturePair{texture: t, texture_egui: egt};
+                        texture_vec.push(te);
+                        
+                        
                     }
                     else{ //On error
                         texture_vec.clear();
@@ -167,7 +206,7 @@ impl TexWrap{
                 for col_idx in 0..self.col_count
                 {
                     let translate_x = translation_x as f64+scale as f64*col_idx  as f64 *self.col_translation  as f64;
-                    draw.image(&self.texture_array[tex_idx])
+                    draw.image(&self.texture_array[tex_idx].texture)
                         .blend_mode(BlendMode::NORMAL)
                         .scale(scale, scale)
                         .translate(translate_x as f32, translate_y as f32);
@@ -176,9 +215,15 @@ impl TexWrap{
             }
     }
 
+    pub fn unregister_textures(&mut self, gfx: &mut Graphics){
+        for text in &self.texture_array{
+            gfx.egui_remove_texture(text.texture_egui.id);
+        }
+    }
+
     pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage){        
         if self.col_count==1 && self.row_count==1 {
-            if let Err(e) = gfx.update_texture(&mut self.texture_array[0]).with_data(image).update() {
+            if let Err(e) = gfx.update_texture(&mut self.texture_array[0].texture).with_data(image).update() {
                 error!("{e}");
             }
         }else{
@@ -198,7 +243,7 @@ impl TexWrap{
                     
                     let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
                     let my_img = sub_img.to_image();
-                    if let Err(e) = gfx.update_texture(&mut self.texture_array[tex_index]).with_data(my_img.as_ref()).update() {
+                    if let Err(e) = gfx.update_texture(&mut self.texture_array[tex_index].texture).with_data(my_img.as_ref()).update() {
                         error!("{e}");
                     }
                     tex_index += 1;
@@ -207,15 +252,15 @@ impl TexWrap{
         }
     }
 
-    pub fn get_texture_at_xy(&self, xa:i32, ya:i32)->TextureResponse2{
+    pub fn get_texture_at_xy(&self, xa:i32, ya:i32)->TextureResponse{
         let x = xa.max(0).min(self.width() as i32-1);
         let y = ya.max(0).min(self.height() as i32-1);
 
         let x_idx = x /self.col_translation as i32;
         let y_idx = y /self.row_translation as i32;
         let tex_idx = (y_idx*self.col_count as i32+x_idx).min(self.texture_array.len() as i32 -1);
-        let my_tex = &self.texture_array[tex_idx as usize];
-
+        let my_tex_pair = &self.texture_array[tex_idx as usize];
+        let my_tex = &my_tex_pair.texture;
         let width = my_tex.width() as i32;
         let height = my_tex.height() as i32;
 
@@ -230,7 +275,7 @@ impl TexWrap{
         let remaining_width =  width- x_offset_texture;
         let remaining_height = height - y_offset_texture;
 
-        TextureResponse2 {texture: my_tex,
+        TextureResponse {texture: my_tex_pair,
             x_offset_texture: x_offset_texture, 
             y_offset_texture: y_offset_texture,
 

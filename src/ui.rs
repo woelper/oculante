@@ -32,7 +32,6 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
-use wgpu::TextureUsages;
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
@@ -456,7 +455,7 @@ impl EguiExt for Ui {
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if let Some(texture) = &state.current_texture {
+    if let Some(texture) = &state.current_texture.get() {
         //let tex_id = gfx.egui_register_texture(&texture.texture_array[0]); //TODO: Adapt if needed
 
         let image_rect = Rect::from_center_size(
@@ -520,7 +519,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
-            if let Some(texture) = &state.current_texture {
+            if let Some(texture) = &state.current_texture.get() {
                 
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
 
@@ -591,12 +590,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let bbox_tl: Pos2;
                 let bbox_br: Pos2;
                 if texture.texture_count==1 {
-                    let texture_resonse = texture.get_texture_at_xy(0,0);
-                    let tex_id = gfx.egui_register_texture(texture_resonse.texture);
+                    let texture_resonse = texture.get_texture_at_xy(0,0);                    
                     ui.add_space(10.);
                     let preview_rect = ui
                         .add(
-                            egui::Image::new(tex_id)
+                            egui::Image::new(texture_resonse.texture.texture_egui)
                             .maintain_aspect_ratio(false)
                             .fit_to_exact_size(egui::Vec2::splat(desired_width as f32))
                             .rounding(ROUNDING)
@@ -610,7 +608,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     bbox_br = preview_rect.right_bottom();
                 }
                 else{
-                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture, gfx);
+                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
                 }
 
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
@@ -716,7 +714,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
             });
 
-            if state.current_texture.is_some() {
+            if state.current_texture.get().is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
                         egui::Frame::none()
@@ -731,7 +729,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+                                    state.current_texture.set(highlight_bleed(img).to_texture(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -740,10 +738,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     )
                                     .clicked()
                                 {
-                                    state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
+
+                                    state.current_texture.set(highlight_semitrans(img).to_texture(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                                    state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                                 }
                             }
                         });
@@ -751,7 +750,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
             }
 
-            if state.current_texture.is_some() {
+            if state.current_texture.get().is_some() {
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -763,7 +762,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     });
 }
 
-fn render_info_image_tiled(ui: &mut Ui, uv_center: (f64, f64), uv_size: (f64, f64), desired_width: f64, texture: &crate::texture_wrapper::TexWrap, gfx: &mut Graphics) -> (Pos2, Pos2) {
+fn render_info_image_tiled(ui: &mut Ui, uv_center: (f64, f64), uv_size: (f64, f64), desired_width: f64, texture: &crate::texture_wrapper::TexWrap) -> (Pos2, Pos2) {
     let xy_size = ((texture.width()as f64*uv_size.0) as i32,
                                             (texture.height()as f64*uv_size.1) as i32);
 
@@ -827,12 +826,12 @@ fn render_info_image_tiled(ui: &mut Ui, uv_center: (f64, f64), uv_size: (f64, f6
             (curr_tex_end.y-curr_tex_response.y_tex_top_global+1) as f64 / curr_tex_response.texture_height as f64);
 
 
-            let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
+            //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
             let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);                        
             let draw_br_32 = Pos2::new((curr_ui_curs.x+display_size.x) as f32, (curr_ui_curs.y+display_size.y) as f32);
             let r_ret =egui::Rect::from_min_max(draw_tl_32, draw_br_32);                       
 
-            egui::Image::new(tex_id2)
+            egui::Image::new(curr_tex_response.texture.texture_egui)
             .maintain_aspect_ratio(false)                        
             .fit_to_exact_size(egui::Vec2::new(display_size.x as f32, display_size.y as f32))
             .uv(egui::Rect::from_x_y_ranges(
@@ -983,18 +982,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -1003,9 +1002,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -1291,7 +1290,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                                state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                             }
                         }
                         if ui
@@ -1558,15 +1557,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
 
                 // Update the texture
-                if let Some(tex) = &mut state.current_texture {
+                if let Some(tex) = &mut state.current_texture.get() {
                     if let Some(img) = &state.current_image {
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
                             state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
-                        } else {
-                            state.current_texture =
-                                state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                        } else {                            
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -2352,16 +2350,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture =
-                            unpremult(img).to_texture(gfx, &state.persistent_settings)
+                        state.current_texture.set(unpremult(img).to_texture(gfx, &state.persistent_settings), gfx);
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture = img.to_texture(gfx, &state.persistent_settings)
+                        state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
                     }
                     _ => {
-                        state.current_texture =
-                            solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx, &state.persistent_settings)
+                        state.current_texture.set(solo_channel(img, state.persistent_settings.current_channel as usize)
+                                .to_texture(gfx, &state.persistent_settings), gfx);
                     }
                 }
             }
@@ -2489,7 +2485,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.is_some() && window_x > ui.cursor().left() + 80. {
+        if state.current_texture.get().is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 unframed_button(PLACEHOLDER, ui),
                 "Clear image",
