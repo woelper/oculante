@@ -136,7 +136,11 @@ fn main() {
             .read_to_string(&mut readme)
             .unwrap();
 
-        let readme_wo_keys = readme.split("<summary>Default Shortcuts</summary>").nth(0).unwrap().to_string();
+        let readme_wo_keys = readme
+            .split("<summary>Default Shortcuts</summary>")
+            .nth(0)
+            .unwrap()
+            .to_string();
 
         use std::io::prelude::*;
 

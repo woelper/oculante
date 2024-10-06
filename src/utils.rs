@@ -151,9 +151,6 @@ impl ExtendedImageInfo {
         Ok(())
     }
 
-    
-
-    
     pub fn from_image(img: &RgbaImage) -> Self {
         let mut hist_r: [u64; 256] = [0; 256];
         let mut hist_g: [u64; 256] = [0; 256];
@@ -165,9 +162,9 @@ impl ExtendedImageInfo {
         //Colors counting
         const FIXED_RGB_SIZE: usize = 24;
         const SUB_INDEX_SIZE: usize = 5;
-        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE-SUB_INDEX_SIZE);
-        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];        
-        
+        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
+        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
+
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
                 num_transparent_pixels += 1;
@@ -180,17 +177,15 @@ impl ExtendedImageInfo {
             //Store every existing color combination in a bit
             //Therefore we use a 24 bit index, splitted into a main and a sub index.
             let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
-            let pos_main = pos>>SUB_INDEX_SIZE;
+            let pos_main = pos >> SUB_INDEX_SIZE;
             let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
             color_map[pos_main as usize] |= 1 << pos_sub;
-            
         }
 
         let mut full_colors = 0u32;
         for &intensity in color_map.iter() {
             full_colors += intensity.count_ones();
-        }     
-        
+        }
 
         let green_histogram: Vec<(i32, u64)> = hist_g
             .iter()
