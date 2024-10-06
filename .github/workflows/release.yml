@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-latest]
+        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-12]
         rust: [stable]
     steps:
     - uses: actions/checkout@v4
@@ -69,11 +69,8 @@ jobs:
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-12'
 
-    - name: Install cargo universal2
-      run: cargo install universal2
-      if: matrix.os == 'macos-latest'
       
     - name: Install cargo deb
       run: cargo install cargo-deb
@@ -130,17 +127,35 @@ jobs:
     - name: Build Mac Intel Bundle
       # run: ./build_mac.sh
       run: |
-        brew install libheif
-        cargo bundle --release --features "notan/shaderc heif"
-        mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
-        cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
-        install_name_tool -change /opt/homebrew/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
-        otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
-      if: matrix.os == 'macos-latest'
+          rustc --version --verbose
+          brew install libheif
+          cargo install cargo-bundle
+          cargo bundle --release --features "notan/shaderc heif"
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/x265/lib/libx265.209.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libde265/lib/libde265.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/aom/lib/libaom.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/webp/lib/libsharpyuv.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libvmaf/lib/libvmaf.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          install_name_tool -change /usr/local/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libx265.209.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -change /usr/local/opt/x265/lib/libx265.209.dylib "@executable_path/../Frameworks/libx265.209.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/libde265/lib/libde265.0.dylib "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+      if: matrix.os == 'macos-12'
 
     - name: Zip Mac Intel Bundle
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-12'
 
     - name: Upload Linux 20.04 Release
       if: matrix.os == 'ubuntu-20.04'
@@ -227,7 +242,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-12'
       id: upload-release-asset-macintel
       uses: actions/upload-release-asset@v1
       env:
