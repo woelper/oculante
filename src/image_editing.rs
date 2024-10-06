@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
+use crate::icons::*;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 use crate::{pos_from_coord, ImageGeometry};
-use crate::icons::*;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
@@ -22,7 +22,6 @@ use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -1034,15 +1033,13 @@ impl ImageOperation {
                     )?;
                 }
             }
-            Self::Rotate(angle) => {
-                match angle {
-                    90 => *img = image::imageops::rotate90(img),
-                    -90 => *img = image::imageops::rotate270(img),
-                    270 => *img = image::imageops::rotate270(img),
-                    180 => *img = image::imageops::rotate180(img),
-                    _ => (),
-                }
-            }
+            Self::Rotate(angle) => match angle {
+                90 => *img = image::imageops::rotate90(img),
+                -90 => *img = image::imageops::rotate270(img),
+                270 => *img = image::imageops::rotate270(img),
+                180 => *img = image::imageops::rotate180(img),
+                _ => (),
+            },
             Self::Flip(vert) => {
                 if *vert {
                     *img = image::imageops::flip_vertical(img);
