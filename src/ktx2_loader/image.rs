@@ -1,5 +1,4 @@
-#[cfg(feature = "dds")]
-use super::dds::*;
+
 use super::{basis::basis_buffer_to_image, ktx2_buffer_to_image};
 
 // use bevy_math::{AspectRatio, UVec2, Vec2};
@@ -259,8 +258,8 @@ impl Image {
             ImageFormat::Basis => {
                 basis_buffer_to_image(buffer, supported_compressed_formats, is_srgb)?
             }
-            #[cfg(feature = "dds")]
-            ImageFormat::Dds => dds_buffer_to_image(buffer, supported_compressed_formats, is_srgb)?,
+            // #[cfg(feature = "dds")]
+            // ImageFormat::Dds => dds_buffer_to_image(buffer, supported_compressed_formats, is_srgb)?,
             ImageFormat::Ktx2 => {
                 ktx2_buffer_to_image(buffer, supported_compressed_formats, is_srgb)?
             }

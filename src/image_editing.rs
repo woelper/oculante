@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::num::NonZeroU32;
 use std::path::Path;
 
 use crate::paint::PaintStroke;
@@ -8,10 +7,10 @@ use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 use crate::{pos_from_coord, ImageGeometry};
-
+use crate::icons::*;
 use anyhow::Result;
 use evalexpr::*;
-use fast_image_resize as fr;
+use fast_image_resize::{self as fr, ResizeOptions};
 use image::{imageops, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error};
@@ -24,7 +23,6 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 
-use egui_phosphor::variants::regular::*;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -187,7 +185,6 @@ impl ImageOperation {
         match self {
             Self::Blur(_) => false,
             Self::Resize { .. } => false,
-            // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
             Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
@@ -204,9 +201,9 @@ impl ImageOperation {
     pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
-            Self::Brightness(val) => ui.slider_styled(val, -255..=255),
-            Self::Exposure(val) => ui.slider_styled(val, -100..=100),
-            Self::ChromaticAberration(val) => ui.slider_styled(val, 0..=255),
+            Self::Brightness(val) => ui.styled_slider(val, -255..=255),
+            Self::Exposure(val) => ui.styled_slider(val, -100..=100),
+            Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
             Self::Filter3x3(val) => {
                 let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
 
@@ -234,7 +231,7 @@ impl ImageOperation {
                     });
                 x
             }
-            Self::Posterize(val) => ui.slider_styled(val, 1..=255),
+            Self::Posterize(val) => ui.styled_slider(val, 1..=255),
             Self::Expression(expr) => ui.text_edit_singleline(expr),
             Self::LUT(lut_name) => {
                 ui.scope(|ui| {
@@ -385,10 +382,10 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Blur(val) => ui.slider_styled(val, 0..=20),
+            Self::Blur(val) => ui.styled_slider(val, 0..=254),
             Self::Noise { amt, mono } => {
-                let mut r = ui.slider_styled(amt, 0..=100);
-                if ui.checkbox(mono, "Grey").changed() {
+                let mut r = ui.styled_slider(amt, 0..=100);
+                if ui.styled_checkbox(mono, "Grey").changed() {
                     r.changed = true
                 }
                 r
@@ -582,8 +579,8 @@ impl ImageOperation {
                 }
                 r
             }
-            Self::Desaturate(val) => ui.slider_styled(val, 0..=100),
-            Self::Contrast(val) => ui.slider_styled(val, -128..=128),
+            Self::Desaturate(val) => ui.styled_slider(val, 0..=100),
+            Self::Contrast(val) => ui.styled_slider(val, -128..=128),
             Self::CropPerspective {
                 points,
                 original_size,
@@ -854,7 +851,9 @@ impl ImageOperation {
                         }
                     }
 
-                    let r2 = ui.checkbox(aspect, "🔗").on_hover_text("Lock aspect ratio");
+                    let r2 = ui
+                        .styled_checkbox(aspect, "🔗")
+                        .on_hover_text("Lock aspect ratio");
 
                     if r2.changed() {
                         r0.changed = true;
@@ -868,7 +867,7 @@ impl ImageOperation {
                     // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                     // Users dragging the resize values will now only trigger a resize on release, which feels
                     // more snappy.
-                    r0.changed = r0.drag_released() || r1.drag_released() || r2.changed();
+                    r0.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
@@ -900,7 +899,20 @@ impl ImageOperation {
         match self {
             Self::Blur(amt) => {
                 if *amt != 0 {
-                    *img = imageops::blur(img, *amt as f32);
+                    let i = img.clone();
+                    let mut data = i.into_raw();
+                    libblur::stack_blur(
+                        data.as_mut_slice(),
+                        img.width() * 4,
+                        img.width(),
+                        img.height(),
+                        (*amt as u32).clamp(2, 254),
+                        libblur::FastBlurChannels::Channels4,
+                        libblur::ThreadingPolicy::Adaptive,
+                    );
+                    use anyhow::Context;
+                    *img = RgbaImage::from_raw(img.width(), img.height(), data)
+                        .context("Can't construct image from blur result")?;
                 }
             }
             Self::Filter3x3(amt) => {
@@ -985,39 +997,32 @@ impl ImageOperation {
                         ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
                     };
 
-                    let width = NonZeroU32::new(img.width()).unwrap_or(anyhow::Context::context(
-                        NonZeroU32::new(1),
-                        "Can't create nonzero",
-                    )?);
-                    let height = NonZeroU32::new(img.height()).unwrap_or(anyhow::Context::context(
-                        NonZeroU32::new(1),
-                        "Can't create nonzero",
-                    )?);
-                    let mut src_image = fr::Image::from_vec_u8(
-                        width,
-                        height,
+                    let src_image = fr::images::Image::from_vec_u8(
+                        img.width(),
+                        img.height(),
                         img.clone().into_raw(),
                         fr::PixelType::U8x4,
                     )?;
 
-                    let mapper = fr::create_gamma_22_mapper();
-                    mapper.forward_map_inplace(&mut src_image.view_mut())?;
+                    // let mapper = fr::create_gamma_22_mapper();
+                    // mapper.forward_map_inplace(&mut src_image.image_view_mut())?;
 
                     // Create container for data of destination image
-                    let dst_width = NonZeroU32::new(dimensions.0).unwrap_or(
-                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
-                    );
-                    let dst_height = NonZeroU32::new(dimensions.1).unwrap_or(
-                        anyhow::Context::context(NonZeroU32::new(1), "Can't create nonzero")?,
-                    );
                     let mut dst_image =
-                        fr::Image::new(dst_width, dst_height, src_image.pixel_type());
+                        fr::images::Image::new(dimensions.0, dimensions.1, src_image.pixel_type());
 
-                    let mut resizer = fr::Resizer::new(fr::ResizeAlg::Convolution(filter));
+                    let mut resizer = fr::Resizer::new();
 
-                    resizer.resize(&src_image.view(), &mut dst_image.view_mut())?;
+                    resizer.resize(
+                        &src_image,
+                        &mut dst_image,
+                        Some(
+                            &ResizeOptions::new()
+                                .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                        ),
+                    )?;
 
-                    mapper.backward_map_inplace(&mut dst_image.view_mut())?;
+                    // mapper.backward_map_inplace(&mut dst_image.view_mut())?;
 
                     *img = anyhow::Context::context(
                         image::RgbaImage::from_raw(
@@ -1035,15 +1040,15 @@ impl ImageOperation {
                     -90 => *img = image::imageops::rotate270(img),
                     270 => *img = image::imageops::rotate270(img),
                     180 => *img = image::imageops::rotate180(img),
-                    // 270 => *img = image::imageops::rotate270(img),
                     _ => (),
                 }
             }
             Self::Flip(vert) => {
                 if *vert {
                     *img = image::imageops::flip_vertical(img);
+                } else {
+                    *img = image::imageops::flip_horizontal(img);
                 }
-                *img = image::imageops::flip_horizontal(img);
             }
             Self::ScaleImageMinMax => {
                 //Step 0: Get color channel min and max values

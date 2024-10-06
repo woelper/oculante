@@ -11,7 +11,11 @@ use std::{fs::File, io::Write, path::PathBuf, time::Instant};
 
 #[test]
 fn load() {
-    open_image(&PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg")).unwrap();
+    open_image(
+        &PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"),
+        None,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -40,6 +44,7 @@ fn net() {
 }
 
 #[test]
+#[allow(unreachable_code)]
 fn bench_load_large() {
     #[cfg(debug_assertions)]
     panic!("This test needs release mode to pass.");
@@ -52,9 +57,10 @@ fn bench_load_large() {
 
     for _i in 0..iters {
         let start = Instant::now();
-        open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
@@ -70,7 +76,8 @@ fn bench_load_large() {
 
     for _i in 0..iters {
         let start = Instant::now();
-        open_image(&PathBuf::from("tests/large.png")).unwrap();
+
+        open_image(&PathBuf::from("tests/large.png"), None).unwrap();
         let elapsed = start.elapsed();
         let d = elapsed.as_millis();
         total += d;
@@ -101,9 +108,10 @@ fn bench_process_pxl() {
     ];
 
     for _i in 0..iters {
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
@@ -128,9 +136,10 @@ fn bench_process_bright() {
     let ops = vec![ImageOperation::Brightness(10)];
 
     for _i in 0..iters {
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
@@ -159,6 +168,113 @@ fn dump_shortcuts() {
 }
 
 #[test]
+/// Generate / update flathub meta
+fn flathub() {
+    use chrono::offset::Utc;
+    use chrono::DateTime;
+    use std::time::SystemTime;
+    use xmltree::Element;
+    use xmltree::{EmitterConfig, XMLNode};
+
+    let kokai_result = std::process::Command::new("kokai")
+        .args(&["release", "--ref", "HEAD"])
+        .output()
+        .unwrap()
+        .stdout;
+    let release_notes = String::from_utf8_lossy(&kokai_result).to_string();
+    let release_notes: String = release_notes
+        .lines()
+        .into_iter()
+        .filter(|l| !l.contains("# HEAD"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+
+    let metafile = "res/flathub/io.github.woelper.Oculante.metainfo.xml";
+    let s = std::fs::read_to_string(metafile).unwrap();
+    let mut doc = Element::parse(s.as_bytes()).unwrap();
+    let releases = doc.get_mut_child("releases").unwrap();
+    // check if this version is already present, we don't want duplicates
+    for c in &releases.children {
+        if c.as_element().unwrap().attributes.get("version").unwrap() == env!("CARGO_PKG_VERSION") {
+            panic!("This release already exists!");
+        }
+    }
+    let mut new_release = Element::new("release");
+
+    new_release
+        .attributes
+        .insert("version".into(), env!("CARGO_PKG_VERSION").into());
+
+    let datetime: DateTime<Utc> = SystemTime::now().into();
+    let date = format!("{}", datetime.format("%Y-%m-%d"));
+    new_release.attributes.insert("date".into(), date);
+    let mut url = Element::new("url");
+    url.attributes.insert("type".into(), "details".into());
+    url.children.insert(
+        0,
+        XMLNode::Text(format!(
+            "https://github.com/woelper/oculante/releases/tag/{}",
+            env!("CARGO_PKG_VERSION")
+        )),
+    );
+    let mut description = Element::new("description");
+    let mut lines = release_notes.lines().into_iter();
+    loop {
+        if let Some(l) = lines.next() {
+            if l.starts_with("###") {
+                let mut paragraph = Element::new("p");
+                paragraph.children.insert(
+                    0,
+                    XMLNode::Text(
+                        l.replace("### ", "")
+                            .replace(":sparkles:", "")
+                            .replace(":beetle:", "")
+                            .replace(":green_apple:", "")
+                            .trim()
+                            .into(),
+                    ),
+                );
+                description.children.insert(0, XMLNode::Element(paragraph));
+
+                let mut list = Element::new("ul");
+
+                // skip next empty line
+                _ = lines.next();
+                while let Some(commit) = lines.next() {
+                    dbg!(commit);
+
+                    if commit.starts_with("*") {
+                        let mut item = Element::new("li");
+                        item.children
+                            .insert(0, XMLNode::Text(commit.replace("* ", "")));
+                        list.children.insert(0, XMLNode::Element(item));
+                    } else {
+                        break;
+                    }
+                }
+                description.children.insert(1, XMLNode::Element(list));
+            }
+        } else {
+            break;
+        }
+    }
+
+    new_release
+        .children
+        .insert(0, XMLNode::Element(description));
+    new_release.children.insert(0, XMLNode::Element(url));
+    releases.children.insert(0, XMLNode::Element(new_release));
+    let config = EmitterConfig::new()
+        .autopad_comments(true)
+        .perform_indent(true);
+
+    // doc.write_with_config(File::create("result.xml").unwrap(), config)
+    //     .unwrap();
+    doc.write_with_config(File::create(metafile).unwrap(), config)
+        .unwrap();
+}
+
+#[test]
 fn bench_process_all() {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
@@ -181,9 +297,10 @@ fn bench_process_all() {
             },
             // ImageOperation::
         ];
-        let f = open_image(&PathBuf::from(
-            "tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
-        ))
+        let f = open_image(
+            &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
+            None,
+        )
         .unwrap();
         let mut buffer = f.recv().unwrap().buffer;
         let start = Instant::now();
