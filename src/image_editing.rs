@@ -79,6 +79,9 @@ fn default_brushes() -> Vec<RgbaImage> {
         image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
             .expect("Brushes must always load")
             .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush6.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
     ]
 }
 
