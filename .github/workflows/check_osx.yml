@@ -49,6 +49,12 @@ jobs:
           install_name_tool -change /usr/local/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /usr/local/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libvmaf.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libsharpyuv.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libde265.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libx265.209.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
         if: matrix.os == 'macos-12'
@@ -89,6 +95,12 @@ jobs:
           install_name_tool -change /opt/homebrew/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /opt/homebrew/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           install_name_tool -change /opt/homebrew/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libvmaf.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libsharpyuv.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libde265.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libx265.209.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
         if: matrix.os == 'macos-14'
