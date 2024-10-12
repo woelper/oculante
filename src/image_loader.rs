@@ -363,9 +363,13 @@ pub fn open_image(
             //TODO this needs to be a thread
 
             fn foo(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
-                let image = JxlImage::builder()
+                let mut image = JxlImage::builder()
                     .open(img_location)
                     .map_err(|e| anyhow!("{e}"))?;
+                //TODO: Disable when colormanagement support exists
+                let colorencoding = jxl_oxide::EnumColourEncoding::srgb(jxl_oxide::RenderingIntent::Perceptual);
+                image.request_color_encoding(colorencoding);
+
                 debug!("{:#?}", image.image_header().metadata);
                 let is_jxl_anim = image.image_header().metadata.animation.is_some();
                 let ticks_ms = image
