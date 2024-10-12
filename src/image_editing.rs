@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
+use crate::icons::*;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 use crate::{pos_from_coord, ImageGeometry};
-use crate::icons::*;
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
@@ -22,7 +22,6 @@ use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -78,6 +77,9 @@ fn default_brushes() -> Vec<RgbaImage> {
             .expect("Brushes must always load")
             .into_rgba8(),
         image::load_from_memory(include_bytes!("../res/brushes/brush5.png"))
+            .expect("Brushes must always load")
+            .into_rgba8(),
+        image::load_from_memory(include_bytes!("../res/brushes/brush6.png"))
             .expect("Brushes must always load")
             .into_rgba8(),
     ]
@@ -213,22 +215,38 @@ impl ImageOperation {
                     ("Emboss", [-200, -100, 0, -100, 100, 100, 0, 100, 200]),
                 ];
 
-                egui::ComboBox::from_label("Presets")
-                    .selected_text(
-                        presets
-                            .iter()
-                            .filter(|p| p.1 == *val)
-                            .map(|p| p.0)
-                            .nth(0)
-                            .unwrap_or("Select"),
-                    )
-                    .show_ui(ui, |ui| {
-                        for p in presets {
-                            if ui.selectable_value(val, p.1, p.0).clicked() {
-                                x.mark_changed();
+                ui.vertical(|ui| {
+                    egui::ComboBox::from_label("Presets")
+                        .selected_text(
+                            presets
+                                .iter()
+                                .filter(|p| p.1 == *val)
+                                .map(|p| p.0)
+                                .nth(0)
+                                .unwrap_or("Select"),
+                        )
+                        .show_ui(ui, |ui| {
+                            for p in presets {
+                                if ui.selectable_value(val, p.1, p.0).clicked() {
+                                    x.mark_changed();
+                                }
                             }
-                        }
-                    });
+                        });
+
+                    for triplet in val.chunks_mut(3) {
+                        ui.horizontal(|ui| {
+                            for v in triplet {
+                                if ui
+                                    .add(egui::DragValue::new(v).clamp_range(-255..=255))
+                                    .changed()
+                                {
+                                    x.mark_changed();
+                                }
+                                ui.add_space(30.);
+                            }
+                        });
+                    }
+                });
                 x
             }
             Self::Posterize(val) => ui.styled_slider(val, 1..=255),
@@ -1034,15 +1052,13 @@ impl ImageOperation {
                     )?;
                 }
             }
-            Self::Rotate(angle) => {
-                match angle {
-                    90 => *img = image::imageops::rotate90(img),
-                    -90 => *img = image::imageops::rotate270(img),
-                    270 => *img = image::imageops::rotate270(img),
-                    180 => *img = image::imageops::rotate180(img),
-                    _ => (),
-                }
-            }
+            Self::Rotate(angle) => match angle {
+                90 => *img = image::imageops::rotate90(img),
+                -90 => *img = image::imageops::rotate270(img),
+                270 => *img = image::imageops::rotate270(img),
+                180 => *img = image::imageops::rotate180(img),
+                _ => (),
+            },
             Self::Flip(vert) => {
                 if *vert {
                     *img = image::imageops::flip_vertical(img);
