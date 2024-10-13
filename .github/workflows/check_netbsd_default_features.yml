@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build in NetBSD
       id: testnet
-      uses: vmactions/netbsd-vm@v1
+      uses: vmactions/netbsd-vm@v1.1.4
       with:
         mem: 4096
         usesh: true
