@@ -729,7 +729,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture.set(highlight_bleed(img).to_texture(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -739,10 +739,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .clicked()
                                 {
 
-                                    state.current_texture.set(highlight_semitrans(img).to_texture(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                             }
                         });
@@ -1018,18 +1018,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -1038,9 +1038,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -1326,7 +1326,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture.set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                                state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                             }
                         }
                         if ui
@@ -1600,7 +1600,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings), gfx);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -2387,19 +2387,19 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
                         state.current_texture.set(
-                            unpremult(img).to_texture(gfx, &state.persistent_settings),
+                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );
                     }
                     ColorChannel::Rgba => {
                         state
                             .current_texture
-                            .set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                            .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                     }
                     _ => {
                         state.current_texture.set(
                             solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx, &state.persistent_settings),
+                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );
                     }

@@ -937,19 +937,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             } else {
                 state
                     .current_texture
-                    .set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                    .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
             }
         } else {
             debug!("Setting texture");
             state
                 .current_texture
-                .set(img.to_texture(gfx, &state.persistent_settings), gfx);
+                .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
         }
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
             ColorChannel::Rgb => state.current_texture.set(
-                unpremult(&img).to_texture(gfx, &state.persistent_settings),
+                unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
                 gfx,
             ),
             // Do nuttin'
@@ -958,7 +958,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {
                 state.current_texture.set(
                     solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, &state.persistent_settings),
+                        .to_texture_with_texwrap(gfx, &state.persistent_settings),
                     gfx,
                 );
             }

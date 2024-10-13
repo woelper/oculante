@@ -215,22 +215,38 @@ impl ImageOperation {
                     ("Emboss", [-200, -100, 0, -100, 100, 100, 0, 100, 200]),
                 ];
 
-                egui::ComboBox::from_label("Presets")
-                    .selected_text(
-                        presets
-                            .iter()
-                            .filter(|p| p.1 == *val)
-                            .map(|p| p.0)
-                            .nth(0)
-                            .unwrap_or("Select"),
-                    )
-                    .show_ui(ui, |ui| {
-                        for p in presets {
-                            if ui.selectable_value(val, p.1, p.0).clicked() {
-                                x.mark_changed();
+                ui.vertical(|ui| {
+                    egui::ComboBox::from_label("Presets")
+                        .selected_text(
+                            presets
+                                .iter()
+                                .filter(|p| p.1 == *val)
+                                .map(|p| p.0)
+                                .nth(0)
+                                .unwrap_or("Select"),
+                        )
+                        .show_ui(ui, |ui| {
+                            for p in presets {
+                                if ui.selectable_value(val, p.1, p.0).clicked() {
+                                    x.mark_changed();
+                                }
                             }
-                        }
-                    });
+                        });
+
+                    for triplet in val.chunks_mut(3) {
+                        ui.horizontal(|ui| {
+                            for v in triplet {
+                                if ui
+                                    .add(egui::DragValue::new(v).clamp_range(-255..=255))
+                                    .changed()
+                                {
+                                    x.mark_changed();
+                                }
+                                ui.add_space(30.);
+                            }
+                        });
+                    }
+                });
                 x
             }
             Self::Posterize(val) => ui.styled_slider(val, 1..=255),
