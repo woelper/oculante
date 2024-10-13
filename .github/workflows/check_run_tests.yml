@@ -5,19 +5,17 @@ on:
     # The branches below must be a subset of the branches above
     branches: [ "master" ]
 
-name: Check Ubuntu
+name: Run tests
 jobs:
   check:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        # os: [ubuntu-latest, ubuntu-20.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
-
         
       - name: Patch azure linux deps
         run: sudo apt update
@@ -28,18 +26,6 @@ jobs:
       - name: Update Rust
         run: rustup update
 
-      - name: build heif
-        run: ./build_deps_linux.sh
-
-      - name: install heif
-        run: cd libheif/build && sudo make install
-
-      # - name: cargo build 
-      #   run: cargo build
-
-      - name: cargo check without default features
-        run: cargo check --no-default-features --features notan/glsl-to-spirv
-
-      - name: cargo check with heif
-        run: PKG_CONFIG_PATH=libheif/build cargo check --features heif --features notan/glsl-to-spirv
+      - name: cargo test
+        run: cargo test ci_
 
