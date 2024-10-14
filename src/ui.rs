@@ -455,8 +455,8 @@ impl EguiExt for Ui {
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if let Some(texture) = &state.current_texture {
-        let tex_id = gfx.egui_register_texture(texture);
+    if let Some(texture) = &state.current_texture.get() {
+        //let tex_id = gfx.egui_register_texture(&texture.texture_array[0]); //TODO: Adapt if needed
 
         let image_rect = Rect::from_center_size(
             Pos2::new(
@@ -471,12 +471,12 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             ) * state.image_geometry.scale,
         );
 
-        egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
+        /*egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
             tex_id.id,
             image_rect,
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             Color32::WHITE,
-        );
+        );*/
     }
 
     // state.image_geometry.scale;
@@ -519,17 +519,15 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
-            if let Some(texture) = &state.current_texture {
-                let tex_id = gfx.egui_register_texture(texture);
+            if let Some(texture) = &state.current_texture.get() {
 
-                // width of image widget
-                let desired_width = PANEL_WIDTH - PANEL_WIDGET_OFFSET;
+                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
 
-                let scale = (desired_width / 8.) / texture.size().0;
+                let scale = (desired_width / 8.) / texture.size().0 as f64;
 
                 let uv_center = (
-                    state.cursor_relative.x / state.image_geometry.dimensions.0 as f32,
-                    (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
+                    state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
+                    (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
                 egui::Grid::new("info")
@@ -587,25 +585,39 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
 
                 // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 / texture.size().1;
+                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
                 let uv_size = (scale, scale * ratio);
+                let bbox_tl: Pos2;
+                let bbox_br: Pos2;
+                if texture.texture_count==1 {
+                    let texture_resonse = texture.get_texture_at_xy(0,0);
+                    ui.add_space(10.);
+                    let preview_rect = ui
+                        .add(
+                            egui::Image::new(texture_resonse.texture.texture_egui)
+                            .maintain_aspect_ratio(false)
+                            .fit_to_exact_size(egui::Vec2::splat(desired_width as f32))
+                            .rounding(ROUNDING)
+                            .uv(egui::Rect::from_x_y_ranges(
+                                (uv_center.0 - uv_size.0) as f32..=(uv_center.0 + uv_size.0) as f32,
+                                (uv_center.1 - uv_size.1) as f32..=(uv_center.1 + uv_size.1) as f32,
+                            )),
+                        )
+                        .rect;
+                    bbox_tl = preview_rect.left_top();
+                    bbox_br = preview_rect.right_bottom();
+                }
+                else{
+                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
+                }
 
-                ui.add_space(10.);
-                let preview_rect = ui
-                    .add(
-                        egui::Image::new(tex_id)
-                        .maintain_aspect_ratio(false)
-                        .fit_to_exact_size(egui::Vec2::splat(desired_width))
-                        .rounding(ROUNDING)
-                        .uv(egui::Rect::from_x_y_ranges(
-                            uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-                            uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-                        )),
-                    )
-                    .rect;
+                let bg_color = Color32::BLACK.linear_multiply(0.5);
+                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+                ui.advance_cursor_after_rect(preview_rect);
+
 
                 let stroke_color = Color32::from_white_alpha(240);
-                let bg_color = Color32::BLACK.linear_multiply(0.5);
+
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
@@ -702,7 +714,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
             });
 
-            if state.current_texture.is_some() {
+            if state.current_texture.get().is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
                         egui::Frame::none()
@@ -717,7 +729,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture = highlight_bleed(img).to_texture(gfx, &state.persistent_settings);
+                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -726,10 +738,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     )
                                     .clicked()
                                 {
-                                    state.current_texture = highlight_semitrans(img).to_texture(gfx, &state.persistent_settings);
+
+                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                                    state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                             }
                         });
@@ -737,7 +750,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 });
             }
 
-            if state.current_texture.is_some() {
+            if state.current_texture.get().is_some() {
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -747,6 +760,138 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             advanced_ui(ui, state);
         });
     });
+}
+
+fn render_info_image_tiled(
+    ui: &mut Ui,
+    uv_center: (f64, f64),
+    uv_size: (f64, f64),
+    desired_width: f64,
+    texture: &crate::texture_wrapper::TexWrap,
+) -> (Pos2, Pos2) {
+    let xy_size = (
+        (texture.width() as f64 * uv_size.0) as i32,
+        (texture.height() as f64 * uv_size.1) as i32,
+    );
+
+    let xy_center = (
+        (texture.width() as f64 * uv_center.0) as i32,
+        (texture.height() as f64 * uv_center.1) as i32,
+    ); //(16384,1024);//
+    let sc1 = (
+        2.0 * xy_size.0 as f64 / desired_width,
+        2.0 * xy_size.1 as f64 / desired_width,
+    );
+
+    //coordinates of the image-view
+    let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
+    let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
+
+    //Ui position to start at
+    let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
+    let mut curr_ui_curs = base_ui_curs;
+    //our start position
+
+    //Loop control variables, start end end coordinates of interest
+    let x_coordinate_end = (xy_center.0 + xy_size.0) as i32;
+    let mut y_coordinate = xy_center.1 - xy_size.1;
+    let y_coordinate_end = (xy_center.1 + xy_size.1) as i32;
+
+    while y_coordinate <= y_coordinate_end {
+        let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
+        let mut x_coordinate = xy_center.0 - xy_size.0;
+        curr_ui_curs.x = base_ui_curs.x;
+        let mut last_display_size_y: f64 = 0.0;
+        while x_coordinate <= x_coordinate_end {
+            //get texture tile
+            let curr_tex_response =
+                texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+
+            //increment coordinates by usable width/height
+            y_coordinate_increment = curr_tex_response.offset_height;
+            x_coordinate += curr_tex_response.offset_width;
+
+            //Handling last texture in a row or col
+            let mut curr_tex_end = nalgebra::Vector2::new(
+                i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
+                i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
+            );
+
+            //Handling positive coordinate overflow
+            if curr_tex_response.x_tex_right_global as f32 >= texture.width() - 1.0f32 {
+                x_coordinate = x_coordinate_end + 1;
+                curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
+            }
+
+            if curr_tex_response.y_tex_bottom_global as f32 >= texture.height() - 1.0f32 {
+                y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
+                curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
+            }
+
+            //Usable tile size, depending on offsets
+            let tile_size = nalgebra::Vector2::new(
+                curr_tex_end.x
+                    - curr_tex_response.x_offset_texture
+                    - curr_tex_response.x_tex_left_global
+                    + 1,
+                curr_tex_end.y
+                    - curr_tex_response.y_offset_texture
+                    - curr_tex_response.y_tex_top_global
+                    + 1,
+            );
+
+            //Display size - tile size scaled
+            let display_size =
+                nalgebra::Vector2::new(tile_size.x as f64 / sc1.0, tile_size.y as f64 / sc1.1);
+
+            //Texture display range
+            let uv_start = nalgebra::Vector2::new(
+                curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
+                curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64,
+            );
+
+            let uv_end = nalgebra::Vector2::new(
+                (curr_tex_end.x - curr_tex_response.x_tex_left_global + 1) as f64
+                    / curr_tex_response.texture_width as f64,
+                (curr_tex_end.y - curr_tex_response.y_tex_top_global + 1) as f64
+                    / curr_tex_response.texture_height as f64,
+            );
+
+            //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
+            let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
+            let draw_br_32 = Pos2::new(
+                (curr_ui_curs.x + display_size.x) as f32,
+                (curr_ui_curs.y + display_size.y) as f32,
+            );
+            let r_ret = egui::Rect::from_min_max(draw_tl_32, draw_br_32);
+
+            egui::Image::new(curr_tex_response.texture.texture_egui)
+                .maintain_aspect_ratio(false)
+                .fit_to_exact_size(egui::Vec2::new(
+                    display_size.x as f32,
+                    display_size.y as f32,
+                ))
+                .uv(egui::Rect::from_x_y_ranges(
+                    uv_start.x as f32..=uv_end.x as f32,
+                    uv_start.y as f32..=uv_end.y as f32,
+                ))
+                .paint_at(ui, r_ret);
+
+            //Update display cursor
+            curr_ui_curs.x += display_size.x;
+            last_display_size_y = display_size.y;
+
+            //Update coordinates for preview rectangle
+            bbox_tl.x = bbox_tl.x.min(r_ret.left());
+            bbox_tl.y = bbox_tl.y.min(r_ret.top());
+            bbox_br.x = bbox_br.x.max(r_ret.right());
+            bbox_br.y = bbox_br.y.max(r_ret.bottom());
+        }
+        //Update y coordinates
+        y_coordinate += y_coordinate_increment;
+        curr_ui_curs.y += last_display_size_y;
+    }
+    (bbox_tl, bbox_br)
 }
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
@@ -873,18 +1018,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -893,9 +1038,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
-                            state.current_texture =  state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -1181,7 +1326,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                                state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                             }
                         }
                         if ui
@@ -1448,15 +1593,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
 
                 // Update the texture
-                if let Some(tex) = &mut state.current_texture {
+                if let Some(tex) = &mut state.current_texture.get() {
                     if let Some(img) = &state.current_image {
                         if tex.width() as u32 == state.edit_state.result_pixel_op.width()
                             && state.edit_state.result_pixel_op.height() == img.height()
                         {
-                            state.edit_state.result_pixel_op.update_texture(gfx, tex);
+                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
                         } else {
-                            state.current_texture =
-                                state.edit_state.result_pixel_op.to_texture(gfx, &state.persistent_settings);
+                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         }
                     }
                 }
@@ -2242,16 +2386,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture =
-                            unpremult(img).to_texture(gfx, &state.persistent_settings)
+                        state.current_texture.set(
+                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture = img.to_texture(gfx, &state.persistent_settings)
+                        state
+                            .current_texture
+                            .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                     }
                     _ => {
-                        state.current_texture =
+                        state.current_texture.set(
                             solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture(gfx, &state.persistent_settings)
+                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
                     }
                 }
             }
@@ -2379,7 +2529,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.is_some() && window_x > ui.cursor().left() + 80. {
+        if state.current_texture.get().is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 unframed_button(PLACEHOLDER, ui),
                 "Clear image",
