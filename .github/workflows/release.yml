@@ -17,7 +17,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: '0'
     - name: Install kokai
@@ -42,10 +42,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-latest, ubuntu-latest]
+        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-12]
         rust: [stable]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: ilammy/setup-nasm@v1
 
     - name: Install latest rust
@@ -69,11 +69,8 @@ jobs:
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-12'
 
-    - name: Install cargo universal2
-      run: cargo install universal2
-      if: matrix.os == 'macos-latest'
       
     - name: Install cargo deb
       run: cargo install cargo-deb
@@ -119,13 +116,53 @@ jobs:
       if: matrix.os == 'ubuntu-20.04'
 
 
-    - name: Build Mac Bundle
+    - name: Build Mac Silicon Bundle
       run: ./build_mac.sh
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
 
-    - name: Zip Mac Bundle
+    - name: Zip Mac Silicon Bundle
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
+
+    - name: Build Mac Intel Bundle
+      # run: ./build_mac.sh
+      run: |
+          rustc --version --verbose
+          brew install libheif
+          cargo install cargo-bundle
+          cargo bundle --release --features "notan/shaderc heif"
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/x265/lib/libx265.209.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libde265/lib/libde265.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/aom/lib/libaom.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/webp/lib/libsharpyuv.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp /usr/local/opt/libvmaf/lib/libvmaf.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          install_name_tool -change /usr/local/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libx265.209.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -change /usr/local/opt/x265/lib/libx265.209.dylib "@executable_path/../Frameworks/libx265.209.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/libde265/lib/libde265.0.dylib "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change /usr/local/opt/libvmaf/lib/libvmaf.3.dylib "@executable_path/../Frameworks/libvmaf.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libvmaf.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libsharpyuv.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libde265.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libx265.209.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
+      if: matrix.os == 'macos-12'
+
+    - name: Zip Mac Intel Bundle
+      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
+      if: matrix.os == 'macos-12'
 
     - name: Upload Linux 20.04 Release
       if: matrix.os == 'ubuntu-20.04'
@@ -200,7 +237,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-14'
       id: upload-release-asset-mac
       uses: actions/upload-release-asset@v1
       env:
@@ -209,6 +246,18 @@ jobs:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_app.zip
         asset_name: oculante_mac.zip
+        asset_content_type: application/zip
+
+    - name: Upload Mac Release
+      if: matrix.os == 'macos-12'
+      id: upload-release-asset-macintel
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: oculante_app_intel.zip
+        asset_name: oculante_mac_intel.zip
         asset_content_type: application/zip
 
     - name: Upload Windows 2019 Release exe
@@ -242,7 +291,7 @@ jobs:
   # aur-publish:
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v2
+  #     - uses: actions/checkout@v4
   #     - name: Publish AUR package
   #       uses: KSXGitHub/github-actions-deploy-aur@v2.7.0
   #       with:
