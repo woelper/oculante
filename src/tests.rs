@@ -10,7 +10,7 @@ use super::*;
 use std::{fs::File, io::Write, path::PathBuf, time::Instant};
 
 #[test]
-fn load() {
+fn ci_load() {
     open_image(
         &PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"),
         None,
@@ -89,7 +89,7 @@ fn bench_load_large() {
 }
 
 #[test]
-fn bench_process_pxl() {
+fn ci_bench_process_pxl() {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
     let iters = 5;
@@ -275,7 +275,7 @@ fn flathub() {
 }
 
 #[test]
-fn bench_process_all() {
+fn ci_bench_process_all() {
     std::env::set_var("RUST_LOG", "info");
     let _ = env_logger::try_init();
     let iters = 5;
