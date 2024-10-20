@@ -2,9 +2,10 @@ name: Check NetBSD minimal
 
 on:
   push:
-    branches:
-      - main
-    pull_request:
+    branches: [ "master" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "master" ]
 
 jobs:
   test:
@@ -14,7 +15,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Test in NetBSD
       id: test
-      uses: vmactions/netbsd-vm@v1.0.5
+      uses: vmactions/netbsd-vm@v1.1.4
       with:
         usesh: true
         copyback: false
