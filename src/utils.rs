@@ -27,7 +27,7 @@ use strum_macros::EnumIter;
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
-use crate::image_loader::open_image;
+use crate::image_loader::{open_image, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
@@ -353,6 +353,11 @@ pub fn send_image_threaded(
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
+
+                        if let Ok(rotated_img) = rotate_rgbaimage(&f.buffer, &path) {
+                            debug!("Image has been rotated.");
+                            f.buffer = rotated_img;
+                        }
 
                         let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
 
