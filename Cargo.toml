@@ -147,7 +147,7 @@ strip = true
 panic = "abort"
 
 [profile.dev]
-debug = false
+debug = true
 incremental = true
 opt-level = 1
 
