@@ -26,7 +26,8 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_loader::open_image;
+use crate::image_editing::{self, ImageOperation};
+use crate::image_loader::{open_image, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 use crate::texture_wrapper::TexWrap;
@@ -339,7 +340,7 @@ pub fn send_image_threaded(
                 // .send(Frame::new_reset(f.buffer.clone()));
 
                 let mut first = true;
-                for f in frame_receiver.iter() {
+                for mut f in frame_receiver.iter() {
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
                         return;
@@ -347,6 +348,10 @@ pub fn send_image_threaded(
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
+                        if let Ok(rotated_img) = rotate_rgbaimage(&f.buffer, &path) {
+                            debug!("Image has been rotated.");
+                            f.buffer = rotated_img;
+                        }
                         let _ = texture_sender.send(f);
                         return;
                     }

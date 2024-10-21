@@ -25,10 +25,10 @@ dirs = "5.0"
 env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
-fast_image_resize = "4.0"
+fast_image_resize = "5.0"
 gif = "0.13.1"
 gif-dispose = "5.0.1"
-image = { version = "0.25.2", features = ["hdr"] }
+image = { version = "0.25.4", features = ["hdr"] }
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = { version = "0.14", optional = true }
@@ -96,7 +96,14 @@ libblur = "0.13.5"
 egui-modal = "0.3.6"
 
 [features]
-default = ["turbo", "avif_native", "update", "notan/glsl-to-spirv", "j2k", "jxlcms"]
+default = [
+    "turbo",
+    "avif_native",
+    "update",
+    "notan/glsl-to-spirv",
+    "j2k",
+    "jxlcms",
+]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
