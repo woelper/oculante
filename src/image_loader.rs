@@ -1,6 +1,6 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::{ktx2_loader, appstate::Message, FONT};
+use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
 use psd::Psd;
 
@@ -999,19 +999,17 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 }
 
 #[allow(unused)]
-pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()>{
+pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     di.apply_orientation(decoder.orientation()?);
     Ok(())
 }
 
-
-
-pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage>{
+pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     let orientation = decoder.orientation()?;
     if orientation != image::metadata::Orientation::NoTransforms {
-        let mut dynimage  =  DynamicImage::ImageRgba8(di.clone());
+        let mut dynimage = DynamicImage::ImageRgba8(di.clone());
         dynimage.apply_orientation(orientation);
         Ok(dynimage.to_rgba8())
     } else {

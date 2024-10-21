@@ -13,6 +13,7 @@ pub mod icons;
 pub mod paint;
 pub mod ui;
 pub mod filebrowser;
+pub mod texture_wrapper;
 use utils::*;
 #[cfg(feature = "update")]
 pub mod update;
