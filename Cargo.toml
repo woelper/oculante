@@ -133,16 +133,25 @@ cmake = "0.1"
 cmd_lib = "1.3.0"
 xmltree = "0.11.0"
 chrono = "0.4.38"
+criterion = { version = "0.5.1", features = [
+    "html_reports",
+    "stable",
+] }
 
 [profile.release]
-codegen-units = 1
+# codegen-units = 1
 # incremental = false
-lto = true
+# lto = true
 strip = true
-opt-level = 3
+# opt-level = 3
 panic = "abort"
 
 [profile.dev]
 debug = false
 incremental = true
 opt-level = 1
+
+
+[[bench]]
+name = "my_benchmark"
+harness = false

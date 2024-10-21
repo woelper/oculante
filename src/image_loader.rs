@@ -1,6 +1,6 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame, FrameSource};
-use crate::{ktx2_loader, Message, FONT};
+use crate::{ktx2_loader, appstate::Message, FONT};
 use log::{debug, error, info};
 use psd::Psd;
 

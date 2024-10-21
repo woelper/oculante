@@ -6,8 +6,8 @@ use crate::icons::*;
 use crate::paint::PaintStroke;
 use crate::ui::EguiExt;
 #[cfg(not(feature = "file_open"))]
-use crate::{filebrowser, SUPPORTED_EXTENSIONS};
-use crate::{pos_from_coord, ImageGeometry};
+use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
+use crate::{utils::pos_from_coord, appstate::ImageGeometry};
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};

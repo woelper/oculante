@@ -955,3 +955,15 @@ pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
 
     Ok(image)
 }
+
+pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
+    let delta = scale - state.image_geometry.scale;
+    let zoom_point = from_center.unwrap_or(state.cursor);
+    state.image_geometry.offset -= scale_pt(
+        state.image_geometry.offset,
+        zoom_point,
+        state.image_geometry.scale,
+        delta,
+    );
+    state.image_geometry.scale = scale;
+}

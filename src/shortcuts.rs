@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use log::{debug, error, info, trace, warn};
 // use std::collections::HashMap;
 
-use crate::OculanteState;
+use crate::appstate::OculanteState;
 use notan::prelude::App;
 use serde::{Deserialize, Serialize};
 
