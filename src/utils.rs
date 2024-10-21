@@ -4,7 +4,7 @@ use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
-use notan::prelude::{App, Graphics, TextureFilter};
+use notan::prelude::{App, Graphics};
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,7 @@ use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::{open_image, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::texture_wrapper::TexWrap;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -97,9 +98,9 @@ pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
     pub num_colors: usize,
-    pub red_histogram: Vec<(i32, i32)>,
-    pub green_histogram: Vec<(i32, i32)>,
-    pub blue_histogram: Vec<(i32, i32)>,
+    pub red_histogram: Vec<(i32, u64)>,
+    pub green_histogram: Vec<(i32, u64)>,
+    pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
     pub raw_exif: Option<Bytes>,
     pub name: String,
@@ -162,9 +163,9 @@ impl ExtendedImageInfo {
     }
 
     pub fn from_image(img: &RgbaImage) -> Self {
-        let mut hist_r: [u32; 256] = [0; 256];
-        let mut hist_g: [u32; 256] = [0; 256];
-        let mut hist_b: [u32; 256] = [0; 256];
+        let mut hist_r: [u64; 256] = [0; 256];
+        let mut hist_g: [u64; 256] = [0; 256];
+        let mut hist_b: [u64; 256] = [0; 256];
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
@@ -197,22 +198,22 @@ impl ExtendedImageInfo {
             full_colors += intensity.count_ones();
         }
 
-        let green_histogram: Vec<(i32, i32)> = hist_g
+        let green_histogram: Vec<(i32, u64)> = hist_g
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
-        let red_histogram: Vec<(i32, i32)> = hist_r
+        let red_histogram: Vec<(i32, u64)> = hist_r
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
-        let blue_histogram: Vec<(i32, i32)> = hist_b
+        let blue_histogram: Vec<(i32, u64)> = hist_b
             .iter()
             .enumerate()
-            .map(|(k, v)| (k as i32, *v as i32))
+            .map(|(k, v)| (k as i32, *v))
             .collect();
 
         Self {
@@ -234,13 +235,12 @@ pub struct Player {
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
     pub cache: Cache,
-    pub max_texture_size: u32,
     watcher: HashMap<PathBuf, SystemTime>,
 }
 
 impl Player {
     /// Create a new Player
-    pub fn new(image_sender: Sender<Frame>, cache_size: usize, max_texture_size: u32) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
             image_sender,
@@ -249,7 +249,6 @@ impl Player {
                 data: Default::default(),
                 cache_size,
             },
-            max_texture_size,
             watcher: Default::default(),
         }
     }
@@ -302,8 +301,6 @@ impl Player {
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
-            self.max_texture_size,
-            forced_frame_source,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -327,8 +324,6 @@ pub fn send_image_threaded(
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
-    max_texture_size: u32,
-    forced_frame_source: Option<FrameSource>,
 ) {
     let loc = img_location.to_owned();
 
@@ -353,44 +348,11 @@ pub fn send_image_threaded(
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
-
                         if let Ok(rotated_img) = rotate_rgbaimage(&f.buffer, &path) {
                             debug!("Image has been rotated.");
                             f.buffer = rotated_img;
                         }
-
-                        let largest_side = f.buffer.dimensions().0.max(f.buffer.dimensions().1);
-
-                        // Check if texture is too large to fit on the texture
-                        if largest_side > max_texture_size {
-                            _ = message_sender.send(Message::warn("This image exceeded the maximum resolution and will be be scaled down."));
-                            let scale_factor = max_texture_size as f32 / largest_side as f32;
-                            let new_dimensions = (
-                                (f.buffer.dimensions().0 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
-                                    as u32,
-                                (f.buffer.dimensions().1 as f32 * scale_factor)
-                                    .min(max_texture_size as f32)
-                                    as u32,
-                            );
-
-                            if let Some(ref fs) = forced_frame_source {
-                                f.source = fs.clone();
-                            }
-
-                            let mut frame = f;
-
-                            let op = ImageOperation::Resize {
-                                dimensions: new_dimensions,
-                                aspect: true,
-                                filter: image_editing::ScaleFilter::Box,
-                            };
-                            _ = op.process_image(&mut frame.buffer);
-                            let _ = texture_sender.send(frame);
-                        } else {
-                            let _ = texture_sender.send(f);
-                        }
-
+                        let _ = texture_sender.send(f);
                         return;
                     }
                     if f.source == FrameSource::Animation {
@@ -677,7 +639,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture(&self, _: &mut Graphics, _settings: &PersistentSettings) -> Option<Texture> {
+    fn to_texture_with_texwrap(&self, _: &mut Graphics, _settings: &PersistentSettings) -> Option<TexWrap> {
         unimplemented!()
     }
 
@@ -686,6 +648,10 @@ pub trait ImageExt {
     }
 
     fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
+        unimplemented!()
+    }
+
+    fn update_texture_with_texwrap(&self, _: &mut Graphics, _: &mut TexWrap) {
         unimplemented!()
     }
 
@@ -700,28 +666,8 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<Texture> {
-        gfx.clean();
-        gfx.create_texture()
-            .from_bytes(self, self.width(), self.height())
-            .with_mipmaps(settings.use_mipmaps)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(
-                if settings.linear_min_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-                if settings.linear_mag_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
+    fn to_texture_with_texwrap(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<TexWrap> {
+        TexWrap::from_rgbaimage(gfx, settings, self)
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
@@ -740,6 +686,10 @@ impl ImageExt for RgbaImage {
         if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
             error!("{e}");
         }
+    }
+
+    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
+        texture.update_textures(gfx, self);
     }
 }
 
@@ -812,7 +762,7 @@ pub fn clear_image(state: &mut OculanteState) {
     debug!("Clearing image. Next is {}", next_img.display());
     if state.scrubber.entries.len() == 0 {
         state.current_image = None;
-        state.current_texture = None;
+        state.current_texture.clear();
         state.current_path = None;
         state.image_info = None;
         return;
