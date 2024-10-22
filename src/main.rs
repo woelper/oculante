@@ -12,6 +12,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use oculante::FONT;
 use shortcuts::key_pressed;
 use std::io::Read;
 use std::path::PathBuf;
@@ -53,7 +54,6 @@ use crate::image_editing::EditState;
 mod image_editing;
 pub mod paint;
 
-pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -1275,14 +1275,4 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .max(-scaled_image_size.1);
 }
 
-fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
-    let delta = scale - state.image_geometry.scale;
-    let zoom_point = from_center.unwrap_or(state.cursor);
-    state.image_geometry.offset -= scale_pt(
-        state.image_geometry.offset,
-        zoom_point,
-        state.image_geometry.scale,
-        delta,
-    );
-    state.image_geometry.scale = scale;
-}
+

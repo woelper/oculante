@@ -1,17 +1,9 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState},
-    clear_image, clipboard_to_image, delete_file, icons,
-    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
-    paint::PaintStroke,
-    set_zoom,
-    settings::{set_system_theme, ColorTheme},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
-    utils::{
+    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    },
-    FrameSource,
+    }, FrameSource
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -23,7 +15,7 @@ pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use icons::*;
+use crate::icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
