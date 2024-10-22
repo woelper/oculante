@@ -87,7 +87,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "avcs",
     #[cfg(feature = "heif")]
     "hif",
-    ];
+];
 
 fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
@@ -639,7 +639,11 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture_with_texwrap(&self, _: &mut Graphics, _settings: &PersistentSettings) -> Option<TexWrap> {
+    fn to_texture_with_texwrap(
+        &self,
+        _: &mut Graphics,
+        _settings: &PersistentSettings,
+    ) -> Option<TexWrap> {
         unimplemented!()
     }
 
@@ -666,7 +670,11 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture_with_texwrap(&self, gfx: &mut Graphics, settings: &PersistentSettings) -> Option<TexWrap> {
+    fn to_texture_with_texwrap(
+        &self,
+        gfx: &mut Graphics,
+        settings: &PersistentSettings,
+    ) -> Option<TexWrap> {
         TexWrap::from_rgbaimage(gfx, settings, self)
     }
 

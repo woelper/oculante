@@ -2392,9 +2392,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         );
                     }
                     ColorChannel::Rgba => {
-                        state
-                            .current_texture
-                            .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                        state.current_texture.set(
+                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
                     }
                     _ => {
                         state.current_texture.set(

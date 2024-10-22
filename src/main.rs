@@ -935,15 +935,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
                 img.update_texture_with_texwrap(gfx, tex);
             } else {
-                state
-                    .current_texture
-                    .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                state.current_texture.set(
+                    img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    gfx,
+                );
             }
         } else {
             debug!("Setting texture");
-            state
-                .current_texture
-                .set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+            state.current_texture.set(
+                img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                gfx,
+            );
         }
 
         match &state.persistent_settings.current_channel {
@@ -1055,8 +1057,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         {
             info_ui(ctx, state, gfx);
         }
-
-        
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
         // ("using pointer {}", ctx.is_using_pointer());
