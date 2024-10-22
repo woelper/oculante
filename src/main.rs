@@ -1042,6 +1042,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
+        if state.persistent_settings.edit_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            edit_ui(app, ctx, state, gfx);
+        }
+
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
@@ -1049,12 +1056,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             info_ui(ctx, state, gfx);
         }
 
-        if state.persistent_settings.edit_enabled
-            && !state.settings_enabled
-            && !state.persistent_settings.zen_mode
-        {
-            edit_ui(app, ctx, state, gfx);
-        }
+        
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
         // ("using pointer {}", ctx.is_using_pointer());
