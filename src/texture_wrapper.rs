@@ -28,9 +28,8 @@ pub struct TextureWrapperManager {
 
 impl TextureWrapperManager {
     pub fn set(&mut self, tex: Option<TexWrap>, gfx: &mut Graphics) {
-
-        let mut texture_taken: Option<TexWrap> = self.current_texture.take();           
-        if let Some(texture) = &mut texture_taken {            
+        let mut texture_taken: Option<TexWrap> = self.current_texture.take();
+        if let Some(texture) = &mut texture_taken {
             texture.unregister_textures(gfx);
         }
 
@@ -164,17 +163,9 @@ impl TexWrap {
         ) -> Option<Texture>,
     ) -> Option<TexWrap> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
-
-        let im_w = image.width();
-        let im_h = image.height();
-
-        if im_w<1{
+        let (im_w, im_h) = image.dimensions();
+        if im_w < 1 || im_h < 1 {
             error!("Image width smaller than 1!");
-            return None;
-        }
-
-        if im_h<1{
-            error!("Image height smaller than 1!");
             return None;
         }
 
@@ -322,7 +313,7 @@ impl TexWrap {
         let y = ya.max(0).min(self.height() as i32 - 1);
 
         //Div by zero possible, never allow zero sized textures!
-        let x_idx = x / self.col_translation as i32; 
+        let x_idx = x / self.col_translation as i32;
         let y_idx = y / self.row_translation as i32;
         let tex_idx =
             (y_idx * self.col_count as i32 + x_idx).min(self.texture_array.len() as i32 - 1);
