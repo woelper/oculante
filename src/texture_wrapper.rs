@@ -4,7 +4,6 @@ use notan::egui::EguiRegisterTexture;
 use notan::egui::SizedTexture;
 
 use crate::settings::PersistentSettings;
-use crate::Draw;
 use image::imageops;
 
 use image::RgbaImage;

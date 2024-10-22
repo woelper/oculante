@@ -26,7 +26,6 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::{open_image, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
@@ -651,6 +650,7 @@ pub trait ImageExt {
         unimplemented!()
     }
 
+    #[allow(unused)]
     fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
         unimplemented!()
     }
@@ -912,4 +912,16 @@ pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     .context("Can't decode RgbaImage")?;
 
     Ok(image)
+}
+
+pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
+    let delta = scale - state.image_geometry.scale;
+    let zoom_point = from_center.unwrap_or(state.cursor);
+    state.image_geometry.offset -= scale_pt(
+        state.image_geometry.offset,
+        zoom_point,
+        state.image_geometry.scale,
+        delta,
+    );
+    state.image_geometry.scale = scale;
 }
