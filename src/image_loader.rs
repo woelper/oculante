@@ -17,7 +17,7 @@ use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use tiff::decoder::Limits;
@@ -44,7 +44,7 @@ pub fn open_image(
         .replace("tiff", "tif")
         .replace("jpeg", "jpg");
 
-    let unchecked_extensions = ["svg"];
+    let unchecked_extensions = ["svg", "kra"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
@@ -664,6 +664,11 @@ pub fn open_image(
             _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).to_rgba8()));
             return Ok(receiver);
         }
+        "kra" => {
+            let i = load_kra(&img_location)?;
+            _ = sender.send(Frame::new_still(i.to_rgba8()));
+            return Ok(receiver);
+        }
         "icns" => {
             let file = BufReader::new(File::open(img_location)?);
             let icon_family = icns::IconFamily::read(file)?;
@@ -1015,4 +1020,14 @@ pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage> {
     } else {
         bail!("This image needs no rotation.")
     }
+}
+
+fn load_kra(path: &Path) -> Result<DynamicImage> {
+    let f = File::open(path)?;
+    let mut archive = zip::ZipArchive::new(f)?;
+    // https://docs.krita.org/en/general_concepts/file_formats/file_kra.html
+    let mut merged_image = archive.by_name("mergedimage.png")?;
+    let mut image_bytes = Vec::<u8>::new();
+    merged_image.read_to_end(&mut image_bytes)?;
+    Ok(image::load_from_memory(&image_bytes)?)
 }

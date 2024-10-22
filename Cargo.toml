@@ -94,6 +94,7 @@ file-format = "0.25.0"
 egui_extras = { version = "0.27.2", features = ["image", "file"] }
 libblur = "0.13.5"
 egui-modal = "0.3.6"
+zip = "2.2.0"
 
 [features]
 default = [
