@@ -1,4 +1,9 @@
-on: [push]
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "master" ]
 
 name: Check Windows
 jobs:
@@ -14,30 +19,11 @@ jobs:
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
       
-      - name: Install vcpkg
-        run: vcpkg integrate install
-
       - name: Install Ninja
         run: choco install ninja
-
-      # - name: Install Vulkan SDK
-      #   uses: humbletim/install-vulkan-sdk@v1.1.1
-      #   with:
-      #     cache: true
-
-
 
       - name: cargo check without default features
         run: cargo check --no-default-features --features notan/shaderc
 
-      - name: clean
-        run: cargo clean
-
-      - name: Install libheif
-        run: vcpkg install libheif:x64-windows-static-md
-
-      - name: Install libheif static
-        run: vcpkg install libheif:x64-windows-static
-
-      - name: cargo check build features & heif
-        run: cargo check --features heif --features notan/shaderc
+      - name: cargo build
+        run: cargo build

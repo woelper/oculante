@@ -76,18 +76,20 @@ fn setup_heif() {
 fn main() {
     println!("Build script");
     // #[cfg(windows)]
-    // match std::process::Command::new("convert")
-    //     .args(vec![
-    //         "res/icons/icon.png",
-    //         "-define",
-    //         "icon:auto-resize=16,32,48,64,128,256",
-    //         "icon.ico",
-    //     ])
-    //     .spawn()
-    // {
-    //     Ok(_b) => println!("Converted icon"),
-    //     Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
-    // }
+    match std::process::Command::new("convert")
+        .args(vec![
+            "res/icons/icon.png",
+            "-compress",
+            "none",
+            "-define",
+            "icon:auto-resize=16,32,48,64,128,256",
+            "icon.ico",
+        ])
+        .spawn()
+    {
+        Ok(_b) => println!("Converted icon"),
+        Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
+    }
 
     // insert version into plist
     let mut plist: String = "".into();
@@ -134,13 +136,17 @@ fn main() {
             .read_to_string(&mut readme)
             .unwrap();
 
-        let readme_wo_keys = readme.split("### Shortcuts:").nth(0).unwrap().to_string();
+        let readme_wo_keys = readme
+            .split("<summary>Default Shortcuts</summary>")
+            .nth(0)
+            .unwrap()
+            .to_string();
 
         use std::io::prelude::*;
 
         let shortcuts = read_to_string(shortcut_file).unwrap();
         let mouse_keys = "`mouse wheel` = zoom\n\n`left mouse`,`middle mouse` = pan\n\n`ctrl + mouse wheel` = prev/next image in folder\n\n`Right mouse` pick color from image (in paint mode)\n\n";
-        let new_readme = format!("{readme_wo_keys}### Shortcuts:\n{mouse_keys}\n{shortcuts}");
+        let new_readme = format!("{readme_wo_keys}<summary>Default Shortcuts</summary>\n\n### Shortcuts:\n{mouse_keys}\n{shortcuts}\n</details>");
         File::create("README.md")
             .unwrap()
             .write_all(new_readme.as_bytes())

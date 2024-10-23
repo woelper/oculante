@@ -1,3 +1,51 @@
+# 0.9.1 (2024-09-21)
+
+### :beetle: Bug Fixes
+
+* Prevent scrollbars from occluding info panel (19d3be85)
+* Remove duplicated shortcuts entry in Readme and fix build script to auto-generate keymaps (99e9d9ef)
+* Noise filter ui would extend panel too much (063df9d6)
+
+### :sparkles: Features
+
+* Generate flathub meta for a release (77e43596)
+
+### :green_apple: Chore
+
+* Improved changelog generation (1665cd3c)
+* Exclude screenshots from cates.io build to save space (c80df685)
+* Fix wronf icon for Rotate operator (5f564b46)
+
+# 0.9.0 (2024-09-21)
+
+### :beetle: Bug Fixes
+
+* Flip operation would always flip horizontal (7019c757)
+* Mac build broke because of icon. Switched image format. (7954c29d)
+* When pressing right mouse, panning operation got stuck. Panning is now only possible using left or middle mouse. (dff337f3)
+
+### :sparkles: Features
+
+* Show confirmation dialog when deleting a file (4ca02a5b)
+* Stack Blur provides much faster blur performance for the blur filter (65a345f3)
+* Visually indicate difference between operator types with a separator (fb26bc06)
+* Persistent and volatile settings are now split for easier versioning of configuration files (936c996c)
+* enable version control friendly settings (297abe16)
+* Use built in file browser (35f9b9ea)
+
+### :green_apple: Chore
+
+* Update deps (ac7e9dc8)
+* **deps**: bump quinn-proto from 0.11.3 to 0.11.8 (c64b79a7)
+* update turbojpeg and remove image dependency (bb021b41)
+* Update `gif`/ `gif-dispose` (8894ef70)
+* Update `fast_image_resize`, `libavif-image`, `self_update`, `libheif-rs` (00da1e57)
+* update `trash` (22bd5e45)
+* Update webbrowser, wgpu, ruzstd (2f27aef8)
+* Update jpg2000 and add test image (541e6c93)
+* update image and nalgebra (5c50f05e)
+* cargo update (0273560e)
+
 # 0.8.23 (2024-07-29)
 
 ### :beetle: Bug Fixes

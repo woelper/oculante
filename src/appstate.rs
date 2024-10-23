@@ -2,8 +2,10 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
+    texture_wrapper::TextureWrapperManager,
     utils::{ExtendedImageInfo, Frame, Player},
 };
+
 use egui_notify::Toasts;
 use image::RgbaImage;
 use nalgebra::Vector2;
@@ -65,7 +67,8 @@ pub struct OculanteState {
     pub extended_info_loading: bool,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
-    pub current_texture: Option<Texture>,
+    //pub current_texture: Option<TexWrap>,
+    pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<RgbaImage>,
     pub settings_enabled: bool,
@@ -92,7 +95,7 @@ pub struct OculanteState {
     pub filebrowser_id: Option<String>,
 }
 
-impl OculanteState {
+impl<'b> OculanteState {
     pub fn send_message_info(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::info(msg));
     }
@@ -106,7 +109,7 @@ impl OculanteState {
     }
 }
 
-impl Default for OculanteState {
+impl<'b> Default for OculanteState {
     fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
         OculanteState {
@@ -122,7 +125,7 @@ impl Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone(), 20, 16384),
+            player: Player::new(tx_channel.0.clone(), 20),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
             load_channel: mpsc::channel(),

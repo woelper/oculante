@@ -2,13 +2,13 @@
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2021"
-exclude = ["res/*.gif", "tests/*"]
+exclude = ["res/*.gif", "tests/*", "res/screenshots/*", "res/previews/*"]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.8.23"
+version = "0.9.1"
 
 [package.metadata.bundle]
 icon = ["icon.ico"]
@@ -25,20 +25,20 @@ dirs = "5.0"
 env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
-fast_image_resize = "4.0"
+fast_image_resize = "5.0"
 gif = "0.13.1"
 gif-dispose = "5.0.1"
-image = { version = "0.25.2", features = ["hdr"] }
+image = { version = "0.25.4", features = ["hdr"] }
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = { version = "0.14", optional = true }
 log = "0.4"
 nalgebra = "0.33"
 notan = { version = "0.12", default-features = false, features = [
-  "backend",
-  "draw",
-  "drop_files",
-  "egui",
+    "backend",
+    "draw",
+    "drop_files",
+    "egui",
 ] }
 egui_plot = "0.27"
 palette = "0.7"
@@ -54,7 +54,7 @@ usvg = "0.42.0"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
 self_update = { version = "0.41", default-features = false, features = [
-  "rustls",
+    "rustls",
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -86,17 +86,25 @@ num-traits = "0.2.18"
 zerocopy = "0.7.34"
 icns = "0.3.1"
 jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
-  "threads",
-  "file-io",
-  "openjpeg-sys",
+    "threads",
+    "file-io",
+    "openjpeg-sys",
 ] }
 file-format = "0.25.0"
 egui_extras = { version = "0.27.2", features = ["image", "file"] }
 libblur = "0.13.5"
 egui-modal = "0.3.6"
+zip = "2.2.0"
 
 [features]
-default = ["turbo", "avif_native", "update", "notan/glsl-to-spirv", "j2k"]
+default = [
+    "turbo",
+    "avif_native",
+    "update",
+    "notan/glsl-to-spirv",
+    "j2k",
+    "jxlcms",
+]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
@@ -104,6 +112,7 @@ file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
 j2k = ["jpeg2k"]
+jxlcms = ["jxl-oxide/lcms2"]
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -123,16 +132,27 @@ cmake = "0.1"
 
 [dev-dependencies]
 cmd_lib = "1.3.0"
+xmltree = "0.11.0"
+chrono = "0.4.38"
+criterion = { version = "0.5.1", features = [
+    "html_reports",
+    "stable",
+] }
 
 [profile.release]
-codegen-units = 1
+# codegen-units = 1
 # incremental = false
-lto = true
+# lto = true
 strip = true
-opt-level = 3
+# opt-level = 3
 panic = "abort"
 
 [profile.dev]
-debug = false
+debug = true
 incremental = true
 opt-level = 1
+
+
+[[bench]]
+name = "my_benchmark"
+harness = false
