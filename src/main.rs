@@ -329,7 +329,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         fonts.font_data.insert(
             "icons".to_owned(),
             FontData::from_static(include_bytes!(
-                "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
+                "../res/fonts/icons.ttf"
             ))
             .tweak(FontTweak {
                 scale: 1.0,
