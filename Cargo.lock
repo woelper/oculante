@@ -1208,13 +1208,14 @@ checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
 name = "colorutils-rs"
-version = "0.5.12"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "964565f4c740d7a05e259762290f556c4a91aefae1c3e964aa21432270513416"
+checksum = "2e1632390e4314e1ce4b4060fbbb36f0d576b994399088bfdfe4216eef0aa54b"
 dependencies = [
  "erydanos",
  "half",
  "num-traits 0.2.19",
+ "rayon",
 ]
 
 [[package]]
@@ -3673,9 +3674,9 @@ dependencies = [
 
 [[package]]
 name = "libblur"
-version = "0.13.8"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b19cfe9c454da6276845220ddf751a651801855d72e8b4689a9541bebb2c315"
+checksum = "38be24bbb762d1d9e748c3e5c2cfed4faf5f9b62df82bce8793257caa50c83fc"
 dependencies = [
  "colorutils-rs",
  "erydanos",
@@ -4996,7 +4997,6 @@ dependencies = [
  "windres",
  "winres",
  "xmltree",
- "zerocopy",
  "zip",
  "zune-png",
 ]
