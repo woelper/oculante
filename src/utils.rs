@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self, ImageBuffer};
+use image::{self, DynamicImage, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -925,4 +925,36 @@ pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut Ocula
         delta,
     );
     state.image_geometry.scale = scale;
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
+
+pub enum FileEncoder {
+    Jpg { quality: u32 },
+    Png,
+    Bmp,
+    WebP,
+}
+
+impl Default for FileEncoder {
+    fn default() -> Self {
+        Self::Png
+    }
+}
+
+impl FileEncoder {
+    pub fn save(&self, image: &DynamicImage, path: &Path) -> Result<()> {
+        match self {
+            FileEncoder::Jpg { quality } => {
+                image.save_with_format(path, image::ImageFormat::Jpeg)?;
+            }
+            FileEncoder::Png => {
+                image.save_with_format(path, image::ImageFormat::Png)?;
+            }
+            FileEncoder::Bmp => {}
+            FileEncoder::WebP => {}
+        }
+
+        Ok(())
+    }
 }

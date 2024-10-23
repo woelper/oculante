@@ -54,7 +54,6 @@ use crate::image_editing::EditState;
 mod image_editing;
 pub mod paint;
 
-
 #[notan_main]
 fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
@@ -1003,6 +1002,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                     },
@@ -1274,5 +1274,3 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
 }
-
-

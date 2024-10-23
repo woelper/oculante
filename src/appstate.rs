@@ -4,6 +4,7 @@ use crate::{
     settings::{PersistentSettings, VolatileSettings},
     texture_wrapper::TextureWrapperManager,
     utils::{ExtendedImageInfo, Frame, Player},
+    FileEncoder,
 };
 
 use egui_notify::Toasts;
@@ -11,6 +12,7 @@ use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
+    collections::BTreeMap,
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
 };
@@ -154,6 +156,7 @@ impl<'b> Default for OculanteState {
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
+
         }
     }
 }

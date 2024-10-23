@@ -1,9 +1,17 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
+    appstate::{ImageGeometry, Message, OculanteState},
+    clear_image, clipboard_to_image, delete_file,
+    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    set_zoom,
+    settings::{self, set_system_theme, ColorTheme, VolatileSettings},
+    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }, FrameSource
+    },
+    FrameSource,
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -13,9 +21,9 @@ const ROUNDING: f32 = 8.;
 const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
+use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use crate::icons::*;
 use image::RgbaImage;
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
@@ -1282,7 +1290,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                     ui.end_row();
 
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
                     if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
                         ui.separator();
@@ -1293,7 +1301,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
-                        ui, &state.image_geometry, &mut state.edit_state.block_panning
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
 
                     ui.label_i(&format!("Reset"));
@@ -1732,9 +1740,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                         let msg_sender = state.message_channel.0.clone();
 
+
+                        // let keys = state.encoding_options.keys().map(|k|k.as_str()).collect::<Vec<&str>>();
+                        let keys = ["png", "webp", "jpg"];
+
                         filebrowser::browse_modal(
                             true,
-                            &["png", "jpg", "bmp", "webp", "tif", "tga"],
+                            keys.as_slice(),
+                            &mut state.volatile_settings,
                             |p| {
                                     match state.edit_state.result_pixel_op
                                     .save(&p) {
@@ -1976,6 +1989,7 @@ fn modifier_stack_ui(
     ui: &mut Ui,
     geo: &ImageGeometry,
     mouse_grab: &mut bool,
+    settings: &mut VolatileSettings
 ) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
@@ -1990,7 +2004,7 @@ fn modifier_stack_ui(
         ui.push_id(i, |ui| {
             // draw the image operator
             ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
-            if operation.ui(ui, geo, mouse_grab).changed() {
+            if operation.ui(ui, geo, mouse_grab, settings).changed() {
                 *image_changed = true;
             }
 
@@ -2598,6 +2612,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                         ui.ctx().memory_mut(|w| w.close_popup());

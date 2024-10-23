@@ -4,10 +4,11 @@ use std::path::Path;
 
 use crate::icons::*;
 use crate::paint::PaintStroke;
+use crate::settings::VolatileSettings;
 use crate::ui::EguiExt;
+use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
-use crate::{utils::pos_from_coord, appstate::ImageGeometry};
 use anyhow::Result;
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
@@ -200,7 +201,7 @@ impl ImageOperation {
     }
 
     // Add functionality about how to draw UI here
-    pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool) -> Response {
+    pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool, settings: &mut VolatileSettings) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),
@@ -293,6 +294,7 @@ impl ImageOperation {
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,
+                                    settings,
                                     |p| {
                                         *lut_name = p.to_string_lossy().to_string();
                                         x.mark_changed();

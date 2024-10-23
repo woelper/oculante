@@ -1,5 +1,7 @@
 use super::icons::*;
+use crate::settings::VolatileSettings;
 use crate::ui::EguiExt;
+use crate::FileEncoder;
 use anyhow::{Context, Result};
 use dirs;
 use notan::egui::{self, *};
@@ -36,6 +38,7 @@ fn save_recent_dir(p: &Path) -> Result<()> {
 pub fn browse_modal<F: FnMut(&PathBuf)>(
     save: bool,
     filter: &[&str],
+    settings: &mut VolatileSettings,
     mut callback: F,
     ctx: &egui::Context,
 ) {
@@ -57,6 +60,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
             browse(
                 &mut path,
                 filter,
+                settings,
                 save,
                 |p| {
                     callback(p);
@@ -79,6 +83,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
 pub fn browse<F: FnMut(&PathBuf)>(
     path: &mut PathBuf,
     filter: &[&str],
+    settings: &mut VolatileSettings,
     save: bool,
     mut callback: F,
     ui: &mut Ui,
@@ -175,6 +180,32 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         *path = d;
                     }
                 }
+
+                // ui.ctx().data(|r| r.get_persisted::<usize>(Id::new("FAVOURITES")))
+
+           
+                    for folder in &settings.folder_bookmarks {
+                        if ui
+                            .styled_button(&format!(
+                                "{BOOKMARK} {}",
+                                folder
+                                    .file_name()
+                                    .map(|x| x.to_string_lossy().to_string())
+                                    .unwrap_or_default()
+                            ))
+                            .clicked()
+                        {
+                            *path = folder.clone();
+                        }
+                    }
+             
+
+                if ui.styled_button(&format!("Add current folder")).clicked() {
+                   settings.folder_bookmarks.insert(path.clone());
+
+                }
+
+              
             },
         );
 
