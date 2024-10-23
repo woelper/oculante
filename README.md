@@ -161,7 +161,7 @@ Uninstalling Oculante is a quick process, just delete the executable and delete 
 - ppm
 - HEIC/HEIF (via `libheif-rs`). Enabled on Windows builds, but optional dependency on MacOS and Linux - available behind `heif` flag.
 - qoi
-- kra (currently only available on the `krita_support` branch)
+- kra (Krita files)
 
 ### Platform support
 
