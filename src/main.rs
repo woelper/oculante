@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod file_encoder;
 pub mod icons;
 pub mod scrubber;
 pub mod settings;
@@ -306,7 +307,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         }
     }
 
-    // Set up egui style
+    // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
         let mut fonts = FontDefinitions::default();

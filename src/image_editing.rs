@@ -201,7 +201,13 @@ impl ImageOperation {
     }
 
     // Add functionality about how to draw UI here
-    pub fn ui(&mut self, ui: &mut Ui, geo: &ImageGeometry, block_panning: &mut bool, settings: &mut VolatileSettings) -> Response {
+    pub fn ui(
+        &mut self,
+        ui: &mut Ui,
+        geo: &ImageGeometry,
+        block_panning: &mut bool,
+        settings: &mut VolatileSettings,
+    ) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),

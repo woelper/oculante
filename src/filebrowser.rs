@@ -1,7 +1,8 @@
 use super::icons::*;
+use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::ui::EguiExt;
-use crate::FileEncoder;
+use crate::ui::{EguiExt, BUTTON_HEIGHT_LARGE};
+
 use anyhow::{Context, Result};
 use dirs;
 use notan::egui::{self, *};
@@ -10,6 +11,7 @@ use std::{
     fs::{self, read_to_string, File},
     path::{Path, PathBuf},
 };
+use strum::IntoEnumIterator;
 
 fn load_recent_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(read_to_string(
@@ -183,29 +185,43 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
                 // ui.ctx().data(|r| r.get_persisted::<usize>(Id::new("FAVOURITES")))
 
-           
-                    for folder in &settings.folder_bookmarks {
-                        if ui
-                            .styled_button(&format!(
-                                "{BOOKMARK} {}",
-                                folder
-                                    .file_name()
-                                    .map(|x| x.to_string_lossy().to_string())
-                                    .unwrap_or_default()
-                            ))
-                            .clicked()
-                        {
-                            *path = folder.clone();
+                for folder in &settings.folder_bookmarks.clone() {
+                    let res = ui.styled_button(&format!(
+                        "{BOOKMARK} {}",
+                        folder
+                            .file_name()
+                            .map(|x| x.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                    ));
+
+                    if res.clicked() {
+                        *path = folder.clone();
+                    }
+
+                    if res.hovered() {
+                        if ui.input(|r| r.pointer.secondary_released() || r.key_released(Key::D)) {
+                            settings.folder_bookmarks.remove(folder);
                         }
                     }
-             
-
-                if ui.styled_button(&format!("Add current folder")).clicked() {
-                   settings.folder_bookmarks.insert(path.clone());
-
+                    res.on_hover_text("Right click or 'd' to delete!");
                 }
 
-              
+                ui.vertical_centered_justified(|ui| {
+                    let col = Color32::from_gray(41);
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new(PLUS).color(col))
+                                .rounding(ui.style().visuals.widgets.inactive.rounding)
+                                .fill(Color32::TRANSPARENT)
+                                .frame(true)
+                                .stroke(Stroke::new(2., col))
+                                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
+                        )
+                        .clicked()
+                    {
+                        settings.folder_bookmarks.insert(path.clone());
+                    }
+                });
             },
         );
 
@@ -308,6 +324,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
             ui.spacing();
 
             if save {
+                let ext = Path::new(&filename)
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
                 ui.horizontal(|ui| {
                     ui.label("Filename");
                     ui.add(
@@ -316,15 +337,18 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     );
                 });
 
+                for fe in settings.encoding_options.iter_mut() {
+                    if ext.to_lowercase() == fe.ext() {
+                        fe.ui(ui);
+                    }
+                }
+
                 ui.horizontal(|ui| {
-                    let ext = Path::new(&filename)
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    for f in filter {
-                        if ui.selectable_label(&ext == f, f.to_string()).clicked() {
+                    for f in FileEncoder::iter() {
+                        let e = f.ext();
+                        if ui.selectable_label(ext == e, &e).clicked() {
                             filename = Path::new(&filename)
-                                .with_extension(f)
+                                .with_extension(&e)
                                 .to_string_lossy()
                                 .to_string();
                         }

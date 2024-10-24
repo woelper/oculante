@@ -1,6 +1,7 @@
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     clear_image, clipboard_to_image, delete_file,
+    file_encoder::FileEncoder,
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
@@ -18,13 +19,13 @@ use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
-const BUTTON_HEIGHT_LARGE: f32 = 35.;
+pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::RgbaImage;
+use image::{DynamicImage, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -1731,26 +1732,30 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("Save as...")).clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
-
                     }
 
+                    let encoding_options = state.volatile_settings.encoding_options.clone();
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
-
-
                         let msg_sender = state.message_channel.0.clone();
 
-
                         // let keys = state.encoding_options.keys().map(|k|k.as_str()).collect::<Vec<&str>>();
-                        let keys = ["png", "webp", "jpg"];
+                        let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
+                        let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
 
                         filebrowser::browse_modal(
                             true,
-                            keys.as_slice(),
+                            key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-                                    match state.edit_state.result_pixel_op
-                                    .save(&p) {
+
+
+                                let dynimage = DynamicImage::ImageRgba8(state.edit_state.result_pixel_op.clone());
+                                let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
+                                    match encoding_options.save(&dynimage, p) {
+
+
+                                    // match state.edit_state.result_pixel_op.save(&p) {
                                         Ok(_) => {
                                             _ = msg_sender.send(Message::Saved(p.clone()));
                                             debug!("Saved to {}", p.display());
@@ -1989,7 +1994,7 @@ fn modifier_stack_ui(
     ui: &mut Ui,
     geo: &ImageGeometry,
     mouse_grab: &mut bool,
-    settings: &mut VolatileSettings
+    settings: &mut VolatileSettings,
 ) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
@@ -2816,13 +2821,18 @@ pub fn blank_icon(
 }
 
 pub fn apply_theme(state: &OculanteState, ctx: &Context) {
+    let mut style: egui::Style = (*ctx.style()).clone();
+    let mut button_color = Color32::from_gray(38);
+
     match state.persistent_settings.theme {
-        ColorTheme::Light => ctx.set_visuals(Visuals::light()),
+        ColorTheme::Light => {
+            ctx.set_visuals(Visuals::light());
+            button_color = Color32::from_gray(230);
+        }
         ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
         ColorTheme::System => set_system_theme(ctx),
     }
     // Switching theme resets accent color, set it again
-    let mut style: egui::Style = (*ctx.style()).clone();
     style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
@@ -2830,6 +2840,13 @@ pub fn apply_theme(state: &OculanteState, ctx: &Context) {
     style.spacing.item_spacing = vec2(8., 6.);
     style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
     style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
+
+    // button color
+    style.visuals.widgets.inactive.weak_bg_fill = button_color;
+    // style.visuals.widgets.inactive.bg_fill = button_color;
+    // style.visuals.widgets.inactive.bg_fill = button_color;
+
+    // button rounding
     style.visuals.widgets.inactive.rounding = Rounding::same(4.);
     style.visuals.widgets.active.rounding = Rounding::same(4.);
     style.visuals.widgets.hovered.rounding = Rounding::same(4.);

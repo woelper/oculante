@@ -7,6 +7,7 @@ pub mod settings;
 pub mod shortcuts;
 pub mod utils;
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
+pub mod file_encoder;
 pub mod filebrowser;
 pub mod icons;
 pub mod paint;

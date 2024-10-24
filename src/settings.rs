@@ -1,10 +1,11 @@
-use crate::{shortcuts::*, utils::ColorChannel, FileEncoder};
+use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
 use log::{debug, info, trace};
 use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
+
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet},
     fs::{create_dir_all, File},
     path::PathBuf,
 };
@@ -139,7 +140,7 @@ pub struct VolatileSettings {
     pub window_geometry: ((u32, u32), (u32, u32)),
     pub last_open_directory: PathBuf,
     pub folder_bookmarks: BTreeSet<PathBuf>,
-    pub encoding_options: BTreeSet<crate::FileEncoder>,
+    pub encoding_options: Vec<FileEncoder>,
 }
 
 impl Default for VolatileSettings {
@@ -155,6 +156,10 @@ impl Default for VolatileSettings {
                 // ("png".to_string(), FileEncoder::WebP),
                 FileEncoder::Jpg { quality: 75 },
                 FileEncoder::WebP,
+                FileEncoder::Png {
+                    compressionlevel: crate::file_encoder::CompressionLevel::Default,
+                },
+                FileEncoder::Bmp,
             ]
             .into_iter()
             .collect(),
