@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod file_encoder;
 pub mod icons;
 pub mod scrubber;
 pub mod settings;
@@ -53,7 +54,6 @@ use crate::image_editing::EditState;
 
 mod image_editing;
 pub mod paint;
-
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -307,7 +307,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         }
     }
 
-    // Set up egui style
+    // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
         let mut fonts = FontDefinitions::default();
@@ -1003,6 +1003,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                     },
@@ -1274,5 +1275,3 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
 }
-
-

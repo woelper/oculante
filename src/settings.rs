@@ -1,10 +1,11 @@
-use crate::{shortcuts::*, utils::ColorChannel};
+use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
 use log::{debug, info, trace};
 use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
+
 use std::{
-    collections::HashSet,
+    collections::{BTreeSet, HashSet},
     fs::{create_dir_all, File},
     path::PathBuf,
 };
@@ -131,13 +132,39 @@ impl PersistentSettings {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct VolatileSettings {
     pub favourite_images: HashSet<PathBuf>,
     pub recent_images: Vec<PathBuf>,
     pub window_geometry: ((u32, u32), (u32, u32)),
     pub last_open_directory: PathBuf,
+    pub folder_bookmarks: BTreeSet<PathBuf>,
+    pub encoding_options: Vec<FileEncoder>,
+}
+
+impl Default for VolatileSettings {
+    fn default() -> Self {
+        Self {
+            favourite_images: Default::default(),
+            recent_images: Default::default(),
+            window_geometry: Default::default(),
+            last_open_directory: Default::default(),
+            folder_bookmarks: Default::default(),
+            encoding_options: [
+                // ("jpg".to_string(), FileEncoder::Jpg { quality: 75 }),
+                // ("png".to_string(), FileEncoder::WebP),
+                FileEncoder::Jpg { quality: 75 },
+                FileEncoder::WebP,
+                FileEncoder::Png {
+                    compressionlevel: crate::file_encoder::CompressionLevel::Default,
+                },
+                FileEncoder::Bmp,
+            ]
+            .into_iter()
+            .collect(),
+        }
+    }
 }
 
 impl VolatileSettings {
