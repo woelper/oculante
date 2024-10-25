@@ -2834,12 +2834,20 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             {
                 state.persistent_settings.background_color = [200, 200, 200];
             }
+            if state.persistent_settings.accent_color == PersistentSettings::default().accent_color
+            {
+                state.persistent_settings.accent_color = [0, 170, 255];
+            }
         }
         ColorTheme::Dark => {
             ctx.set_visuals(Visuals::dark());
             if state.persistent_settings.background_color == [200, 200, 200] {
                 state.persistent_settings.background_color =
                     PersistentSettings::default().background_color;
+            }
+            if state.persistent_settings.accent_color == [0, 170, 255] {
+                state.persistent_settings.accent_color =
+                    PersistentSettings::default().accent_color;
             }
         }
         ColorTheme::System => set_system_theme(ctx),
@@ -2853,6 +2861,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     style.spacing.item_spacing = vec2(8., 6.);
     style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
     style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
+    style.visuals.window_fill = panel_color;
 
     // button color
     style.visuals.widgets.inactive.weak_bg_fill = button_color;

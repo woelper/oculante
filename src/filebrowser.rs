@@ -204,7 +204,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
 
                 ui.vertical_centered_justified(|ui| {
-                    let col = Color32::from_gray(41);
+                    let col = ui.style().visuals.widgets.inactive.weak_bg_fill;
                     if ui
                         .add(
                             egui::Button::new(RichText::new(PLUS).color(col))
