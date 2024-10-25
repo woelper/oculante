@@ -1,22 +1,31 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
+    appstate::{ImageGeometry, Message, OculanteState},
+    clear_image, clipboard_to_image, delete_file,
+    file_encoder::FileEncoder,
+    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    set_zoom,
+    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
+    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }, FrameSource
+    },
+    FrameSource,
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
-const BUTTON_HEIGHT_LARGE: f32 = 35.;
+pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
+use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use crate::icons::*;
-use image::RgbaImage;
+use image::{DynamicImage, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -1282,7 +1291,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                     ui.end_row();
 
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning);
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
                     if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
                         ui.separator();
@@ -1293,7 +1302,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
-                        ui, &state.image_geometry, &mut state.edit_state.block_panning
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
 
                     ui.label_i(&format!("Reset"));
@@ -1723,21 +1732,30 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if state.current_image.is_some() {
                     if ui.button(format!("Save as...")).clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
-
                     }
 
+                    let encoding_options = state.volatile_settings.encoding_options.clone();
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
-
-
                         let msg_sender = state.message_channel.0.clone();
+
+                        // let keys = state.encoding_options.keys().map(|k|k.as_str()).collect::<Vec<&str>>();
+                        let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
+                        let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
 
                         filebrowser::browse_modal(
                             true,
-                            &["png", "jpg", "bmp", "webp", "tif", "tga"],
+                            key_slice.as_slice(),
+                            &mut state.volatile_settings,
                             |p| {
-                                    match state.edit_state.result_pixel_op
-                                    .save(&p) {
+
+
+                                let dynimage = DynamicImage::ImageRgba8(state.edit_state.result_pixel_op.clone());
+                                let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
+                                    match encoding_options.save(&dynimage, p) {
+
+
+                                    // match state.edit_state.result_pixel_op.save(&p) {
                                         Ok(_) => {
                                             _ = msg_sender.send(Message::Saved(p.clone()));
                                             debug!("Saved to {}", p.display());
@@ -1976,6 +1994,7 @@ fn modifier_stack_ui(
     ui: &mut Ui,
     geo: &ImageGeometry,
     mouse_grab: &mut bool,
+    settings: &mut VolatileSettings,
 ) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
@@ -1990,7 +2009,7 @@ fn modifier_stack_ui(
         ui.push_id(i, |ui| {
             // draw the image operator
             ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
-            if operation.ui(ui, geo, mouse_grab).changed() {
+            if operation.ui(ui, geo, mouse_grab, settings).changed() {
                 *image_changed = true;
             }
 
@@ -2598,6 +2617,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                         ui.ctx().memory_mut(|w| w.close_popup());
@@ -2800,10 +2820,36 @@ pub fn blank_icon(
 ) {
 }
 
-pub fn apply_theme(state: &OculanteState, ctx: &Context) {
+pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
+    let mut button_color = Color32::from_gray(38);
+    let mut panel_color = Color32::from_gray(23);
+
     match state.persistent_settings.theme {
-        ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-        ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+        ColorTheme::Light => {
+            ctx.set_visuals(Visuals::light());
+            button_color = Color32::from_gray(255);
+            panel_color = Color32::from_gray(230);
+            if state.persistent_settings.background_color
+                == PersistentSettings::default().background_color
+            {
+                state.persistent_settings.background_color = [200, 200, 200];
+            }
+            if state.persistent_settings.accent_color == PersistentSettings::default().accent_color
+            {
+                state.persistent_settings.accent_color = [0, 170, 255];
+            }
+        }
+        ColorTheme::Dark => {
+            ctx.set_visuals(Visuals::dark());
+            if state.persistent_settings.background_color == [200, 200, 200] {
+                state.persistent_settings.background_color =
+                    PersistentSettings::default().background_color;
+            }
+            if state.persistent_settings.accent_color == [0, 170, 255] {
+                state.persistent_settings.accent_color =
+                    PersistentSettings::default().accent_color;
+            }
+        }
         ColorTheme::System => set_system_theme(ctx),
     }
     // Switching theme resets accent color, set it again
@@ -2815,16 +2861,30 @@ pub fn apply_theme(state: &OculanteState, ctx: &Context) {
     style.spacing.item_spacing = vec2(8., 6.);
     style.spacing.icon_width_inner = style.spacing.icon_width / 1.5;
     style.spacing.interact_size.y = BUTTON_HEIGHT_SMALL;
+    style.visuals.window_fill = panel_color;
+
+    // button color
+    style.visuals.widgets.inactive.weak_bg_fill = button_color;
+    // style.visuals.widgets.inactive.bg_fill = button_color;
+    // style.visuals.widgets.inactive.bg_fill = button_color;
+
+    // button rounding
     style.visuals.widgets.inactive.rounding = Rounding::same(4.);
     style.visuals.widgets.active.rounding = Rounding::same(4.);
     style.visuals.widgets.hovered.rounding = Rounding::same(4.);
+
+    // No stroke on buttons
     style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
+
     style.visuals.warn_fg_color = Color32::from_rgb(255, 204, 0);
+
+    style.visuals.panel_fill = panel_color;
 
     style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
     style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
     style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12.;
     style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18.;
+    // accent color
     style.visuals.selection.bg_fill = Color32::from_rgb(
         state.persistent_settings.accent_color[0],
         state.persistent_settings.accent_color[1],
