@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod file_encoder;
 pub mod icons;
 pub mod scrubber;
 pub mod settings;
@@ -53,7 +54,6 @@ use crate::image_editing::EditState;
 
 mod image_editing;
 pub mod paint;
-
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -307,7 +307,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         }
     }
 
-    // Set up egui style
+    // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
         let mut fonts = FontDefinitions::default();
@@ -352,7 +352,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .insert(0, "inter".to_owned());
 
         debug!("Theme {:?}", state.persistent_settings.theme);
-        apply_theme(&state, ctx);
+        apply_theme(&mut state, ctx);
         ctx.set_fonts(fonts);
     });
 
@@ -689,8 +689,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
         }
     }
 
-    // Save every 1.5 secs
-    let t = app.timer.elapsed_f32() % 1.5;
+    // Save every 5 secs
+    let t = app.timer.elapsed_f32() % 5.0;
     if t <= 0.01 {
         state.volatile_settings.window_geometry = (
             (
@@ -991,8 +991,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
 
     let egui_output = plugins.egui(|ctx| {
-        // the top menu bar
-        // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
@@ -1003,6 +1001,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                     },
@@ -1011,6 +1010,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
+        // the top menu bar
         if !state.persistent_settings.zen_mode {
             let menu_height = 36.0;
             egui::TopBottomPanel::top("menu")
@@ -1274,5 +1274,3 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
 }
-
-
