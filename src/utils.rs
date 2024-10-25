@@ -3,7 +3,6 @@ use arboard::Clipboard;
 use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error};
 use nalgebra::{clamp, Vector2};
-use notan::egui::Ui;
 use notan::graphics::Texture;
 use notan::prelude::{App, Graphics};
 use rayon::prelude::ParallelIterator;
@@ -18,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self, DynamicImage, ImageBuffer};
+use image::{self, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -31,7 +30,6 @@ use crate::image_loader::{open_image, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 use crate::texture_wrapper::TexWrap;
-use crate::ui::EguiExt;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",

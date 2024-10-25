@@ -5,7 +5,7 @@ use crate::{
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
-    settings::{self, set_system_theme, ColorTheme, VolatileSettings},
+    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
@@ -2820,19 +2820,32 @@ pub fn blank_icon(
 ) {
 }
 
-pub fn apply_theme(state: &OculanteState, ctx: &Context) {
-    let mut style: egui::Style = (*ctx.style()).clone();
+pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut button_color = Color32::from_gray(38);
+    let mut panel_color = Color32::from_gray(23);
 
     match state.persistent_settings.theme {
         ColorTheme::Light => {
             ctx.set_visuals(Visuals::light());
-            button_color = Color32::from_gray(230);
+            button_color = Color32::from_gray(255);
+            panel_color = Color32::from_gray(230);
+            if state.persistent_settings.background_color
+                == PersistentSettings::default().background_color
+            {
+                state.persistent_settings.background_color = [200, 200, 200];
+            }
         }
-        ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
+        ColorTheme::Dark => {
+            ctx.set_visuals(Visuals::dark());
+            if state.persistent_settings.background_color == [200, 200, 200] {
+                state.persistent_settings.background_color =
+                    PersistentSettings::default().background_color;
+            }
+        }
         ColorTheme::System => set_system_theme(ctx),
     }
     // Switching theme resets accent color, set it again
+    let mut style: egui::Style = (*ctx.style()).clone();
     style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
@@ -2850,13 +2863,19 @@ pub fn apply_theme(state: &OculanteState, ctx: &Context) {
     style.visuals.widgets.inactive.rounding = Rounding::same(4.);
     style.visuals.widgets.active.rounding = Rounding::same(4.);
     style.visuals.widgets.hovered.rounding = Rounding::same(4.);
+
+    // No stroke on buttons
     style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
+
     style.visuals.warn_fg_color = Color32::from_rgb(255, 204, 0);
+
+    style.visuals.panel_fill = panel_color;
 
     style.text_styles.get_mut(&TextStyle::Body).unwrap().size = 15.;
     style.text_styles.get_mut(&TextStyle::Button).unwrap().size = 15.;
     style.text_styles.get_mut(&TextStyle::Small).unwrap().size = 12.;
     style.text_styles.get_mut(&TextStyle::Heading).unwrap().size = 18.;
+    // accent color
     style.visuals.selection.bg_fill = Color32::from_rgb(
         state.persistent_settings.accent_color[0],
         state.persistent_settings.accent_color[1],

@@ -352,7 +352,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .insert(0, "inter".to_owned());
 
         debug!("Theme {:?}", state.persistent_settings.theme);
-        apply_theme(&state, ctx);
+        apply_theme(&mut state, ctx);
         ctx.set_fonts(fonts);
     });
 
@@ -689,8 +689,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
         }
     }
 
-    // Save every 1.5 secs
-    let t = app.timer.elapsed_f32() % 1.5;
+    // Save every 5 secs
+    let t = app.timer.elapsed_f32() % 5.0;
     if t <= 0.01 {
         state.volatile_settings.window_geometry = (
             (
@@ -991,8 +991,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
 
     let egui_output = plugins.egui(|ctx| {
-        // the top menu bar
-        // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
@@ -1012,6 +1010,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
+        // the top menu bar
         if !state.persistent_settings.zen_mode {
             let menu_height = 36.0;
             egui::TopBottomPanel::top("menu")

@@ -2,16 +2,16 @@
 //!
 //! To add more formats, add a variant to the `[FileEncoder]` struct.
 
-use std::fs::File;
-use std::path::Path;
+use crate::ui::EguiExt;
 use anyhow::Result;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, PngEncoder};
 use image::DynamicImage;
 use notan::egui::Ui;
 use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::path::Path;
 use strum::{Display, EnumIter};
-use crate::ui::EguiExt;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Display, EnumIter)]
 
@@ -94,21 +94,16 @@ impl FileEncoder {
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
-        ui.label(self.ext());
-
         match self {
             FileEncoder::Jpg { quality } => {
+                ui.label("Quality");
                 ui.styled_slider(quality, 0..=100);
             }
-            FileEncoder::Png { compressionlevel } => {
-                ui.label(self.to_string());
-            }
-            FileEncoder::Bmp => {
-                ui.label(self.to_string());
-            }
-            FileEncoder::WebP => {
-                ui.label(self.to_string());
-            }
+            FileEncoder::Png {
+                compressionlevel: _,
+            } => {}
+            FileEncoder::Bmp => {}
+            FileEncoder::WebP => {}
         }
     }
 }
