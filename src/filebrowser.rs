@@ -73,7 +73,6 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
             if ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
                 ui.ctx().memory_mut(|w| w.close_popup());
             }
-
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
         });
     if !open {
@@ -147,13 +146,13 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
             |ui| {
-                if let Some(d) = dirs::desktop_dir() {
-                    if ui.styled_button(&format!("{DESKTOP} Desktop")).clicked() {
+                if let Some(d) = dirs::home_dir() {
+                    if ui.styled_button(&format!("{FOLDER} Home")).clicked() {
                         *path = d;
                     }
                 }
-                if let Some(d) = dirs::home_dir() {
-                    if ui.styled_button(&format!("{HOUSE} Home")).clicked() {
+                if let Some(d) = dirs::desktop_dir() {
+                    if ui.styled_button(&format!("{FOLDERDESKTOP} Desktop")).clicked() {
                         *path = d;
                     }
                 }

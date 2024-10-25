@@ -578,7 +578,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
-                    ui.label_i(" UV");
+                    ui.label_i(&format!("{INTERSECT} UV"));
                     ui.label_right(
                         RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
                     );
