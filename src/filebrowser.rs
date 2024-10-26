@@ -5,6 +5,7 @@ use crate::ui::{EguiExt, BUTTON_HEIGHT_LARGE};
 
 use anyhow::{Context, Result};
 use dirs;
+use log::debug;
 use notan::egui::{self, *};
 use std::io::Write;
 use std::{
@@ -88,10 +89,22 @@ pub fn browse<F: FnMut(&PathBuf)>(
     mut callback: F,
     ui: &mut Ui,
 ) {
+    let mut prev_path = path.clone();
     let mut filename = ui
         .ctx()
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
+
+    // read cached entries
+    let entries = ui
+        .ctx()
+        .data(|r| r.get_temp::<Vec<PathBuf>>(Id::new("FBDIRS")));
+
+    if entries.is_none() {
+        // mark prev_path as dirty. This is to cause a reload at first start,
+        prev_path = Default::default();
+    }
+    let entries = entries.unwrap_or_default();
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -139,7 +152,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
         }
     });
 
-    let d = fs::read_dir(&path).ok();
     ui.horizontal(|ui| {
         ui.add_space(item_spacing);
         ui.allocate_ui_with_layout(
@@ -152,7 +164,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 }
                 if let Some(d) = dirs::desktop_dir() {
-                    if ui.styled_button(&format!("{FOLDERDESKTOP} Desktop")).clicked() {
+                    if ui
+                        .styled_button(&format!("{FOLDERDESKTOP} Desktop"))
+                        .clicked()
+                    {
                         *path = d;
                     }
                 }
@@ -222,8 +237,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
         );
 
         ui.vertical(|ui| {
-            // ui.style_mut().visuals.faint_bg_color = Color32::from_white_alpha(5);
-
             let panel_bg_color = match ui.style().visuals.dark_mode {
                 true => Color32::from_gray(13),
                 false => Color32::from_gray(217),
@@ -232,54 +245,29 @@ pub fn browse<F: FnMut(&PathBuf)>(
             egui::ScrollArea::new([false, true])
                 .min_scrolled_height(400.)
                 .auto_shrink([false, false])
-                .show(ui, |ui| match d {
-                    Some(contents) => {
-                        egui::Frame::none()
-                            .fill(panel_bg_color)
-                            .rounding(ui.style().visuals.widgets.active.rounding * 1.5)
-                            .inner_margin(Margin::same(6.))
-                            .show(ui, |ui| {
-                                egui::Grid::new("browser")
-                                    .with_row_color(|_, _| Some(Color32::from_gray(0)))
-                                    .striped(true)
-                                    .num_columns(0)
-                                    .min_col_width(ui.available_width())
-                                    .show(ui, |ui| {
-                                        let mut entries = contents
-                                            .into_iter()
-                                            .flat_map(|x| x)
-                                            .filter(|de| {
-                                                !de.file_name().to_string_lossy().starts_with(".")
-                                            })
-                                            .filter(|de| {
-                                                de.path().is_dir()
-                                                    || filter.contains(
-                                                        &de.path()
-                                                            .extension()
-                                                            .map(|ext| {
-                                                                ext.to_string_lossy().to_string()
-                                                            })
-                                                            .unwrap_or_default()
-                                                            .to_lowercase()
-                                                            .as_str(),
-                                                    )
-                                            })
-                                            .collect::<Vec<_>>();
-
-                                        entries.sort_by(|a, b| {
-                                            a.file_name().to_string_lossy().to_lowercase().cmp(
-                                                &b.file_name().to_string_lossy().to_lowercase(),
-                                            )
-                                        });
-
+                .show(ui, |ui| {
+                    egui::Frame::none()
+                        .fill(panel_bg_color)
+                        .rounding(ui.style().visuals.widgets.active.rounding * 1.5)
+                        .inner_margin(Margin::same(6.))
+                        .show(ui, |ui| {
+                            egui::Grid::new("browser")
+                                .striped(true)
+                                .num_columns(0)
+                                .min_col_width(ui.available_width())
+                                .show(ui, |ui| {
+                                    if entries.is_empty() {
+                                        ui.label("Empty directory");
+                                    } else {
                                         for de in entries {
-                                            if de.path().is_dir() {
+                                            if de.is_dir() {
                                                 if ui
                                                     .add(
                                                         egui::Button::new(format!(
                                                             "{FOLDER} {}",
                                                             de.file_name()
-                                                                .to_string_lossy()
+                                                                .map(|n| n.to_string_lossy())
+                                                                .unwrap_or_default()
                                                                 .chars()
                                                                 .take(50)
                                                                 .collect::<String>()
@@ -288,7 +276,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     )
                                                     .clicked()
                                                 {
-                                                    *path = de.path();
+                                                    *path = de;
                                                 }
                                             } else {
                                                 if ui
@@ -296,7 +284,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                         egui::Button::new(format!(
                                                             "{IMAGE_SQUARE} {}",
                                                             de.file_name()
-                                                                .to_string_lossy()
+                                                                .map(|f| f.to_string_lossy())
+                                                                .unwrap_or_default()
                                                                 .chars()
                                                                 .take(50)
                                                                 .collect::<String>()
@@ -305,13 +294,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     )
                                                     .clicked()
                                                 {
-                                                    _ = save_recent_dir(&de.path());
+                                                    _ = save_recent_dir(&de);
                                                     if !save {
-                                                        callback(&de.path());
+                                                        callback(&de);
                                                     } else {
                                                         filename = de
-                                                            .path()
-                                                            .to_path_buf()
                                                             .file_name()
                                                             .map(|f| {
                                                                 f.to_string_lossy().to_string()
@@ -324,19 +311,16 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                             )
                                                         });
                                                     }
-                                                    // self.result = Some(de.path().to_path_buf());
                                                 }
                                             }
                                             ui.end_row();
                                         }
-                                    });
-                            });
-                    }
-                    None => {
-                        ui.label("no contents");
-                    }
+                                    }
+                                });
+                        });
                 });
-            ui.spacing();
+
+            ui.add_space(10.);
 
             if save {
                 let ext = Path::new(&filename)
@@ -370,10 +354,63 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         fe.ui(ui);
                     }
                 }
+            }
 
-                ui.ctx()
-                    .data_mut(|w| w.insert_temp(Id::new("FBFILENAME"), filename.clone()));
+            ui.ctx()
+                .data_mut(|w| w.insert_temp(Id::new("FBFILENAME"), filename.clone()));
+
+            if prev_path != *path {
+                if let Ok(contents) = fs::read_dir(&path) {
+                    debug!("read {}", path.display());
+                    let mut contents = contents
+                        .into_iter()
+                        .flat_map(|x| x)
+                        .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
+                        .filter(|de| {
+                            de.path().is_dir()
+                                || filter.contains(
+                                    &de.path()
+                                        .extension()
+                                        .map(|ext| ext.to_string_lossy().to_string())
+                                        .unwrap_or_default()
+                                        .to_lowercase()
+                                        .as_str(),
+                                )
+                        })
+                        .map(|d| d.path())
+                        .collect::<Vec<_>>();
+
+                    contents.sort_by(|a, b| {
+                        a.file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                            .to_lowercase()
+                            .cmp(
+                                &b.file_name()
+                                    .map(|f| f.to_string_lossy().to_string())
+                                    .unwrap_or_default()
+                                    .to_lowercase(),
+                            )
+                    });
+
+                    ui.ctx()
+                        .data_mut(|r| r.insert_temp::<Vec<PathBuf>>(Id::new("FBDIRS"), contents));
+                }
             }
         });
     });
+}
+
+trait PathExt {
+    fn ext(&self) -> String {
+        todo!()
+    }
+}
+
+impl PathExt for PathBuf {
+    fn ext(&self) -> String {
+        self.extension()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
 }
