@@ -646,22 +646,16 @@ pub fn open_image(
         }
         #[cfg(feature = "turbo")]
         "jpg" | "jpeg" => {
-            debug!("Loading jpeg using turbojpeg");
-            let jpeg_data = std::fs::read(&img_location)?;
-            let mut decompressor = turbojpeg::Decompressor::new()?;
-            let header = decompressor.read_header(&jpeg_data)?;
-            let (width, height) = (header.width, header.height);
-            let mut image = turbojpeg::Image {
-                pixels: vec![0; 3 * width * height],
-                width: width,
-                pitch: 3 * width, // we use no padding between rows
-                height: height,
-                format: turbojpeg::PixelFormat::RGB,
-            };
-            decompressor.decompress(&jpeg_data, image.as_deref_mut())?;
-            let i = RgbImage::from_raw(width as u32, height as u32, image.pixels)
-                .context("Can't load RgbImage from decompressed TurboJPEG")?;
-            _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(i).to_rgba8()));
+            match load_jpeg_turbojpeg(&img_location) {
+                Ok(i) => {
+                    _ = sender.send(Frame::new_still(i.to_rgba8()));
+                },
+                Err(e) => {
+                    error!("Could not load using turbojpeg: {e}. Trying to load with image library.");
+                    let img = image::open(img_location)?;
+                    _ = sender.send(Frame::new_still(img.to_rgba8()));
+                },
+            }
             return Ok(receiver);
         }
         "kra" => {
@@ -680,7 +674,6 @@ pub fn open_image(
                 icns::IconType::RGBA32_256x256,
                 icns::IconType::RGBA32_128x128,
             ] {
-                // just a vec to write the ong to
                 let mut target = vec![];
                 let image = icon_family.get_icon_with_type(icon_type)?;
                 image.write_png(&mut target)?;
@@ -1030,4 +1023,23 @@ fn load_kra(path: &Path) -> Result<DynamicImage> {
     let mut image_bytes = Vec::<u8>::new();
     merged_image.read_to_end(&mut image_bytes)?;
     Ok(image::load_from_memory(&image_bytes)?)
+}
+
+fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
+    debug!("Loading jpeg using turbojpeg");
+    let jpeg_data = std::fs::read(&img_location)?;
+    let mut decompressor = turbojpeg::Decompressor::new()?;
+    let header = decompressor.read_header(&jpeg_data)?;
+    let (width, height) = (header.width, header.height);
+    let mut image = turbojpeg::Image {
+        pixels: vec![0; 3 * width * height],
+        width,
+        pitch: 3 * width, // we use no padding between rows
+        height,
+        format: turbojpeg::PixelFormat::RGB,
+    };
+    decompressor.decompress(&jpeg_data, image.as_deref_mut())?;
+    let i = RgbImage::from_raw(width as u32, height as u32, image.pixels)
+        .context("Can't load RgbImage from decompressed TurboJPEG")?;
+    Ok(DynamicImage::ImageRgb8(i))
 }
