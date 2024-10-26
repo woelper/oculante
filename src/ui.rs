@@ -645,7 +645,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 
             let button_color = match ui.style().visuals.dark_mode {
                 true => Color32::from_gray(25),
-                false => Color32::from_gray(191)
+                false => Color32::from_gray(230)
             };
 
             ui.vertical_centered_justified(|ui| {
@@ -2822,7 +2822,7 @@ pub fn blank_icon(
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut button_color = Color32::from_gray(38);
-    let mut panel_color = Color32::from_gray(23);
+    let mut panel_color = Color32::from_gray(25);
 
     match state.persistent_settings.theme {
         ColorTheme::Light => ctx.set_visuals(Visuals::light()),
