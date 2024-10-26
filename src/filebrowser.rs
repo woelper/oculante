@@ -183,7 +183,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
                 for folder in &settings.folder_bookmarks.clone() {
                     let res = ui.styled_button(&format!(
-                        "{BOOKMARK} {}",
+                        "{FOLDERBOOKMARK} {}",
                         folder
                             .file_name()
                             .map(|x| x.to_string_lossy().to_string())
