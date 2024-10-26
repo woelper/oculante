@@ -12,6 +12,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use oculante::BOLD_FONT;
 use oculante::FONT;
 use shortcuts::key_pressed;
 use std::io::Read;
@@ -327,11 +328,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         );
 
         fonts.font_data.insert(
+            "inter_bold".to_owned(),
+            FontData::from_static(BOLD_FONT).tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: -1.4,
+                baseline_offset_factor: 0.0,
+            }),
+        );
+        fonts.families.insert(
+            FontFamily::Name("bold".to_owned().into()),
+            vec!["inter_bold".into()],
+        );
+
+        fonts.font_data.insert(
             "icons".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../res/fonts/icons.ttf"
-            ))
-            .tweak(FontTweak {
+            FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: 1.0,

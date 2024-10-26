@@ -649,12 +649,14 @@ pub fn open_image(
             match load_jpeg_turbojpeg(&img_location) {
                 Ok(i) => {
                     _ = sender.send(Frame::new_still(i.to_rgba8()));
-                },
+                }
                 Err(e) => {
-                    error!("Could not load using turbojpeg: {e}. Trying to load with image library.");
+                    error!(
+                        "Could not load using turbojpeg: {e}. Trying to load with image library."
+                    );
                     let img = image::open(img_location)?;
                     _ = sender.send(Frame::new_still(img.to_rgba8()));
-                },
+                }
             }
             return Ok(receiver);
         }

@@ -521,11 +521,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
             if let Some(texture) = &state.current_texture.get() {
-
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
-
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
-
                 let uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
@@ -590,7 +587,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 let uv_size = (scale, scale * ratio);
                 let bbox_tl: Pos2;
                 let bbox_br: Pos2;
-                if texture.texture_count==1 {
+                if texture.texture_count == 1 {
                     let texture_resonse = texture.get_texture_at_xy(0,0);
                     ui.add_space(10.);
                     let preview_rect = ui
@@ -608,7 +605,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     bbox_tl = preview_rect.left_top();
                     bbox_br = preview_rect.right_bottom();
                 }
-                else{
+                else {
                     (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
                 }
 
@@ -637,17 +634,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                 );
             }
             ui.add_space(10.);
-
-            let panel_bg_color = match ui.style().visuals.dark_mode {
-                true => Color32::from_gray(13),
-                false => Color32::from_gray(217)
-            };
-
-            let button_color = match ui.style().visuals.dark_mode {
-                true => Color32::from_gray(25),
-                false => Color32::from_gray(230)
-            };
-
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
 
@@ -655,14 +641,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
                     ui.vertical_centered_justified(|ui| {
-                        egui::Frame::none()
-                        .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding*1.5)
-                        .inner_margin(Margin::same(6.))
-                        .show(ui, |ui| {
-
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
-
+                        dark_panel(ui, |ui| {
                             if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
@@ -718,12 +697,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
             if state.current_texture.get().is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
-                        egui::Frame::none()
-                        .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding)
-                        .inner_margin(Margin::same(6.))
-                        .show(ui, |ui| {
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
+                        dark_panel(ui, |ui| {
                             if let Some(img) = &state.current_image {
                                 if ui
                                     .button("Show alpha bleed")
@@ -1127,16 +1101,23 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 
         if !info.exif.is_empty() {
             ui.styled_collapsing("EXIF", |ui| {
-                egui::ScrollArea::new([true, false]).show(ui, |ui| {
-                    egui::Grid::new("extended_exif")
-                        .striped(true)
-                        .show(ui, |ui| {
-                            for (key, val) in &info.exif {
-                                ui.label(key);
-                                ui.label(val);
-                                ui.end_row();
-                            }
+                dark_panel(ui, |ui| {
+                    for (key, val) in &info.exif {
+                        ui.scope(|ui| {
+                            ui.style_mut().override_font_id =
+                                Some(FontId::new(14., FontFamily::Name("bold".into())));
+                            ui.colored_label(
+                                if ui.style().visuals.dark_mode {
+                                    Color32::from_gray(200)
+                                } else {
+                                    Color32::from_gray(20)
+                                },
+                                key,
+                            );
                         });
+                        ui.label(val);
+                        ui.separator();
+                    }
                 });
             });
         }
@@ -2935,4 +2916,30 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     ));
 
     ui.painter().add(text);
+}
+
+fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+    let panel_bg_color = match ui.style().visuals.dark_mode {
+        true => Color32::from_gray(13),
+        false => Color32::from_gray(217),
+    };
+
+    let button_color = match ui.style().visuals.dark_mode {
+        true => Color32::from_gray(25),
+        false => Color32::from_gray(230),
+    };
+
+    egui::Frame::none()
+        .fill(panel_bg_color)
+        .rounding(ui.style().visuals.widgets.active.rounding)
+        .inner_margin(Margin::same(6.))
+        .show(ui, |ui| {
+            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
+
+            ui.scope(add_contents);
+            // let mut prepared = ui.begin(ui);
+            // let ret = add_contents(&mut prepared.content_ui);
+            // let response = prepared.end(ui);
+            // InnerResponse::new(ret, response)
+        });
 }
