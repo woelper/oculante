@@ -2825,35 +2825,36 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut panel_color = Color32::from_gray(25);
 
     match state.persistent_settings.theme {
-        ColorTheme::Light => {
-            ctx.set_visuals(Visuals::light());
-            button_color = Color32::from_gray(255);
-            panel_color = Color32::from_gray(230);
-            if state.persistent_settings.background_color
-                == PersistentSettings::default().background_color
-            {
-                state.persistent_settings.background_color = [200, 200, 200];
-            }
-            if state.persistent_settings.accent_color == PersistentSettings::default().accent_color
-            {
-                state.persistent_settings.accent_color = [0, 170, 255];
-            }
-        }
-        ColorTheme::Dark => {
-            ctx.set_visuals(Visuals::dark());
-            if state.persistent_settings.background_color == [200, 200, 200] {
-                state.persistent_settings.background_color =
-                    PersistentSettings::default().background_color;
-            }
-            if state.persistent_settings.accent_color == [0, 170, 255] {
-                state.persistent_settings.accent_color =
-                    PersistentSettings::default().accent_color;
-            }
-        }
+        ColorTheme::Light => ctx.set_visuals(Visuals::light()),
+        ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
         ColorTheme::System => set_system_theme(ctx),
     }
+
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
+
+    if style.visuals.dark_mode {
+        if state.persistent_settings.background_color == [200, 200, 200] {
+            state.persistent_settings.background_color =
+                PersistentSettings::default().background_color;
+        }
+        if state.persistent_settings.accent_color == [0, 170, 255] {
+            state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
+        }
+    } else {
+        button_color = Color32::from_gray(255);
+        panel_color = Color32::from_gray(230);
+        if state.persistent_settings.background_color
+            == PersistentSettings::default().background_color
+        {
+            state.persistent_settings.background_color = [200, 200, 200];
+        }
+        if state.persistent_settings.accent_color == PersistentSettings::default().accent_color {
+            state.persistent_settings.accent_color = [0, 170, 255];
+        }
+        style.visuals.widgets.inactive.bg_fill = Color32::WHITE;
+    }
+
     style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
