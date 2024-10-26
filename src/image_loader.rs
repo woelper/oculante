@@ -1025,6 +1025,7 @@ fn load_kra(path: &Path) -> Result<DynamicImage> {
     Ok(image::load_from_memory(&image_bytes)?)
 }
 
+#[cfg(feature = "turbo")]
 fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
     debug!("Loading jpeg using turbojpeg");
     let jpeg_data = std::fs::read(&img_location)?;
