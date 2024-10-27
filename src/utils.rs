@@ -549,15 +549,15 @@ pub fn is_ext_compatible(fname: &Path) -> bool {
     )
 }
 
-pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
-    let mut updated_img = img.clone();
+pub fn solo_channel(img: &DynamicImage, channel: usize) -> DynamicImage {
+    let mut updated_img = img.to_rgba8();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         pixel[0] = pixel[channel];
         pixel[1] = pixel[channel];
         pixel[2] = pixel[channel];
         pixel[3] = 255;
     });
-    updated_img
+    DynamicImage::ImageRgba8(updated_img)
 }
 
 pub fn unpremult(img: &DynamicImage) -> DynamicImage {
@@ -701,6 +701,46 @@ impl ImageExt for RgbaImage {
         texture.update_textures(gfx, self);
     }
 }
+
+impl ImageExt for DynamicImage {
+    fn size_vec(&self) -> Vector2<f32> {
+        Vector2::new(self.width() as f32, self.height() as f32)
+    }
+
+    fn to_texture_with_texwrap(
+        &self,
+        gfx: &mut Graphics,
+        settings: &PersistentSettings,
+    ) -> Option<TexWrap> {
+        // FIXME: use the actual imagetype here
+        TexWrap::from_rgbaimage(gfx, settings, &self.to_rgba8())
+    }
+
+    fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
+        gfx.clean();
+
+        gfx.create_texture()
+            .from_bytes(&self.to_rgba8(), self.width(), self.height())
+            .with_premultiplied_alpha()
+            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
+            .build()
+            .ok()
+    }
+
+    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
+        if let Err(e) = gfx.update_texture(texture).with_data(&self.to_rgba8()).update() {
+            error!("{e}");
+        }
+    }
+
+    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
+        texture.update_textures(gfx, &self.to_rgba8());
+    }
+}
+
+
+
 
 impl ImageExt for (i32, i32) {
     fn size_vec(&self) -> Vector2<f32> {

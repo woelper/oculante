@@ -704,7 +704,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_bleed(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -714,7 +714,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .clicked()
                                 {
 
-                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_semitrans(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui.button("Reset image").clicked() {
                                     state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
@@ -2379,7 +2379,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
                         state.current_texture.set(
-                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            unpremult(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );
                     }
@@ -2391,7 +2391,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     }
                     _ => {
                         state.current_texture.set(
-                            solo_channel(img, state.persistent_settings.current_channel as usize)
+                            solo_channel(&DynamicImage::ImageRgba8(img.clone()), state.persistent_settings.current_channel as usize)
                                 .to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );

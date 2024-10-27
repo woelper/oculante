@@ -21,14 +21,14 @@ fn process_pixel_ops() {
     ];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
     let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer, &ops);
+    process_pixels(&mut buffer.to_rgba8(), &ops);
 }
 
 fn blur() {
     let ops = vec![ImageOperation::Blur(200)];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
     let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer, &ops);
+    process_pixels(&mut buffer.to_rgba8(), &ops);
 }
 
 fn resize() {
@@ -39,7 +39,7 @@ fn resize() {
     }];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
     let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer, &ops);
+    process_pixels(&mut buffer.to_rgba8(), &ops);
 }
 
 fn load_webp() {

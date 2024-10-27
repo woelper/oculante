@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use image::DynamicImage;
 use image::GenericImageView;
 use log::debug;
 use log::error;
@@ -972,13 +973,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // Display the channel
             _ => {
                 state.current_texture.set(
-                    solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    solo_channel(
+                        &img,
+                        state.persistent_settings.current_channel as usize,
+                    )
+                    .to_texture_with_texwrap(gfx, &state.persistent_settings),
                     gfx,
                 );
             }
         }
-        state.current_image = Some(img);
+        state.current_image = Some(img.to_rgba8());
         if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(
