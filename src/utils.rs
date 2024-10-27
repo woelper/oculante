@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self, ImageBuffer};
+use image::{self, DynamicImage, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -26,7 +26,7 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_loader::{open_image, rotate_rgbaimage};
+use crate::image_loader::{open_image, rotate_dynimage, rotate_rgbaimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 use crate::texture_wrapper::TexWrap;
@@ -348,10 +348,8 @@ pub fn send_image_threaded(
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
-                        if let Ok(rotated_img) = rotate_rgbaimage(&f.buffer, &path) {
-                            debug!("Image has been rotated.");
-                            f.buffer = rotated_img;
-                        }
+                        _ = rotate_dynimage(&mut f.buffer, &path);
+
                         let _ = texture_sender.send(f);
                         return;
                     }
@@ -422,14 +420,14 @@ pub enum FrameSource {
 /// A single frame
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pub buffer: RgbaImage,
+    pub buffer: DynamicImage,
     /// How long to pause until the next frame, in milliseconds
     pub delay: u16,
     pub source: FrameSource,
 }
 
 impl Frame {
-    pub fn new(buffer: RgbaImage, delay_ms: u16, source: FrameSource) -> Frame {
+    pub fn new(buffer: DynamicImage, delay_ms: u16, source: FrameSource) -> Frame {
         Frame {
             buffer,
             delay: delay_ms,
@@ -437,7 +435,7 @@ impl Frame {
         }
     }
 
-    pub fn new_reset(buffer: RgbaImage) -> Frame {
+    pub fn new_reset(buffer: DynamicImage) -> Frame {
         Frame {
             buffer,
             delay: 0,
@@ -446,7 +444,7 @@ impl Frame {
     }
 
     #[allow(dead_code)]
-    pub fn new_edit(buffer: RgbaImage) -> Frame {
+    pub fn new_edit(buffer: DynamicImage) -> Frame {
         Frame {
             buffer,
             delay: 0,
@@ -454,7 +452,7 @@ impl Frame {
         }
     }
 
-    pub fn new_still(buffer: RgbaImage) -> Frame {
+    pub fn new_still(buffer: DynamicImage) -> Frame {
         Frame {
             buffer,
             delay: 0,
@@ -562,36 +560,38 @@ pub fn solo_channel(img: &RgbaImage, channel: usize) -> RgbaImage {
     updated_img
 }
 
-pub fn unpremult(img: &RgbaImage) -> RgbaImage {
-    let mut updated_img = img.clone();
+pub fn unpremult(img: &DynamicImage) -> DynamicImage {
+    // FIXME: Respect previous image format
+    let mut updated_img = img.to_rgba8();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         pixel[3] = 255;
     });
-    updated_img
+    DynamicImage::ImageRgba8(updated_img)
 }
 
 /// Mark pixels with no alpha but color info
-pub fn highlight_bleed(img: &RgbaImage) -> RgbaImage {
-    let mut updated_img = img.clone();
+pub fn highlight_bleed(img: &DynamicImage) -> DynamicImage {
+    let mut updated_img = img.to_rgba8();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         if pixel[3] == 0 && (pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
             pixel[1] = pixel[1].saturating_add(100);
             pixel[3] = 255;
         }
     });
-    updated_img
+    DynamicImage::ImageRgba8(updated_img)
+
 }
 
 /// Mark pixels with transparency
-pub fn highlight_semitrans(img: &RgbaImage) -> RgbaImage {
-    let mut updated_img = img.clone();
+pub fn highlight_semitrans(img: &DynamicImage) -> DynamicImage {
+    let mut updated_img = img.to_rgba8();
     updated_img.par_chunks_mut(4).for_each(|pixel| {
         if pixel[3] != 0 && pixel[3] != 255 {
             pixel[1] = pixel[1].saturating_add(100);
             pixel[3] = pixel[1].saturating_add(100);
         }
     });
-    updated_img
+    DynamicImage::ImageRgba8(updated_img)
 }
 
 pub fn scale_pt(
@@ -901,7 +901,7 @@ pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     Ok(())
 }
 
-pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
+pub fn clipboard_to_image() -> Result<DynamicImage> {
     let clipboard = &mut Clipboard::new()?;
 
     let imagedata = clipboard.get_image()?;
@@ -912,7 +912,7 @@ pub fn clipboard_to_image() -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>> {
     )
     .context("Can't decode RgbaImage")?;
 
-    Ok(image)
+    Ok(DynamicImage::ImageRgba8(image))
 }
 
 pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {

@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use image::GenericImageView;
 use log::debug;
 use log::error;
 use log::info;
@@ -288,7 +289,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                             .texture_channel
                             .0
                             .clone()
-                            .send(utils::Frame::new_reset(i.to_rgba8()));
+                            .send(utils::Frame::new_reset(i));
                     }
                     Err(e) => error!("ERR loading from stdin: {e} - for now, oculante only supports data that can be decoded by the image crate."),
                 }
