@@ -267,6 +267,30 @@ impl TexWrap {
         }
     }
 
+    pub fn draw_zoomed(
+        &self,
+        draw: &mut Draw,
+        translation_x: f32,
+        translation_y: f32,
+        width: f32,
+        // xy, size
+        center: (f32, f32),
+    ) {
+        let size = self.size();
+        let mut tex_idx = 0;
+        for _row_idx in 0..self.row_count {
+            for _col_idx in 0..self.col_count {
+                draw.image(&self.texture_array[tex_idx].texture)
+                    .blend_mode(BlendMode::NORMAL)
+                    .size(width, width)
+                    .crop(center, (200., 200.))
+                    // .crop((size.0 * 0.5, size.1 * 0.5), (200., 200.))
+                    .translate(translation_x as f32, translation_y as f32);
+                tex_idx += 1;
+            }
+        }
+    }
+
     pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
         for text in &self.texture_array {
             gfx.egui_remove_texture(text.texture_egui.id);

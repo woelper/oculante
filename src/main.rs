@@ -328,10 +328,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         fonts.font_data.insert(
             "icons".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../res/fonts/icons.ttf"
-            ))
-            .tweak(FontTweak {
+            FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: 1.0,
@@ -783,6 +780,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
+    let mut zoom_image = gfx.create_draw();
 
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
@@ -804,9 +802,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             frame.source
         );
         state.image_geometry.dimensions = img.dimensions();
-        // state.current_texture = img.to_texture(gfx);
-
-        // debug!("Frame source: {:?}", frame.source);
 
         set_title(app, state);
 
@@ -1114,12 +1109,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .size(
+                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                    )
                     .blend_mode(BlendMode::ADD)
-                    .translate(aligned_offset_x, aligned_offset_y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
+                    .translate(aligned_offset_x, aligned_offset_y);
             }
         }
         if state.tiling < 2 {
@@ -1164,18 +1159,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.show_minimap {
+        if state.persistent_settings.info_enabled {
             // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
-            let offset_x = 0.0;
 
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_geometry.dimensions.0 as f32
-                * state.image_geometry.scale
-                > app.window().size().0 as f32;
+            // let center = (text)
 
-            if show_minimap {
-                texture.draw_textures(&mut draw, offset_x, 100., scale);
-            }
+            texture.draw_zoomed(
+                &mut zoom_image,
+                8.,
+                220.,
+                240.,
+                (state.cursor_relative.x, state.cursor_relative.y),
+            );
         }
 
         // Draw a brush preview when paint mode is on
@@ -1223,6 +1218,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
+    gfx.render(&zoom_image);
 }
 
 // Show file browser to select image to load
