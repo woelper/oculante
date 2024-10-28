@@ -7,7 +7,7 @@ use crate::{
 };
 
 use egui_notify::Toasts;
-use image::{RgbImage, RgbaImage};
+use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
@@ -112,7 +112,7 @@ impl<'b> OculanteState {
         let _ = self
         .texture_channel
         .0
-        .send(utils::Frame::new_edit(img.clone()));
+        .send(utils::Frame::new_edit(img));
     }
 }
 

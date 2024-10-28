@@ -8,7 +8,9 @@ use crate::{
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
-        self, clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans, load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt
+        clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed,
+        highlight_semitrans, load_image_from_path, next_image, prev_image, send_extended_info,
+        set_title, solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
     FrameSource,
 };
@@ -493,7 +495,7 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
         let mut img = img;
 
@@ -866,7 +868,7 @@ fn render_info_image_tiled(
     (bbox_tl, bbox_br)
 }
 
-pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
