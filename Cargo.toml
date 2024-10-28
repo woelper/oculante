@@ -110,6 +110,7 @@ turbo = ["turbojpeg"]
 update = ["self_update"]
 j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
+hdr = []
 
 
 [target.'cfg(target_os = "macos")'.dependencies]

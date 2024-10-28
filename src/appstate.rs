@@ -7,7 +7,7 @@ use crate::{
 };
 
 use egui_notify::Toasts;
-use image::RgbaImage;
+use image::DynamicImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
@@ -70,7 +70,7 @@ pub struct OculanteState {
     //pub current_texture: Option<TexWrap>,
     pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
-    pub current_image: Option<RgbaImage>,
+    pub current_image: Option<DynamicImage>,
     pub settings_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
     pub tiling: usize,

@@ -384,19 +384,27 @@ pub fn open_image(
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
 
-            let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
-                DynamicImage::ImageRgb32F(image) => image,
-                _ => bail!("expected rgb32f image"),
-            };
+            #[cfg(feature = "hdr")]
+            {
+                let d = DynamicImage::from_decoder(hdr_decoder)?;
+                _ = sender.send(Frame::new_still(d));
+                return Ok(receiver);
+            }
 
-            let buf = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
-                let pixel = hdr_img.get_pixel(x, y);
-                image::Rgba(tonemap_rgb(pixel.0))
-            });
-            let i = DynamicImage::ImageRgba8(buf);
-
-            _ = sender.send(Frame::new_still(i));
-            return Ok(receiver);
+            #[cfg(not(feature = "hdr"))]
+            {
+                let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
+                    DynamicImage::ImageRgb32F(image) => image,
+                    _ => bail!("expected rgb32f image"),
+                };
+                let buf = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
+                    let pixel = hdr_img.get_pixel(x, y);
+                    image::Rgba(tonemap_rgb(pixel.0))
+                });
+                let i = DynamicImage::ImageRgba8(buf);
+                _ = sender.send(Frame::new_still(i));
+                return Ok(receiver);
+            }
         }
         "psd" => {
             let contents = std::fs::read(img_location)?;

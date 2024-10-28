@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self, DynamicImage, ImageBuffer};
+use image::{self, DynamicImage, GenericImageView, ImageBuffer};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -616,12 +616,12 @@ pub fn pos_from_coord(
 }
 
 pub fn send_extended_info(
-    current_image: &Option<RgbaImage>,
+    current_image: &Option<DynamicImage>,
     current_path: &Option<PathBuf>,
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
 ) {
     if let Some(img) = current_image {
-        let copied_img = img.clone();
+        let copied_img = img.to_rgba8();
         let sender = channel.0.clone();
         let current_path = current_path.clone();
         thread::spawn(move || {
@@ -760,12 +760,12 @@ impl ImageExt for (u32, u32) {
     }
 }
 
-pub fn clipboard_copy(img: &RgbaImage) {
+pub fn clipboard_copy(img: &DynamicImage) {
     if let Ok(clipboard) = &mut Clipboard::new() {
         let _ = clipboard.set_image(arboard::ImageData {
             width: img.width() as usize,
             height: img.height() as usize,
-            bytes: std::borrow::Cow::Borrowed(img.clone().as_bytes()),
+            bytes: std::borrow::Cow::Borrowed(img.to_rgba8().as_bytes()),
         });
     }
 }
@@ -965,4 +965,17 @@ pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut Ocula
         delta,
     );
     state.image_geometry.scale = scale;
+}
+
+pub fn get_pixel_checked(img: &DynamicImage, x: u32, y: u32) -> Option<Rgba<u8>> {
+    if img.in_bounds(
+        x,
+        y,
+    ) {
+        return Some(img.get_pixel(
+            x,
+            y,
+        ));
+    }
+    None
 }

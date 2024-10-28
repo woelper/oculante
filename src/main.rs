@@ -982,7 +982,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 );
             }
         }
-        state.current_image = Some(img.to_rgba8());
+        state.current_image = Some(img);
         if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(

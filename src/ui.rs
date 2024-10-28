@@ -1,18 +1,9 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState},
-    clear_image, clipboard_to_image, delete_file,
-    file_encoder::FileEncoder,
-    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
-    paint::PaintStroke,
-    set_zoom,
-    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
-    utils::{
+    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, file_encoder::FileEncoder, get_pixel_checked, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    },
-    FrameSource,
+    }, FrameSource
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -25,7 +16,7 @@ pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{DynamicImage, RgbaImage};
+use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -496,20 +487,23 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 }
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+
+    let mut color_type = ColorType::Rgba8;
     if let Some(img) = &state.current_image {
-        let mut img = img;
+        color_type = img.color();
 
         // prefer edit result if present
-        if state.edit_state.result_pixel_op.width() > 0 {
-            img = &state.edit_state.result_pixel_op;
-        }
+        let img = if state.edit_state.result_pixel_op.width() > 0 {
+            &state.edit_state.result_pixel_op
+        } else {
+            img
+        };
 
-        if let Some(p) = img.get_pixel_checked(
-            state.cursor_relative.x as u32,
-            state.cursor_relative.y as u32,
-        ) {
+        if let Some(p) = get_pixel_checked(img, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
             state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
         }
+
+
     }
 
     egui::SidePanel::left("side_panel")
@@ -563,6 +557,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                     ui.label_i(&format!("{PALETTE} RGBA"));
                     ui.label_right(
                         RichText::new(disp_col_norm(state.sampled_color, 255.))
+                    );
+                    ui.end_row();
+
+                    ui.label_i(&format!("{PALETTE} Color"));
+                    ui.label_right(
+                        format!("{:?}", color_type)
                     );
                     ui.end_row();
 
@@ -704,7 +704,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture.set(highlight_bleed(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -714,7 +714,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .clicked()
                                 {
 
-                                    state.current_texture.set(highlight_semitrans(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                                 }
                                 if ui.button("Reset image").clicked() {
                                     state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
@@ -992,7 +992,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 ui.end_row();
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
+                        if state.edit_state.result_image_op.width() == 0 {
                             state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
                             state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
@@ -1001,7 +1001,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
+                        if state.edit_state.result_image_op.width() == 0 {
                             state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
                             state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
@@ -1012,7 +1012,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
 
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
+                        if state.edit_state.result_image_op.width() == 0 {
                             state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
                         } else {
                             state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
@@ -1329,11 +1329,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     if ctx.input(|i|i.pointer.secondary_down()) {
                         if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
-                                state.cursor_relative.x as u32,
-                                state.cursor_relative.y as u32,
-                            ) {
-                                debug!("{:?}", p);
+                            if let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -1528,8 +1524,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     // start with a fresh copy of the unmodified image
                     state.edit_state.result_image_op = img.clone();
                     for operation in &mut state.edit_state.image_op_stack {
-                        if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}")
+
+                        if let Some(compatible_buffer) = state.edit_state.result_image_op.as_mut_rgba8() {
+                            if let Err(e) = operation.process_image(compatible_buffer) {
+                                error!("{e}")
+                            }
+                        } else {
+                            error!("This image is not RGBA!! No editing");
                         }
                     }
                     debug!(
@@ -1555,7 +1556,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
                     let ops = &state.edit_state.pixel_op_stack;
-                    process_pixels(&mut state.edit_state.result_pixel_op, ops);
+
+
+                    if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                    
+                        process_pixels(compatible_buffer, ops);
+                    }
+
 
                 }
 
@@ -1567,10 +1574,16 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
                     if !stroke.committed {
-                        stroke.render(
-                            &mut state.edit_state.result_pixel_op,
-                            &state.edit_state.brushes,
-                        );
+
+                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                    
+                            stroke.render(
+                                compatible_buffer,
+                                &state.edit_state.brushes,
+                            );
+                        }
+
+
                     }
                 }
 
@@ -1616,10 +1629,15 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
                         if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-                            stroke.render(
-                                &mut state.edit_state.result_image_op,
-                                &state.edit_state.brushes,
-                            );
+
+                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                                stroke.render(
+                                    compatible_buffer,
+                                    &state.edit_state.brushes,
+                                );
+                            }
+                            
+
                             stroke.committed = true;
                             debug!("Committed stroke {}", i);
                         }
@@ -1731,7 +1749,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             |p| {
 
 
-                                let dynimage = DynamicImage::ImageRgba8(state.edit_state.result_pixel_op.clone());
+                                let dynimage = state.edit_state.result_pixel_op.clone();
                                 let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
                                     match encoding_options.save(&dynimage, p) {
 
@@ -2379,7 +2397,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
                         state.current_texture.set(
-                            unpremult(&DynamicImage::ImageRgba8(img.clone())).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );
                     }
@@ -2391,7 +2409,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     }
                     _ => {
                         state.current_texture.set(
-                            solo_channel(&DynamicImage::ImageRgba8(img.clone()), state.persistent_settings.current_channel as usize)
+                            solo_channel(img, state.persistent_settings.current_channel as usize)
                                 .to_texture_with_texwrap(gfx, &state.persistent_settings),
                             gfx,
                         );
@@ -2645,7 +2663,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     .clicked()
                     || copy_pressed
                 {
-                    clipboard_copy(img);
+                    clipboard_copy(&img);
                     ui.close_menu();
                 }
             }

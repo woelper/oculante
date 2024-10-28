@@ -28,10 +28,10 @@ use serde::{Deserialize, Serialize};
 pub struct EditState {
     #[serde(skip)]
     /// The final result of image modifications
-    pub result_pixel_op: RgbaImage,
+    pub result_pixel_op: DynamicImage,
     #[serde(skip)]
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
-    pub result_image_op: RgbaImage,
+    pub result_image_op: DynamicImage,
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
@@ -48,8 +48,8 @@ pub struct EditState {
 impl Default for EditState {
     fn default() -> Self {
         Self {
-            result_pixel_op: RgbaImage::default(),
-            result_image_op: RgbaImage::default(),
+            result_pixel_op: Default::default(),
+            result_image_op: Default::default(),
             painting: Default::default(),
             block_panning: false,
             non_destructive_painting: Default::default(),
