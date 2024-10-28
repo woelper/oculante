@@ -8,9 +8,7 @@ use crate::{
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
-        clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
-        load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
-        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+        self, clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans, load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt
     },
     FrameSource,
 };
@@ -704,7 +702,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.send_edit_image(highlight_bleed(img));
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -713,11 +711,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     )
                                     .clicked()
                                 {
-
-                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.send_edit_image(highlight_semitrans(img));
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.send_edit_image(img.clone());
                                 }
                             }
                         });
@@ -993,18 +990,19 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(img.clone());
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
                         }
                     }
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(img.clone());
+
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
                         }
                     }
                 }
@@ -1013,9 +1011,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
                     if let Some(img) = &state.current_image {
                         if state.edit_state.result_image_op.is_empty() {
-                            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(img.clone());
                         } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
                         }
                     }
                 }

@@ -921,8 +921,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.image_info = None;
             }
             FrameSource::EditResult => {
-                // debug!("EditResult");
-                // state.edit_state.is_processing = false;
+                state.redraw = false;
             }
             FrameSource::AnimationStart => {
                 state.redraw = true;
@@ -977,7 +976,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 );
             }
         }
-        state.current_image = Some(img);
+
+        // Update the image buffer in all cases except incoming edits.
+        // In those cases, we want the image to stay as it is.
+        match &frame.source {
+            FrameSource::EditResult => (),
+            _ => {
+                state.current_image = Some(img);
+            }
+        }
         if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(

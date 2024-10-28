@@ -3,11 +3,11 @@ use crate::{
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
     texture_wrapper::TextureWrapperManager,
-    utils::{ExtendedImageInfo, Frame, Player},
+    utils::{self, ExtendedImageInfo, Frame, Player},
 };
 
 use egui_notify::Toasts;
-use image::RgbaImage;
+use image::{RgbImage, RgbaImage};
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
@@ -106,6 +106,13 @@ impl<'b> OculanteState {
 
     pub fn send_message_warn(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::warn(msg));
+    }
+
+    pub fn send_edit_image(&self, img: RgbaImage) {
+        let _ = self
+        .texture_channel
+        .0
+        .send(utils::Frame::new_edit(img.clone()));
     }
 }
 
