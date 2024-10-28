@@ -495,7 +495,7 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState/*, gfx: &mut Graphics */) {
     if let Some(img) = &state.current_image {
         let mut img = img;
 
@@ -704,7 +704,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    //state.current_texture.set(highlight_bleed(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_modifications_image = Some(highlight_bleed(img));
+                                    state.current_modifications_image_reset = false;
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -713,11 +715,14 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
                                     )
                                     .clicked()
                                 {
-
-                                    state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    //state.current_texture.set(highlight_semitrans(img).to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_modifications_image = Some(highlight_semitrans(img));
+                                    state.current_modifications_image_reset = false;
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    //state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                    state.current_modifications_image = None;
+                                    state.current_modifications_image_reset = true;
                                 }
                             }
                         });

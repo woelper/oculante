@@ -880,7 +880,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // always reset if first image
                 if state.current_texture.get().is_none() {
                     state.reset_image = true;
-                }
+                }                
 
                 if !state.persistent_settings.keep_edits {
                     state.edit_state = Default::default();
@@ -1067,7 +1067,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            info_ui(ctx, state, gfx);
+            info_ui(ctx, state/* , gfx*/); //Changes texture to display
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1235,6 +1235,23 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
+
+    //post render changes of stored image buffer
+    if let Some(img) = &state.current_image {
+        if state.current_modifications_image_reset{ //Reset to normal image buffer if reset is requested.
+            debug!("Resetting modifications buffer");
+            state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+        }
+        else{//If modified image available, set it to the display texture
+            debug!("Applying modifications buffer");            
+            if let Some(modification_image) = &state.current_modifications_image {
+                state.current_texture.set(modification_image.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+            }
+        }
+    }
+    //make sure buffer and flag is always None/false after this section.
+    state.current_modifications_image = None;
+    state.current_modifications_image_reset = false;
 }
 
 // Show file browser to select image to load
