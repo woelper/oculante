@@ -1242,9 +1242,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             debug!("Resetting modifications buffer");
             state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
         }
-        else{//If modified image available, set it to the display texture
-            debug!("Applying modifications buffer");            
+        else{//If modified image available, set it to the display texture                    
             if let Some(modification_image) = &state.current_modifications_image {
+                debug!("Applying modifications buffer");    
                 state.current_texture.set(modification_image.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
             }
         }
