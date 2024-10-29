@@ -151,7 +151,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             }
         }
         let textinput_width = if search_term.len() < 10 {
-            88
+            (ui.ctx().animate_bool("id".into(), search_active) * 88.) as usize
         } else {
             ui.available_width() as usize
         };
