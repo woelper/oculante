@@ -133,9 +133,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
         if ui
             .add(
-                egui::Button::new(format!("{SEARCH}"))
-                    .rounding(5.)
-                    .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                egui::Button::new(
+                    RichText::new(format!("{SEARCH}")).color(ui.style().visuals.selection.bg_fill),
+                )
+                .rounding(5.)
+                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -154,9 +156,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
         }
         if ui
             .add(
-                egui::Button::new(format!("{CHEVRON_UP}"))
-                    .rounding(5.)
-                    .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                egui::Button::new(
+                    RichText::new(format!("{CHEVRON_UP}"))
+                        .color(ui.style().visuals.selection.bg_fill),
+                )
+                .rounding(5.)
+                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -365,11 +370,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             ui.add_space(10.);
 
             if save {
-                let ext = Path::new(&filename)
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
+                let ext = Path::new(&filename).ext();
                 ui.label("Filename");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().button_padding = Vec2::new(2., 5.);
@@ -412,14 +413,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
                         .filter(|de| {
                             de.path().is_dir()
-                                || filter.contains(
-                                    &de.path()
-                                        .extension()
-                                        .map(|ext| ext.to_string_lossy().to_string())
-                                        .unwrap_or_default()
-                                        .to_lowercase()
-                                        .as_str(),
-                                )
+                                || filter.contains(&de.path().ext().to_lowercase().as_str())
                         })
                         .map(|d| d.path())
                         .collect::<Vec<_>>();
@@ -456,6 +450,14 @@ trait PathExt {
 }
 
 impl PathExt for PathBuf {
+    fn ext(&self) -> String {
+        self.extension()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
+}
+
+impl PathExt for Path {
     fn ext(&self) -> String {
         self.extension()
             .map(|f| f.to_string_lossy().to_string())
