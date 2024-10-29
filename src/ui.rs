@@ -716,7 +716,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     state.send_edit_image(highlight_semitrans(img));
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.send_edit_image(img.clone());
+                                    state.send_empty_edit_image();
                                 }
                             }
                         });

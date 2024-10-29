@@ -348,19 +348,22 @@ pub fn send_image_threaded(
                     // a "normal image (no animation)"
                     if f.source == FrameSource::Still {
                         debug!("Received image in {:?}", timer.elapsed());
-                        if let Ok(rotated_img) = rotate_rgbaimage(&f.buffer, &path) {
-                            debug!("Image has been rotated.");
-                            f.buffer = rotated_img;
+                        if let Some(buffer) = f.buffer.as_ref() {
+
+                            if let Ok(rotated_img) = rotate_rgbaimage(&buffer, &path) {
+                                debug!("Image has been rotated.");
+                                f.buffer = Some(rotated_img);
+                            }
+                            let _ = texture_sender.send(f);
+                            return;
                         }
-                        let _ = texture_sender.send(f);
-                        return;
                     }
                     if f.source == FrameSource::Animation {
                         framecache.push(f.clone());
                         if first {
                             _ = texture_sender
                                 .clone()
-                                .send(Frame::new_reset(f.buffer.clone()));
+                                .send(Frame::new_reset(f.buffer.clone().unwrap_or_default()));
                         } else {
                             let _ = texture_sender.send(f.clone());
                         }
@@ -422,7 +425,7 @@ pub enum FrameSource {
 /// A single frame
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pub buffer: RgbaImage,
+    pub buffer: Option<RgbaImage>,
     /// How long to pause until the next frame, in milliseconds
     pub delay: u16,
     pub source: FrameSource,
@@ -431,7 +434,7 @@ pub struct Frame {
 impl Frame {
     pub fn new(buffer: RgbaImage, delay_ms: u16, source: FrameSource) -> Frame {
         Frame {
-            buffer,
+            buffer: Some(buffer),
             delay: delay_ms,
             source,
         }
@@ -439,7 +442,7 @@ impl Frame {
 
     pub fn new_reset(buffer: RgbaImage) -> Frame {
         Frame {
-            buffer,
+            buffer: Some(buffer),
             delay: 0,
             source: FrameSource::AnimationStart,
         }
@@ -448,7 +451,16 @@ impl Frame {
     #[allow(dead_code)]
     pub fn new_edit(buffer: RgbaImage) -> Frame {
         Frame {
-            buffer,
+            buffer: Some(buffer),
+            delay: 0,
+            source: FrameSource::EditResult,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_empty_edit() -> Frame {
+        Frame {
+            buffer: Default::default(),
             delay: 0,
             source: FrameSource::EditResult,
         }
@@ -456,7 +468,7 @@ impl Frame {
 
     pub fn new_still(buffer: RgbaImage) -> Frame {
         Frame {
-            buffer,
+            buffer: Some(buffer),
             delay: 0,
             source: FrameSource::Still,
         }

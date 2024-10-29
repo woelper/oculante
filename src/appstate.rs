@@ -114,6 +114,12 @@ impl<'b> OculanteState {
         .0
         .send(utils::Frame::new_edit(img));
     }
+    pub fn send_empty_edit_image(&self) {
+        let _ = self
+        .texture_channel
+        .0
+        .send(utils::Frame::new_empty_edit());
+    }
 }
 
 impl<'b> Default for OculanteState {
