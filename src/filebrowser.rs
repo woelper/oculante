@@ -120,7 +120,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
             e.file_name()
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_default()
-                .contains(&search_term)
+                .to_lowercase()
+                .contains(&search_term.to_lowercase())
         })
         .collect::<Vec<_>>();
 
@@ -131,10 +132,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
     ui.horizontal(|ui| {
         ui.add_space(item_spacing);
 
+        let search_icon = if search_active {BOLDX} else {SEARCH};
+
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{SEARCH}")).color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(format!("{search_icon}")).color(ui.style().visuals.selection.bg_fill),
                 )
                 .rounding(5.)
                 .min_size(vec2(0., 35.)), // .shortcut_text("sds")
