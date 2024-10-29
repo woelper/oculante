@@ -106,6 +106,7 @@ pub enum ScaleFilter {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub enum ImageOperation {
+    ColorType(i32),
     Brightness(i32),
     Expression(String),
     Desaturate(u8),
@@ -151,6 +152,7 @@ pub enum ImageOperation {
 impl fmt::Display for ImageOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Self::ColorType(_) => write!(f, "{PAINT_BUCKET} Color Type"),
             Self::Brightness(_) => write!(f, "{SUN} Brightness"),
             Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
@@ -210,6 +212,7 @@ impl ImageOperation {
     ) -> Response {
         // ui.label_i(&format!("{}", self));
         match self {
+            Self::ColorType(_) => ui.label("This converts the image to rgba8."),
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),
             Self::Exposure(val) => ui.styled_slider(val, -100..=100),
             Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
@@ -1313,44 +1316,54 @@ pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
     luts
 }
 
-pub fn process_pixels(buffer: &mut RgbaImage, operators: &Vec<ImageOperation>) {
-    // use pulp::Arch;
-    // let arch = Arch::new();
+pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperation>) {
+    
 
-    // arch.dispatch(|| {
-    //         for x in &mut buffer.into_vec() {
-    //             *x = 12 as u8;
-    //         }
-    //     });
-
-    buffer
-        // .chunks_mut(4)
-        .par_chunks_mut(4)
-        .for_each(|px| {
-            // let mut float_pixel = image::Rgba([
-            //     px[0] as f32 / 255.,
-            //     px[1] as f32 / 255.,
-            //     px[2] as f32 / 255.,
-            //     px[3] as f32 / 255.,
-            // ]);
-
-            let mut float_pixel =
-                Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
-
-            // run pixel operations
-            for operation in operators {
-                if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                    error!("{e}")
+    if let Some(buffer) = dynimage.as_mut_rgba8() {
+        buffer
+            .par_chunks_mut(4)
+            .for_each(|px| {
+                let mut float_pixel =
+                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
+    
+                // run pixel operations
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
                 }
-            }
+    
+                float_pixel *= 255.;
+    
+                px[0] = (float_pixel[0]) as u8;
+                px[1] = (float_pixel[1]) as u8;
+                px[2] = (float_pixel[2]) as u8;
+                px[3] = (float_pixel[3]) as u8;
+            });
+    }
 
-            float_pixel *= 255.;
+    if let Some(buffer) = dynimage.as_mut_rgb8() {
+        buffer
+            .par_chunks_mut(3)
+            .for_each(|px| {
+                let mut float_pixel =
+                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0 as f32) / 255.;
+    
+                // run pixel operations
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
+                }
+    
+                float_pixel *= 255.;
+    
+                px[0] = (float_pixel[0]) as u8;
+                px[1] = (float_pixel[1]) as u8;
+                px[2] = (float_pixel[2]) as u8;
+            });
+    }
 
-            px[0] = (float_pixel[0]) as u8;
-            px[1] = (float_pixel[1]) as u8;
-            px[2] = (float_pixel[2]) as u8;
-            px[3] = (float_pixel[3]) as u8;
-        });
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.

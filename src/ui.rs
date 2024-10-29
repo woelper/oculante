@@ -17,7 +17,7 @@ use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
@@ -1179,15 +1179,23 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // Ensure that edit result image is always filled
                 if state.edit_state.result_pixel_op.width() == 0 {
                     debug!("Edit state pixel comp buffer is default, cloning from image");
-                    state.edit_state.result_pixel_op = img.clone();
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
+                    state.edit_state.result_pixel_op = DynamicImage::ImageRgba8(img.to_rgba8());
                     pixels_changed = true;
                 }
                 if state.edit_state.result_image_op.width() == 0 {
                     debug!("Edit state image comp buffer is default, cloning from image");
-                    state.edit_state.result_image_op = img.clone();
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
+                    state.edit_state.result_image_op = DynamicImage::ImageRgba8(img.to_rgba8());
                     image_changed = true;
                 }
+
+
+
+          
+
             }
+
 
             egui::Grid::new("editing")
                 .num_columns(2)
@@ -1522,7 +1530,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if let Some(img) = &mut state.current_image {
                     let stamp = Instant::now();
                     // start with a fresh copy of the unmodified image
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
+                    // state.edit_state.result_image_op = DynamicImage::ImageRgba8(img.to_rgba8());
                     for operation in &mut state.edit_state.image_op_stack {
 
                         if let Some(compatible_buffer) = state.edit_state.result_image_op.as_mut_rgba8() {
@@ -1558,11 +1568,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     let ops = &state.edit_state.pixel_op_stack;
 
 
-                    if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
                     
-                        process_pixels(compatible_buffer, ops);
-                    }
-
+                        process_pixels(&mut state.edit_state.result_pixel_op, ops);
+                      
 
                 }
 
@@ -1837,6 +1845,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                         }
 
+                    }
+                    if let Some(img) = &state.current_image {
+                        if img.color() != ColorType::Rgba8 {
+                            ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
+                        }
                     }
                 }
             });
