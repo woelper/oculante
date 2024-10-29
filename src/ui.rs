@@ -2815,6 +2815,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut style: egui::Style = (*ctx.style()).clone();
 
     if style.visuals.dark_mode {
+        style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
                 PersistentSettings::default().background_color;
@@ -2823,6 +2824,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
+        style.visuals.extreme_bg_color = Color32::from_hex("#E6E6E6").unwrap_or_default();
+
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
         if state.persistent_settings.background_color

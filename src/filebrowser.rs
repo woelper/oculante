@@ -56,7 +56,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        .default_width(700.)
+        .default_width(750.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
@@ -129,18 +129,19 @@ pub fn browse<F: FnMut(&PathBuf)>(
     ui.add_space(item_spacing);
 
     // The navigation bar
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.add_space(item_spacing);
 
-        let search_icon = if search_active {BOLDX} else {SEARCH};
+        let search_icon = if search_active { BOLDX } else { SEARCH };
 
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{search_icon}")).color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(format!("{search_icon}"))
+                        .color(ui.style().visuals.selection.bg_fill),
                 )
                 .rounding(5.)
-                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                .min_size(vec2(35., 35.)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -149,13 +150,25 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 search_term = Default::default();
             }
         }
+        let textinput_width = if search_term.len() < 10 {
+            88
+        } else {
+            ui.available_width() as usize
+        };
+
         if search_active {
-            ui.add(
+            ui.visuals_mut().selection.stroke = Stroke::NONE;
+            let resp = ui.add(
                 TextEdit::singleline(&mut search_term)
                     .min_size(vec2(0., 35.))
-                    .desired_width(80.)
+                    .desired_width(textinput_width as f32)
                     .vertical_align(Align::Center),
             );
+            ui.memory_mut(|r| r.request_focus(resp.id));
+        }
+        if search_term.len() >= 10 {
+            ui.end_row();
+            ui.add_space(item_spacing);
         }
         if ui
             .add(
@@ -164,7 +177,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .color(ui.style().visuals.selection.bg_fill),
                 )
                 .rounding(5.)
-                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                .min_size(vec2(35., 35.)), // .shortcut_text("sds")
             )
             .clicked()
         {
