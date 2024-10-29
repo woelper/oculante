@@ -95,6 +95,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    let mut search_term = ui
+        .ctx()
+        .data(|r| r.get_temp::<String>(Id::new("FBSEARCH")))
+        .unwrap_or_default();
+    let mut search_active = ui
+        .ctx()
+        .data(|r| r.get_temp::<bool>(Id::new("FBSEARCHACTIVE")))
+        .unwrap_or_default();
+
     // read cached entries
     let entries = ui
         .ctx()
@@ -104,7 +113,16 @@ pub fn browse<F: FnMut(&PathBuf)>(
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
     }
-    let entries = entries.unwrap_or_default();
+    let entries = entries
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|e| {
+            e.file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default()
+                .contains(&search_term)
+        })
+        .collect::<Vec<_>>();
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -112,6 +130,28 @@ pub fn browse<F: FnMut(&PathBuf)>(
     // The navigation bar
     ui.horizontal(|ui| {
         ui.add_space(item_spacing);
+
+        if ui
+            .add(
+                egui::Button::new(format!("{SEARCH}"))
+                    .rounding(5.)
+                    .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+            )
+            .clicked()
+        {
+            search_active = !search_active;
+            if !search_active {
+                search_term = Default::default();
+            }
+        }
+        if search_active {
+            ui.add(
+                TextEdit::singleline(&mut search_term)
+                    .min_size(vec2(0., 35.))
+                    .desired_width(80.)
+                    .vertical_align(Align::Center),
+            );
+        }
         if ui
             .add(
                 egui::Button::new(format!("{CHEVRON_UP}"))
@@ -296,6 +336,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 {
                                                     _ = save_recent_dir(&de);
                                                     if !save {
+                                                        search_active = false;
+                                                        search_term.clear();
                                                         callback(&de);
                                                     } else {
                                                         filename = de
@@ -345,6 +387,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if ui.button(format!("   Save file   ")).clicked() {
+                        search_active = false;
+                        search_term.clear();
                         callback(&path.join(filename.clone()));
                     }
                 });
@@ -399,6 +443,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
             }
         });
     });
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<String>(Id::new("FBSEARCH"), search_term));
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<bool>(Id::new("FBSEARCHACTIVE"), search_active));
 }
 
 trait PathExt {
