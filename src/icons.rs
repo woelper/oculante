@@ -46,6 +46,15 @@ pub const OPTIONS: &str = "\u{E92b}";
 pub const BOOKMARK_OFF: &str = "\u{E92c}";
 pub const WARNING_CIRCLE: &str = "\u{E92d}";
 pub const ERROR_CIRCLE: &str = "\u{E92e}";
+pub const FOLDERDESKTOP: &str = "\u{E93b}";
+pub const FOLDERBOOKMARK: &str = "\u{E93c}";
+pub const BOLDUP: &str = "\u{E92f}";
+pub const BOLDDOWN: &str = "\u{E930}";
+pub const BOLDX: &str = "\u{E931}";
+pub const GHLOGO: &str = "\u{E933}";
+pub const CIRCLESQUARE: &str = "\u{E932}";
+pub const GRID: &str = "\u{E934}";
+pub const BEZEIR: &str = "\u{E935}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.

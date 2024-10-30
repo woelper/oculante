@@ -25,10 +25,10 @@ dirs = "5.0"
 env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
-fast_image_resize = "4.0"
+fast_image_resize = "5.0"
 gif = "0.13.1"
 gif-dispose = "5.0.1"
-image = { version = "0.25.2", features = ["hdr"] }
+image = { version = "0.25.4", features = ["hdr"] }
 kamadak-exif = "0.5"
 lexical-sort = "0.3"
 libavif-image = { version = "0.14", optional = true }
@@ -80,10 +80,7 @@ ruzstd = "0.7" # for ktx
 basis-universal = "0.3.1"
 mouse_position = "0.1.3"
 webp-animation = { version = "0.9.0", features = ["static"] }
-fluent-uri = "0.1.4"
 imageproc = { version = "0.25", features = ["rayon"] }
-num-traits = "0.2.18"
-zerocopy = "0.7.34"
 icns = "0.3.1"
 jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
     "threads",
@@ -94,9 +91,17 @@ file-format = "0.25.0"
 egui_extras = { version = "0.27.2", features = ["image", "file"] }
 libblur = "0.13.5"
 egui-modal = "0.3.6"
+zip = "2.2.0"
 
 [features]
-default = ["turbo", "avif_native", "update", "notan/glsl-to-spirv", "j2k", "jxlcms"]
+default = [
+    "turbo",
+    "avif_native",
+    "update",
+    "notan/glsl-to-spirv",
+    "j2k",
+    "jxlcms",
+]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
@@ -126,16 +131,22 @@ cmake = "0.1"
 cmd_lib = "1.3.0"
 xmltree = "0.11.0"
 chrono = "0.4.38"
+criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
 [profile.release]
-codegen-units = 1
+# codegen-units = 1
 # incremental = false
-lto = true
+# lto = true
 strip = true
-opt-level = 3
+# opt-level = 3
 panic = "abort"
 
 [profile.dev]
 debug = false
 incremental = true
-opt-level = 1
+opt-level = 3
+
+
+[[bench]]
+name = "my_benchmark"
+harness = false

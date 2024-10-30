@@ -12,12 +12,15 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use oculante::BOLD_FONT;
+use oculante::FONT;
 use shortcuts::key_pressed;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 pub mod cache;
+pub mod file_encoder;
 pub mod icons;
 pub mod scrubber;
 pub mod settings;
@@ -33,6 +36,7 @@ mod image_loader;
 use appstate::*;
 #[cfg(not(feature = "file_open"))]
 mod filebrowser;
+mod texture_wrapper;
 
 pub mod ktx2_loader;
 // mod events;
@@ -51,8 +55,6 @@ use crate::image_editing::EditState;
 
 mod image_editing;
 pub mod paint;
-
-pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -207,7 +209,6 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     state.player = Player::new(
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache,
-        gfx.limits().max_texture_size,
     );
 
     debug!("matches {:?}", matches);
@@ -307,7 +308,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         }
     }
 
-    // Set up egui style
+    // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
         let mut fonts = FontDefinitions::default();
@@ -327,11 +328,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         );
 
         fonts.font_data.insert(
+            "inter_bold".to_owned(),
+            FontData::from_static(BOLD_FONT).tweak(FontTweak {
+                scale: 1.0,
+                y_offset_factor: 0.0,
+                y_offset: -1.4,
+                baseline_offset_factor: 0.0,
+            }),
+        );
+        fonts.families.insert(
+            FontFamily::Name("bold".to_owned().into()),
+            vec!["inter_bold".into()],
+        );
+
+        fonts.font_data.insert(
             "icons".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../res/fonts/oculante_icons_iconamoon_bootstrap.ttf"
-            ))
-            .tweak(FontTweak {
+            FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: 1.0,
@@ -352,7 +364,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .insert(0, "inter".to_owned());
 
         debug!("Theme {:?}", state.persistent_settings.theme);
-        apply_theme(&state, ctx);
+        apply_theme(&mut state, ctx);
         ctx.set_fonts(fonts);
     });
 
@@ -689,8 +701,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
         }
     }
 
-    // Save every 1.5 secs
-    let t = app.timer.elapsed_f32() % 1.5;
+    // Save every 5 secs
+    let t = app.timer.elapsed_f32() % 5.0;
     if t <= 0.01 {
         state.volatile_settings.window_geometry = (
             (
@@ -759,7 +771,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.toasts.error(e);
                 state.current_image = None;
                 state.is_loaded = true;
-                state.current_texture = None;
+                state.current_texture.clear();
             }
             Message::Info(m) => {
                 state
@@ -866,7 +878,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 }
                 // always reset if first image
-                if state.current_texture.is_none() {
+                if state.current_texture.get().is_none() {
                     state.reset_image = true;
                 }
 
@@ -923,7 +935,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received compare result");
 
                 // always reset if first image
-                if state.current_texture.is_none() {
+                if state.current_texture.get().is_none() {
                     state.reset_image = true;
                 }
 
@@ -931,29 +943,38 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
-        if let Some(tex) = &mut state.current_texture {
+        if let Some(tex) = &mut state.current_texture.get() {
             if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                img.update_texture(gfx, tex);
+                img.update_texture_with_texwrap(gfx, tex);
             } else {
-                state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+                state.current_texture.set(
+                    img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    gfx,
+                );
             }
         } else {
             debug!("Setting texture");
-            state.current_texture = img.to_texture(gfx, &state.persistent_settings);
+            state.current_texture.set(
+                img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                gfx,
+            );
         }
 
         match &state.persistent_settings.current_channel {
             // Unpremultiply the image
-            ColorChannel::Rgb => {
-                state.current_texture = unpremult(&img).to_texture(gfx, &state.persistent_settings)
-            }
+            ColorChannel::Rgb => state.current_texture.set(
+                unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                gfx,
+            ),
             // Do nuttin'
             ColorChannel::Rgba => (),
             // Display the channel
             _ => {
-                state.current_texture =
+                state.current_texture.set(
                     solo_channel(&img, state.persistent_settings.current_channel as usize)
-                        .to_texture(gfx, &state.persistent_settings)
+                        .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    gfx,
+                );
             }
         }
         state.current_image = Some(img);
@@ -982,8 +1003,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
 
     let egui_output = plugins.egui(|ctx| {
-        // the top menu bar
-        // ctx.request_repaint_after(Duration::from_secs(1));
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
@@ -994,6 +1013,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
+                    &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
                     },
@@ -1002,6 +1022,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
 
+        // the top menu bar
         if !state.persistent_settings.zen_mode {
             let menu_height = 36.0;
             egui::TopBottomPanel::top("menu")
@@ -1035,18 +1056,18 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 });
         }
 
-        if state.persistent_settings.info_enabled
-            && !state.settings_enabled
-            && !state.persistent_settings.zen_mode
-        {
-            info_ui(ctx, state, gfx);
-        }
-
         if state.persistent_settings.edit_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
             edit_ui(app, ctx, state, gfx);
+        }
+
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1097,7 +1118,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         settings_ui(app, ctx, state, gfx);
     });
 
-    if let Some(texture) = &state.current_texture {
+    if let Some(texture) = &state.current_texture.get() {
         // align to pixel to prevent distortion
         let aligned_offset_x = state.image_geometry.offset.x.trunc();
         let aligned_offset_y = state.image_geometry.offset.y.trunc();
@@ -1114,18 +1135,31 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
         }
         if state.tiling < 2 {
-            draw.image(texture)
-                .blend_mode(BlendMode::NORMAL)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(aligned_offset_x, aligned_offset_y);
+            texture.draw_textures(
+                &mut draw,
+                aligned_offset_x,
+                aligned_offset_y,
+                state.image_geometry.scale,
+            );
         } else {
-            draw.pattern(texture)
-                .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(aligned_offset_x, aligned_offset_y)
-                .size(
-                    texture.width() * state.tiling as f32,
-                    texture.height() * state.tiling as f32,
-                );
+            for yi in 0..state.tiling {
+                for xi in 0..state.tiling {
+                    //The "old" version used only a static offset, is this correct?
+                    let translate_x = (xi as f32 * texture.width() * state.image_geometry.scale
+                        + state.image_geometry.offset.x)
+                        .trunc();
+                    let translate_y = (yi as f32 * texture.height() * state.image_geometry.scale
+                        + state.image_geometry.offset.y)
+                        .trunc();
+
+                    texture.draw_textures(
+                        &mut draw,
+                        translate_x,
+                        translate_y,
+                        state.image_geometry.scale,
+                    );
+                }
+            }
         }
 
         if state.persistent_settings.show_frame {
@@ -1152,10 +1186,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 > app.window().size().0 as f32;
 
             if show_minimap {
-                draw.image(texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .translate(offset_x, 100.)
-                    .scale(scale, scale);
+                texture.draw_textures(&mut draw, offset_x, 100., scale);
             }
         }
 
@@ -1254,16 +1285,4 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
-}
-
-fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteState) {
-    let delta = scale - state.image_geometry.scale;
-    let zoom_point = from_center.unwrap_or(state.cursor);
-    state.image_geometry.offset -= scale_pt(
-        state.image_geometry.offset,
-        zoom_point,
-        state.image_geometry.scale,
-        delta,
-    );
-    state.image_geometry.scale = scale;
 }
