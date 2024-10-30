@@ -157,12 +157,14 @@ pub fn browse<F: FnMut(&PathBuf)>(
         };
 
         if search_active {
-            ui.scope(|ui|{
-
+            ui.scope(|ui| {
                 ui.visuals_mut().selection.stroke = Stroke::NONE;
-                ui.visuals_mut().widgets.active.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.inactive.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.hovered.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.active.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
                 let resp = ui.add(
                     TextEdit::singleline(&mut search_term)
                         .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
@@ -277,7 +279,13 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.pointer.secondary_released() || r.key_released(Key::D)) {
+                        if ui.input(|r| r.key_released(Key::D)) {
+                            if !ui.ctx().wants_keyboard_input() {
+                                settings.folder_bookmarks.remove(folder);
+                            }
+                        }
+
+                        if ui.input(|r| r.pointer.secondary_released()) {
                             settings.folder_bookmarks.remove(folder);
                         }
                     }
