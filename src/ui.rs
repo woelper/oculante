@@ -2837,7 +2837,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
-        style.visuals.extreme_bg_color = Color32::from_hex("#E6E6E6").unwrap_or_default();
+        style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
