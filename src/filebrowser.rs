@@ -140,8 +140,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     RichText::new(format!("{search_icon}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(5.)
-                .min_size(vec2(35., 35.)), // .shortcut_text("sds")
+                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -157,14 +157,20 @@ pub fn browse<F: FnMut(&PathBuf)>(
         };
 
         if search_active {
-            ui.visuals_mut().selection.stroke = Stroke::NONE;
-            let resp = ui.add(
-                TextEdit::singleline(&mut search_term)
-                    .min_size(vec2(0., 35.))
-                    .desired_width(textinput_width as f32)
-                    .vertical_align(Align::Center),
-            );
-            ui.memory_mut(|r| r.request_focus(resp.id));
+            ui.scope(|ui|{
+
+                ui.visuals_mut().selection.stroke = Stroke::NONE;
+                ui.visuals_mut().widgets.active.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                let resp = ui.add(
+                    TextEdit::singleline(&mut search_term)
+                        .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
+                        .desired_width(textinput_width as f32)
+                        .vertical_align(Align::Center),
+                );
+                ui.memory_mut(|r| r.request_focus(resp.id));
+            });
         }
         if search_term.len() >= 10 {
             ui.end_row();
@@ -176,8 +182,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     RichText::new(format!("{CHEVRON_UP}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(5.)
-                .min_size(vec2(35., 35.)), // .shortcut_text("sds")
+                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -283,7 +289,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     if ui
                         .add(
                             egui::Button::new(RichText::new(PLUS).color(col))
-                                .rounding(ui.style().visuals.widgets.inactive.rounding)
+                                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                                 .fill(Color32::TRANSPARENT)
                                 .frame(true)
                                 .stroke(Stroke::new(2., col))
@@ -309,7 +315,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .show(ui, |ui| {
                     egui::Frame::none()
                         .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding * 1.5)
+                        .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
                             egui::Grid::new("browser")
