@@ -97,6 +97,11 @@ pub trait EguiExt {
     ) -> Response {
         unimplemented!()
     }
+
+    fn get_rounding(&self, _height: f32) -> f32 {
+        unimplemented!()
+    }
+
     fn styled_collapsing<R>(
         &mut self,
         _heading: impl Into<WidgetText>,
@@ -107,6 +112,14 @@ pub trait EguiExt {
 }
 
 impl EguiExt for Ui {
+    fn get_rounding(&self, height: f32) -> f32 {
+        if height > 25. {
+            self.style().visuals.widgets.inactive.rounding.ne * 2.
+        } else {
+            self.style().visuals.widgets.inactive.rounding.ne
+        }
+    }
+
     fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
         let color = self.style().visuals.selection.bg_fill;
 
@@ -250,7 +263,7 @@ impl EguiExt for Ui {
         let spacing = if icon.len() == 0 { "" } else { "      " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
-                .rounding(self.style().visuals.widgets.inactive.rounding)
+                .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
         );
 
@@ -276,13 +289,13 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
-        self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
+        // self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
         let spacing = if icon.len() == 0 { "" } else { "  " };
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
-                .rounding(5.)
-                .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(0., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
         );
 
         let mut icon_pos = r.rect.right_center();
@@ -2815,6 +2828,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut style: egui::Style = (*ctx.style()).clone();
 
     if style.visuals.dark_mode {
+        style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
                 PersistentSettings::default().background_color;
@@ -2823,6 +2837,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
+        style.visuals.extreme_bg_color = Color32::from_hex("#E6E6E6").unwrap_or_default();
+
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
         if state.persistent_settings.background_color
