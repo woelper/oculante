@@ -860,7 +860,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {}
         }
 
-        match frame {
+        match &frame {
             Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
                 state.edit_state.result_image_op = Default::default();
                 state.edit_state.result_pixel_op = Default::default();
@@ -927,9 +927,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             Frame::Animation(_, _) => {
                 state.redraw = true;
             }
-            Frame::CompareResult(_) => {
+            Frame::CompareResult(_, geo) => {
                 debug!("Received compare result");
-
+                state.image_geometry = geo.clone();
                 // always reset if first image
                 if state.current_texture.get().is_none() {
                     state.reset_image = true;
@@ -945,7 +945,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             Frame::AnimationStart(img)
             | Frame::Still(img)
             | Frame::EditResult(img)
-            | Frame::CompareResult(img)
+            | Frame::CompareResult(img, _)
             | Frame::Animation(img, _)
             | Frame::ImageCollectionMember(img) => {
                 debug!("Received image buffer: {:?}", img.dimensions(),);

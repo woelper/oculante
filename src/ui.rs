@@ -671,10 +671,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     }
                                     ui.vertical_centered_justified(|ui| {
                                         if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
-                                            state.image_geometry = geo.clone();
                                             state
                                                 .player
-                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default())), state.message_channel.0.clone());
+                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), geo.clone())), state.message_channel.0.clone());
                                             ui.ctx().request_repaint();
                                             ui.ctx().request_repaint_after(Duration::from_millis(500));
                                             state.current_path = Some(path);

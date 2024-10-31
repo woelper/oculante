@@ -285,12 +285,14 @@ impl Player {
         if let Some(cached_image) = self.cache.get(img_location) {
             debug!("Cache hit for {}", img_location.display());
 
-            let mut frame = Frame::new_still(cached_image);
+            let frame = Frame::new_still(cached_image);
             if let Some(fs) = forced_frame_source {
-                debug!("Frame source set to {:?}", fs);
-                frame = fs;
+                debug!("Frame source set to {fs}");
+                _ = self.image_sender.send(frame.transmute(fs));
+
+            } else {
+                _ = self.image_sender.send(frame);
             }
-            _ = self.image_sender.send(frame);
             return;
         }
 
@@ -301,6 +303,7 @@ impl Player {
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
+            forced_frame_source,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -324,6 +327,7 @@ pub fn send_image_threaded(
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
+    forced_frame_source: Option<Frame>,
 ) {
     let loc = img_location.to_owned();
 
@@ -367,7 +371,13 @@ pub fn send_image_threaded(
                                 debug!("Image has been rotated.");
                                 *buffer = rotated_img;
                             }
-                            let _ = texture_sender.send(f);
+                            // TODO force frame sournce
+                            if let Some(new_frame) = forced_frame_source {
+                                debug!("Converting from {f} to {new_frame}");
+                                let _ = texture_sender.send(f.transmute(new_frame));
+                            } else {
+                                let _ = texture_sender.send(f);
+                            }
                             return;
                         }
                         _ => (),
@@ -423,7 +433,7 @@ pub enum Frame {
     /// Only update the current texture.
     UpdateTexture,
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
-    CompareResult(RgbaImage),
+    CompareResult(RgbaImage, ImageGeometry),
     /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
     ImageCollectionMember(RgbaImage),
 }
@@ -455,19 +465,40 @@ impl Frame {
         Frame::Still(buffer)
     }
 
+    // Convert one `Frame` variant to something else, replacing its buffer.
+    // This is useful to force a certain frame type.
+    pub fn transmute(self, forced_variant: Self) -> Frame {
+        let mut forced_variant = forced_variant;
+
+        match &self {
+            Frame::Still(img)
+            | Frame::Animation(img, _)
+            | Frame::AnimationStart(img)
+            | Frame::EditResult(img)
+            | Frame::CompareResult(img, _)
+            | Frame::ImageCollectionMember(img) => match forced_variant {
+                Frame::Still(ref mut image_buffer)
+                | Frame::Animation(ref mut image_buffer, _)
+                | Frame::AnimationStart(ref mut image_buffer)
+                | Frame::EditResult(ref mut image_buffer)
+                | Frame::CompareResult(ref mut image_buffer, _)
+                | Frame::ImageCollectionMember(ref mut image_buffer) => *image_buffer = img.clone(),
+                Frame::UpdateTexture => (),
+            },
+            Frame::UpdateTexture => (),
+        }
+        forced_variant
+    }
+
     pub fn get_image(&self) -> Option<RgbaImage> {
         match self {
             Frame::AnimationStart(img)
             | Frame::Still(img)
             | Frame::EditResult(img)
-            | Frame::CompareResult(img)
+            | Frame::CompareResult(img, _)
             | Frame::Animation(img, _)
-            | Frame::ImageCollectionMember(img) => {
-                Some(img.clone())
-            }
-            _ => {
-                None
-            }
+            | Frame::ImageCollectionMember(img) => Some(img.clone()),
+            _ => None,
         }
     }
 }
@@ -868,15 +899,12 @@ pub fn compare_next(state: &mut OculanteState) {
             0
         };
 
-        if let Some(c) = compare_list.get(index) {
-            let path = &c.0;
-            let geo = &c.1;
-            state.image_geometry = geo.clone();
+        if let Some((path, geo)) = compare_list.get(index) {
             state.is_loaded = false;
             state.current_image = None;
             state.player.load_advanced(
                 path,
-                Some(Frame::CompareResult(Default::default())),
+                Some(Frame::CompareResult(Default::default(), geo.clone())),
                 state.message_channel.0.clone(),
             );
             state.current_path = Some(path.clone());
