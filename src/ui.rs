@@ -1571,30 +1571,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                // Update the texture
-                if let Some(tex) = &mut state.current_texture.get() {
-                    if let Some(img) = &state.current_image {
-                        if tex.width() as u32 == state.edit_state.result_pixel_op.width()
-                            && state.edit_state.result_pixel_op.height() == img.height()
-                        {
-                            state.edit_state.result_pixel_op.update_texture_with_texwrap(gfx, tex);
-                        } else {
-                            state.current_texture.set(state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
-                        }
-                    }
-                }
-
+                state.send_frame(crate::Frame::UpdateTexture);
                 debug!(
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
-
-    //             let sender = state.texture_channel.0.clone();
-
-    //             let f = Frame::new_edit(state.edit_state.result_pixel_op.clone());
-                    //  _ = sender.send(f);
-
-
             }
 
             // render uncommitted strokes if destructive to speed up painting
