@@ -367,10 +367,8 @@ pub fn send_image_threaded(
                         }
                         Frame::Still(ref mut buffer) => {
                             debug!("Received image in {:?}", timer.elapsed());
-                            if let Ok(rotated_img) = rotate_rgbaimage(&buffer, &path) {
-                                debug!("Image has been rotated.");
-                                *buffer = rotated_img;
-                            }
+                            _ = rotate_dynimage(buffer, &path);
+                    
                             // TODO force frame sournce
                             if let Some(new_frame) = forced_frame_source {
                                 debug!("Converting from {f} to {new_frame}");
@@ -423,19 +421,19 @@ pub fn send_image_threaded(
 #[derive(Debug, Clone, PartialEq, Display)]
 pub enum Frame {
     /// A regular still frame (most common)
-    Still(RgbaImage),
+    Still(DynamicImage),
     /// Part of an animation. Delay in ms
-    Animation(RgbaImage, u16),
+    Animation(DynamicImage, u16),
     /// First frame of animation. This is necessary to reset the image and stop the player.
-    AnimationStart(RgbaImage),
+    AnimationStart(DynamicImage),
     /// Result of an edit operation with image
-    EditResult(RgbaImage),
+    EditResult(DynamicImage),
     /// Only update the current texture.
     UpdateTexture,
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
-    CompareResult(RgbaImage, ImageGeometry),
+    CompareResult(DynamicImage, ImageGeometry),
     /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
-    ImageCollectionMember(RgbaImage),
+    ImageCollectionMember(DynamicImage),
 }
 
 impl Frame {
@@ -443,16 +441,16 @@ impl Frame {
         source
     }
 
-    pub fn new_reset(buffer: RgbaImage) -> Frame {
+    pub fn new_reset(buffer: DynamicImage) -> Frame {
         Frame::AnimationStart(buffer)
     }
 
-    pub fn new_animation(buffer: RgbaImage, delay_ms: u16) -> Frame {
+    pub fn new_animation(buffer: DynamicImage, delay_ms: u16) -> Frame {
         Frame::Animation(buffer, delay_ms)
     }
 
     #[allow(dead_code)]
-    pub fn new_edit(buffer: RgbaImage) -> Frame {
+    pub fn new_edit(buffer: DynamicImage) -> Frame {
         Frame::EditResult(buffer)
     }
 
@@ -461,7 +459,7 @@ impl Frame {
         Frame::UpdateTexture
     }
 
-    pub fn new_still(buffer: RgbaImage) -> Frame {
+    pub fn new_still(buffer: DynamicImage) -> Frame {
         Frame::Still(buffer)
     }
 
@@ -490,7 +488,7 @@ impl Frame {
     }
 
     /// Return the image buffor of a `Frame`.
-    pub fn get_image(&self) -> Option<RgbaImage> {
+    pub fn get_image(&self) -> Option<DynamicImage> {
         match self {
             Frame::AnimationStart(img)
             | Frame::Still(img)

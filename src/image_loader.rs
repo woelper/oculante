@@ -447,7 +447,8 @@ pub fn open_image(
                     let delay = t - last_timestamp;
                     debug!("time {t} {delay}");
                     last_timestamp = t;
-                    let frame = Frame::new_animation(buf, delay as u16);
+                    let i = DynamicImage::ImageRgba8(buf);
+                    let frame = Frame::new_animation(i, delay as u16);
                     _ = sender.send(frame);
                 } else {
                     break;
@@ -527,7 +528,7 @@ pub fn open_image(
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
 
-                    _ = sender.send(Frame::new_animation(buf, delay as u16));
+                    _ = sender.send(Frame::new_animation(img, delay as u16));
                     background = Some(output.clone());
                 }
                 return Ok(receiver);
@@ -636,8 +637,10 @@ pub fn open_image(
                             dim.1,
                             screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
+                        let buf = buf.context("Can't read gif frame")?;
+                        let i = DynamicImage::ImageRgba8(buf);
                         _ = sender.send(Frame::new_animation(
-                            buf.context("Can't read gif frame")?,
+                            i,
                             frame.delay * 10,
                         ));
                     } else {
@@ -1005,7 +1008,7 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
         if is_jxl_anim {
             // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
             _ = frame_sender.send(Frame::new_animation(
-                image_result.to_rgba8(),
+                image_result,
                 frame_duration
             ));
         } else {
