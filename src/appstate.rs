@@ -107,6 +107,13 @@ impl<'b> OculanteState {
     pub fn send_message_warn(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::warn(msg));
     }
+
+    pub fn send_frame(&self, frame: Frame) {
+        let _ = self
+        .texture_channel
+        .0
+        .send(frame);
+    }
 }
 
 impl<'b> Default for OculanteState {
