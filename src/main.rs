@@ -822,7 +822,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         match &frame {
             Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {
-                // Something new came in, update scrubber (incex slider) and path
+                // Something new came in, update scrubber (index slider) and path
                 if let Some(path) = &state.current_path {
                     if state.scrubber.has_folder_changed(&path) {
                         debug!("Folder has changed, creating new scrubber");
@@ -854,11 +854,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {}
         }
 
-        // Set recent images
-        match &frame {
-            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {}
-            _ => {}
-        }
+ 
 
         match &frame {
             Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
@@ -990,6 +986,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.current_image = Some(img);
             }
             Frame::UpdateTexture => {
+                // Only update the texture.
                 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
@@ -1014,7 +1011,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // Update the image buffer in all cases except incoming edits.
         // In those cases, we want the image to stay as it is.
-
+        // TODO: PERF: This copies the image buffer. This should also maybe not run for animation frames
+        // although it looks cool.
         if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(

@@ -716,8 +716,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_bleed(img);
-                                    // state.send_frame(crate::Frame::EditResult(highlight_bleed(img)));
                                     state.send_frame(crate::Frame::UpdateTexture);
+                                    ui.ctx().request_repaint();
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -727,9 +727,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_semitrans(img);
-                                    // state.send_frame(crate::Frame::EditResult(highlight_bleed(img)));
                                     state.send_frame(crate::Frame::UpdateTexture);
-                                    // state.send_frame(crate::Frame::EditResult(highlight_semitrans(img)));
+                                    ui.ctx().request_repaint();
                                 }
                                 if ui.button("Reset image").clicked() {
                                     state.edit_state.result_pixel_op = Default::default();

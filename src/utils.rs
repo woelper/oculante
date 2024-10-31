@@ -469,7 +469,6 @@ impl Frame {
     // This is useful to force a certain frame type.
     pub fn transmute(self, forced_variant: Self) -> Frame {
         let mut forced_variant = forced_variant;
-
         match &self {
             Frame::Still(img)
             | Frame::Animation(img, _)
@@ -490,6 +489,7 @@ impl Frame {
         forced_variant
     }
 
+    /// Return the image buffor of a `Frame`.
     pub fn get_image(&self) -> Option<RgbaImage> {
         match self {
             Frame::AnimationStart(img)
