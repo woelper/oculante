@@ -10,7 +10,15 @@ use log::warn;
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
-use notan::egui::{self, *};
+use notan::egui;
+use notan::egui::Align;
+use notan::egui::EguiConfig;
+use notan::egui::EguiPluginSugar;
+use notan::egui::FontData;
+use notan::egui::FontDefinitions;
+use notan::egui::FontFamily;
+use notan::egui::FontTweak;
+use notan::egui::Id;
 use notan::prelude::*;
 use oculante::BOLD_FONT;
 use oculante::FONT;
@@ -257,7 +265,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 state.current_path = Some(first_img_location.clone());
                 state.player.load_advanced(
                     &first_img_location,
-                    Some(FrameSource::ImageCollectionMember),
+                    Some(Frame::ImageCollectionMember(Default::default())),
                     state.message_channel.0.clone(),
                 );
             }
@@ -266,7 +274,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             state.current_path = Some(location.clone().clone());
             state.player.load_advanced(
                 &location,
-                Some(FrameSource::ImageCollectionMember),
+                Some(Frame::ImageCollectionMember(Default::default())),
                 state.message_channel.0.clone(),
             );
         };
@@ -806,205 +814,214 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_path = Some(p);
     }
 
-    // check if a new texture has been sent
+    // check if a new loaded image has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
 
-        if let Some(img) = frame.buffer {
-            debug!(
-                "Received image buffer: {:?}, type: {:?}",
-                img.dimensions(),
-                frame.source
-            );
-            state.image_geometry.dimensions = img.dimensions();
-            // state.current_texture = img.to_texture(gfx);
+        debug!("Got frame: {}", frame.to_string());
 
-            // debug!("Frame source: {:?}", frame.source);
-
-            set_title(app, state);
-
-            match &frame.source {
-                FrameSource::AnimationStart | FrameSource::Still => {
-                    if let Some(path) = &state.current_path {
-                        if state.scrubber.has_folder_changed(&path) {
-                            debug!("Folder has changed, creating new scrubber");
-                            state.scrubber = scrubber::Scrubber::new(path);
-                            state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                        } else {
-                            let index = state
-                                .scrubber
-                                .entries
-                                .iter()
-                                .position(|p| p == path)
-                                .unwrap_or_default();
-                            if index < state.scrubber.entries.len() {
-                                state.scrubber.index = index;
-                            }
+        match &frame {
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {
+                // Something new came in, update scrubber (incex slider) and path
+                if let Some(path) = &state.current_path {
+                    if state.scrubber.has_folder_changed(&path) {
+                        debug!("Folder has changed, creating new scrubber");
+                        state.scrubber = scrubber::Scrubber::new(path);
+                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                    } else {
+                        let index = state
+                            .scrubber
+                            .entries
+                            .iter()
+                            .position(|p| p == path)
+                            .unwrap_or_default();
+                        if index < state.scrubber.entries.len() {
+                            state.scrubber.index = index;
                         }
                     }
                 }
-                _ => {}
-            }
 
-            match &frame.source {
-                FrameSource::AnimationStart
-                | FrameSource::Still
-                | FrameSource::ImageCollectionMember => {
-                    if let Some(path) = &state.current_path {
-                        if !state.volatile_settings.recent_images.contains(path) {
-                            state
-                                .volatile_settings
-                                .recent_images
-                                .insert(0, path.clone());
-                            state.volatile_settings.recent_images.truncate(10);
+                if let Some(path) = &state.current_path {
+                    if !state.volatile_settings.recent_images.contains(path) {
+                        state
+                            .volatile_settings
+                            .recent_images
+                            .insert(0, path.clone());
+                        state.volatile_settings.recent_images.truncate(10);
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Set recent images
+        match &frame {
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {}
+            _ => {}
+        }
+
+        match frame {
+            Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
+                state.edit_state.result_image_op = Default::default();
+                state.edit_state.result_pixel_op = Default::default();
+
+                if !state.persistent_settings.keep_view {
+                    state.reset_image = true;
+
+                    if let Some(p) = state.current_path.clone() {
+                        if state.persistent_settings.max_cache != 0 {
+                            state.player.cache.insert(&p, img.clone());
                         }
                     }
                 }
-                _ => {}
-            }
+                // always reset if first image
+                if state.current_texture.get().is_none() {
+                    state.reset_image = true;
+                }
 
-            match frame.source {
-                FrameSource::Still | FrameSource::ImageCollectionMember => {
-                    debug!("Received still");
-                    state.edit_state.result_image_op = Default::default();
-                    state.edit_state.result_pixel_op = Default::default();
+                if !state.persistent_settings.keep_edits {
+                    state.edit_state = Default::default();
+                    state.persistent_settings.edit_enabled = false;
+                    state.edit_state = Default::default();
+                }
 
-                    if !state.persistent_settings.keep_view {
-                        state.reset_image = true;
-
-                        if let Some(p) = state.current_path.clone() {
-                            if state.persistent_settings.max_cache != 0 {
-                                state.player.cache.insert(&p, img.clone());
+                // Load edit information if any
+                if let Some(p) = &state.current_path {
+                    if p.with_extension("oculante").is_file() {
+                        if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                            if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
+                                state.send_message_info("Edits have been loaded for this image.");
+                                state.edit_state = edit_state;
+                                state.persistent_settings.edit_enabled = true;
+                                state.reset_image = true;
                             }
                         }
-                    }
-                    // always reset if first image
-                    if state.current_texture.get().is_none() {
-                        state.reset_image = true;
-                    }
+                    } else if let Some(parent) = p.parent() {
+                        debug!("Looking for {}", parent.join(".oculante").display());
+                        if parent.join(".oculante").is_file() {
+                            debug!("is file {}", parent.join(".oculante").display());
 
-                    if !state.persistent_settings.keep_edits {
-                        state.edit_state = Default::default();
-                        state.persistent_settings.edit_enabled = false;
-                        state.edit_state = Default::default();
-                    }
-
-                    // Load edit information if any
-                    if let Some(p) = &state.current_path {
-                        if p.with_extension("oculante").is_file() {
-                            if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
+                            if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
                                 if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
                                     state.send_message_info(
-                                        "Edits have been loaded for this image.",
+                                        "Directory edits have been loaded for this image.",
                                     );
                                     state.edit_state = edit_state;
                                     state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
                                 }
                             }
-                        } else if let Some(parent) = p.parent() {
-                            debug!("Looking for {}", parent.join(".oculante").display());
-                            if parent.join(".oculante").is_file() {
-                                debug!("is file {}", parent.join(".oculante").display());
-
-                                if let Ok(f) = std::fs::File::open(parent.join(".oculante")) {
-                                    if let Ok(edit_state) =
-                                        serde_json::from_reader::<_, EditState>(f)
-                                    {
-                                        state.send_message_info(
-                                            "Directory edits have been loaded for this image.",
-                                        );
-                                        state.edit_state = edit_state;
-                                        state.persistent_settings.edit_enabled = true;
-                                        state.reset_image = true;
-                                    }
-                                }
-                            }
                         }
                     }
-                    state.redraw = false;
-                    state.image_info = None;
                 }
-                FrameSource::EditResult => {
-                    state.redraw = false;
-                }
-                FrameSource::AnimationStart => {
-                    state.redraw = true;
-                    state.reset_image = true
-                }
-                FrameSource::Animation => {
-                    state.redraw = true;
-                }
-                FrameSource::CompareResult => {
-                    debug!("Received compare result");
-
-                    // always reset if first image
-                    if state.current_texture.get().is_none() {
-                        state.reset_image = true;
-                    }
-
-                    state.redraw = false;
-                }
+                state.redraw = false;
+                state.image_info = None;
             }
+            Frame::EditResult(_) => {
+                state.redraw = false;
+            }
+            Frame::AnimationStart(_) => {
+                state.redraw = true;
+                state.reset_image = true
+            }
+            Frame::Animation(_, _) => {
+                state.redraw = true;
+            }
+            Frame::CompareResult(_) => {
+                debug!("Received compare result");
 
-            if let Some(tex) = &mut state.current_texture.get() {
-                if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                    img.update_texture_with_texwrap(gfx, tex);
+                // always reset if first image
+                if state.current_texture.get().is_none() {
+                    state.reset_image = true;
+                }
+
+                state.redraw = false;
+            }
+            Frame::UpdateTexture => {}
+        }
+
+        // Deal with everything that sends an image
+        match frame {
+            Frame::AnimationStart(img)
+            | Frame::Still(img)
+            | Frame::EditResult(img)
+            | Frame::CompareResult(img)
+            | Frame::Animation(img, _)
+            | Frame::ImageCollectionMember(img) => {
+                debug!("Received image buffer: {:?}", img.dimensions(),);
+                state.image_geometry.dimensions = img.dimensions();
+
+                if let Some(tex) = &mut state.current_texture.get() {
+                    if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
+                        debug!("Re-using texture as it is the same size.");
+                        img.update_texture_with_texwrap(gfx, tex);
+                    } else {
+                        debug!("Updating texture with new size.");
+                        state.current_texture.set(
+                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
                 } else {
+                    debug!("No current texture. Creating and setting texture");
                     state.current_texture.set(
                         img.to_texture_with_texwrap(gfx, &state.persistent_settings),
                         gfx,
                     );
                 }
-            } else {
-                debug!("Setting texture");
-                state.current_texture.set(
-                    img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                    gfx,
-                );
-            }
 
-            match &state.persistent_settings.current_channel {
-                // Unpremultiply the image
-                ColorChannel::Rgb => state.current_texture.set(
-                    unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
-                    gfx,
-                ),
-                // Do nuttin'
-                ColorChannel::Rgba => (),
-                // Display the channel
-                _ => {
+                match &state.persistent_settings.current_channel {
+                    // Unpremultiply the image
+                    ColorChannel::Rgb => state.current_texture.set(
+                        unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        gfx,
+                    ),
+                    // Do nuttin'
+                    ColorChannel::Rgba => (),
+                    // Display the channel
+                    _ => {
+                        state.current_texture.set(
+                            solo_channel(&img, state.persistent_settings.current_channel as usize)
+                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
+                }
+                state.current_image = Some(img);
+            }
+            Frame::UpdateTexture => {
+                
+                // Prefer the edit result, if present
+                if state.edit_state.result_pixel_op != Default::default() {
                     state.current_texture.set(
-                        solo_channel(&img, state.persistent_settings.current_channel as usize)
-                            .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings),
                         gfx,
                     );
-                }
-            }
 
-            // Update the image buffer in all cases except incoming edits.
-            // In those cases, we want the image to stay as it is.
-            match &frame.source {
-                FrameSource::EditResult => (),
-                _ => {
-                    state.current_image = Some(img);
+                } else {
+                    // update from image
+                    if let Some(img) = &state.current_image {
+                        state.current_texture.set(
+                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
                 }
             }
-            if state.persistent_settings.info_enabled {
-                debug!("Sending extended info");
-                send_extended_info(
-                    &state.current_image,
-                    &state.current_path,
-                    &state.extended_info_channel,
-                );
-            }
-        } else {
-            if let Some(img) = &state.current_image {
-                state.current_texture.set(
-                    img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                    gfx,
-                );
-            }
+        }
+
+        set_title(app, state);
+
+        // Update the image buffer in all cases except incoming edits.
+        // In those cases, we want the image to stay as it is.
+
+        if state.persistent_settings.info_enabled {
+            debug!("Sending extended info");
+            send_extended_info(
+                &state.current_image,
+                &state.current_path,
+                &state.extended_info_channel,
+            );
         }
     }
 

@@ -8,11 +8,10 @@ use crate::{
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
-        clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed,
-        highlight_semitrans, load_image_from_path, next_image, prev_image, send_extended_info,
-        set_title, solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+        clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
+        load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
+        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
-    FrameSource,
 };
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
@@ -675,7 +674,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                             state.image_geometry = geo.clone();
                                             state
                                                 .player
-                                                .load_advanced(&path, Some(FrameSource::CompareResult), state.message_channel.0.clone());
+                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default())), state.message_channel.0.clone());
                                             ui.ctx().request_repaint();
                                             ui.ctx().request_repaint_after(Duration::from_millis(500));
                                             state.current_path = Some(path);
@@ -717,7 +716,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     .on_hover_text("Highlight pixels with zero alpha and color information")
                                     .clicked()
                                 {
-                                    state.send_edit_image(highlight_bleed(img));
+                                    state.edit_state.result_pixel_op = highlight_bleed(img);
+                                    // state.send_frame(crate::Frame::EditResult(highlight_bleed(img)));
+                                    state.send_frame(crate::Frame::UpdateTexture);
                                 }
                                 if ui
                                     .button("Show semi-transparent pixels")
@@ -726,10 +727,15 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     )
                                     .clicked()
                                 {
-                                    state.send_edit_image(highlight_semitrans(img));
+                                    state.edit_state.result_pixel_op = highlight_semitrans(img);
+                                    // state.send_frame(crate::Frame::EditResult(highlight_bleed(img)));
+                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    // state.send_frame(crate::Frame::EditResult(highlight_semitrans(img)));
                                 }
                                 if ui.button("Reset image").clicked() {
-                                    state.send_empty_edit_image();
+                                    state.edit_state.result_pixel_op = Default::default();
+
+                                    state.send_frame(crate::Frame::UpdateTexture);
                                 }
                             }
                         });
@@ -1003,36 +1009,16 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 // ui.label(format!("lazy {}", app.window().lazy_loop()));
                 ui.end_row();
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
-                    if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
-                            state.send_edit_image(img.clone());
-                        } else {
-                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
-                        }
-                    }
+                    state.send_frame(crate::Frame::UpdateTexture);
                 }
                 if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
-                    if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
-                            state.send_edit_image(img.clone());
-
-                        } else {
-                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
-                        }
-                    }
+                    state.send_frame(crate::Frame::UpdateTexture);
                 }
                 ui.end_row();
 
                 if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
-                    if let Some(img) = &state.current_image {
-                        if state.edit_state.result_image_op.is_empty() {
-                            state.send_edit_image(img.clone());
-                        } else {
-                            state.send_edit_image(state.edit_state.result_pixel_op.clone());
-                        }
-                    }
+                    state.send_frame(crate::Frame::UpdateTexture);
                 }
-
 
                 ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
                 ui.end_row();

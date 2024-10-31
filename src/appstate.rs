@@ -3,7 +3,7 @@ use crate::{
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
     texture_wrapper::TextureWrapperManager,
-    utils::{self, ExtendedImageInfo, Frame, Player},
+    utils::{ExtendedImageInfo, Frame, Player},
 };
 
 use egui_notify::Toasts;
@@ -108,17 +108,11 @@ impl<'b> OculanteState {
         _ = self.message_channel.0.send(Message::warn(msg));
     }
 
-    pub fn send_edit_image(&self, img: RgbaImage) {
+    pub fn send_frame(&self, frame: Frame) {
         let _ = self
         .texture_channel
         .0
-        .send(utils::Frame::new_edit(img));
-    }
-    pub fn send_empty_edit_image(&self) {
-        let _ = self
-        .texture_channel
-        .0
-        .send(utils::Frame::new_empty_edit());
+        .send(frame);
     }
 }
 

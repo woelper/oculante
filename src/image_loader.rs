@@ -1,5 +1,5 @@
 use crate::ktx2_loader::CompressedImageFormats;
-use crate::utils::{fit, Frame, FrameSource};
+use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
 use psd::Psd;
@@ -427,7 +427,7 @@ pub fn open_image(
                     let delay = t - last_timestamp;
                     debug!("time {t} {delay}");
                     last_timestamp = t;
-                    let frame = Frame::new(buf, delay as u16, FrameSource::Animation);
+                    let frame = Frame::new_animation(buf, delay as u16);
                     _ = sender.send(frame);
                 } else {
                     break;
@@ -507,7 +507,8 @@ pub fn open_image(
                     let buf = img.to_rgba8();
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
-                    _ = sender.send(Frame::new(buf, delay as u16, FrameSource::Animation));
+
+                    _ = sender.send(Frame::new_animation(buf, delay as u16));
                     background = Some(output.clone());
                 }
                 return Ok(receiver);
@@ -618,10 +619,9 @@ pub fn open_image(
                             dim.1,
                             screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
-                        _ = sender.send(Frame::new(
+                        _ = sender.send(Frame::new_animation(
                             buf.context("Can't read gif frame")?,
                             frame.delay * 10,
-                            FrameSource::Animation,
                         ));
                     } else {
                         break;
@@ -983,10 +983,9 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
         // Dispatch to still or animation
         if is_jxl_anim {
             // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
-            _ = frame_sender.send(Frame::new(
+            _ = frame_sender.send(Frame::new_animation(
                 image_result.to_rgba8(),
-                frame_duration,
-                FrameSource::Animation,
+                frame_duration
             ));
         } else {
             // col.add_still(image_result.to_rgba8());
