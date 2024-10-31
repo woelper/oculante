@@ -56,7 +56,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        .default_width(700.)
+        .default_width(750.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
@@ -95,6 +95,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    let mut search_term = ui
+        .ctx()
+        .data(|r| r.get_temp::<String>(Id::new("FBSEARCH")))
+        .unwrap_or_default();
+    let mut search_active = ui
+        .ctx()
+        .data(|r| r.get_temp::<bool>(Id::new("FBSEARCHACTIVE")))
+        .unwrap_or_default();
+
     // read cached entries
     let entries = ui
         .ctx()
@@ -104,19 +113,79 @@ pub fn browse<F: FnMut(&PathBuf)>(
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
     }
-    let entries = entries.unwrap_or_default();
+    let entries = entries
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|e| {
+            e.file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default()
+                .to_lowercase()
+                .contains(&search_term.to_lowercase())
+        })
+        .collect::<Vec<_>>();
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
 
     // The navigation bar
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.add_space(item_spacing);
+
+        let search_icon = if search_active { BOLDX } else { SEARCH };
+
         if ui
             .add(
-                egui::Button::new(format!("{CHEVRON_UP}"))
-                    .rounding(5.)
-                    .min_size(vec2(0., 35.)), // .shortcut_text("sds")
+                egui::Button::new(
+                    RichText::new(format!("{search_icon}"))
+                        .color(ui.style().visuals.selection.bg_fill),
+                )
+                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
+            )
+            .clicked()
+        {
+            search_active = !search_active;
+            if !search_active {
+                search_term = Default::default();
+            }
+        }
+        let textinput_width = if search_term.len() < 10 {
+            (ui.ctx().animate_bool("id".into(), search_active) * 88.) as usize
+        } else {
+            ui.available_width() as usize
+        };
+
+        if search_active {
+            ui.scope(|ui| {
+                ui.visuals_mut().selection.stroke = Stroke::NONE;
+                ui.visuals_mut().widgets.active.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                let resp = ui.add(
+                    TextEdit::singleline(&mut search_term)
+                        .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
+                        .desired_width(textinput_width as f32)
+                        .vertical_align(Align::Center),
+                );
+                ui.memory_mut(|r| r.request_focus(resp.id));
+            });
+        }
+        if search_term.len() >= 10 {
+            ui.end_row();
+            ui.add_space(item_spacing);
+        }
+        if ui
+            .add(
+                egui::Button::new(
+                    RichText::new(format!("{CHEVRON_UP}"))
+                        .color(ui.style().visuals.selection.bg_fill),
+                )
+                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
         {
@@ -210,7 +279,13 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.pointer.secondary_released() || r.key_released(Key::D)) {
+                        if ui.input(|r| r.key_released(Key::D)) {
+                            if !ui.ctx().wants_keyboard_input() {
+                                settings.folder_bookmarks.remove(folder);
+                            }
+                        }
+
+                        if ui.input(|r| r.pointer.secondary_released()) {
                             settings.folder_bookmarks.remove(folder);
                         }
                     }
@@ -222,7 +297,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     if ui
                         .add(
                             egui::Button::new(RichText::new(PLUS).color(col))
-                                .rounding(ui.style().visuals.widgets.inactive.rounding)
+                                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                                 .fill(Color32::TRANSPARENT)
                                 .frame(true)
                                 .stroke(Stroke::new(2., col))
@@ -248,7 +323,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .show(ui, |ui| {
                     egui::Frame::none()
                         .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding * 1.5)
+                        .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
                             egui::Grid::new("browser")
@@ -296,6 +371,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 {
                                                     _ = save_recent_dir(&de);
                                                     if !save {
+                                                        search_active = false;
+                                                        search_term.clear();
                                                         callback(&de);
                                                     } else {
                                                         filename = de
@@ -323,11 +400,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             ui.add_space(10.);
 
             if save {
-                let ext = Path::new(&filename)
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
+                let ext = Path::new(&filename).ext();
                 ui.label("Filename");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().button_padding = Vec2::new(2., 5.);
@@ -345,6 +418,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if ui.button(format!("   Save file   ")).clicked() {
+                        search_active = false;
+                        search_term.clear();
                         callback(&path.join(filename.clone()));
                     }
                 });
@@ -368,14 +443,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
                         .filter(|de| {
                             de.path().is_dir()
-                                || filter.contains(
-                                    &de.path()
-                                        .extension()
-                                        .map(|ext| ext.to_string_lossy().to_string())
-                                        .unwrap_or_default()
-                                        .to_lowercase()
-                                        .as_str(),
-                                )
+                                || filter.contains(&de.path().ext().to_lowercase().as_str())
                         })
                         .map(|d| d.path())
                         .collect::<Vec<_>>();
@@ -399,6 +467,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
             }
         });
     });
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<String>(Id::new("FBSEARCH"), search_term));
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<bool>(Id::new("FBSEARCHACTIVE"), search_active));
 }
 
 trait PathExt {
@@ -408,6 +480,14 @@ trait PathExt {
 }
 
 impl PathExt for PathBuf {
+    fn ext(&self) -> String {
+        self.extension()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_default()
+    }
+}
+
+impl PathExt for Path {
     fn ext(&self) -> String {
         self.extension()
             .map(|f| f.to_string_lossy().to_string())

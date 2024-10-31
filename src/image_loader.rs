@@ -1,5 +1,5 @@
 use crate::ktx2_loader::CompressedImageFormats;
-use crate::utils::{fit, Frame, FrameSource};
+use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
 use psd::Psd;
@@ -447,9 +447,7 @@ pub fn open_image(
                     let delay = t - last_timestamp;
                     debug!("time {t} {delay}");
                     last_timestamp = t;
-                    let i = DynamicImage::ImageRgba8(buf);
-
-                    let frame = Frame::new(i, delay as u16, FrameSource::Animation);
+                    let frame = Frame::new_animation(buf, delay as u16);
                     _ = sender.send(frame);
                 } else {
                     break;
@@ -528,7 +526,8 @@ pub fn open_image(
                     let img = image::load_from_memory(&out)?;
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
-                    _ = sender.send(Frame::new(img, delay as u16, FrameSource::Animation));
+
+                    _ = sender.send(Frame::new_animation(buf, delay as u16));
                     background = Some(output.clone());
                 }
                 return Ok(receiver);
@@ -637,10 +636,10 @@ pub fn open_image(
                             dim.1,
                             screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
-                        let buf = buf.context("Can't read gif frame")?;
-                        let i = DynamicImage::ImageRgba8(buf);
-
-                        _ = sender.send(Frame::new(i, frame.delay * 10, FrameSource::Animation));
+                        _ = sender.send(Frame::new_animation(
+                            buf.context("Can't read gif frame")?,
+                            frame.delay * 10,
+                        ));
                     } else {
                         break;
                     }
@@ -1005,10 +1004,9 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
         // Dispatch to still or animation
         if is_jxl_anim {
             // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
-            _ = frame_sender.send(Frame::new(
-                image_result,
-                frame_duration,
-                FrameSource::Animation,
+            _ = frame_sender.send(Frame::new_animation(
+                image_result.to_rgba8(),
+                frame_duration
             ));
         } else {
             // col.add_still(image_result.to_rgba8());

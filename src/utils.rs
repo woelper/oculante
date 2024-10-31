@@ -274,7 +274,7 @@ impl Player {
     pub fn load_advanced(
         &mut self,
         img_location: &Path,
-        forced_frame_source: Option<FrameSource>,
+        forced_frame_source: Option<Frame>,
         message_sender: Sender<Message>,
     ) {
         debug!("Stopping player on load");
@@ -285,12 +285,14 @@ impl Player {
         if let Some(cached_image) = self.cache.get(img_location) {
             debug!("Cache hit for {}", img_location.display());
 
-            let mut frame = Frame::new_still(cached_image);
+            let frame = Frame::new_still(cached_image);
             if let Some(fs) = forced_frame_source {
-                debug!("Frame source set to {:?}", fs);
-                frame.source = fs;
+                debug!("Frame source set to {fs}");
+                _ = self.image_sender.send(frame.transmute(fs));
+
+            } else {
+                _ = self.image_sender.send(frame);
             }
-            _ = self.image_sender.send(frame);
             return;
         }
 
@@ -301,6 +303,7 @@ impl Player {
             self.image_sender.clone(),
             message_sender,
             stop_receiver,
+            forced_frame_source,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -324,6 +327,7 @@ pub fn send_image_threaded(
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
+    forced_frame_source: Option<Frame>,
 ) {
     let loc = img_location.to_owned();
 
@@ -335,9 +339,6 @@ pub fn send_image_threaded(
         match open_image(&loc, Some(message_sender.clone())) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
-                // _ = texture_sender
-                // .clone()
-                // .send(Frame::new_reset(f.buffer.clone()));
 
                 let mut first = true;
                 for mut f in frame_receiver.iter() {
@@ -345,28 +346,41 @@ pub fn send_image_threaded(
                         debug!("Stopped from receiver.");
                         return;
                     }
-                    // a "normal image (no animation)"
-                    if f.source == FrameSource::Still {
-                        debug!("Received image in {:?}", timer.elapsed());
-                        _ = rotate_dynimage(&mut f.buffer, &path);
 
-                        let _ = texture_sender.send(f);
-                        return;
-                    }
-                    if f.source == FrameSource::Animation {
-                        framecache.push(f.clone());
-                        if first {
-                            _ = texture_sender
-                                .clone()
-                                .send(Frame::new_reset(f.buffer.clone()));
-                        } else {
-                            let _ = texture_sender.send(f.clone());
+                    match f {
+                        Frame::Animation(ref buffer, delay) => {
+                            framecache.push(f.clone());
+                            if first {
+                                _ = texture_sender
+                                    .clone()
+                                    .send(Frame::new_reset(buffer.clone()));
+                            } else {
+                                let _ = texture_sender.send(f.clone());
+                            }
+                            let elapsed = timer.elapsed().as_millis();
+                            let wait_time_after_loading = delay.saturating_sub(elapsed as u16);
+                            debug!("elapsed {elapsed}, wait {wait_time_after_loading}");
+                            std::thread::sleep(Duration::from_millis(
+                                wait_time_after_loading as u64,
+                            ));
+                            timer = std::time::Instant::now();
                         }
-                        let elapsed = timer.elapsed().as_millis();
-                        let wait_time_after_loading = f.delay.saturating_sub(elapsed as u16);
-                        debug!("elapsed {elapsed}, wait {wait_time_after_loading}");
-                        std::thread::sleep(Duration::from_millis(wait_time_after_loading as u64));
-                        timer = std::time::Instant::now();
+                        Frame::Still(ref mut buffer) => {
+                            debug!("Received image in {:?}", timer.elapsed());
+                            if let Ok(rotated_img) = rotate_rgbaimage(&buffer, &path) {
+                                debug!("Image has been rotated.");
+                                *buffer = rotated_img;
+                            }
+                            // TODO force frame sournce
+                            if let Some(new_frame) = forced_frame_source {
+                                debug!("Converting from {f} to {new_frame}");
+                                let _ = texture_sender.send(f.transmute(new_frame));
+                            } else {
+                                let _ = texture_sender.send(f);
+                            }
+                            return;
+                        }
+                        _ => (),
                     }
 
                     first = false;
@@ -374,18 +388,20 @@ pub fn send_image_threaded(
 
                 // loop over the image. For sanity, stop at a limit of iterations.
                 for _ in 0..500 {
-                    // let frames = col.frames.clone();
                     for frame in &framecache {
                         if stop_receiver.try_recv().is_ok() {
                             debug!("Stopped from receiver.");
                             return;
                         }
-                        let _ = texture_sender.send(frame.clone());
-                        if frame.delay > 0 {
-                            //                                                  cap at 60fps
-                            thread::sleep(Duration::from_millis(frame.delay.max(17) as u64));
-                        } else {
-                            thread::sleep(Duration::from_millis(40_u64));
+
+                        if let Frame::Animation(_, delay) = frame {
+                            let _ = texture_sender.send(frame.clone());
+                            if *delay > 0 {
+                                //                                      cap at 60fps
+                                thread::sleep(Duration::from_millis(*delay.max(&17) as u64));
+                            } else {
+                                thread::sleep(Duration::from_millis(40_u64));
+                            }
                         }
                     }
                 }
@@ -404,59 +420,85 @@ pub fn send_image_threaded(
 
 /// A single frame
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum FrameSource {
-    ///Part of an animation
-    Animation,
-    ///First frame of animation. This is necessary to reset the image and stop the player.
-    AnimationStart,
-    Still,
-    EditResult,
-    CompareResult,
-    ///A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
-    ImageCollectionMember,
-}
-
-/// A single frame
-#[derive(Debug, Clone)]
-pub struct Frame {
-    pub buffer: DynamicImage,
-    /// How long to pause until the next frame, in milliseconds
-    pub delay: u16,
-    pub source: FrameSource,
+#[derive(Debug, Clone, PartialEq, Display)]
+pub enum Frame {
+    /// A regular still frame (most common)
+    Still(RgbaImage),
+    /// Part of an animation. Delay in ms
+    Animation(RgbaImage, u16),
+    /// First frame of animation. This is necessary to reset the image and stop the player.
+    AnimationStart(RgbaImage),
+    /// Result of an edit operation with image
+    EditResult(RgbaImage),
+    /// Only update the current texture.
+    UpdateTexture,
+    /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
+    CompareResult(RgbaImage, ImageGeometry),
+    /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
+    ImageCollectionMember(RgbaImage),
 }
 
 impl Frame {
-    pub fn new(buffer: DynamicImage, delay_ms: u16, source: FrameSource) -> Frame {
-        Frame {
-            buffer,
-            delay: delay_ms,
-            source,
-        }
+    pub fn new(source: Frame) -> Frame {
+        source
     }
 
-    pub fn new_reset(buffer: DynamicImage) -> Frame {
-        Frame {
-            buffer,
-            delay: 0,
-            source: FrameSource::AnimationStart,
-        }
+    pub fn new_reset(buffer: RgbaImage) -> Frame {
+        Frame::AnimationStart(buffer)
+    }
+
+    pub fn new_animation(buffer: RgbaImage, delay_ms: u16) -> Frame {
+        Frame::Animation(buffer, delay_ms)
     }
 
     #[allow(dead_code)]
-    pub fn new_edit(buffer: DynamicImage) -> Frame {
-        Frame {
-            buffer,
-            delay: 0,
-            source: FrameSource::EditResult,
-        }
+    pub fn new_edit(buffer: RgbaImage) -> Frame {
+        Frame::EditResult(buffer)
     }
 
-    pub fn new_still(buffer: DynamicImage) -> Frame {
-        Frame {
-            buffer,
-            delay: 0,
-            source: FrameSource::Still,
+    #[allow(dead_code)]
+    pub fn new_empty_edit() -> Frame {
+        Frame::UpdateTexture
+    }
+
+    pub fn new_still(buffer: RgbaImage) -> Frame {
+        Frame::Still(buffer)
+    }
+
+    // Convert one `Frame` variant to something else, replacing its buffer.
+    // This is useful to force a certain frame type.
+    pub fn transmute(self, forced_variant: Self) -> Frame {
+        let mut forced_variant = forced_variant;
+        match &self {
+            Frame::Still(img)
+            | Frame::Animation(img, _)
+            | Frame::AnimationStart(img)
+            | Frame::EditResult(img)
+            | Frame::CompareResult(img, _)
+            | Frame::ImageCollectionMember(img) => match forced_variant {
+                Frame::Still(ref mut image_buffer)
+                | Frame::Animation(ref mut image_buffer, _)
+                | Frame::AnimationStart(ref mut image_buffer)
+                | Frame::EditResult(ref mut image_buffer)
+                | Frame::CompareResult(ref mut image_buffer, _)
+                | Frame::ImageCollectionMember(ref mut image_buffer) => *image_buffer = img.clone(),
+                Frame::UpdateTexture => (),
+            },
+            Frame::UpdateTexture => (),
+        }
+        forced_variant
+    }
+
+    /// Return the image buffor of a `Frame`.
+    pub fn get_image(&self) -> Option<RgbaImage> {
+        match self {
+            Frame::AnimationStart(img)
+            | Frame::Still(img)
+            | Frame::EditResult(img)
+            | Frame::CompareResult(img, _)
+            | Frame::Animation(img, _)
+            | Frame::ImageCollectionMember(img) => Some(img.clone()),
+            _ => None,
         }
     }
 }
@@ -899,15 +941,12 @@ pub fn compare_next(state: &mut OculanteState) {
             0
         };
 
-        if let Some(c) = compare_list.get(index) {
-            let path = &c.0;
-            let geo = &c.1;
-            state.image_geometry = geo.clone();
+        if let Some((path, geo)) = compare_list.get(index) {
             state.is_loaded = false;
             state.current_image = None;
             state.player.load_advanced(
                 path,
-                Some(FrameSource::CompareResult),
+                Some(Frame::CompareResult(Default::default(), geo.clone())),
                 state.message_channel.0.clone(),
             );
             state.current_path = Some(path.clone());

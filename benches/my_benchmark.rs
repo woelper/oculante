@@ -20,15 +20,16 @@ fn process_pixel_ops() {
         ImageOperation::ChromaticAberration(30),
     ];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-    let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer.to_rgba8(), &ops);
+
+    let mut buffer = f.recv().unwrap().get_image().unwrap();
+    process_pixels(&mut buffer, &ops);
 }
 
 fn blur() {
     let ops = vec![ImageOperation::Blur(200)];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-    let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer.to_rgba8(), &ops);
+    let mut buffer = f.recv().unwrap().get_image().unwrap();
+    process_pixels(&mut buffer, &ops);
 }
 
 fn resize() {
@@ -38,13 +39,13 @@ fn resize() {
         filter: ScaleFilter::Bilinear,
     }];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-    let mut buffer = f.recv().unwrap().buffer;
-    process_pixels(&mut buffer.to_rgba8(), &ops);
+    let mut buffer = f.recv().unwrap().get_image().unwrap();
+    process_pixels(&mut buffer, &ops);
 }
 
 fn load_webp() {
     let f = open_image(&PathBuf::from("tests/mohsen-karimi.webp"), None).unwrap();
-    let _buffer = f.recv().unwrap().buffer;
+    let _buffer = f.recv().unwrap().get_image().unwrap();
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

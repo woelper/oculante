@@ -12,7 +12,15 @@ use log::warn;
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
-use notan::egui::{self, *};
+use notan::egui;
+use notan::egui::Align;
+use notan::egui::EguiConfig;
+use notan::egui::EguiPluginSugar;
+use notan::egui::FontData;
+use notan::egui::FontDefinitions;
+use notan::egui::FontFamily;
+use notan::egui::FontTweak;
+use notan::egui::Id;
 use notan::prelude::*;
 use oculante::BOLD_FONT;
 use oculante::FONT;
@@ -259,7 +267,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 state.current_path = Some(first_img_location.clone());
                 state.player.load_advanced(
                     &first_img_location,
-                    Some(FrameSource::ImageCollectionMember),
+                    Some(Frame::ImageCollectionMember(Default::default())),
                     state.message_channel.0.clone(),
                 );
             }
@@ -268,7 +276,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             state.current_path = Some(location.clone().clone());
             state.player.load_advanced(
                 &location,
-                Some(FrameSource::ImageCollectionMember),
+                Some(Frame::ImageCollectionMember(Default::default())),
                 state.message_channel.0.clone(),
             );
         };
@@ -808,24 +816,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.current_path = Some(p);
     }
 
-    // check if a new texture has been sent
+    // check if a new loaded image has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
-        let img = frame.buffer;
-        debug!(
-            "Received image buffer: {:?}, type: {:?}",
-            img.dimensions(),
-            frame.source
-        );
-        state.image_geometry.dimensions = img.dimensions();
-        // state.current_texture = img.to_texture(gfx);
 
-        // debug!("Frame source: {:?}", frame.source);
+        debug!("Got frame: {}", frame.to_string());
 
-        set_title(app, state);
-
-        match &frame.source {
-            FrameSource::AnimationStart | FrameSource::Still => {
+        match &frame {
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {
+                // Something new came in, update scrubber (index slider) and path
                 if let Some(path) = &state.current_path {
                     if state.scrubber.has_folder_changed(&path) {
                         debug!("Folder has changed, creating new scrubber");
@@ -843,14 +842,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
                 }
-            }
-            _ => {}
-        }
 
-        match &frame.source {
-            FrameSource::AnimationStart
-            | FrameSource::Still
-            | FrameSource::ImageCollectionMember => {
                 if let Some(path) = &state.current_path {
                     if !state.volatile_settings.recent_images.contains(path) {
                         state
@@ -864,9 +856,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {}
         }
 
-        match frame.source {
-            FrameSource::Still | FrameSource::ImageCollectionMember => {
-                debug!("Received still");
+ 
+
+        match &frame {
+            Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
                 state.edit_state.result_image_op = Default::default();
                 state.edit_state.result_pixel_op = Default::default();
 
@@ -922,20 +915,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state.redraw = false;
                 state.image_info = None;
             }
-            FrameSource::EditResult => {
-                // debug!("EditResult");
-                // state.edit_state.is_processing = false;
+            Frame::EditResult(_) => {
+                state.redraw = false;
             }
-            FrameSource::AnimationStart => {
+            Frame::AnimationStart(_) => {
                 state.redraw = true;
                 state.reset_image = true
             }
-            FrameSource::Animation => {
+            Frame::Animation(_, _) => {
                 state.redraw = true;
             }
-            FrameSource::CompareResult => {
+            Frame::CompareResult(_, geo) => {
                 debug!("Received compare result");
-
+                state.image_geometry = geo.clone();
                 // always reset if first image
                 if state.current_texture.get().is_none() {
                     state.reset_image = true;
@@ -943,46 +935,86 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 state.redraw = false;
             }
+            Frame::UpdateTexture => {}
         }
 
-        if let Some(tex) = &mut state.current_texture.get() {
-            if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                img.update_texture_with_texwrap(gfx, tex);
-            } else {
-                state.current_texture.set(
-                    img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                    gfx,
-                );
+        // Deal with everything that sends an image
+        match frame {
+            Frame::AnimationStart(img)
+            | Frame::Still(img)
+            | Frame::EditResult(img)
+            | Frame::CompareResult(img, _)
+            | Frame::Animation(img, _)
+            | Frame::ImageCollectionMember(img) => {
+                debug!("Received image buffer: {:?}", img.dimensions(),);
+                state.image_geometry.dimensions = img.dimensions();
+
+                if let Some(tex) = &mut state.current_texture.get() {
+                    if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
+                        debug!("Re-using texture as it is the same size.");
+                        img.update_texture_with_texwrap(gfx, tex);
+                    } else {
+                        debug!("Updating texture with new size.");
+                        state.current_texture.set(
+                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
+                } else {
+                    debug!("No current texture. Creating and setting texture");
+                    state.current_texture.set(
+                        img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        gfx,
+                    );
+                }
+
+                match &state.persistent_settings.current_channel {
+                    // Unpremultiply the image
+                    ColorChannel::Rgb => state.current_texture.set(
+                        unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        gfx,
+                    ),
+                    // Do nuttin'
+                    ColorChannel::Rgba => (),
+                    // Display the channel
+                    _ => {
+                        state.current_texture.set(
+                            solo_channel(&img, state.persistent_settings.current_channel as usize)
+                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
+                }
+                state.current_image = Some(img);
             }
-        } else {
-            debug!("Setting texture");
-            state.current_texture.set(
-                img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                gfx,
-            );
+            Frame::UpdateTexture => {
+                // Only update the texture.
+                
+                // Prefer the edit result, if present
+                if state.edit_state.result_pixel_op != Default::default() {
+                    state.current_texture.set(
+                        state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        gfx,
+                    );
+
+                } else {
+                    // update from image
+                    if let Some(img) = &state.current_image {
+                        state.current_texture.set(
+                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                            gfx,
+                        );
+                    }
+                }
+            }
         }
 
-        match &state.persistent_settings.current_channel {
-            // Unpremultiply the image
-            ColorChannel::Rgb => state.current_texture.set(
-                unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
-                gfx,
-            ),
-            // Do nuttin'
-            ColorChannel::Rgba => (),
-            // Display the channel
-            _ => {
-                state.current_texture.set(
-                    solo_channel(
-                        &img,
-                        state.persistent_settings.current_channel as usize,
-                    )
-                    .to_texture_with_texwrap(gfx, &state.persistent_settings),
-                    gfx,
-                );
-            }
-        }
-        state.current_image = Some(img);
+        set_title(app, state);
+
+        // Update the image buffer in all cases except incoming edits.
+        // In those cases, we want the image to stay as it is.
+        // TODO: PERF: This copies the image buffer. This should also maybe not run for animation frames
+        // although it looks cool.
         if state.persistent_settings.info_enabled {
             debug!("Sending extended info");
             send_extended_info(
