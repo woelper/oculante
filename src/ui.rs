@@ -888,7 +888,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx:
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable(true)
+            .resizable([false, true])
             .default_width(600.)
             .show(ctx, |ui| {
 
