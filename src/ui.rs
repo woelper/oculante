@@ -1,5 +1,14 @@
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState}, clear_image, clipboard_to_image, delete_file, file_encoder::FileEncoder, get_pixel_checked, image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter}, paint::PaintStroke, set_zoom, settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings}, shortcuts::{key_pressed, keypresses_as_string, lookup}, utils::{
+    appstate::{ImageGeometry, Message, OculanteState},
+    clear_image, clipboard_to_image, delete_file,
+    file_encoder::FileEncoder,
+    get_pixel_checked,
+    image_editing::{process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ScaleFilter},
+    paint::PaintStroke,
+    set_zoom,
+    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
+    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
@@ -500,7 +509,6 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 }
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
-
     let mut color_type = ColorType::Rgba8;
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -512,11 +520,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
             img
         };
 
-        if let Some(p) = get_pixel_checked(img, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
+        if let Some(p) = get_pixel_checked(
+            img,
+            state.cursor_relative.x as u32,
+            state.cursor_relative.y as u32,
+        ) {
             state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
         }
-
-
     }
 
     egui::SidePanel::left("side_panel")
@@ -1169,29 +1179,39 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .show_separator_line(false)
         .show(ctx, |ui| {
 
+         
+
+
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
             let mut pixels_changed = false;
 
             if let Some(img) = &state.current_image {
+
+                if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+                    ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). It is recommended to temporarily convert your image.");
+                    state.edit_state.image_op_stack.insert(0, ImageOperation::ColorType(ColorTypeExt::Rgba8));
+                    image_changed = true;
+                    pixels_changed = true;
+                    // if ui.button("Add conversion").clicked() {
+                    // }
+                    state.send_message_info("Your image is not RGBA 8 bit. A conversion operator was added. Please remove if you don't need it.");
+                }
+
+
                 // Ensure that edit result image is always filled
                 if state.edit_state.result_pixel_op.width() == 0 {
                     debug!("Edit state pixel comp buffer is default, cloning from image");
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_pixel_op = DynamicImage::ImageRgba8(img.to_rgba8());
+                    state.edit_state.result_pixel_op = img.clone();
                     pixels_changed = true;
                 }
                 if state.edit_state.result_image_op.width() == 0 {
                     debug!("Edit state image comp buffer is default, cloning from image");
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = DynamicImage::ImageRgba8(img.to_rgba8());
+                    state.edit_state.result_image_op = img.clone();
                     image_changed = true;
                 }
-
-
-
-          
-
             }
 
 
@@ -1221,6 +1241,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
                         ImageOperation::Posterize(8),
                         ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
+                        ImageOperation::ColorType(crate::image_editing::ColorTypeExt::Rgba8),
 
                         // Mathematical
                         ImageOperation::MMult,
@@ -1530,15 +1551,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     // start with a fresh copy of the unmodified image
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
-                    // state.edit_state.result_image_op = DynamicImage::ImageRgba8(img.to_rgba8());
                     for operation in &mut state.edit_state.image_op_stack {
-
-                        if let Some(compatible_buffer) = state.edit_state.result_image_op.as_mut_rgba8() {
-                            if let Err(e) = operation.process_image(compatible_buffer) {
-                                error!("{e}")
-                            }
-                        } else {
-                            error!("This image is not RGBA!! No editing");
+                        if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
+                            error!("{e}")
                         }
                     }
                     debug!(
@@ -1579,7 +1594,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     if !stroke.committed {
 
                         if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                    
+
                             stroke.render(
                                 compatible_buffer,
                                 &state.edit_state.brushes,
@@ -1620,7 +1635,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                     &state.edit_state.brushes,
                                 );
                             }
-                            
+
 
                             stroke.committed = true;
                             debug!("Committed stroke {}", i);
@@ -1818,15 +1833,25 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                             }
-
-                        }
-
-                    }
-                    if let Some(img) = &state.current_image {
-                        if img.color() != ColorType::Rgba8 {
-                            ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
                         }
                     }
+
+                    #[cfg(debug_assertions)]
+                    {
+                        ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+                        ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
+                        ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
+                        if let Some(img) = &state.current_image {
+                         
+                        ui.label(format!("current_image: {:?}", img.color()));
+                         
+                            if img.color() != ColorType::Rgba8 {
+                                ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
+                            }
+                        }
+        
+                    }
+
                 }
             });
 

@@ -109,10 +109,7 @@ impl<'b> OculanteState {
     }
 
     pub fn send_frame(&self, frame: Frame) {
-        let _ = self
-        .texture_channel
-        .0
-        .send(frame);
+        let _ = self.texture_channel.0.send(frame);
     }
 }
 

@@ -289,7 +289,6 @@ impl Player {
             if let Some(fs) = forced_frame_source {
                 debug!("Frame source set to {fs}");
                 _ = self.image_sender.send(frame.transmute(fs));
-
             } else {
                 _ = self.image_sender.send(frame);
             }
@@ -368,7 +367,7 @@ pub fn send_image_threaded(
                         Frame::Still(ref mut buffer) => {
                             debug!("Received image in {:?}", timer.elapsed());
                             _ = rotate_dynimage(buffer, &path);
-                    
+
                             // TODO force frame sournce
                             if let Some(new_frame) = forced_frame_source {
                                 debug!("Converting from {f} to {new_frame}");
@@ -619,7 +618,6 @@ pub fn highlight_bleed(img: &DynamicImage) -> DynamicImage {
         }
     });
     DynamicImage::ImageRgba8(updated_img)
-
 }
 
 /// Mark pixels with transparency
@@ -769,7 +767,11 @@ impl ImageExt for DynamicImage {
     }
 
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
-        if let Err(e) = gfx.update_texture(texture).with_data(&self.to_rgba8()).update() {
+        if let Err(e) = gfx
+            .update_texture(texture)
+            .with_data(&self.to_rgba8())
+            .update()
+        {
             error!("{e}");
         }
     }
@@ -778,9 +780,6 @@ impl ImageExt for DynamicImage {
         texture.update_textures(gfx, &self.to_rgba8());
     }
 }
-
-
-
 
 impl ImageExt for (i32, i32) {
     fn size_vec(&self) -> Vector2<f32> {
@@ -1005,14 +1004,8 @@ pub fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut Ocula
 }
 
 pub fn get_pixel_checked(img: &DynamicImage, x: u32, y: u32) -> Option<Rgba<u8>> {
-    if img.in_bounds(
-        x,
-        y,
-    ) {
-        return Some(img.get_pixel(
-            x,
-            y,
-        ));
+    if img.in_bounds(x, y) {
+        return Some(img.get_pixel(x, y));
     }
     None
 }

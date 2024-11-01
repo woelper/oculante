@@ -639,10 +639,7 @@ pub fn open_image(
                         );
                         let buf = buf.context("Can't read gif frame")?;
                         let i = DynamicImage::ImageRgba8(buf);
-                        _ = sender.send(Frame::new_animation(
-                            i,
-                            frame.delay * 10,
-                        ));
+                        _ = sender.send(Frame::new_animation(i, frame.delay * 10));
                     } else {
                         break;
                     }
@@ -706,7 +703,6 @@ pub fn open_image(
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(buf) => {
-
                 _ = sender.send(Frame::new_still(buf));
                 return Ok(receiver);
             }
@@ -1001,10 +997,7 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 
         // Dispatch to still or animation
         if is_jxl_anim {
-            _ = frame_sender.send(Frame::new_animation(
-                image_result,
-                frame_duration
-            ));
+            _ = frame_sender.send(Frame::new_animation(image_result, frame_duration));
         } else {
             _ = frame_sender.send(Frame::new_still(image_result));
         }

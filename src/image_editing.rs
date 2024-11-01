@@ -12,9 +12,9 @@ use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
 use anyhow::{bail, Result};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::{imageops, DynamicImage, Rgba, RgbaImage};
+use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
-use log::{debug, error};
+use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use notan::egui::epaint::PathShape;
 use notan::egui::{self, lerp, vec2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2};
@@ -23,6 +23,7 @@ use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -106,7 +107,7 @@ pub enum ScaleFilter {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub enum ImageOperation {
-    ColorType(i32),
+    ColorType(ColorTypeExt),
     Brightness(i32),
     Expression(String),
     Desaturate(u8),
@@ -193,6 +194,7 @@ impl ImageOperation {
             Self::Crop(_) => false,
             Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
+            Self::ColorType(_) => false,
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
             Self::LUT(_) => false,
@@ -210,9 +212,23 @@ impl ImageOperation {
         block_panning: &mut bool,
         settings: &mut VolatileSettings,
     ) -> Response {
-        // ui.label_i(&format!("{}", self));
         match self {
-            Self::ColorType(_) => ui.label("This converts the image to rgba8."),
+            Self::ColorType(ct) => {
+                let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+                egui::ComboBox::from_id_source("color_types")
+                    .selected_text(ct.to_string())
+                    .show_ui(ui, |ui| {
+                        for t in ColorTypeExt::iter() {
+                            if ui.selectable_value(ct, t.clone(), t.to_string()).clicked() {
+                                x.mark_changed();
+                            }
+                        }
+                    });
+                    if x.changed() {
+                        info!("set to {}", ct);
+                    }
+                x
+            }
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),
             Self::Exposure(val) => ui.styled_slider(val, -100..=100),
             Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
@@ -924,215 +940,271 @@ impl ImageOperation {
     }
 
     /// Process all image operators (All things that modify the image and are not "per pixel")
-    pub fn process_image(&self, img: &mut RgbaImage) -> Result<()> {
-        match self {
-            Self::Blur(amt) => {
-                if *amt != 0 {
-                    let i = img.clone();
-                    let mut data = i.into_raw();
-                    libblur::stack_blur(
-                        data.as_mut_slice(),
-                        img.width() * 4,
-                        img.width(),
-                        img.height(),
-                        (*amt as u32).clamp(2, 254),
-                        libblur::FastBlurChannels::Channels4,
-                        libblur::ThreadingPolicy::Adaptive,
-                    );
-                    use anyhow::Context;
-                    *img = RgbaImage::from_raw(img.width(), img.height(), data)
-                        .context("Can't construct image from blur result")?;
+    pub fn process_image(&self, dyn_img: &mut DynamicImage) -> Result<()> {
+        match dyn_img {
+            DynamicImage::ImageRgba8(img) => {
+                match self {
+                    Self::Blur(amt) => {
+                        if *amt != 0 {
+                            let i = img.clone();
+                            let mut data = i.into_raw();
+                            libblur::stack_blur(
+                                data.as_mut_slice(),
+                                img.width() * 4,
+                                img.width(),
+                                img.height(),
+                                (*amt as u32).clamp(2, 254),
+                                libblur::FastBlurChannels::Channels4,
+                                libblur::ThreadingPolicy::Adaptive,
+                            );
+                            use anyhow::Context;
+                            *img = RgbaImage::from_raw(img.width(), img.height(), data)
+                                .context("Can't construct image from blur result")?;
+                        }
+                    }
+                    Self::Filter3x3(amt) => {
+                        let kernel = amt
+                            .into_iter()
+                            .map(|a| *a as f32 / 100.)
+                            .collect::<Vec<_>>();
+                        *img = imageops::filter3x3(img, &kernel);
+                    }
+                    Self::LUT(lut_name) => {
+                        use lutgen::identity::correct_image;
+                        let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
+                        if let Some(lut_data) = builtin_luts().get(lut_name) {
+                            let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
+                            correct_image(&mut external_image, &lut_img);
+                        } else {
+                            if let Ok(lut_img) = image::open(&lut_name) {
+                                correct_image(&mut external_image, &lut_img.to_rgb8());
+                            }
+                        }
+                        *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
+                    }
+                    Self::Crop(dim) => {
+                        if *dim != [0, 0, 0, 0] {
+                            let window = cropped_range(dim, &(img.width(), img.height()));
+                            let sub_img = image::imageops::crop_imm(
+                                img, window[0], window[1], window[2], window[3],
+                            );
+                            *img = sub_img.to_image();
+                        }
+                    }
+                    Self::CropPerspective { points, .. } => {
+                        let img_dim = img.dimensions();
+
+                        let max_width = points[1].0.max(points[3].0);
+                        let min_width = points[0].0.min(points[2].0);
+                        let max_height = points[2].1.max(points[3].1);
+                        let min_height = points[0].1.min(points[1].1);
+                        let x = max_width - min_width;
+                        let y = max_height - min_height;
+
+                        let from = [
+                            (points[0].0 as f32, points[0].1 as f32),
+                            (points[1].0 as f32, points[1].1 as f32),
+                            (points[2].0 as f32, points[2].1 as f32),
+                            (points[3].0 as f32, points[3].1 as f32),
+                        ];
+
+                        let to = [
+                            (0 as f32, 0 as f32),
+                            (img_dim.0 as f32, 0 as f32),
+                            (0 as f32, img_dim.1 as f32),
+                            (img_dim.0 as f32, img_dim.1 as f32),
+                        ];
+
+                        if let Some(proj) =
+                            imageproc::geometric_transformations::Projection::from_control_points(
+                                from, to,
+                            )
+                        {
+                            let default_p: Rgba<u8> = [0, 0, 0, 0].into();
+
+                            *img = imageproc::geometric_transformations::warp(
+                                img,
+                                &proj,
+                                Interpolation::Bicubic,
+                                default_p,
+                            );
+
+                            *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);
+                        } else {
+                            error!("Projection failed")
+                        }
+                    }
+                    Self::Resize {
+                        dimensions, filter, ..
+                    } => {
+                        if *dimensions != Default::default() {
+                            let filter = match filter {
+                                ScaleFilter::Box => fr::FilterType::Box,
+                                ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                                ScaleFilter::Hamming => fr::FilterType::Hamming,
+                                ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                                ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                                ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
+                            };
+
+                            let src_image = fr::images::Image::from_vec_u8(
+                                img.width(),
+                                img.height(),
+                                img.clone().into_raw(),
+                                fr::PixelType::U8x4,
+                            )?;
+
+                            // Create container for data of destination image
+                            let mut dst_image = fr::images::Image::new(
+                                dimensions.0,
+                                dimensions.1,
+                                src_image.pixel_type(),
+                            );
+
+                            let mut resizer = fr::Resizer::new();
+
+                            resizer.resize(
+                                &src_image,
+                                &mut dst_image,
+                                Some(
+                                    &ResizeOptions::new().resize_alg(
+                                        fast_image_resize::ResizeAlg::Convolution(filter),
+                                    ),
+                                ),
+                            )?;
+
+                            *img = anyhow::Context::context(
+                                image::RgbaImage::from_raw(
+                                    dimensions.0,
+                                    dimensions.1,
+                                    dst_image.into_vec(),
+                                ),
+                                "Can't create RgbaImage",
+                            )?;
+                        }
+                    }
+                    Self::Rotate(angle) => match angle {
+                        90 => *img = image::imageops::rotate90(img),
+                        -90 => *img = image::imageops::rotate270(img),
+                        270 => *img = image::imageops::rotate270(img),
+                        180 => *img = image::imageops::rotate180(img),
+                        _ => (),
+                    },
+                    Self::Flip(vert) => {
+                        if *vert {
+                            *img = image::imageops::flip_vertical(img);
+                        } else {
+                            *img = image::imageops::flip_horizontal(img);
+                        }
+                    }
+                    Self::ScaleImageMinMax => {
+                        //Step 0: Get color channel min and max values
+                        let mut min = 255u8;
+                        let mut max = 0u8;
+
+                        img.chunks_mut(4).for_each(|px| {
+                            min = std::cmp::min(min, px[0]);
+                            min = std::cmp::min(min, px[1]);
+                            min = std::cmp::min(min, px[2]);
+
+                            max = std::cmp::max(max, px[0]);
+                            max = std::cmp::max(max, px[1]);
+                            max = std::cmp::max(max, px[2]);
+                        });
+                        let min_f = min as f64;
+                        let max_f = max as f64;
+
+                        //Step 1: Don't do zero division
+                        if min != max {
+                            //Step 2: Create 8-Bit LUT
+                            let mut lut: [u8; 256] = [0u8; 256];
+
+                            for n in min as usize..=max as usize {
+                                let g = n as f64;
+                                lut[n] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
+                            }
+
+                            //Step 3: Apply 8-Bit LUT
+                            img.par_chunks_mut(4).for_each(|px| {
+                                px[0] = lut[px[0] as usize];
+                                px[1] = lut[px[1] as usize];
+                                px[2] = lut[px[2] as usize];
+                            });
+                        }
+                    }
+                    Self::ChromaticAberration(amt) => {
+                        let center = (img.width() as i32 / 2, img.height() as i32 / 2);
+                        let img_c = img.clone();
+
+                        for (x, y, p) in img.enumerate_pixels_mut() {
+                            let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
+                            let dist_to_center = (
+                                (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
+                                (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
+                            );
+                            if let Some(l) = img_c.get_pixel_checked(
+                                (x as i32 + dist_to_center.0 as i32).max(0) as u32,
+                                (y as i32 + dist_to_center.1 as i32).max(0) as u32,
+                            ) {
+                                p[0] = l[0];
+                            }
+                        }
+                    }
+
+                    _ => (),
                 }
             }
-            Self::Filter3x3(amt) => {
-                let kernel = amt
-                    .into_iter()
-                    .map(|a| *a as f32 / 100.)
-                    .collect::<Vec<_>>();
-                *img = imageops::filter3x3(img, &kernel);
-            }
-            Self::LUT(lut_name) => {
-                use lutgen::identity::correct_image;
-                let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-                if let Some(lut_data) = builtin_luts().get(lut_name) {
-                    let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
-                    correct_image(&mut external_image, &lut_img);
-                } else {
-                    if let Ok(lut_img) = image::open(&lut_name) {
-                        correct_image(&mut external_image, &lut_img.to_rgb8());
+            // These must work on all types
+            _ => {
+                info!("Proc with color type {:?}", dyn_img.color());
+
+                match self {
+                    Self::ColorType(t) => match t {
+                        ColorTypeExt::L8 => {
+                            *dyn_img = DynamicImage::ImageLuma8(dyn_img.to_luma8());
+                        }
+                        ColorTypeExt::La8 => {
+                            *dyn_img = DynamicImage::ImageLumaA8(dyn_img.to_luma_alpha8());
+                        }
+                        ColorTypeExt::Rgb8 => {
+                            *dyn_img = DynamicImage::ImageRgb8(dyn_img.to_rgb8());
+                        }
+                        ColorTypeExt::Rgba8 => {
+                            *dyn_img = DynamicImage::ImageRgba8(dyn_img.to_rgba8());
+                        }
+                        ColorTypeExt::L16 => {
+                            *dyn_img = DynamicImage::ImageLuma16(dyn_img.to_luma16());
+                        }
+                        ColorTypeExt::La16 => {
+                            *dyn_img = DynamicImage::ImageLumaA16(dyn_img.to_luma_alpha16());
+                        }
+                        ColorTypeExt::Rgb16 => {
+                            *dyn_img = DynamicImage::ImageRgb16(dyn_img.to_rgb16());
+                        }
+                        ColorTypeExt::Rgba16 => {
+                            *dyn_img = DynamicImage::ImageRgba16(dyn_img.to_rgba16());
+                        }
+                        ColorTypeExt::Rgb32F => {
+                            *dyn_img = DynamicImage::ImageRgb32F(dyn_img.to_rgb32f());
+                        }
+                        ColorTypeExt::Rgba32F => {
+                            *dyn_img = DynamicImage::ImageRgba32F(dyn_img.to_rgba32f());
+                        }
+                    },
+                    Self::Flip(vert) => {
+                        if *vert {
+                            *dyn_img = dyn_img.flipv();
+                        } else {
+                            *dyn_img = dyn_img.fliph();
+                        }
+                    }
+                    _ => {
+                        bail!("This color type is unsupported: {:?}", dyn_img.color())
                     }
                 }
-                *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
             }
-            Self::Crop(dim) => {
-                if *dim != [0, 0, 0, 0] {
-                    let window = cropped_range(dim, &(img.width(), img.height()));
-                    let sub_img =
-                        image::imageops::crop_imm(img, window[0], window[1], window[2], window[3]);
-                    *img = sub_img.to_image();
-                }
-            }
-            Self::CropPerspective { points, .. } => {
-                let img_dim = img.dimensions();
-
-                let max_width = points[1].0.max(points[3].0);
-                let min_width = points[0].0.min(points[2].0);
-                let max_height = points[2].1.max(points[3].1);
-                let min_height = points[0].1.min(points[1].1);
-                let x = max_width - min_width;
-                let y = max_height - min_height;
-
-                let from = [
-                    (points[0].0 as f32, points[0].1 as f32),
-                    (points[1].0 as f32, points[1].1 as f32),
-                    (points[2].0 as f32, points[2].1 as f32),
-                    (points[3].0 as f32, points[3].1 as f32),
-                ];
-
-                let to = [
-                    (0 as f32, 0 as f32),
-                    (img_dim.0 as f32, 0 as f32),
-                    (0 as f32, img_dim.1 as f32),
-                    (img_dim.0 as f32, img_dim.1 as f32),
-                ];
-
-                if let Some(proj) =
-                    imageproc::geometric_transformations::Projection::from_control_points(from, to)
-                {
-                    let default_p: Rgba<u8> = [0, 0, 0, 0].into();
-
-                    *img = imageproc::geometric_transformations::warp(
-                        img,
-                        &proj,
-                        Interpolation::Bicubic,
-                        default_p,
-                    );
-
-                    *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);
-                } else {
-                    error!("Projection failed")
-                }
-            }
-            Self::Resize {
-                dimensions, filter, ..
-            } => {
-                if *dimensions != Default::default() {
-                    let filter = match filter {
-                        ScaleFilter::Box => fr::FilterType::Box,
-                        ScaleFilter::Bilinear => fr::FilterType::Bilinear,
-                        ScaleFilter::Hamming => fr::FilterType::Hamming,
-                        ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
-                        ScaleFilter::Mitchell => fr::FilterType::Mitchell,
-                        ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
-                    };
-
-                    let src_image = fr::images::Image::from_vec_u8(
-                        img.width(),
-                        img.height(),
-                        img.clone().into_raw(),
-                        fr::PixelType::U8x4,
-                    )?;
-
-                    // let mapper = fr::create_gamma_22_mapper();
-                    // mapper.forward_map_inplace(&mut src_image.image_view_mut())?;
-
-                    // Create container for data of destination image
-                    let mut dst_image =
-                        fr::images::Image::new(dimensions.0, dimensions.1, src_image.pixel_type());
-
-                    let mut resizer = fr::Resizer::new();
-
-                    resizer.resize(
-                        &src_image,
-                        &mut dst_image,
-                        Some(
-                            &ResizeOptions::new()
-                                .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
-                        ),
-                    )?;
-
-                    // mapper.backward_map_inplace(&mut dst_image.view_mut())?;
-
-                    *img = anyhow::Context::context(
-                        image::RgbaImage::from_raw(
-                            dimensions.0,
-                            dimensions.1,
-                            dst_image.into_vec(),
-                        ),
-                        "Can't create RgbaImage",
-                    )?;
-                }
-            }
-            Self::Rotate(angle) => match angle {
-                90 => *img = image::imageops::rotate90(img),
-                -90 => *img = image::imageops::rotate270(img),
-                270 => *img = image::imageops::rotate270(img),
-                180 => *img = image::imageops::rotate180(img),
-                _ => (),
-            },
-            Self::Flip(vert) => {
-                if *vert {
-                    *img = image::imageops::flip_vertical(img);
-                } else {
-                    *img = image::imageops::flip_horizontal(img);
-                }
-            }
-            Self::ScaleImageMinMax => {
-                //Step 0: Get color channel min and max values
-                let mut min = 255u8;
-                let mut max = 0u8;
-
-                img.chunks_mut(4).for_each(|px| {
-                    min = std::cmp::min(min, px[0]);
-                    min = std::cmp::min(min, px[1]);
-                    min = std::cmp::min(min, px[2]);
-
-                    max = std::cmp::max(max, px[0]);
-                    max = std::cmp::max(max, px[1]);
-                    max = std::cmp::max(max, px[2]);
-                });
-                let min_f = min as f64;
-                let max_f = max as f64;
-
-                //Step 1: Don't do zero division
-                if min != max {
-                    //Step 2: Create 8-Bit LUT
-                    let mut lut: [u8; 256] = [0u8; 256];
-
-                    for n in min as usize..=max as usize {
-                        let g = n as f64;
-                        lut[n] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
-                    }
-
-                    //Step 3: Apply 8-Bit LUT
-                    img.par_chunks_mut(4).for_each(|px| {
-                        px[0] = lut[px[0] as usize];
-                        px[1] = lut[px[1] as usize];
-                        px[2] = lut[px[2] as usize];
-                    });
-                }
-            }
-            Self::ChromaticAberration(amt) => {
-                let center = (img.width() as i32 / 2, img.height() as i32 / 2);
-                let img_c = img.clone();
-
-                for (x, y, p) in img.enumerate_pixels_mut() {
-                    let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
-                    let dist_to_center = (
-                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
-                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
-                    );
-                    if let Some(l) = img_c.get_pixel_checked(
-                        (x as i32 + dist_to_center.0 as i32).max(0) as u32,
-                        (y as i32 + dist_to_center.1 as i32).max(0) as u32,
-                    ) {
-                        p[0] = l[0];
-                    }
-                }
-            }
-
-            _ => (),
         }
+
         Ok(())
     }
 
@@ -1589,4 +1661,47 @@ fn range_test() {
     let res = interpolate_u8(&map, 5);
 
     debug!("result: {:?}", res);
+}
+#[derive(
+    Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize, EnumIter, Display,
+)]
+pub enum ColorTypeExt {
+    // Pixel is 8-bit luminance
+    L8,
+    /// Pixel is 8-bit luminance with an alpha channel
+    La8,
+    /// Pixel contains 8-bit R, G and B channels
+    Rgb8,
+    /// Pixel is 8-bit RGB with an alpha channel
+    Rgba8,
+    /// Pixel is 16-bit luminance
+    L16,
+    /// Pixel is 16-bit luminance with an alpha channel
+    La16,
+    /// Pixel is 16-bit RGB
+    Rgb16,
+    /// Pixel is 16-bit RGBA
+    Rgba16,
+    /// Pixel is 32-bit float RGB
+    Rgb32F,
+    /// Pixel is 32-bit float RGBA
+    Rgba32F,
+}
+
+impl ColorTypeExt {
+    pub fn _from_image(ct: ColorType) -> Self {
+        match ct {
+            ColorType::L8 => ColorTypeExt::L8,
+            ColorType::La8 => ColorTypeExt::La8,
+            ColorType::Rgb8 => ColorTypeExt::Rgb8,
+            ColorType::Rgba8 => ColorTypeExt::Rgba8,
+            ColorType::L16 => ColorTypeExt::L16,
+            ColorType::La16 => ColorTypeExt::La16,
+            ColorType::Rgb16 => ColorTypeExt::Rgb16,
+            ColorType::Rgba16 => ColorTypeExt::Rgba16,
+            ColorType::Rgb32F => ColorTypeExt::Rgb32F,
+            ColorType::Rgba32F => ColorTypeExt::Rgba32F,
+            _ => ColorTypeExt::Rgba8,
+        }
+    }
 }

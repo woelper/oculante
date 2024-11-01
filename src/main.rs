@@ -855,8 +855,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             _ => {}
         }
 
- 
-
         match &frame {
             Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
                 state.edit_state.result_image_op = Default::default();
@@ -988,14 +986,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             Frame::UpdateTexture => {
                 // Only update the texture.
-                
+
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
                     state.current_texture.set(
-                        state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state
+                            .edit_state
+                            .result_pixel_op
+                            .to_texture_with_texwrap(gfx, &state.persistent_settings),
                         gfx,
                     );
-
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
