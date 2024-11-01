@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
-use image::{self, DynamicImage, GenericImageView, ImageBuffer};
+use image::{self, DynamicImage, GenericImageView};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
@@ -26,7 +26,7 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_loader::{open_image, rotate_dynimage, rotate_rgbaimage};
+use crate::image_loader::{open_image, rotate_dynimage};
 use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 use crate::texture_wrapper::TexWrap;

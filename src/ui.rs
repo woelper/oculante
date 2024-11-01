@@ -17,7 +17,7 @@ use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
@@ -499,7 +499,7 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
 
     let mut color_type = ColorType::Rgba8;
     if let Some(img) = &state.current_image {
@@ -1564,12 +1564,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
                     let ops = &state.edit_state.pixel_op_stack;
-
-
-                    
-                        process_pixels(&mut state.edit_state.result_pixel_op, ops);
-                      
-
+                    if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
+                        state.send_message_warn(&format!("{e}"));
+                    }
                 }
 
                     debug!(

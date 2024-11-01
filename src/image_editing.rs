@@ -9,7 +9,7 @@ use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
 use image::{imageops, DynamicImage, Rgba, RgbaImage};
@@ -1316,54 +1316,100 @@ pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
     luts
 }
 
-pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperation>) {
-    
-
-    if let Some(buffer) = dynimage.as_mut_rgba8() {
-        buffer
-            .par_chunks_mut(4)
-            .for_each(|px| {
+pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperation>) -> Result<()> {
+    match dynimage {
+        DynamicImage::ImageRgb8(buffer) => {
+            buffer.par_chunks_mut(3).for_each(|px| {
                 let mut float_pixel =
-                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
-    
+                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0 as f32) / 255.;
                 // run pixel operations
                 for operation in operators {
                     if let Err(e) = operation.process_pixel(&mut float_pixel) {
                         error!("{e}")
                     }
                 }
-    
                 float_pixel *= 255.;
-    
+                px[0] = (float_pixel[0]) as u8;
+                px[1] = (float_pixel[1]) as u8;
+                px[2] = (float_pixel[2]) as u8;
+            });
+        }
+        DynamicImage::ImageRgba8(buffer) => {
+            buffer.par_chunks_mut(4).for_each(|px| {
+                let mut float_pixel =
+                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
+                // run pixel operations
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
+                }
+                float_pixel *= 255.;
                 px[0] = (float_pixel[0]) as u8;
                 px[1] = (float_pixel[1]) as u8;
                 px[2] = (float_pixel[2]) as u8;
                 px[3] = (float_pixel[3]) as u8;
             });
-    }
-
-    if let Some(buffer) = dynimage.as_mut_rgb8() {
-        buffer
-            .par_chunks_mut(3)
-            .for_each(|px| {
-                let mut float_pixel =
-                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0 as f32) / 255.;
-    
+        }
+        DynamicImage::ImageLuma8(buffer) => {
+            buffer.par_chunks_mut(1).for_each(|px| {
+                let mut float_pixel = Vector4::new(px[0] as f32, 0.0, 0.0, 0.0) / 255.;
                 // run pixel operations
                 for operation in operators {
                     if let Err(e) = operation.process_pixel(&mut float_pixel) {
                         error!("{e}")
                     }
                 }
-    
                 float_pixel *= 255.;
-    
+                px[0] = (float_pixel[0]) as u8;
+            });
+        }
+        DynamicImage::ImageLumaA8(buffer) => {
+            buffer.par_chunks_mut(2).for_each(|px| {
+                let mut float_pixel = Vector4::new(px[0] as f32, 0.0, 0.0, px[1] as f32) / 255.;
+                // run pixel operations
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
+                }
+                float_pixel *= 255.;
                 px[0] = (float_pixel[0]) as u8;
                 px[1] = (float_pixel[1]) as u8;
-                px[2] = (float_pixel[2]) as u8;
             });
+        }
+        DynamicImage::ImageRgb32F(buffer) => {
+            buffer.par_chunks_mut(3).for_each(|px| {
+                let mut float_pixel = Vector4::new(px[0], px[1], px[2], 0.0);
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
+                }
+                px[0] = float_pixel[0];
+                px[1] = float_pixel[1];
+                px[2] = float_pixel[2];
+            });
+        }
+        DynamicImage::ImageRgba32F(buffer) => {
+            buffer.par_chunks_mut(3).for_each(|px| {
+                let mut float_pixel = Vector4::new(px[0], px[1], px[2], px[3]);
+                for operation in operators {
+                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
+                        error!("{e}")
+                    }
+                }
+                px[0] = float_pixel[0];
+                px[1] = float_pixel[1];
+                px[2] = float_pixel[2];
+                px[3] = float_pixel[3];
+            });
+        }
+        _ => {
+            bail!("Pixel operators are not yet supported for this image type.");
+        }
     }
-
+    return Ok(());
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.

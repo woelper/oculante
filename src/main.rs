@@ -2,7 +2,6 @@
 
 use clap::Arg;
 use clap::Command;
-use image::DynamicImage;
 use image::GenericImageView;
 use log::debug;
 use log::error;

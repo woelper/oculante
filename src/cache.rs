@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use image::{DynamicImage, RgbaImage};
+use image::DynamicImage;
 use log::debug;
 
 #[derive(Debug)]

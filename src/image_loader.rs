@@ -44,7 +44,7 @@ pub fn open_image(
         .replace("tiff", "tif")
         .replace("jpeg", "jpg");
 
-    let unchecked_extensions = ["svg", "kra"];
+    let unchecked_extensions = ["svg", "kra", "tga"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
@@ -706,9 +706,8 @@ pub fn open_image(
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(buf) => {
-                let i = DynamicImage::ImageRgba8(buf);
 
-                _ = sender.send(Frame::new_still(i));
+                _ = sender.send(Frame::new_still(buf));
                 return Ok(receiver);
             }
             Err(tiff_error) => match load_raw(&img_location) {
@@ -788,7 +787,7 @@ fn load_raw(img_location: &Path) -> Result<RgbaImage> {
     Ok(DynamicImage::ImageRgb8(x).to_rgba8())
 }
 
-fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
+fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
     // TODO: Probe if dng
     let data = File::open(img_location)?;
 
@@ -855,29 +854,25 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
             debug!("Loading gray color");
             let i =
                 image::GrayImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load gray img")?;
-            // col.add_still(DynamicImage::ImageLuma8(i).into_rgba8());
-            return Ok(DynamicImage::ImageLuma8(i).into_rgba8());
+            return Ok(DynamicImage::ImageLuma8(i));
         }
         tiff::ColorType::RGB(_) => {
             debug!("Loading rgb color");
             let i =
                 image::RgbImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGB img")?;
-            // col.add_still(DynamicImage::ImageRgb8(i).into_rgba8());
-            return Ok(DynamicImage::ImageRgb8(i).into_rgba8());
+            return Ok(DynamicImage::ImageRgb8(i));
         }
         tiff::ColorType::RGBA(_) => {
             debug!("Loading rgba color");
             let i =
                 image::RgbaImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGBA img")?;
-            // col.add_still(i);
-            return Ok(i);
+            return Ok(image::DynamicImage::ImageRgba8(i));
         }
         tiff::ColorType::GrayA(_) => {
             debug!("Loading gray color with alpha");
             let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                 .context("Can't load gray alpha img")?;
-            // col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
-            return Ok(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+            return Ok(image::DynamicImage::ImageLumaA8(i));
         }
         _ => {
             bail!(
@@ -1006,13 +1001,11 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 
         // Dispatch to still or animation
         if is_jxl_anim {
-            // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
             _ = frame_sender.send(Frame::new_animation(
                 image_result,
                 frame_duration
             ));
         } else {
-            // col.add_still(image_result.to_rgba8());
             _ = frame_sender.send(Frame::new_still(image_result));
         }
     }
@@ -1021,13 +1014,13 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     Ok(())
 }
 
-#[allow(unused)]
 pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     di.apply_orientation(decoder.orientation()?);
     Ok(())
 }
 
+#[allow(unused)]
 pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     let orientation = decoder.orientation()?;
