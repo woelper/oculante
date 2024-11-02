@@ -984,7 +984,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
-
+    let mut bbox_tl: Pos2 = Default::default();
+    let mut bbox_br: Pos2 = Default::default();
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
@@ -1046,11 +1047,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
+        
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1158,7 +1160,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(aligned_offset_x, aligned_offset_y);
         }
-
+        
         if state.persistent_settings.info_enabled {
             // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
 
@@ -1166,9 +1168,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
             texture.draw_zoomed(
                 &mut zoom_image,
-                8.,
-                220.,
-                240.,
+                bbox_tl.x,
+                bbox_tl.y,
+                bbox_br.x-bbox_tl.x,
                 (state.cursor_relative.x, state.cursor_relative.y),
             );
         }
