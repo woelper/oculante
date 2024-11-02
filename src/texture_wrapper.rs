@@ -64,7 +64,7 @@ impl TextureWrapperManager {
         }
 
 
-        self.current_texture = TexWrap::from_rgbaimage(gfx, settings, img);
+        self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img);
     }
 
     pub fn get(&mut self) -> &mut Option<TexWrap> {
@@ -123,21 +123,21 @@ const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
 };
 
 impl TexWrap {
-    pub fn from_rgbaimage(
+    pub fn from_dynamic_image(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
         image: &DynamicImage,
     ) -> Option<TexWrap> {
-        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
+        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_standard)
     }
 
-    pub fn from_rgbaimage_premult(
+    /*pub fn from_rgbaimage_premult(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
         image: &DynamicImage,
     ) -> Option<TexWrap> {
-        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_premult)
-    }
+        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_premult)
+    }*/
 
     fn gen_texture_standard(
         gfx: &mut Graphics,
@@ -148,7 +148,7 @@ impl TexWrap {
         settings: &PersistentSettings,
         size_ok: bool,
     ) -> Option<Texture> {
-        let texer = gfx.create_texture()
+        let texture_result = gfx.create_texture()
             .from_bytes(bytes, width, height)
             .with_mipmaps(settings.use_mipmaps && size_ok)
             .with_format(format)
@@ -168,15 +168,13 @@ impl TexWrap {
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build();
 
-            let _greeting_file = match texer {
-                Ok(file) => return Some(file),
-                Err(error) => panic!("Problem opening the file: {error:?}"),
+            let _ = match texture_result {
+                Ok(texture) => return Some(texture),
+                Err(error) => panic!("Problem generating texture: {error:?}"),
             };
-                
-        //return texer.ok();
     }
 
-    fn gen_texture_premult(
+    /*fn gen_texture_premult(
         gfx: &mut Graphics,
         bytes: &[u8],
         width: u32,
@@ -206,9 +204,9 @@ impl TexWrap {
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
             .ok()
-    }
+    }*/
 
-    fn gen_from_rgbaimage(
+    fn gen_from_dynamic_image(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
         image: &DynamicImage,
@@ -299,11 +297,6 @@ impl TexWrap {
                         );
                     }
                 }
-
-                
-                
-                
-                
 
                 if let Some(t) = tex {
                    

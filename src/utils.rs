@@ -754,7 +754,7 @@ impl ImageExt for DynamicImage {
         gfx: &mut Graphics,
         settings: &PersistentSettings,
     ) -> Option<TexWrap> {        
-        TexWrap::from_rgbaimage(gfx, settings, &self)
+        TexWrap::from_dynamic_image(gfx, settings, &self)
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
