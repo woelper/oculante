@@ -32,6 +32,7 @@ use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
+    draw::*,
 };
 use std::{
     collections::BTreeSet,
@@ -508,7 +509,7 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics, draw: &mut Draw) {
     let mut color_type = ColorType::Rgba8;
     if let Some(img) = &state.current_image {
         color_type = img.color();

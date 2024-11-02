@@ -709,13 +709,7 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-    fn to_texture_with_texwrap(
-        &self,
-        gfx: &mut Graphics,
-        settings: &PersistentSettings,
-    ) -> Option<TexWrap> {
-        TexWrap::from_rgbaimage(gfx, settings, self)
-    }
+   
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.clean();
@@ -735,9 +729,19 @@ impl ImageExt for RgbaImage {
         }
     }
 
+    /*fn to_texture_with_texwrap(
+        &self,
+        gfx: &mut Graphics,
+        settings: &PersistentSettings,
+    ) -> Option<TexWrap> {
+        TexWrap::from_rgbaimage(gfx, settings, self)
+    }
+
     fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
         texture.update_textures(gfx, self);
-    }
+    }*/
+
+    
 }
 
 impl ImageExt for DynamicImage {
@@ -749,9 +753,8 @@ impl ImageExt for DynamicImage {
         &self,
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-    ) -> Option<TexWrap> {
-        // FIXME: use the actual imagetype here
-        TexWrap::from_rgbaimage(gfx, settings, &self.to_rgba8())
+    ) -> Option<TexWrap> {        
+        TexWrap::from_rgbaimage(gfx, settings, &self)
     }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
@@ -769,7 +772,7 @@ impl ImageExt for DynamicImage {
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
         if let Err(e) = gfx
             .update_texture(texture)
-            .with_data(&self.to_rgba8())
+            .with_data(&self.as_bytes())
             .update()
         {
             error!("{e}");
@@ -777,7 +780,7 @@ impl ImageExt for DynamicImage {
     }
 
     fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
-        texture.update_textures(gfx, &self.to_rgba8());
+        texture.update_textures(gfx, &self);
     }
 }
 

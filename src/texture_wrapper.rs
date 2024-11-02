@@ -1,15 +1,15 @@
+use image::DynamicImage;
+use image::EncodableLayout;
+use image::GenericImageView;
 use log::warn;
+use log::debug;
 use notan::draw::*;
 use notan::egui::EguiRegisterTexture;
 use notan::egui::SizedTexture;
-
 use crate::settings::PersistentSettings;
 use image::imageops;
-
-use image::RgbaImage;
-
 use log::error;
-use notan::prelude::{BlendMode, Graphics, Texture, TextureFilter};
+use notan::prelude::{BlendMode, Graphics, Texture, TextureFilter, ShaderSource};
 
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
@@ -19,6 +19,9 @@ pub struct TexWrap {
     pub row_translation: u32,
     pub size_vec: (f32, f32), // The whole Texture Array size
     pub texture_count: usize,
+    pipeline:Option<notan::prelude::Pipeline>,
+    pub format:notan::prelude::TextureFormat,
+    pub image_format:image::ColorType
 }
 
 #[derive(Default)]
@@ -27,6 +30,7 @@ pub struct TextureWrapperManager {
 }
 
 impl TextureWrapperManager {
+    #[deprecated(note="please use `set_image` instead")]
     pub fn set(&mut self, tex: Option<TexWrap>, gfx: &mut Graphics) {
         let mut texture_taken: Option<TexWrap> = self.current_texture.take();
         if let Some(texture) = &mut texture_taken {
@@ -34,6 +38,33 @@ impl TextureWrapperManager {
         }
 
         self.current_texture = tex;
+    }
+
+    pub fn set_image(&mut self, img: &DynamicImage, gfx: &mut Graphics,
+        settings: &PersistentSettings) {
+
+        //First: try to update an existing texture
+        if let Some(tex) = &mut self.current_texture {
+            if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() 
+            && img.color() == tex.image_format{
+                debug!("Re-using texture as it is the same size.");
+                tex.update_textures(gfx, img);
+                return;
+            }
+        }
+
+        //If update not possible: Remove existing texture and generate a new one
+        let mut texture_taken: Option<TexWrap> = self.current_texture.take();
+        if let Some(texture) = &mut texture_taken {
+            debug!("Updating texture with new size.");
+            texture.unregister_textures(gfx);
+        }
+        else{
+            debug!("No current texture. Creating and setting texture");
+        }
+
+
+        self.current_texture = TexWrap::from_rgbaimage(gfx, settings, img);
     }
 
     pub fn get(&mut self) -> &mut Option<TexWrap> {
@@ -71,11 +102,31 @@ pub struct TexturePair {
     pub texture_egui: SizedTexture,
 }
 
+//language=glsl
+const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
+    r#"
+    #version 450
+    precision mediump float;
+
+    layout(location = 0) in vec2 v_uvs;
+    layout(location = 1) in vec4 v_color;
+
+    layout(binding = 0) uniform sampler2D u_texture;
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+        vec4 tex_col = texture(u_texture, v_uvs);
+        color = vec4(tex_col.r, tex_col.r,tex_col.r, 1.0) * v_color;
+    }
+    "#
+};
+
 impl TexWrap {
     pub fn from_rgbaimage(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
     ) -> Option<TexWrap> {
         Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
     }
@@ -83,7 +134,7 @@ impl TexWrap {
     pub fn from_rgbaimage_premult(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
     ) -> Option<TexWrap> {
         Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_premult)
     }
@@ -93,13 +144,14 @@ impl TexWrap {
         bytes: &[u8],
         width: u32,
         height: u32,
+        format:notan::prelude::TextureFormat,
         settings: &PersistentSettings,
         size_ok: bool,
     ) -> Option<Texture> {
-        gfx.create_texture()
+        let texer = gfx.create_texture()
             .from_bytes(bytes, width, height)
             .with_mipmaps(settings.use_mipmaps && size_ok)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
+            .with_format(format)
             // .with_premultiplied_alpha()
             .with_filter(
                 if settings.linear_min_filter {
@@ -114,8 +166,14 @@ impl TexWrap {
                 },
             )
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
+            .build();
+
+            let _greeting_file = match texer {
+                Ok(file) => return Some(file),
+                Err(error) => panic!("Problem opening the file: {error:?}"),
+            };
+                
+        //return texer.ok();
     }
 
     fn gen_texture_premult(
@@ -123,6 +181,7 @@ impl TexWrap {
         bytes: &[u8],
         width: u32,
         height: u32,
+        _format:notan::prelude::TextureFormat,
         settings: &PersistentSettings,
         size_ok: bool,
     ) -> Option<Texture> {
@@ -152,23 +211,36 @@ impl TexWrap {
     fn gen_from_rgbaimage(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
         texture_generator_function: fn(
             &mut Graphics,
             &[u8],
             u32,
             u32,
+            notan::prelude::TextureFormat,
             &PersistentSettings,
             bool,
         ) -> Option<Texture>,
     ) -> Option<TexWrap> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
-        let (im_w, im_h) = image.dimensions();
+        
+        let im_w = image.width();
+        let im_h = image.height();
+        let mut format:notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
+        let mut pipeline: Option<notan::prelude::Pipeline> = None;
+        match image.color(){
+            image::ColorType::L8 =>{
+                format = notan::prelude::TextureFormat::R8;
+                pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+            }
+            _ => {}
+        }
+
         if im_w < 1 || im_h < 1 {
             error!("Image width smaller than 1!");
             return None;
         }
-
+        
         let im_pixel_count = (im_w * im_h) as usize;
         let allow_mipmap = im_pixel_count < MAX_PIXEL_COUNT;
 
@@ -194,21 +266,47 @@ impl TexWrap {
             let tex_height = std::cmp::min(row_increment, im_h - tex_start_y);
             for col_index in 0..col_count {
                 let tex_start_x = col_index * col_increment;
-                let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);
+                let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);               
+                
+                let sub_img = imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
 
-                let sub_img =
-                    imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
-                let my_img = sub_img.to_image();
-                let tex = texture_generator_function(
-                    gfx,
-                    my_img.as_ref(),
-                    my_img.width(),
-                    my_img.height(),
-                    settings,
-                    allow_mipmap,
-                );
+                let tex: Option<Texture>;                
+                match image.color(){
+                    image::ColorType::L8 =>{
+                        let temp_image = image.as_luma8().unwrap();
+                        let sub_img = imageops::crop_imm(temp_image, tex_start_x, tex_start_y, tex_width, tex_height);
+                        let my_img = sub_img.to_image(); //TODO: This is an unnecessary copy!
+                        tex = texture_generator_function(
+                            gfx,
+                            my_img.as_bytes(),
+                            sub_img.width(),
+                            sub_img.height(),
+                            format,
+                            settings,
+                            allow_mipmap,
+                        );                        
+                    }
+                    _ => {
+                        let my_img = sub_img.to_image();
+                        tex = texture_generator_function(
+                            gfx,
+                            my_img.as_bytes(),
+                            sub_img.width(),
+                            sub_img.height(),
+                            format,
+                            settings,
+                            allow_mipmap,
+                        );
+                    }
+                }
+
+                
+                
+                
+                
 
                 if let Some(t) = tex {
+                   
                     let egt = gfx.egui_register_texture(&t);
                     let te = TexturePair {
                         texture: t,
@@ -224,6 +322,7 @@ impl TexWrap {
             }
             if !fine {
                 //early exit if we failed
+                error!("Texture generation failed!");
                 break;
             }
         }
@@ -238,6 +337,9 @@ impl TexWrap {
                 col_translation: col_increment,
                 row_translation: row_increment,
                 texture_count,
+                pipeline,
+                format,
+                image_format: image.color()
             })
         } else {
             None
@@ -246,11 +348,16 @@ impl TexWrap {
 
     pub fn draw_textures(
         &self,
+        
         draw: &mut Draw,
         translation_x: f32,
         translation_y: f32,
         scale: f32,
     ) {
+
+        
+        self.begin_draw(draw);
+
         let mut tex_idx = 0;
         for row_idx in 0..self.row_count {
             let translate_y =
@@ -260,11 +367,12 @@ impl TexWrap {
                     + scale as f64 * col_idx as f64 * self.col_translation as f64;
                 draw.image(&self.texture_array[tex_idx].texture)
                     .blend_mode(BlendMode::NORMAL)
-                    .scale(scale, scale)
+                    .scale(scale, scale)                  
                     .translate(translate_x as f32, translate_y as f32);
                 tex_idx += 1;
             }
         }
+        self.end_draw(draw);
     }
 
     pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
@@ -273,11 +381,11 @@ impl TexWrap {
         }
     }
 
-    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage) {
+    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
         if self.col_count == 1 && self.row_count == 1 {
             if let Err(e) = gfx
                 .update_texture(&mut self.texture_array[0].texture)
-                .with_data(image)
+                .with_data(image.as_bytes())
                 .update()
             {
                 error!("{e}");
@@ -350,6 +458,24 @@ impl TexWrap {
             offset_height: remaining_height,
         }
     }
+
+    fn begin_draw(
+        &self,
+        draw: &mut Draw){
+
+        if let Some(pip) = &self.pipeline{
+            draw.image_pipeline()
+        .pipeline(pip);
+        }
+        }
+
+    fn end_draw(
+        &self,
+        draw: &mut Draw){
+           if self.pipeline.is_some(){
+        draw.image_pipeline().remove();
+        }
+        }
 
     pub fn size(&self) -> (f32, f32) {
         return self.size_vec;

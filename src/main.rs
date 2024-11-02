@@ -59,7 +59,6 @@ mod ui;
 #[cfg(feature = "update")]
 mod update;
 use ui::*;
-
 use crate::image_editing::EditState;
 
 mod image_editing;
@@ -162,11 +161,13 @@ fn main() -> Result<(), String> {
     window_config.always_on_top = true;
     window_config.max_size = None;
 
+
     debug!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
         .add_config(EguiConfig)
         .add_config(DrawConfig)
+        
         .event(event)
         .update(update)
         .draw(drawe)
@@ -803,8 +804,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
-    let mut draw = gfx.create_draw();
-
+    let mut draw = gfx.create_draw();   
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
@@ -946,24 +946,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                if let Some(tex) = &mut state.current_texture.get() {
-                    if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                        debug!("Re-using texture as it is the same size.");
-                        img.update_texture_with_texwrap(gfx, tex);
-                    } else {
-                        debug!("Updating texture with new size.");
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
-                    }
-                } else {
-                    debug!("No current texture. Creating and setting texture");
-                    state.current_texture.set(
-                        img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                        gfx,
-                    );
-                }
+                state.current_texture.set_image(&img, gfx, &state.persistent_settings);
 
                 match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
@@ -1102,8 +1085,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
-        {
-            info_ui(ctx, state, gfx);
+        {           
+            info_ui(ctx, state, gfx, & mut draw);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
