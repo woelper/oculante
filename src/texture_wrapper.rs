@@ -270,15 +270,12 @@ impl TexWrap {
                 let tex_start_x = col_index * col_increment;
                 let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);
 
-                let sub_img =
-                    imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
-
                 let tex: Option<Texture>;
-                match image.color() {
-                    image::ColorType::L8 => {
-                        let temp_image = image.as_luma8().unwrap();
+
+                match image {
+                    DynamicImage::ImageLuma8(luma8_image) => {
                         let sub_img = imageops::crop_imm(
-                            temp_image,
+                            luma8_image,
                             tex_start_x,
                             tex_start_y,
                             tex_width,
@@ -295,7 +292,14 @@ impl TexWrap {
                             allow_mipmap,
                         );
                     }
-                    _ => {
+                    other_image_type => {
+                        let sub_img = imageops::crop_imm(
+                            other_image_type,
+                            tex_start_x,
+                            tex_start_y,
+                            tex_width,
+                            tex_height,
+                        );
                         let my_img = sub_img.to_image();
                         tex = texture_generator_function(
                             gfx,
@@ -401,11 +405,10 @@ impl TexWrap {
                     let tex_width =
                         std::cmp::min(self.col_translation, image.width() - tex_start_x);
 
-                    match image.color() {
-                        image::ColorType::L8 => {
-                            let temp_image = image.as_luma8().unwrap();
+                        match image {
+                            DynamicImage::ImageLuma8(luma8_image) => {                           
                             let sub_img = imageops::crop_imm(
-                                temp_image,
+                                luma8_image,
                                 tex_start_x,
                                 tex_start_y,
                                 tex_width,
@@ -420,9 +423,9 @@ impl TexWrap {
                                 error!("{e}");
                             }
                         }
-                        _ => {
+                        other_image_type => {
                             let sub_img = imageops::crop_imm(
-                                image,
+                                other_image_type,
                                 tex_start_x,
                                 tex_start_y,
                                 tex_width,
