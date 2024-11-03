@@ -588,13 +588,24 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
                 });
 
                 // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                let uv_size = (scale, scale * ratio);
-               
-                if texture.texture_count==1 {
+                //let ratio = texture.size().0 as f64 / texture.size().1 as f64;
+                //let uv_size = (scale, scale * ratio);
+
+                ui.add_space(10.);
+
+                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+                
+                //Rendering a placeholder rectangle
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));
+            
+                bbox_tl = preview_rect.left_top();
+                bbox_br = preview_rect.right_bottom();
+                /*if texture.texture_count==1 {
                     let texture_resonse = texture.get_texture_at_xy(0,0);
-                    ui.add_space(10.);
-                    let preview_rect = ui
+                    
+                    
+
+                    /*let preview_rect = ui
                         .add(
                             egui::Image::new(texture_resonse.texture.texture_egui)
                             .maintain_aspect_ratio(false)
@@ -605,13 +616,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
                                 (uv_center.1 - uv_size.1) as f32..=(uv_center.1 + uv_size.1) as f32,
                             )),
                         )
-                        .rect;
+                        .rect;*/
                     bbox_tl = preview_rect.left_top();
                     bbox_br = preview_rect.right_bottom();
                 }
                 else{
                     (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
-                }
+                }*/
 
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
@@ -619,7 +630,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
 
 
                 let stroke_color = Color32::from_white_alpha(240);
-
+                //TODO: Render this after rendering notan view
                 ui.painter_at(preview_rect).line_segment(
                     [preview_rect.center_bottom(), preview_rect.center_top()],
                     Stroke::new(4., bg_color),
