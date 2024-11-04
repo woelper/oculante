@@ -510,10 +510,12 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
 }
 
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> (Pos2, Pos2) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2, (f64, f64)) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
+    let mut uv_center: (f64, f64)= Default::default();
+    let mut uv_size: (f64, f64)= Default::default();
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -545,7 +547,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
-                let uv_center = (
+                uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
@@ -611,9 +613,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
                 });
 
                 // make sure aspect ratio is compensated for the square preview
-                //let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                //let uv_size = (scale, scale * ratio);
-
+                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
+                uv_size = (scale, scale * ratio);
                 ui.add_space(10.);
 
                 let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
@@ -623,30 +624,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
             
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
-                /*if texture.texture_count==1 {
-                    let texture_resonse = texture.get_texture_at_xy(0,0);
-                    
-                    
-
-                    /*let preview_rect = ui
-                        .add(
-                            egui::Image::new(texture_resonse.texture.texture_egui)
-                            .maintain_aspect_ratio(false)
-                            .fit_to_exact_size(egui::Vec2::splat(desired_width as f32))
-                            .rounding(ROUNDING)
-                            .uv(egui::Rect::from_x_y_ranges(
-                                (uv_center.0 - uv_size.0) as f32..=(uv_center.0 + uv_size.0) as f32,
-                                (uv_center.1 - uv_size.1) as f32..=(uv_center.1 + uv_size.1) as f32,
-                            )),
-                        )
-                        .rect;*/
-                    bbox_tl = preview_rect.left_top();
-                    bbox_br = preview_rect.right_bottom();
-                }
-                else {
-                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
-                }*/
-
+                
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
@@ -778,7 +756,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> 
             
         });
     });
-    return (bbox_tl, bbox_br);
+    return (bbox_tl, bbox_br, uv_size);
 }
 
 fn render_info_image_tiled(

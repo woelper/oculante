@@ -1024,6 +1024,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let mut bbox_tl: egui::Pos2 = Default::default();
     let mut bbox_br: egui::Pos2 = Default::default();
+    let mut uv_center: (f64,f64) = Default::default();
+    let mut uv_size: (f64,f64) = Default::default();
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
@@ -1090,8 +1092,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
-
+            (bbox_tl, bbox_br, uv_size) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1211,7 +1212,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 bbox_tl.y,
                 bbox_br.x-bbox_tl.x,
                 (state.cursor_relative.x, state.cursor_relative.y),
-            );
+                uv_size
+            );            
         }
 
         // Draw a brush preview when paint mode is on
