@@ -804,7 +804,8 @@ fn update(app: &mut App, state: &mut OculanteState) {
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
-    let mut draw = gfx.create_draw();   
+    let mut draw = gfx.create_draw();
+    let mut zoom_image = gfx.create_draw();
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
@@ -818,6 +819,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // check if a new loaded image has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
+
 
         debug!("Got frame: {}", frame.to_string());
 
@@ -1020,7 +1022,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
-
+    let mut bbox_tl: egui::Pos2 = Default::default();
+    let mut bbox_br: egui::Pos2 = Default::default();
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
@@ -1082,11 +1085,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
+        
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
-        {           
-            info_ui(ctx, state, gfx, & mut draw);
+        {
+            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
+
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1145,12 +1150,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .size(
+                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                    )
                     .blend_mode(BlendMode::ADD)
-                    .translate(aligned_offset_x, aligned_offset_y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
+                    .translate(aligned_offset_x, aligned_offset_y);
             }
         }
         if state.tiling < 2 {
@@ -1194,19 +1199,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(aligned_offset_x, aligned_offset_y);
         }
-
-        if state.persistent_settings.show_minimap {
+        
+        if state.persistent_settings.info_enabled {
             // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
-            let offset_x = 0.0;
 
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_geometry.dimensions.0 as f32
-                * state.image_geometry.scale
-                > app.window().size().0 as f32;
+            // let center = (text)
 
-            if show_minimap {
-                texture.draw_textures(&mut draw, offset_x, 100., scale);
-            }
+            texture.draw_zoomed(
+                &mut zoom_image,
+                bbox_tl.x,
+                bbox_tl.y,
+                bbox_br.x-bbox_tl.x,
+                (state.cursor_relative.x, state.cursor_relative.y),
+            );
         }
 
         // Draw a brush preview when paint mode is on
@@ -1254,6 +1259,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
+    gfx.render(&zoom_image);
 }
 
 // Show file browser to select image to load

@@ -509,8 +509,12 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics, draw: &mut Draw) {
+
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
+    let mut bbox_tl: Pos2 = Default::default();
+    let mut bbox_br: Pos2 = Default::default();
+
     if let Some(img) = &state.current_image {
         color_type = img.color();
 
@@ -609,9 +613,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics, dr
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 as f64 / texture.size().1 as f64;
                 let uv_size = (scale, scale * ratio);
-                let bbox_tl: Pos2;
-                let bbox_br: Pos2;
-                if texture.texture_count == 1 {
+
+               
+                if texture.texture_count==1 {
                     let texture_resonse = texture.get_texture_at_xy(0,0);
                     ui.add_space(10.);
                     let preview_rect = ui
@@ -761,8 +765,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics, dr
                 });
             }
             advanced_ui(ui, state);
+            
         });
     });
+    return (bbox_tl, bbox_br);
 }
 
 fn render_info_image_tiled(
