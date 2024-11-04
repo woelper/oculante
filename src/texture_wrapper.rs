@@ -10,6 +10,8 @@ use notan::draw::*;
 use notan::egui::EguiRegisterTexture;
 use notan::egui::SizedTexture;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
+use palette::cast::ArraysInto;
+use turbojpeg::libc::memcpy;
 
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
@@ -230,11 +232,12 @@ impl TexWrap {
         let im_h = image.height();
         let mut format: notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
         let mut pipeline: Option<notan::prelude::Pipeline> = None;
+        debug!("{:?}", image.color());
         match image.color() {
             image::ColorType::L8 => {
                 format = notan::prelude::TextureFormat::R8;
                 pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
-            }
+            }            
             _ => {}
         }
 
@@ -274,19 +277,33 @@ impl TexWrap {
 
                 match image {
                     DynamicImage::ImageLuma8(luma8_image) => {
-                        let sub_img = imageops::crop_imm(
+                        /*let sub_img = imageops::crop_imm(
                             luma8_image,
                             tex_start_x,
                             tex_start_y,
                             tex_width,
                             tex_height,
-                        );
-                        let my_img = sub_img.to_image();
+                        );*/
+                        //let my_img = sub_img.to_image();
+
+                        let mut buff:Vec<u8> = vec![0;tex_width as usize*tex_height as usize];
+                        
+                        unsafe {
+                            let mut ptr_src = luma8_image.as_bytes().as_ptr();
+                            let mut ptr = buff.as_mut_ptr(); // y=0, x=0                            
+                            ptr_src = ptr_src.add((tex_start_x + tex_start_y*im_w) as usize);
+                            for _y in 0..tex_height{                                
+                                std::ptr::copy_nonoverlapping(ptr_src, ptr, tex_width as usize);
+                                ptr_src = ptr_src.add(im_w as usize);
+                                ptr = ptr.add(tex_width as usize);
+                            }
+                        }
+
                         tex = texture_generator_function(
                             gfx,
-                            my_img.as_bytes(),
-                            sub_img.width(),
-                            sub_img.height(),
+                            buff.as_bytes(),
+                            tex_width,
+                            tex_height,
                             format,
                             settings,
                             allow_mipmap,
