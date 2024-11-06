@@ -12,6 +12,7 @@ use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
 use anyhow::{bail, Result};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
+use image::codecs::png::FilterType;
 use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
@@ -107,7 +108,7 @@ pub enum ScaleFilter {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub enum ImageOperation {
-    ColorType(ColorTypeExt),
+    ColorConverter(ColorTypeExt),
     Brightness(i32),
     Expression(String),
     Desaturate(u8),
@@ -153,7 +154,7 @@ pub enum ImageOperation {
 impl fmt::Display for ImageOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::ColorType(_) => write!(f, "{PAINT_BUCKET} Color Type"),
+            Self::ColorConverter(_) => write!(f, "{PAINT_BUCKET} Color Type"),
             Self::Brightness(_) => write!(f, "{SUN} Brightness"),
             Self::Noise { .. } => write!(f, "〰 Noise"),
             Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
@@ -194,7 +195,7 @@ impl ImageOperation {
             Self::Crop(_) => false,
             Self::CropPerspective { .. } => false,
             Self::Rotate(_) => false,
-            Self::ColorType(_) => false,
+            Self::ColorConverter(_) => false,
             Self::Flip(_) => false,
             Self::ChromaticAberration(_) => false,
             Self::LUT(_) => false,
@@ -213,7 +214,7 @@ impl ImageOperation {
         settings: &mut VolatileSettings,
     ) -> Response {
         match self {
-            Self::ColorType(ct) => {
+            Self::ColorConverter(ct) => {
                 let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
                 egui::ComboBox::from_id_source("color_types")
                     .selected_text(ct.to_string())
@@ -224,9 +225,9 @@ impl ImageOperation {
                             }
                         }
                     });
-                    if x.changed() {
-                        info!("set to {}", ct);
-                    }
+                if x.changed() {
+                    info!("set to {}", ct);
+                }
                 x
             }
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),
@@ -855,7 +856,6 @@ impl ImageOperation {
                     val[1] as f32 / 255.,
                     val[2] as f32 / 255.,
                 ];
-
                 let r = ui.color_edit_button_rgb(&mut color);
                 if r.changed() {
                     val[0] = (color[0] * 255.) as u8;
@@ -1159,7 +1159,7 @@ impl ImageOperation {
                 info!("Proc with color type {:?}", dyn_img.color());
 
                 match self {
-                    Self::ColorType(t) => match t {
+                    Self::ColorConverter(t) => match t {
                         ColorTypeExt::L8 => {
                             *dyn_img = DynamicImage::ImageLuma8(dyn_img.to_luma8());
                         }
@@ -1197,6 +1197,28 @@ impl ImageOperation {
                         } else {
                             *dyn_img = dyn_img.fliph();
                         }
+                    }
+                    Self::Rotate(angle) => match angle {
+                        90 => *dyn_img = dyn_img.rotate90(),
+                        -90 => *dyn_img = dyn_img.rotate270(),
+                        270 => *dyn_img = dyn_img.rotate270(),
+                        180 => *dyn_img = dyn_img.rotate180(),
+                        _ => (),
+                    },
+                    Self::Blur(amt) => {
+                        if *amt != 0 {
+                            *dyn_img = dyn_img.fast_blur(*amt as f32 / 2.5);
+                        }
+                    }
+                    Self::Resize {
+                        dimensions, filter, ..
+                    } => {
+                        let filter = match filter {
+                            ScaleFilter::CatmullRom => imageops::FilterType::CatmullRom,
+                            ScaleFilter::Lanczos3 => imageops::FilterType::Lanczos3,
+                            _ => imageops::FilterType::Gaussian
+                        };
+                        *dyn_img = dyn_img.resize(dimensions.0, dimensions.0, filter);
                     }
                     _ => {
                         bail!("This color type is unsupported: {:?}", dyn_img.color())
@@ -1305,10 +1327,6 @@ impl ImageOperation {
             }
             Self::Mult(amt) => {
                 let amt = Vector4::new(amt[0] as f32, amt[1] as f32, amt[2] as f32, 255_f32) / 255.;
-
-                // p[0] = p[0] * amt[0] as f32 / 255.;
-                // p[1] = p[1] * amt[1] as f32 / 255.;
-                // p[2] = p[2] * amt[2] as f32 / 255.;
                 *p = p.component_mul(&amt);
             }
             Self::Add(amt) => {
@@ -1327,7 +1345,6 @@ impl ImageOperation {
                 hsv.lightness *= amt.2 as f32 / 100.;
                 let rgb: Rgb = hsv.into_color();
 
-                // *p = image::Rgba([rgb.red, rgb.green, rgb.blue, p[3]]);
                 p[0] = rgb.red;
                 p[1] = rgb.green;
                 p[2] = rgb.blue;
