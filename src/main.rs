@@ -952,19 +952,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
-                    ColorChannel::Rgb => state.current_texture.set(
-                        unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
-                        gfx,
-                    ),
+                    ColorChannel::Rgb => 
+                    state.current_texture.set_image(&unpremult(&img), gfx, &state.persistent_settings),
                     // Do nuttin'
                     ColorChannel::Rgba => (),
                     // Display the channel
                     _ => {
-                        state.current_texture.set(
-                            solo_channel(&img, state.persistent_settings.current_channel as usize)
-                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state.current_texture.set_image(&solo_channel(&img, state.persistent_settings.current_channel as usize), gfx, &state.persistent_settings);
                     }
                 }
                 state.current_image = Some(img);
@@ -974,20 +968,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set(
-                        state
-                            .edit_state
-                            .result_pixel_op
-                            .to_texture_with_texwrap(gfx, &state.persistent_settings),
-                        gfx,
-                    );
+                    state.current_texture.set_image(&state
+                        .edit_state
+                        .result_pixel_op, gfx, &state.persistent_settings)                    
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state.current_texture.set_image(&img, gfx, &state.persistent_settings);
                     }
                 }
             }
@@ -1024,8 +1011,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let mut bbox_tl: egui::Pos2 = Default::default();
     let mut bbox_br: egui::Pos2 = Default::default();
-    let mut uv_center: (f64,f64) = Default::default();
-    let mut uv_size: (f64,f64) = Default::default();
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
@@ -1092,7 +1077,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            (bbox_tl, bbox_br, uv_size) = info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1212,7 +1197,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 bbox_tl.y,
                 bbox_br.x-bbox_tl.x,
                 (state.cursor_relative.x, state.cursor_relative.y),
-                uv_size
+                8.0
             );            
         }
 

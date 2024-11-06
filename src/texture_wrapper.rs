@@ -10,8 +10,6 @@ use notan::draw::*;
 use notan::egui::EguiRegisterTexture;
 use notan::egui::SizedTexture;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
-use notan::{
-    egui::{self, *}};
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
     pub col_count: u32,
@@ -236,12 +234,12 @@ impl TexWrap {
             image::ColorType::L8 => {
                 format = notan::prelude::TextureFormat::R8;
                 pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
-            }            
+            }
             _ => {}
         }
 
         if im_w < 1 || im_h < 1 {
-            error!("Image width smaller than 1!");//TODO: fix t
+            error!("Image width smaller than 1!"); //TODO: fix t
             return None;
         }
 
@@ -276,26 +274,19 @@ impl TexWrap {
 
                 match image {
                     DynamicImage::ImageLuma8(luma8_image) => {
-                        /*let sub_img = imageops::crop_imm(
-                            luma8_image,
-                            tex_start_x,
-                            tex_start_y,
-                            tex_width,
-                            tex_height,
-                        );*/
-                        //let my_img = sub_img.to_image();
 
-                        let mut buff:Vec<u8> = vec![0;tex_width as usize*tex_height as usize];
-                        
-                        unsafe {
-                            let mut ptr_src = luma8_image.as_bytes().as_ptr();
-                            let mut ptr = buff.as_mut_ptr(); // y=0, x=0                            
-                            ptr_src = ptr_src.add((tex_start_x + tex_start_y*im_w) as usize);
-                            for _y in 0..tex_height{                                
-                                std::ptr::copy_nonoverlapping(ptr_src, ptr, tex_width as usize);
-                                ptr_src = ptr_src.add(im_w as usize);
-                                ptr = ptr.add(tex_width as usize);
-                            }
+                        // Creating luma 8 sub image
+                        let mut buff: Vec<u8> = vec![0; tex_width as usize * tex_height as usize];
+                        let bytes_src = luma8_image.as_bytes();
+                        let mut dst_idx_start = 0 as usize;
+                        let mut src_idx_start = tex_start_x as usize + tex_start_y as usize * im_w as usize;
+
+                        for _y in 0..tex_height {             
+                            let dst_idx_end = dst_idx_start + tex_width as usize;
+                            let src_idx_end = src_idx_start + tex_width as usize;
+                            buff[dst_idx_start..dst_idx_end].copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
+                            dst_idx_start = dst_idx_end;
+                            src_idx_start += im_w as usize;
                         }
 
                         tex = texture_generator_function(
@@ -376,7 +367,7 @@ impl TexWrap {
         translation_y: f32,
         scale: f32,
     ) {
-        self.begin_draw(draw);
+        self.add_draw_shader(draw);
 
         let mut tex_idx = 0;
         for row_idx in 0..self.row_count {
@@ -392,7 +383,7 @@ impl TexWrap {
                 tex_idx += 1;
             }
         }
-        self.end_draw(draw);
+        self.remove_draw_shader(draw);
     }
 
     pub fn draw_zoomed(
@@ -403,71 +394,58 @@ impl TexWrap {
         width: f32,
         // xy, size
         center: (f32, f32),
-        texture_relsz: (f64, f64)
+        scale: f32,
     ) {
-        self.begin_draw(draw);
-        let size = self.size();
-        let width_tex = (texture_relsz.0*size.0 as f64) as i32;
-        let xy_size = (
-            (width_tex) as i32,
-            (width_tex) as i32,
-        );
-    
-        let xy_center = (
-            (translation_x) as i32,
-            (translation_y) as i32,
-        ); //(16384,1024);//
-        
-        let sc1 = (
-            2.0 * xy_size.0 as f64 / width as f64,
-            2.0 * xy_size.1 as f64 / width as f64,
-        );
-    
-        //coordinates of the image-view
-        let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
-        let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
-    
+        self.add_draw_shader(draw);
+
+        let width_tex = (width / scale) as i32;
+
+        let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
+
+        let xy_tex_center = ((center.0) as i32, (center.1) as i32);
+
         //Ui position to start at
         let base_ui_curs = nalgebra::Vector2::new(translation_x as f64, translation_y as f64);
         let mut curr_ui_curs = base_ui_curs;
-        //our start position
-    
+
         //Loop control variables, start end end coordinates of interest
-        let x_coordinate_end = (xy_center.0 + xy_size.0) as i32;
-        let mut y_coordinate = xy_center.1 - xy_size.1;
-        let y_coordinate_end = (xy_center.1 + xy_size.1) as i32;
-    
+        let x_coordinate_end = (xy_tex_center.0 + xy_tex_size.0) as i32;
+        let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
+        let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
+
         while y_coordinate <= y_coordinate_end {
             let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
-            let mut x_coordinate = xy_center.0 - xy_size.0;
+            let mut x_coordinate = xy_tex_center.0 - xy_tex_size.0;
             curr_ui_curs.x = base_ui_curs.x;
             let mut last_display_size_y: f64 = 0.0;
             while x_coordinate <= x_coordinate_end {
                 //get texture tile
                 let curr_tex_response =
                     self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-    
+
                 //increment coordinates by usable width/height
                 y_coordinate_increment = curr_tex_response.offset_height;
                 x_coordinate += curr_tex_response.offset_width;
-    
+
                 //Handling last texture in a row or col
                 let mut curr_tex_end = nalgebra::Vector2::new(
                     i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
                     i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
                 );
-    
+
                 //Handling positive coordinate overflow
                 if curr_tex_response.x_tex_right_global as f32 >= self.width() - 1.0f32 {
                     x_coordinate = x_coordinate_end + 1;
-                    curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
+                    curr_tex_end.x +=
+                        (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
                 }
-    
+
                 if curr_tex_response.y_tex_bottom_global as f32 >= self.height() - 1.0f32 {
                     y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
-                    curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
+                    curr_tex_end.y +=
+                        (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
                 }
-    
+
                 //Usable tile size, depending on offsets
                 let tile_size = nalgebra::Vector2::new(
                     curr_tex_end.x
@@ -479,180 +457,45 @@ impl TexWrap {
                         - curr_tex_response.y_tex_top_global
                         + 1,
                 );
-    
+
                 //Display size - tile size scaled
-                let display_size =
-                    nalgebra::Vector2::new(tile_size.x as f64 / sc1.0, tile_size.y as f64 / sc1.1);
-    
-                //Texture display range
-                let uv_start = nalgebra::Vector2::new(
-                    curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
-                    curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64,
+                let display_size = nalgebra::Vector2::new(
+                    ((tile_size.x - 1) as f64 / (2 * width_tex) as f64) * width as f64,
+                    ((tile_size.y - 1) as f64 / (2 * width_tex) as f64) * width as f64,
                 );
-    
-                let uv_end = nalgebra::Vector2::new(
-                    (curr_tex_end.x - curr_tex_response.x_tex_left_global + 1) as f64
-                        / curr_tex_response.texture_width as f64,
-                    (curr_tex_end.y - curr_tex_response.y_tex_top_global + 1) as f64
-                        / curr_tex_response.texture_height as f64,
-                );
-    
-                //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
-                let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-                let draw_br_32 = Pos2::new(
-                    (curr_ui_curs.x + display_size.x) as f32,
-                    (curr_ui_curs.y + display_size.y) as f32,
-                );
-                let r_ret = egui::Rect::from_min_max(draw_tl_32, draw_br_32);
-    
-                
+
                 draw.image(&curr_tex_response.texture.texture)
-                .blend_mode(BlendMode::NORMAL)
-                .size(display_size.x as f32, display_size.y as f32)
-                .crop((curr_tex_response.x_offset_texture as f32, curr_tex_response.y_offset_texture as f32), ((tile_size.x) as f32, (tile_size.y) as f32))
-                // .crop((size.0 * 0.5, size.1 * 0.5), (200., 200.))
-                .translate(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-                
-                
-                /*egui::Image::new(curr_tex_response.texture.texture_egui)
-                    .maintain_aspect_ratio(false)
-                    .fit_to_exact_size(egui::Vec2::new(
-                        display_size.x as f32,
-                        display_size.y as f32,
-                    ))
-                    .uv(egui::Rect::from_x_y_ranges(
-                        uv_start.x as f32..=uv_end.x as f32,
-                        uv_start.y as f32..=uv_end.y as f32,
-                    ))
-                    .paint_at(ui, r_ret);*/
-    
+                    .blend_mode(BlendMode::NORMAL)
+                    .size(display_size.x as f32, display_size.y as f32)
+                    .crop(
+                        (
+                            curr_tex_response.x_offset_texture as f32,
+                            curr_tex_response.y_offset_texture as f32,
+                        ),
+                        ((tile_size.x) as f32, (tile_size.y) as f32),
+                    )
+                    .translate(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
+
                 //Update display cursor
                 curr_ui_curs.x += display_size.x;
                 last_display_size_y = display_size.y;
-    
-                //Update coordinates for preview rectangle
-                bbox_tl.x = bbox_tl.x.min(r_ret.left());
-                bbox_tl.y = bbox_tl.y.min(r_ret.top());
-                bbox_br.x = bbox_br.x.max(r_ret.right());
-                bbox_br.y = bbox_br.y.max(r_ret.bottom());
             }
             //Update y coordinates
             y_coordinate += y_coordinate_increment;
             curr_ui_curs.y += last_display_size_y;
         }
+        self.remove_draw_shader(draw);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        /*let size = self.size();
-        let width_tex = (texture_relsz.0*size.0 as f64) as i32;
-        let scale_disp = width/width_tex as f32;
-
-        let textures_start = (center.0 as i32-width_tex/2, center.1 as i32-width_tex/2);
-        //TODO: Looped render
-
-        //Loop control variables, start end end coordinates of interest
-        let x_coordinate_end = (textures_start.0 + width_tex) as i32;
-        let mut y_coordinate = textures_start.1 as i32;
-        let y_coordinate_end = (textures_start.1 + width_tex) as i32;
-        let base_ui_curs = nalgebra::Vector2::new(translation_x, translation_y);
-        let mut curr_ui_curs = base_ui_curs;
-
-        while y_coordinate <= y_coordinate_end {
-            let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
-            let mut x_coordinate = textures_start.0;
-            curr_ui_curs.x = base_ui_curs.x;
-            let mut last_display_size_y: f64 = 0.0;
-            while x_coordinate <= x_coordinate_end {
-                //get texture tile
-                let curr_tex_response =
-                self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-
-                //increment coordinates by usable width/height
-                y_coordinate_increment = curr_tex_response.offset_height;
-                x_coordinate += curr_tex_response.offset_width;
-
-                //Handling last texture in a row or col
-                let mut curr_tex_end = nalgebra::Vector2::new(
-                    i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
-                    i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
-                );
-
-                //Handling positive coordinate overflow
-                if curr_tex_response.x_tex_right_global as f32 >= self.width() - 1.0f32 {
-                    x_coordinate = x_coordinate_end + 1;
-                    curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
-                }
-                if curr_tex_response.y_tex_bottom_global as f32 >= self.height() - 1.0f32 {
-                    y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
-                    curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
-                }
-
-                //Usable tile size, depending on offsets
-                let tile_size = nalgebra::Vector2::new(
-                    curr_tex_end.x
-                        - curr_tex_response.x_offset_texture
-                        - curr_tex_response.x_tex_left_global
-                        + 1,
-                    curr_tex_end.y
-                        - curr_tex_response.y_offset_texture
-                        - curr_tex_response.y_tex_top_global
-                        + 1,
-                );
-
-                draw.image(&curr_tex_response.texture.texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .size(width, width)
-                    .crop((x_coordinate as f32, y_coordinate as f32), ((x_coordinate-curr_tex_end.x) as f32, (y_coordinate-curr_tex_end.y) as f32))
-                    // .crop((size.0 * 0.5, size.1 * 0.5), (200., 200.))
-                    .translate(translation_x as f32, translation_y as f32);
-
-                curr_ui_curs.x      = (curr_tex_end.x-x_coordinate) as f32*scale_disp as f32;
-                last_display_size_y = (curr_tex_end.y-y_coordinate) as f64*scale_disp as f64;
-
-            }
-            //Update y coordinates
-            y_coordinate += y_coordinate_increment;
-            curr_ui_curs.y += last_display_size_y as f32;
-        }
-
-
-
-        let mut tex_idx = 0;
-        /*for _row_idx in 0..self.row_count {
-            for _col_idx in 0..self.col_count {
-                draw.image(&self.texture_array[tex_idx].texture)
-                    .blend_mode(BlendMode::NORMAL)
-                    .size(width, width)
-                    .crop(textures_start, (width_tex, width_tex))
-                    // .crop((size.0 * 0.5, size.1 * 0.5), (200., 200.))
-                    .translate(translation_x as f32, translation_y as f32);
-                tex_idx += 1;
-            }
-        }*/*/
-        self.end_draw(draw);
+        //Draw crosshair
+        let half_width = 1.0;
+        draw.rect(
+            (translation_x + width / 2.0 - half_width, translation_y),
+            (2.0 * half_width, width),
+        );
+        draw.rect(
+            (translation_x, translation_y + width / 2.0 - half_width),
+            (width, 2.0 * half_width),
+        );
     }
 
     pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
@@ -661,8 +504,10 @@ impl TexWrap {
         }
     }
 
-    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {        
-        if self.col_count == 1 && self.row_count == 1 && self.image_format != image::ColorType::Rgb8{ //If it's rgb, use crop_imm and to_image to convert it to rgba
+    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
+        if self.col_count == 1 && self.row_count == 1 && self.image_format != image::ColorType::Rgb8
+        {
+            //If it's rgb, use crop_imm and to_image to convert it to rgba
             if let Err(e) = gfx
                 .update_texture(&mut self.texture_array[0].texture)
                 .with_data(image.as_bytes())
@@ -680,8 +525,8 @@ impl TexWrap {
                     let tex_width =
                         std::cmp::min(self.col_translation, image.width() - tex_start_x);
 
-                        match image {
-                            DynamicImage::ImageLuma8(luma8_image) => {                           
+                    match image {
+                        DynamicImage::ImageLuma8(luma8_image) => {
                             let sub_img = imageops::crop_imm(
                                 luma8_image,
                                 tex_start_x,
@@ -689,7 +534,7 @@ impl TexWrap {
                                 tex_width,
                                 tex_height,
                             );
-                            let my_img = sub_img.to_image(); //TODO: This is an unnecessary copy!
+                            let my_img = sub_img.to_image(); //TODO: This is an unnecessary slow copy!
                             if let Err(e) = gfx
                                 .update_texture(&mut self.texture_array[tex_index].texture)
                                 .with_data(my_img.as_ref())
@@ -766,13 +611,13 @@ impl TexWrap {
         }
     }
 
-    fn begin_draw(&self, draw: &mut Draw) {
+    fn add_draw_shader(&self, draw: &mut Draw) {
         if let Some(pip) = &self.pipeline {
             draw.image_pipeline().pipeline(pip);
         }
     }
 
-    fn end_draw(&self, draw: &mut Draw) {
+    fn remove_draw_shader(&self, draw: &mut Draw) {
         if self.pipeline.is_some() {
             draw.image_pipeline().remove();
         }

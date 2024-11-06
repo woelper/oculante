@@ -27,9 +27,7 @@ use strum_macros::EnumIter;
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
-use crate::settings::PersistentSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
-use crate::texture_wrapper::TexWrap;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -677,24 +675,12 @@ pub trait ImageExt {
         unimplemented!()
     }
 
-    fn to_texture_with_texwrap(
-        &self,
-        _: &mut Graphics,
-        _settings: &PersistentSettings,
-    ) -> Option<TexWrap> {
-        unimplemented!()
-    }
-
     fn to_texture_premult(&self, _: &mut Graphics) -> Option<Texture> {
         unimplemented!()
     }
 
     #[allow(unused)]
     fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
-        unimplemented!()
-    }
-
-    fn update_texture_with_texwrap(&self, _: &mut Graphics, _: &mut TexWrap) {
         unimplemented!()
     }
 
@@ -727,35 +713,13 @@ impl ImageExt for RgbaImage {
         if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
             error!("{e}");
         }
-    }
-
-    /*fn to_texture_with_texwrap(
-        &self,
-        gfx: &mut Graphics,
-        settings: &PersistentSettings,
-    ) -> Option<TexWrap> {
-        TexWrap::from_rgbaimage(gfx, settings, self)
-    }
-
-    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
-        texture.update_textures(gfx, self);
-    }*/
-
-    
+    }    
 }
 
 impl ImageExt for DynamicImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
-    }
-
-    fn to_texture_with_texwrap(
-        &self,
-        gfx: &mut Graphics,
-        settings: &PersistentSettings,
-    ) -> Option<TexWrap> {        
-        TexWrap::from_dynamic_image(gfx, settings, &self)
-    }
+    }   
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.clean();
@@ -777,10 +741,6 @@ impl ImageExt for DynamicImage {
         {
             error!("{e}");
         }
-    }
-
-    fn update_texture_with_texwrap(&self, gfx: &mut Graphics, texture: &mut TexWrap) {
-        texture.update_textures(gfx, &self);
     }
 }
 
