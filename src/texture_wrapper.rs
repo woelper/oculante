@@ -414,8 +414,8 @@ impl TexWrap {
         );
     
         let xy_center = (
-            (translation_x) as i32,
-            (translation_y) as i32,
+            (center.0) as i32,
+            (center.1) as i32,
         ); //(16384,1024);//
         
         let sc1 = (
@@ -446,7 +446,7 @@ impl TexWrap {
                 //get texture tile
                 let curr_tex_response =
                     self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-    
+                debug!(" x: {} y: {} ", x_coordinate,y_coordinate);
                 //increment coordinates by usable width/height
                 y_coordinate_increment = curr_tex_response.offset_height;
                 x_coordinate += curr_tex_response.offset_width;
@@ -547,7 +547,7 @@ impl TexWrap {
 
 
 
-
+        debug!(" end.\n");
 
 
 
