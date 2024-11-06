@@ -274,26 +274,19 @@ impl TexWrap {
 
                 match image {
                     DynamicImage::ImageLuma8(luma8_image) => {
-                        /*let sub_img = imageops::crop_imm(
-                            luma8_image,
-                            tex_start_x,
-                            tex_start_y,
-                            tex_width,
-                            tex_height,
-                        );*/
-                        //let my_img = sub_img.to_image();
 
+                        // Creating luma 8 sub image
                         let mut buff: Vec<u8> = vec![0; tex_width as usize * tex_height as usize];
+                        let bytes_src = luma8_image.as_bytes();
+                        let mut dst_idx_start = 0 as usize;
+                        let mut src_idx_start = tex_start_x as usize + tex_start_y as usize * im_w as usize;
 
-                        unsafe {
-                            let mut ptr_src = luma8_image.as_bytes().as_ptr();
-                            let mut ptr = buff.as_mut_ptr(); // y=0, x=0
-                            ptr_src = ptr_src.add((tex_start_x + tex_start_y * im_w) as usize);
-                            for _y in 0..tex_height {
-                                std::ptr::copy_nonoverlapping(ptr_src, ptr, tex_width as usize);
-                                ptr_src = ptr_src.add(im_w as usize);
-                                ptr = ptr.add(tex_width as usize);
-                            }
+                        for _y in 0..tex_height {             
+                            let dst_idx_end = dst_idx_start + tex_width as usize;
+                            let src_idx_end = src_idx_start + tex_width as usize;
+                            buff[dst_idx_start..dst_idx_end].copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
+                            dst_idx_start = dst_idx_end;
+                            src_idx_start += im_w as usize;
                         }
 
                         tex = texture_generator_function(
@@ -541,7 +534,7 @@ impl TexWrap {
                                 tex_width,
                                 tex_height,
                             );
-                            let my_img = sub_img.to_image(); //TODO: This is an unnecessary copy!
+                            let my_img = sub_img.to_image(); //TODO: This is an unnecessary slow copy!
                             if let Err(e) = gfx
                                 .update_texture(&mut self.texture_array[tex_index].texture)
                                 .with_data(my_img.as_ref())
