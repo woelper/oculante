@@ -695,8 +695,6 @@ impl ImageExt for RgbaImage {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
 
-   
-
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.clean();
 
@@ -713,13 +711,13 @@ impl ImageExt for RgbaImage {
         if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
             error!("{e}");
         }
-    }    
+    }
 }
 
 impl ImageExt for DynamicImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
-    }   
+    }
 
     fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
         gfx.clean();

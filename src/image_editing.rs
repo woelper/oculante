@@ -1216,7 +1216,7 @@ impl ImageOperation {
                         let filter = match filter {
                             ScaleFilter::CatmullRom => imageops::FilterType::CatmullRom,
                             ScaleFilter::Lanczos3 => imageops::FilterType::Lanczos3,
-                            _ => imageops::FilterType::Gaussian
+                            _ => imageops::FilterType::Gaussian,
                         };
                         *dyn_img = dyn_img.resize(dimensions.0, dimensions.0, filter);
                     }

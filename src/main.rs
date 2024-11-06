@@ -58,8 +58,8 @@ mod tests;
 mod ui;
 #[cfg(feature = "update")]
 mod update;
-use ui::*;
 use crate::image_editing::EditState;
+use ui::*;
 
 mod image_editing;
 pub mod paint;
@@ -161,13 +161,11 @@ fn main() -> Result<(), String> {
     window_config.always_on_top = true;
     window_config.max_size = None;
 
-
     debug!("Starting oculante.");
     notan::init_with(init)
         .add_config(window_config)
         .add_config(EguiConfig)
         .add_config(DrawConfig)
-        
         .event(event)
         .update(update)
         .draw(drawe)
@@ -820,7 +818,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
 
-
         debug!("Got frame: {}", frame.to_string());
 
         match &frame {
@@ -948,17 +945,26 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                state.current_texture.set_image(&img, gfx, &state.persistent_settings);
+                state
+                    .current_texture
+                    .set_image(&img, gfx, &state.persistent_settings);
 
                 match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
-                    ColorChannel::Rgb => 
-                    state.current_texture.set_image(&unpremult(&img), gfx, &state.persistent_settings),
+                    ColorChannel::Rgb => state.current_texture.set_image(
+                        &unpremult(&img),
+                        gfx,
+                        &state.persistent_settings,
+                    ),
                     // Do nuttin'
                     ColorChannel::Rgba => (),
                     // Display the channel
                     _ => {
-                        state.current_texture.set_image(&solo_channel(&img, state.persistent_settings.current_channel as usize), gfx, &state.persistent_settings);
+                        state.current_texture.set_image(
+                            &solo_channel(&img, state.persistent_settings.current_channel as usize),
+                            gfx,
+                            &state.persistent_settings,
+                        );
                     }
                 }
                 state.current_image = Some(img);
@@ -968,13 +974,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set_image(&state
-                        .edit_state
-                        .result_pixel_op, gfx, &state.persistent_settings)                    
+                    state.current_texture.set_image(
+                        &state.edit_state.result_pixel_op,
+                        gfx,
+                        &state.persistent_settings,
+                    )
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state.current_texture.set_image(&img, gfx, &state.persistent_settings);
+                        state
+                            .current_texture
+                            .set_image(&img, gfx, &state.persistent_settings);
                     }
                 }
             }
@@ -1072,7 +1082,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
@@ -1185,7 +1194,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
                 .translate(aligned_offset_x, aligned_offset_y);
         }
-        
+
         if state.persistent_settings.info_enabled {
             // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
 
@@ -1195,10 +1204,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 &mut zoom_image,
                 bbox_tl.x,
                 bbox_tl.y,
-                bbox_br.x-bbox_tl.x,
+                bbox_br.x - bbox_tl.x,
                 (state.cursor_relative.x, state.cursor_relative.y),
-                8.0
-            );            
+                8.0,
+            );
         }
 
         // Draw a brush preview when paint mode is on

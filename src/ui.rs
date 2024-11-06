@@ -3,7 +3,9 @@ use crate::{
     clear_image, clipboard_to_image, delete_file,
     file_encoder::FileEncoder,
     get_pixel_checked,
-    image_editing::{process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ScaleFilter},
+    image_editing::{
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ScaleFilter,
+    },
     paint::PaintStroke,
     set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
@@ -31,7 +33,7 @@ use log::{debug, error, info};
 use mouse_position::mouse_position::Mouse;
 use notan::{
     egui::{self, *},
-    prelude::{App, Graphics}
+    prelude::{App, Graphics},
 };
 use std::{
     collections::BTreeSet,
@@ -508,13 +510,12 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
-    let mut uv_center: (f64, f64)= Default::default();
-    let mut uv_size: (f64, f64)= Default::default();
+    let mut uv_center: (f64, f64) = Default::default();
+    let mut uv_size: (f64, f64) = Default::default();
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -619,10 +620,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
 
                 //Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));            
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));
                 bbox_tl = preview_rect.left_top();
-                bbox_br = preview_rect.right_bottom();               
-                
+                bbox_br = preview_rect.right_bottom();
+
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
             }
@@ -1426,7 +1427,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
                         state.send_message_warn(&format!("{e}"));
                         message = Some(e.to_string())
-                        
+
                     }
                 }
 
@@ -2252,18 +2253,28 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         // TODO: remove redundancy
-        if changed_channels { //TODO: Make this dependent of DynamicImage's type
+        if changed_channels {
+            //TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture.set_image(&unpremult(img), gfx, &state.persistent_settings);                       
+                        state.current_texture.set_image(
+                            &unpremult(img),
+                            gfx,
+                            &state.persistent_settings,
+                        );
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                        state
+                            .current_texture
+                            .set_image(img, gfx, &state.persistent_settings);
                     }
                     _ => {
-                        let solo_im = solo_channel(img, state.persistent_settings.current_channel as usize);
-                        state.current_texture.set_image(&solo_im, gfx, &state.persistent_settings);
+                        let solo_im =
+                            solo_channel(img, state.persistent_settings.current_channel as usize);
+                        state
+                            .current_texture
+                            .set_image(&solo_im, gfx, &state.persistent_settings);
                     }
                 }
             }

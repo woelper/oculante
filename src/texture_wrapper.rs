@@ -274,17 +274,18 @@ impl TexWrap {
 
                 match image {
                     DynamicImage::ImageLuma8(luma8_image) => {
-
                         // Creating luma 8 sub image
                         let mut buff: Vec<u8> = vec![0; tex_width as usize * tex_height as usize];
                         let bytes_src = luma8_image.as_bytes();
                         let mut dst_idx_start = 0 as usize;
-                        let mut src_idx_start = tex_start_x as usize + tex_start_y as usize * im_w as usize;
+                        let mut src_idx_start =
+                            tex_start_x as usize + tex_start_y as usize * im_w as usize;
 
-                        for _y in 0..tex_height {             
+                        for _y in 0..tex_height {
                             let dst_idx_end = dst_idx_start + tex_width as usize;
                             let src_idx_end = src_idx_start + tex_width as usize;
-                            buff[dst_idx_start..dst_idx_end].copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
+                            buff[dst_idx_start..dst_idx_end]
+                                .copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
                             dst_idx_start = dst_idx_end;
                             src_idx_start += im_w as usize;
                         }
