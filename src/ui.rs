@@ -618,13 +618,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 ui.add_space(10.);
 
                 let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
-                
+
                 //Rendering a placeholder rectangle
                 ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));
-            
+
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
-                
+
                 let bg_color = Color32::BLACK.linear_multiply(0.5);
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
@@ -753,7 +753,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 });
             }
             advanced_ui(ui, state);
-            
+
         });
     });
     return (bbox_tl, bbox_br, uv_size);
@@ -1174,7 +1174,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .show_separator_line(false)
         .show(ctx, |ui| {
 
-         
+
 
 
             // A flag to indicate that the image needs to be rebuilt
@@ -1184,13 +1184,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             if let Some(img) = &state.current_image {
 
                 if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-                    ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). It is recommended to temporarily convert your image.");
-                    state.edit_state.image_op_stack.insert(0, ImageOperation::ColorType(ColorTypeExt::Rgba8));
-                    image_changed = true;
-                    pixels_changed = true;
-                    // if ui.button("Add conversion").clicked() {
-                    // }
-                    state.send_message_info("Your image is not RGBA 8 bit. A conversion operator was added. Please remove if you don't need it.");
+                    ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator was added. You can edit it later.");
+                    let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op {true} else {false}).unwrap_or_default();
+                    if !op_present {
+                        state.edit_state.image_op_stack.insert(0, ImageOperation::ColorConverter(ColorTypeExt::Rgba8));
+                        image_changed = true;
+                        pixels_changed = true;
+                        state.send_message_info("Color conversion operator added.");
+                    }
                 }
 
 
@@ -1236,7 +1237,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
                         ImageOperation::Posterize(8),
                         ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
-                        ImageOperation::ColorType(crate::image_editing::ColorTypeExt::Rgba8),
+                        ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
 
                         // Mathematical
                         ImageOperation::MMult,
@@ -1540,15 +1541,18 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             // Do the processing
 
             // If expensive operations happened (modifying image geometry), process them here
+            let mut message: Option<String> = None;
             if image_changed {
                 if let Some(img) = &mut state.current_image {
                     let stamp = Instant::now();
                     // start with a fresh copy of the unmodified image
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
-                    for operation in &mut state.edit_state.image_op_stack {
+                    for operation in &state.edit_state.image_op_stack {
                         if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}")
+                            error!("{e}");
+                            state.send_message_warn(&format!("{e}"));
+                            message = Some(e.to_string())
                         }
                     }
                     debug!(
@@ -1576,6 +1580,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     let ops = &state.edit_state.pixel_op_stack;
                     if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
                         state.send_message_warn(&format!("{e}"));
+                        message = Some(e.to_string())
+                        
                     }
                 }
 
@@ -1837,14 +1843,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
                         ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
                         if let Some(img) = &state.current_image {
-                         
+
                         ui.label(format!("current_image: {:?}", img.color()));
-                         
+
                             if img.color() != ColorType::Rgba8 {
                                 ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
                             }
                         }
-        
+
                     }
 
                 }
