@@ -2,13 +2,10 @@ use crate::settings::PersistentSettings;
 use image::imageops;
 use image::DynamicImage;
 use image::EncodableLayout;
-use image::GenericImageView;
 use log::debug;
 use log::error;
 use log::warn;
 use notan::draw::*;
-use notan::egui::EguiRegisterTexture;
-use notan::egui::SizedTexture;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
@@ -29,7 +26,7 @@ pub struct TextureWrapperManager {
 }
 
 impl TextureWrapperManager {
-    #[deprecated(note = "please use `set_image` instead")]
+    /*#[deprecated(note = "please use `set_image` instead")]
     pub fn set(&mut self, tex: Option<TexWrap>, gfx: &mut Graphics) {
         let mut texture_taken: Option<TexWrap> = self.current_texture.take();
         if let Some(texture) = &mut texture_taken {
@@ -37,7 +34,7 @@ impl TextureWrapperManager {
         }
 
         self.current_texture = tex;
-    }
+    }*/
 
     pub fn set_image(
         &mut self,
@@ -58,13 +55,10 @@ impl TextureWrapperManager {
         }
 
         //If update not possible: Remove existing texture and generate a new one
-        let mut texture_taken: Option<TexWrap> = self.current_texture.take();
-        if let Some(texture) = &mut texture_taken {
-            debug!("Updating texture with new size.");
-            texture.unregister_textures(gfx);
-        } else {
-            debug!("No current texture. Creating and setting texture");
-        }
+        {
+            self.clear();           
+            debug!("Updating or creating texture with new size.");
+        }        
 
         self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img);
     }
@@ -72,12 +66,8 @@ impl TextureWrapperManager {
     pub fn get(&mut self) -> &mut Option<TexWrap> {
         &mut self.current_texture
     }
-
-    //TODO: Extend for clearing textures
-    pub fn clear(&mut self /*, gfx: &mut Graphics */) {
-        /*if let Some(texture) = &mut self.current_texture {
-            texture.unregister_textures(gfx);
-        }*/
+    
+    pub fn clear(&mut self /*, gfx: &mut Graphics */) {               
         self.current_texture = None;
     }
 }
@@ -100,8 +90,7 @@ pub struct TextureResponse<'a> {
 }
 
 pub struct TexturePair {
-    pub texture: Texture,
-    pub texture_egui: SizedTexture,
+    pub texture: Texture
 }
 
 //language=glsl
@@ -209,6 +198,77 @@ impl TexWrap {
             .ok()
     }*/
 
+    /*fn gen_single_from_dynamic_image(gfx: &mut Graphics,
+    settings: &PersistentSettings,
+    image: &DynamicImage,
+    texture_generator_function: fn(
+        &mut Graphics,
+        &[u8],
+        u32,
+        u32,
+        notan::prelude::TextureFormat,
+        &PersistentSettings,
+        bool,
+    ) -> Option<Texture>,
+) -> Option<Texture>
+{
+
+}*/
+
+    fn get_dyn_image_part(                         
+                            image: &DynamicImage,
+                            offset:(u32,u32),
+                            size:(u32,u32))-> Option<DynamicImage>{
+        if offset.0==0 && offset.1==0 &&
+           size.0==image.width() && size.1==image.height() { //Whole image
+            match image {
+                DynamicImage::ImageRgb8(_rgb8_image) => {
+                    let img_rgba = image.to_rgba8();
+                    return Some(DynamicImage::ImageRgba8(img_rgba));
+                }
+                _other_image_type => {
+                    return None;
+                }
+            }
+           }
+           else {
+            match image {
+                DynamicImage::ImageLuma8(luma8_image) => {
+                    // Creating luma 8 sub image
+                    let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize];
+                    let bytes_src = luma8_image.as_bytes();
+                    let mut dst_idx_start = 0 as usize;
+                    let mut src_idx_start =
+                    offset.0 as usize + offset.1 as usize * image.width() as usize;
+
+                    for _y in 0..size.1 {
+                        let dst_idx_end = dst_idx_start + size.0 as usize;
+                        let src_idx_end = src_idx_start + size.0 as usize;
+                        buff[dst_idx_start..dst_idx_end]
+                            .copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
+                        dst_idx_start = dst_idx_end;
+                        src_idx_start += image.width() as usize;
+                    }
+                    let gi: image::GrayImage =  image::GrayImage::from_raw(size.0, size.1, buff).unwrap(); //ImageBuffer::from_raw(size.0, size.1, buff).context("Spast.");
+                    return Some(DynamicImage::ImageLuma8(gi));
+                }
+                other_image_type => {
+                    let sub_img = imageops::crop_imm(
+                        other_image_type,
+                        offset.0,
+                        offset.1,
+                        size.0,
+                        size.1,
+                    );
+                    let my_img = sub_img.to_image();                    
+                    return Some(DynamicImage::ImageRgba8(my_img));
+                }
+            }
+           }
+    }
+
+
+
     fn gen_from_dynamic_image(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
@@ -261,7 +321,7 @@ impl TexWrap {
         let mut texture_vec: Vec<TexturePair> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);
         let col_increment = std::cmp::min(max_texture_size, im_w);
-        let mut fine = true;
+        let mut fine = true;        
 
         for row_index in 0..row_count {
             let tex_start_y = row_index * row_increment;
@@ -272,60 +332,37 @@ impl TexWrap {
 
                 let tex: Option<Texture>;
 
-                match image {
-                    DynamicImage::ImageLuma8(luma8_image) => {
-                        // Creating luma 8 sub image
-                        let mut buff: Vec<u8> = vec![0; tex_width as usize * tex_height as usize];
-                        let bytes_src = luma8_image.as_bytes();
-                        let mut dst_idx_start = 0 as usize;
-                        let mut src_idx_start =
-                            tex_start_x as usize + tex_start_y as usize * im_w as usize;
+                let sub_img_opt = Self::get_dyn_image_part(image,
+                    (tex_start_x,tex_start_y),
+                    (tex_width, tex_height));
 
-                        for _y in 0..tex_height {
-                            let dst_idx_end = dst_idx_start + tex_width as usize;
-                            let src_idx_end = src_idx_start + tex_width as usize;
-                            buff[dst_idx_start..dst_idx_end]
-                                .copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
-                            dst_idx_start = dst_idx_end;
-                            src_idx_start += im_w as usize;
-                        }
-
-                        tex = texture_generator_function(
-                            gfx,
-                            buff.as_bytes(),
-                            tex_width,
-                            tex_height,
-                            format,
-                            settings,
-                            allow_mipmap,
-                        );
-                    }
-                    other_image_type => {
-                        let sub_img = imageops::crop_imm(
-                            other_image_type,
-                            tex_start_x,
-                            tex_start_y,
-                            tex_width,
-                            tex_height,
-                        );
-                        let my_img = sub_img.to_image();
-                        tex = texture_generator_function(
-                            gfx,
-                            my_img.as_ref(),
-                            sub_img.width(),
-                            sub_img.height(),
-                            format,
-                            settings,
-                            allow_mipmap,
-                        );
-                    }
+                if let Some(suba_img) = sub_img_opt{
+                    tex = texture_generator_function(
+                        gfx,
+                        suba_img.as_bytes(),
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
                 }
+                else {
+                    tex = texture_generator_function(
+                        gfx,
+                        image.as_bytes(),
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
+                }
+                
 
-                if let Some(t) = tex {
-                    let egt = gfx.egui_register_texture(&t);
+                if let Some(t) = tex {                    
                     let te = TexturePair {
-                        texture: t,
-                        texture_egui: egt,
+                        texture: t
                     };
                     texture_vec.push(te);
                 } else {
@@ -499,24 +536,14 @@ impl TexWrap {
         );
     }
 
-    pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
+    /*pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
         for text in &self.texture_array {
             gfx.egui_remove_texture(text.texture_egui.id);
         }
-    }
+    }*/
 
     pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
-        if self.col_count == 1 && self.row_count == 1 && self.image_format != image::ColorType::Rgb8
-        {
-            //If it's rgb, use crop_imm and to_image to convert it to rgba
-            if let Err(e) = gfx
-                .update_texture(&mut self.texture_array[0].texture)
-                .with_data(image.as_bytes())
-                .update()
-            {
-                error!("{e}");
-            }
-        } else {
+        
             let mut tex_index = 0;
             for row_index in 0..self.row_count {
                 let tex_start_y = row_index * self.row_translation;
@@ -526,46 +553,34 @@ impl TexWrap {
                     let tex_width =
                         std::cmp::min(self.col_translation, image.width() - tex_start_x);
 
-                    match image {
-                        DynamicImage::ImageLuma8(luma8_image) => {
-                            let sub_img = imageops::crop_imm(
-                                luma8_image,
-                                tex_start_x,
-                                tex_start_y,
-                                tex_width,
-                                tex_height,
-                            );
-                            let my_img = sub_img.to_image(); //TODO: This is an unnecessary slow copy!
+                        let sub_img_opt = Self::get_dyn_image_part(image,
+                            (tex_start_x,tex_start_y),
+                            (tex_width, tex_height));
+        
+                        if let Some(suba_img) = sub_img_opt{
                             if let Err(e) = gfx
                                 .update_texture(&mut self.texture_array[tex_index].texture)
-                                .with_data(my_img.as_ref())
+                                .with_data(suba_img.as_bytes())
                                 .update()
                             {
                                 error!("{e}");
-                            }
+                                return;
+                            }                            
                         }
-                        other_image_type => {
-                            let sub_img = imageops::crop_imm(
-                                other_image_type,
-                                tex_start_x,
-                                tex_start_y,
-                                tex_width,
-                                tex_height,
-                            );
-                            let my_img = sub_img.to_image();
-
+                        else {
                             if let Err(e) = gfx
                                 .update_texture(&mut self.texture_array[tex_index].texture)
-                                .with_data(my_img.as_ref())
+                                .with_data(image.as_bytes())
                                 .update()
                             {
                                 error!("{e}");
-                            }
+                                return;
+                            }       
                         }
-                    }
+                    
                     tex_index += 1;
                 }
-            }
+            
         }
     }
 
