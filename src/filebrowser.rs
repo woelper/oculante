@@ -1,7 +1,8 @@
 use super::icons::*;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::ui::{EguiExt, BUTTON_HEIGHT_LARGE};
+use crate::thumbnails::{Thumbnails, THUMB_SIZE};
+use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_SMALL};
 
 use anyhow::{Context, Result};
 use dirs;
@@ -95,6 +96,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    let mut thumbnails = ui
+        .ctx()
+        .data(|r| r.get_temp::<Thumbnails>(Id::new("FBTHUMBS")))
+        .unwrap_or_default();
+
     let mut search_term = ui
         .ctx()
         .data(|r| r.get_temp::<String>(Id::new("FBSEARCH")))
@@ -102,6 +108,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
     let mut search_active = ui
         .ctx()
         .data(|r| r.get_temp::<bool>(Id::new("FBSEARCHACTIVE")))
+        .unwrap_or_default();
+
+    let mut listview_enabled = ui
+        .ctx()
+        .data(|r| r.get_temp::<bool>(Id::new("FBLISTVIEW")))
         .unwrap_or_default();
 
     // read cached entries
@@ -113,7 +124,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
     }
-    let entries = entries
+    let mut entries = entries
         .unwrap_or_default()
         .into_iter()
         .filter(|e| {
@@ -124,6 +135,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .contains(&search_term.to_lowercase())
         })
         .collect::<Vec<_>>();
+
+    entries.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -326,47 +339,67 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
                         .inner_margin(Margin::same(6.))
                         .show(ui, |ui| {
-                            egui::Grid::new("browser")
-                                .striped(true)
-                                .num_columns(0)
-                                .min_col_width(ui.available_width())
-                                .show(ui, |ui| {
+                            if listview_enabled {
+                            } else {
+                                ui.horizontal_wrapped(|ui| {
                                     if entries.is_empty() {
                                         ui.label("Empty directory");
                                     } else {
+                                        let dirs = entries
+                                            .iter()
+                                            .filter(|d| d.is_dir())
+                                            .collect::<Vec<_>>();
+
+                                        for de in dirs.iter() {
+                                            let folder_response = ui.allocate_response(
+                                                Vec2::new(THUMB_SIZE[0] as f32, 30.),
+                                                Sense::click(),
+                                            );
+
+                                            ui.painter().rect(
+                                                folder_response.rect,
+                                                4.,
+                                                ui.style().visuals.widgets.inactive.bg_fill,
+                                                Stroke::NONE,
+                                            );
+
+                                            let folder_name = format!(
+                                                "{FOLDER} {}",
+                                                de.file_name()
+                                                    .map(|n| n.to_string_lossy())
+                                                    .unwrap_or_default()
+                                                    .chars()
+                                                    .take(12)
+                                                    .collect::<String>()
+                                            );
+
+                                            let mut pos = ui.painter().text(
+                                                folder_response.rect.shrink(4.).left_center(),
+                                                Align2::LEFT_CENTER,
+                                                folder_name,
+                                                FontId::proportional(13.),
+                                                ui.style().visuals.text_color(),
+                                            );
+
+                                            if folder_response.clicked() {
+                                                *path = de.clone().clone();
+                                            }
+                                            folder_response.on_hover_text(
+                                                de.file_name()
+                                                    .map(|n| n.to_string_lossy().to_string())
+                                                    .unwrap_or_default(),
+                                            );
+                                        }
+
+                                        if !dirs.is_empty() {
+                                            ui.end_row();
+                                        }
+
+                                        // ui.separator();
+
                                         for de in entries {
-                                            if de.is_dir() {
-                                                if ui
-                                                    .add(
-                                                        egui::Button::new(format!(
-                                                            "{FOLDER} {}",
-                                                            de.file_name()
-                                                                .map(|n| n.to_string_lossy())
-                                                                .unwrap_or_default()
-                                                                .chars()
-                                                                .take(50)
-                                                                .collect::<String>()
-                                                        ))
-                                                        .frame(false),
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    *path = de;
-                                                }
-                                            } else {
-                                                if ui
-                                                    .add(
-                                                        egui::Button::new(format!(
-                                                            "{IMAGE_SQUARE} {}",
-                                                            de.file_name()
-                                                                .map(|f| f.to_string_lossy())
-                                                                .unwrap_or_default()
-                                                                .chars()
-                                                                .take(50)
-                                                                .collect::<String>()
-                                                        ))
-                                                        .frame(false),
-                                                    )
+                                            if de.is_file() {
+                                                if render_file_icon(&de, ui, &mut thumbnails)
                                                     .clicked()
                                                 {
                                                     _ = save_recent_dir(&de);
@@ -390,23 +423,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     }
                                                 }
                                             }
-                                            ui.end_row();
                                         }
                                     }
                                 });
+                            }
                         });
                 });
 
-            ui.add_space(10.);
+            // ui.add_space(10.);
 
             if save {
                 let ext = Path::new(&filename).ext();
                 ui.label("Filename");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().button_padding = Vec2::new(2., 5.);
-
                     ui.add(egui::TextEdit::singleline(&mut filename).min_size(Vec2::new(10., 28.)));
-
                     for f in FileEncoder::iter() {
                         let e = f.ext();
                         if ui.selectable_label(ext == e, &e).clicked() {
@@ -471,6 +502,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data_mut(|r| r.insert_temp::<String>(Id::new("FBSEARCH"), search_term));
     ui.ctx()
         .data_mut(|r| r.insert_temp::<bool>(Id::new("FBSEARCHACTIVE"), search_active));
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<bool>(Id::new("FBLISTVIEW"), listview_enabled));
+    ui.ctx()
+        .data_mut(|r| r.insert_temp::<Thumbnails>(Id::new("FBTHUMBS"), thumbnails));
 }
 
 trait PathExt {
