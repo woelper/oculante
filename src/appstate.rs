@@ -3,6 +3,7 @@ use crate::{
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
     texture_wrapper::TextureWrapperManager,
+    thumbnails::Thumbnails,
     utils::{ExtendedImageInfo, Frame, Player},
 };
 
@@ -93,6 +94,7 @@ pub struct OculanteState {
     pub first_start: bool,
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
+    pub thumbnails: Thumbnails,
 }
 
 impl<'b> OculanteState {
@@ -158,6 +160,7 @@ impl<'b> Default for OculanteState {
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
+            thumbnails: Default::default(),
         }
     }
 }

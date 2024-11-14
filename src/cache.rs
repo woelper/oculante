@@ -7,7 +7,7 @@ use std::{
 use image::DynamicImage;
 use log::debug;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Cache {
     pub data: HashMap<PathBuf, CachedImage>,
     pub cache_size: usize,

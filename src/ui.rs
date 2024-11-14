@@ -10,6 +10,7 @@ use crate::{
     set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
+    thumbnails::{Thumbnails, THUMB_SIZE},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
@@ -28,7 +29,7 @@ use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{ColorType, GenericImageView, RgbaImage};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
@@ -42,6 +43,7 @@ use std::{
     time::{Duration, Instant},
 };
 use strum::IntoEnumIterator;
+use text::{LayoutJob, TextWrapping};
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
@@ -2566,28 +2568,22 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.right_bottom().x + 200., r.left_top().y),
+                    Pos2::new(r.right_bottom().x + 100., r.left_top().y),
                     Pos2::new(
                         r.left_bottom().x - ui.available_width(),
-                        r.left_top().y + 300.,
+                        r.left_top().y + 100.,
                     ),
                 );
 
                 ui.allocate_ui_at_rect(recent_rect, |ui| {
-                    for r in &state.volatile_settings.recent_images.clone() {
-                        ui.horizontal(|ui| {
-                            render_file_icon(&r, ui);
-                            // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
-                            ui.vertical_centered_justified(|ui| {
-                                if let Some(filename) = r.file_name() {
-                                    if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(r, state);
-                                        ui.close_menu();
-                                    }
-                                }
-                            });
-                        });
-                    }
+                    ui.horizontal_wrapped(|ui| {
+                        for r in &state.volatile_settings.recent_images.clone() {
+                            if render_file_icon(&r, ui, &mut state.thumbnails).clicked() {
+                                load_image_from_path(r, state);
+                                ui.close_menu();
+                            }
+                        }
+                    });
                 });
             });
 
@@ -2653,22 +2649,77 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
         }
     }
 }
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
-    let size = 30.;
-    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
-    ui.painter()
-        .rect_filled(rect, Rounding::same(size / 4.), Color32::GRAY);
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        icon_path
-            .extension()
-            .map(|e| e.to_string_lossy().to_string().to_uppercase())
-            .unwrap_or_default(),
-        FontId::proportional(10.),
-        Color32::BLACK,
+pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
+    let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32);
+    let response = ui.allocate_response(size, Sense::click());
+    let rounding = Rounding::same(4.);
+    let margin = 4.0;
+
+    match thumbnails.get(icon_path) {
+        Ok(tp) => {
+            ui.put(
+                response.rect,
+                egui::Image::new(format!("file://{}", tp.display()))
+                    .fit_to_exact_size(size)
+                    .rounding(rounding),
+            );
+        }
+        Err(e) => {
+            warn!("{e}");
+            ui.painter()
+                .rect_filled(response.rect, rounding, Color32::from_gray(50).to_opaque());
+            ui.painter().text(
+                response.rect.center(),
+                Align2::CENTER_CENTER,
+                icon_path
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string().to_uppercase())
+                    .unwrap_or_default(),
+                FontId::proportional(25.),
+                Color32::WHITE,
+            );
+        }
+    }
+
+    let mut caption_rect = response.rect;
+    *caption_rect.top_mut() -= THUMB_SIZE[0] as f32 + 10.;
+
+    let text = icon_path
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut job = LayoutJob::simple(
+        text,
+        FontId::proportional(13.),
+        ui.style().visuals.text_color(),
+        THUMB_SIZE[0] as f32 - margin * 2.,
     );
-    // ui.add(egui::Label::new(""))
+
+    job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32 - margin);
+    let galley = ui.painter().layout_job(job);
+    let text_rect = galley.rect;
+    let mut text_pos = response.rect.left_bottom();
+    text_pos.y -= text_rect.size().y + margin / 3.;
+    text_pos.x += margin;
+
+    ui.painter().rect(
+        response.rect.with_min_y(text_pos.y - margin / 3.),
+        Rounding {
+            nw: 0.0,
+            ne: 0.0,
+            sw: rounding.sw,
+            se: rounding.se,
+        },
+        Color32::from_white_alpha(150),
+        Stroke::NONE,
+    );
+
+    ui.painter().galley(text_pos, galley, Color32::RED);
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
+    }
     response
 }
 

@@ -45,9 +45,8 @@ mod image_loader;
 use appstate::*;
 #[cfg(not(feature = "file_open"))]
 mod filebrowser;
-mod texture_wrapper;
-
 pub mod ktx2_loader;
+mod texture_wrapper;
 // mod events;
 #[cfg(target_os = "macos")]
 mod mac;
@@ -60,9 +59,9 @@ mod ui;
 mod update;
 use crate::image_editing::EditState;
 use ui::*;
-
 mod image_editing;
 pub mod paint;
+mod thumbnails;
 
 #[notan_main]
 fn main() -> Result<(), String> {

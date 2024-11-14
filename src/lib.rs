@@ -14,6 +14,7 @@ pub mod icons;
 pub mod paint;
 pub mod scrubber;
 pub mod texture_wrapper;
+pub mod thumbnails;
 pub mod ui;
 use utils::*;
 #[cfg(feature = "update")]
