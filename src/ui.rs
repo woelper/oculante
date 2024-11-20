@@ -2650,24 +2650,29 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
-    let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32);
+    let mut zoom = ui
+        .data_mut(|w| w.get_temp::<f32>("ZM".into()))
+        .unwrap_or(0.997);
+    let delta = ui.input(|r| r.zoom_delta()).clamp(0.9999, 1.0001);
+    debug!("d {:?}", delta);
+    zoom *= delta;
+    zoom = zoom.clamp(0.5, 1.3);
+    ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
+    debug!("z {:?}", zoom);
+    let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32) * zoom;
     let response = ui.allocate_response(size, Sense::click());
     let rounding = Rounding::same(4.);
     let margin = 4.0;
 
     match thumbnails.get(icon_path) {
         Ok(tp) => {
-            ui.put(
-                response.rect,
-                egui::Image::new(format!("file://{}", tp.display()))
-                    .fit_to_exact_size(size)
-                    .rounding(rounding),
-            );
+            let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
+            image.paint_at(ui, response.rect);
         }
         Err(e) => {
-            warn!("{e}");
+            // warn!("{e}");
             ui.painter()
-                .rect_filled(response.rect, rounding, Color32::from_gray(50).to_opaque());
+                .rect_filled(response.rect, rounding, Color32::from_gray(80).to_opaque());
             ui.painter().text(
                 response.rect.center(),
                 Align2::CENTER_CENTER,

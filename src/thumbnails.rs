@@ -8,12 +8,17 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use image::{DynamicImage, GenericImageView};
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 
-use crate::{image_editing::ImageOperation, image_loader::open_image};
+use crate::{
+    file_encoder::{CompressionLevel, FileEncoder},
+    image_editing::ImageOperation,
+    image_loader::open_image,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Thumbnails {
+    /// The known thumbnail ids. This is used to avoid re-generating known thumbnails
     ids: Vec<PathBuf>,
 }
 
@@ -22,11 +27,12 @@ impl Thumbnails {
         trace!("Thumbnail requested for {}", path.as_ref().display());
 
         if !get_disk_cache_path()?.exists() {
-            warn!("Thumbnail cache dir missing, ceating it");
+            warn!("Thumbnail cache dir missing, creating it");
             create_dir_all(&get_disk_cache_path()?)?;
         }
         let cached_path = get_cached_path(&path);
 
+        // The thumbnail is missing and needs to be generated
         if !cached_path.exists() {
             if self.ids.contains(&cached_path) {
                 bail!("Thumbnail is still processing or failed in the past.");
@@ -34,7 +40,9 @@ impl Thumbnails {
             debug!("\tThumbnail missing");
             let fp = path.as_ref().to_path_buf();
             std::thread::spawn(move || {
-                generate(&fp).unwrap();
+                if let Err(e) = generate(&fp) {
+                    error!("Error generating thumbnail: {e}");
+                }
             });
             self.ids.push(cached_path);
             bail!("Thumbnail not yet present.");
@@ -97,7 +105,7 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
     }
 
     let mut d = DynamicImage::ImageRgba8(image.crop_imm(x, y, width, height).to_rgba8());
-    debug!("Dim: {:?}", d.dimensions());
+    debug!("\tDim: {:?}", d.dimensions());
 
     let op = ImageOperation::Resize {
         dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
@@ -105,11 +113,9 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
         filter: crate::image_editing::ScaleFilter::Bilinear,
     };
     op.process_image(&mut d)?;
-    debug!("Dim: {:?}", d.dimensions());
-    debug!("Saving to {}", dest_path.as_ref().display());
-
+    debug!("\tDim: {:?}", d.dimensions());
     d.save(&dest_path)?;
-    debug!("Saved to {}", dest_path.as_ref().display());
+    debug!("\tSaved to {}.", dest_path.as_ref().display());
     Ok(())
 }
 
