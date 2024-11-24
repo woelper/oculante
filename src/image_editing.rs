@@ -878,7 +878,7 @@ impl ImageOperation {
                     }
 
                     let r2 = ui
-                        .styled_checkbox(aspect, "🔗")
+                        .styled_checkbox(aspect, "🔒")
                         .on_hover_text("Lock aspect ratio");
 
                     if r2.changed() {
