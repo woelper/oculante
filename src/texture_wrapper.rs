@@ -1,16 +1,12 @@
-use log::warn;
-use notan::draw::*;
-use notan::egui::EguiRegisterTexture;
-use notan::egui::SizedTexture;
-
 use crate::settings::PersistentSettings;
 use image::imageops;
-
-use image::RgbaImage;
-
+use image::DynamicImage;
+use image::EncodableLayout;
+use log::debug;
 use log::error;
-use notan::prelude::{BlendMode, Graphics, Texture, TextureFilter};
-
+use log::warn;
+use notan::draw::*;
+use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
     pub col_count: u32,
@@ -19,6 +15,9 @@ pub struct TexWrap {
     pub row_translation: u32,
     pub size_vec: (f32, f32), // The whole Texture Array size
     pub texture_count: usize,
+    pipeline: Option<notan::prelude::Pipeline>,
+    pub format: notan::prelude::TextureFormat,
+    pub image_format: image::ColorType,
 }
 
 #[derive(Default)]
@@ -27,6 +26,7 @@ pub struct TextureWrapperManager {
 }
 
 impl TextureWrapperManager {
+    /*#[deprecated(note = "please use `set_image` instead")]
     pub fn set(&mut self, tex: Option<TexWrap>, gfx: &mut Graphics) {
         let mut texture_taken: Option<TexWrap> = self.current_texture.take();
         if let Some(texture) = &mut texture_taken {
@@ -34,17 +34,40 @@ impl TextureWrapperManager {
         }
 
         self.current_texture = tex;
+    }*/
+
+    pub fn set_image(
+        &mut self,
+        img: &DynamicImage,
+        gfx: &mut Graphics,
+        settings: &PersistentSettings,
+    ) {
+        //First: try to update an existing texture
+        if let Some(tex) = &mut self.current_texture {
+            if tex.width() as u32 == img.width()
+                && tex.height() as u32 == img.height()
+                && img.color() == tex.image_format
+            {
+                debug!("Re-using texture as it is the same size.");
+                tex.update_textures(gfx, img);
+                return;
+            }
+        }
+
+        //If update not possible: Remove existing texture and generate a new one
+        {
+            self.clear();
+            debug!("Updating or creating texture with new size.");
+        }
+
+        self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img);
     }
 
     pub fn get(&mut self) -> &mut Option<TexWrap> {
         &mut self.current_texture
     }
 
-    //TODO: Extend for clearing textures
     pub fn clear(&mut self /*, gfx: &mut Graphics */) {
-        /*if let Some(texture) = &mut self.current_texture {
-            texture.unregister_textures(gfx);
-        }*/
         self.current_texture = None;
     }
 }
@@ -68,38 +91,59 @@ pub struct TextureResponse<'a> {
 
 pub struct TexturePair {
     pub texture: Texture,
-    pub texture_egui: SizedTexture,
 }
 
+//language=glsl
+const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
+    r#"
+    #version 450
+    precision mediump float;
+
+    layout(location = 0) in vec2 v_uvs;
+    layout(location = 1) in vec4 v_color;
+
+    layout(binding = 0) uniform sampler2D u_texture;
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+        vec4 tex_col = texture(u_texture, v_uvs);
+        color = vec4(tex_col.r, tex_col.r,tex_col.r, 1.0) * v_color;
+    }
+    "#
+};
+
 impl TexWrap {
-    pub fn from_rgbaimage(
+    pub fn from_dynamic_image(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
     ) -> Option<TexWrap> {
-        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_standard)
+        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_standard)
     }
 
-    pub fn from_rgbaimage_premult(
+    /*pub fn from_rgbaimage_premult(
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
     ) -> Option<TexWrap> {
-        Self::gen_from_rgbaimage(gfx, settings, image, Self::gen_texture_premult)
-    }
+        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_premult)
+    }*/
 
     fn gen_texture_standard(
         gfx: &mut Graphics,
         bytes: &[u8],
         width: u32,
         height: u32,
+        format: notan::prelude::TextureFormat,
         settings: &PersistentSettings,
         size_ok: bool,
     ) -> Option<Texture> {
-        gfx.create_texture()
+        let texture_result = gfx
+            .create_texture()
             .from_bytes(bytes, width, height)
             .with_mipmaps(settings.use_mipmaps && size_ok)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
+            .with_format(format)
             // .with_premultiplied_alpha()
             .with_filter(
                 if settings.linear_min_filter {
@@ -114,15 +158,20 @@ impl TexWrap {
                 },
             )
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
+            .build();
+
+        let _ = match texture_result {
+            Ok(texture) => return Some(texture),
+            Err(error) => panic!("Problem generating texture: {error:?}"),
+        };
     }
 
-    fn gen_texture_premult(
+    /*fn gen_texture_premult(
         gfx: &mut Graphics,
         bytes: &[u8],
         width: u32,
         height: u32,
+        _format:notan::prelude::TextureFormat,
         settings: &PersistentSettings,
         size_ok: bool,
     ) -> Option<Texture> {
@@ -147,25 +196,120 @@ impl TexWrap {
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
             .ok()
-    }
+    }*/
 
-    fn gen_from_rgbaimage(
-        gfx: &mut Graphics,
+    /*fn gen_single_from_dynamic_image(gfx: &mut Graphics,
         settings: &PersistentSettings,
-        image: &RgbaImage,
+        image: &DynamicImage,
         texture_generator_function: fn(
             &mut Graphics,
             &[u8],
             u32,
             u32,
+            notan::prelude::TextureFormat,
+            &PersistentSettings,
+            bool,
+        ) -> Option<Texture>,
+    ) -> Option<Texture>
+    {
+
+    }*/
+
+    fn get_dyn_image_part(
+        image: &DynamicImage,
+        offset: (u32, u32),
+        size: (u32, u32),
+    ) -> Option<DynamicImage> {
+        if offset.0 == 0 && offset.1 == 0 && size.0 == image.width() && size.1 == image.height() {
+            //Whole image
+            match image {
+                DynamicImage::ImageRgb8(_rgb8_image) => {
+                    let img_rgba = image.to_rgba8();
+                    return Some(DynamicImage::ImageRgba8(img_rgba));
+                }
+                /*DynamicImage::ImageLumaA8(_la8_image) => {
+                    let img_rgba = image.to_rgba8();
+                    return Some(DynamicImage::ImageRgba8(img_rgba));
+                }*/
+                _other_image_type => {
+                    return None;
+                }
+            }
+        } else {
+            match image {
+                DynamicImage::ImageLuma8(luma8_image) => {
+                    // Creating luma 8 sub image
+                    let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize];
+                    let bytes_src = luma8_image.as_bytes();
+                    let mut dst_idx_start = 0 as usize;
+                    let mut src_idx_start =
+                        offset.0 as usize + offset.1 as usize * image.width() as usize;
+
+                    for _y in 0..size.1 {
+                        let dst_idx_end = dst_idx_start + size.0 as usize;
+                        let src_idx_end = src_idx_start + size.0 as usize;
+                        buff[dst_idx_start..dst_idx_end]
+                            .copy_from_slice(&bytes_src[src_idx_start..src_idx_end]);
+                        dst_idx_start = dst_idx_end;
+                        src_idx_start += image.width() as usize;
+                    }
+                    let gi: image::GrayImage =
+                        image::GrayImage::from_raw(size.0, size.1, buff).unwrap(); //ImageBuffer::from_raw(size.0, size.1, buff).context("Spast.");
+                    return Some(DynamicImage::ImageLuma8(gi));
+                }
+                other_image_type => {
+                    let sub_img =
+                        imageops::crop_imm(other_image_type, offset.0, offset.1, size.0, size.1);
+                    let my_img = sub_img.to_image();
+                    return Some(DynamicImage::ImageRgba8(my_img));
+                }
+            }
+        }
+    }
+
+    fn get_texture_type_and_pipe(
+        gfx: &mut Graphics,
+        image: &DynamicImage,
+    ) -> (
+        notan::prelude::TextureFormat,
+        Option<notan::prelude::Pipeline>,
+    ) {
+        let mut format: notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
+        let mut pipeline: Option<notan::prelude::Pipeline> = None;
+        debug!("{:?}", image.color());
+        match image.color() {
+            image::ColorType::L8 => {
+                format = notan::prelude::TextureFormat::R8;
+                pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+            }
+            _ => {}
+        }
+        return (format, pipeline);
+    }
+
+    fn gen_from_dynamic_image(
+        gfx: &mut Graphics,
+        settings: &PersistentSettings,
+        image: &DynamicImage,
+        texture_generator_function: fn(
+            &mut Graphics,
+            &[u8],
+            u32,
+            u32,
+            notan::prelude::TextureFormat,
             &PersistentSettings,
             bool,
         ) -> Option<Texture>,
     ) -> Option<TexWrap> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
-        let (im_w, im_h) = image.dimensions();
+
+        let im_w = image.width();
+        let im_h = image.height();
+
+        let (format, pipeline) = Self::get_texture_type_and_pipe(gfx, image);
+
         if im_w < 1 || im_h < 1 {
-            error!("Image width smaller than 1!");
+            error!("Image width smaller than 1!"); //TODO: fix t
             return None;
         }
 
@@ -196,24 +340,38 @@ impl TexWrap {
                 let tex_start_x = col_index * col_increment;
                 let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);
 
-                let sub_img =
-                    imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
-                let my_img = sub_img.to_image();
-                let tex = texture_generator_function(
-                    gfx,
-                    my_img.as_ref(),
-                    my_img.width(),
-                    my_img.height(),
-                    settings,
-                    allow_mipmap,
+                let tex: Option<Texture>;
+
+                let sub_img_opt = Self::get_dyn_image_part(
+                    image,
+                    (tex_start_x, tex_start_y),
+                    (tex_width, tex_height),
                 );
 
+                if let Some(suba_img) = sub_img_opt {
+                    tex = texture_generator_function(
+                        gfx,
+                        suba_img.as_bytes(),
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
+                } else {
+                    tex = texture_generator_function(
+                        gfx,
+                        image.as_bytes(),
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
+                }
+
                 if let Some(t) = tex {
-                    let egt = gfx.egui_register_texture(&t);
-                    let te = TexturePair {
-                        texture: t,
-                        texture_egui: egt,
-                    };
+                    let te = TexturePair { texture: t };
                     texture_vec.push(te);
                 } else {
                     //On error
@@ -224,6 +382,7 @@ impl TexWrap {
             }
             if !fine {
                 //early exit if we failed
+                error!("Texture generation failed!");
                 break;
             }
         }
@@ -238,6 +397,9 @@ impl TexWrap {
                 col_translation: col_increment,
                 row_translation: row_increment,
                 texture_count,
+                pipeline,
+                format,
+                image_format: image.color(),
             })
         } else {
             None
@@ -251,6 +413,8 @@ impl TexWrap {
         translation_y: f32,
         scale: f32,
     ) {
+        self.add_draw_shader(draw);
+
         let mut tex_idx = 0;
         for row_idx in 0..self.row_count {
             let translate_y =
@@ -265,45 +429,163 @@ impl TexWrap {
                 tex_idx += 1;
             }
         }
+        self.remove_draw_shader(draw);
     }
 
-    pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
+    pub fn draw_zoomed(
+        &self,
+        draw: &mut Draw,
+        translation_x: f32,
+        translation_y: f32,
+        width: f32,
+        // xy, size
+        center: (f32, f32),
+        scale: f32,
+    ) {
+        self.add_draw_shader(draw);
+
+        let width_tex = (width / scale) as i32;
+
+        let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
+
+        let xy_tex_center = ((center.0) as i32, (center.1) as i32);
+
+        //Ui position to start at
+        let base_ui_curs = nalgebra::Vector2::new(translation_x as f64, translation_y as f64);
+        let mut curr_ui_curs = base_ui_curs;
+
+        //Loop control variables, start end end coordinates of interest
+        let x_coordinate_end = (xy_tex_center.0 + xy_tex_size.0) as i32;
+        let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
+        let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
+
+        while y_coordinate <= y_coordinate_end {
+            let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
+            let mut x_coordinate = xy_tex_center.0 - xy_tex_size.0;
+            curr_ui_curs.x = base_ui_curs.x;
+            let mut last_display_size_y: f64 = 0.0;
+            while x_coordinate <= x_coordinate_end {
+                //get texture tile
+                let curr_tex_response =
+                    self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+
+                //increment coordinates by usable width/height
+                y_coordinate_increment = curr_tex_response.offset_height;
+                x_coordinate += curr_tex_response.offset_width;
+
+                //Handling last texture in a row or col
+                let mut curr_tex_end = nalgebra::Vector2::new(
+                    i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
+                    i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
+                );
+
+                //Handling positive coordinate overflow
+                if curr_tex_response.x_tex_right_global as f32 >= self.width() - 1.0f32 {
+                    x_coordinate = x_coordinate_end + 1;
+                    curr_tex_end.x +=
+                        (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
+                }
+
+                if curr_tex_response.y_tex_bottom_global as f32 >= self.height() - 1.0f32 {
+                    y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
+                    curr_tex_end.y +=
+                        (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
+                }
+
+                //Usable tile size, depending on offsets
+                let tile_size = nalgebra::Vector2::new(
+                    curr_tex_end.x
+                        - curr_tex_response.x_offset_texture
+                        - curr_tex_response.x_tex_left_global
+                        + 1,
+                    curr_tex_end.y
+                        - curr_tex_response.y_offset_texture
+                        - curr_tex_response.y_tex_top_global
+                        + 1,
+                );
+
+                //Display size - tile size scaled
+                let display_size = nalgebra::Vector2::new(
+                    ((tile_size.x - 1) as f64 / (2 * width_tex) as f64) * width as f64,
+                    ((tile_size.y - 1) as f64 / (2 * width_tex) as f64) * width as f64,
+                );
+
+                draw.image(&curr_tex_response.texture.texture)
+                    .blend_mode(BlendMode::NORMAL)
+                    .size(display_size.x as f32, display_size.y as f32)
+                    .crop(
+                        (
+                            curr_tex_response.x_offset_texture as f32,
+                            curr_tex_response.y_offset_texture as f32,
+                        ),
+                        ((tile_size.x) as f32, (tile_size.y) as f32),
+                    )
+                    .translate(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
+
+                //Update display cursor
+                curr_ui_curs.x += display_size.x;
+                last_display_size_y = display_size.y;
+            }
+            //Update y coordinates
+            y_coordinate += y_coordinate_increment;
+            curr_ui_curs.y += last_display_size_y;
+        }
+        self.remove_draw_shader(draw);
+
+        //Draw crosshair
+        let half_width = 1.0;
+        draw.rect(
+            (translation_x + width / 2.0 - half_width, translation_y),
+            (2.0 * half_width, width),
+        );
+        draw.rect(
+            (translation_x, translation_y + width / 2.0 - half_width),
+            (width, 2.0 * half_width),
+        );
+    }
+
+    /*pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
         for text in &self.texture_array {
             gfx.egui_remove_texture(text.texture_egui.id);
         }
-    }
+    }*/
 
-    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &RgbaImage) {
-        if self.col_count == 1 && self.row_count == 1 {
-            if let Err(e) = gfx
-                .update_texture(&mut self.texture_array[0].texture)
-                .with_data(image)
-                .update()
-            {
-                error!("{e}");
-            }
-        } else {
-            let mut tex_index = 0;
-            for row_index in 0..self.row_count {
-                let tex_start_y = row_index * self.row_translation;
-                let tex_height = std::cmp::min(self.row_translation, image.height() - tex_start_y);
-                for col_index in 0..self.col_count {
-                    let tex_start_x = col_index * self.col_translation;
-                    let tex_width =
-                        std::cmp::min(self.col_translation, image.width() - tex_start_x);
+    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
+        let mut tex_index = 0;
+        for row_index in 0..self.row_count {
+            let tex_start_y = row_index * self.row_translation;
+            let tex_height = std::cmp::min(self.row_translation, image.height() - tex_start_y);
+            for col_index in 0..self.col_count {
+                let tex_start_x = col_index * self.col_translation;
+                let tex_width = std::cmp::min(self.col_translation, image.width() - tex_start_x);
 
-                    let sub_img =
-                        imageops::crop_imm(image, tex_start_x, tex_start_y, tex_width, tex_height);
-                    let my_img = sub_img.to_image();
+                let sub_img_opt = Self::get_dyn_image_part(
+                    image,
+                    (tex_start_x, tex_start_y),
+                    (tex_width, tex_height),
+                );
+
+                if let Some(suba_img) = sub_img_opt {
                     if let Err(e) = gfx
                         .update_texture(&mut self.texture_array[tex_index].texture)
-                        .with_data(my_img.as_ref())
+                        .with_data(suba_img.as_bytes())
                         .update()
                     {
                         error!("{e}");
+                        return;
                     }
-                    tex_index += 1;
+                } else {
+                    if let Err(e) = gfx
+                        .update_texture(&mut self.texture_array[tex_index].texture)
+                        .with_data(image.as_bytes())
+                        .update()
+                    {
+                        error!("{e}");
+                        return;
+                    }
                 }
+
+                tex_index += 1;
             }
         }
     }
@@ -348,6 +630,18 @@ impl TexWrap {
 
             offset_width: remaining_width,
             offset_height: remaining_height,
+        }
+    }
+
+    fn add_draw_shader(&self, draw: &mut Draw) {
+        if let Some(pip) = &self.pipeline {
+            draw.image_pipeline().pipeline(pip);
+        }
+    }
+
+    fn remove_draw_shader(&self, draw: &mut Draw) {
+        if self.pipeline.is_some() {
+            draw.image_pipeline().remove();
         }
     }
 

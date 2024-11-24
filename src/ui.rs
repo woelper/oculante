@@ -2,11 +2,15 @@ use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     clear_image, clipboard_to_image, delete_file,
     file_encoder::FileEncoder,
-    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
+    get_pixel_checked,
+    image_editing::{
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ScaleFilter,
+    },
     paint::PaintStroke,
     set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
+    thumbnails::{Thumbnails, THUMB_SIZE},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
@@ -24,8 +28,8 @@ pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 use crate::icons::*;
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{DynamicImage, RgbaImage};
-use log::{debug, error, info};
+use image::{ColorType, GenericImageView, RgbaImage};
+use log::{debug, error, info, warn};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
@@ -39,6 +43,7 @@ use std::{
     time::{Duration, Instant},
 };
 use strum::IntoEnumIterator;
+use text::{LayoutJob, TextWrapping};
 const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
@@ -507,16 +512,25 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
+    let mut color_type = ColorType::Rgba8;
+    let mut bbox_tl: Pos2 = Default::default();
+    let mut bbox_br: Pos2 = Default::default();
+    let mut uv_center: (f64, f64) = Default::default();
+    let mut uv_size: (f64, f64) = Default::default();
+
     if let Some(img) = &state.current_image {
-        let mut img = img;
+        color_type = img.color();
 
         // prefer edit result if present
-        if state.edit_state.result_pixel_op.width() > 0 {
-            img = &state.edit_state.result_pixel_op;
-        }
+        let img = if state.edit_state.result_pixel_op.width() > 0 {
+            &state.edit_state.result_pixel_op
+        } else {
+            img
+        };
 
-        if let Some(p) = img.get_pixel_checked(
+        if let Some(p) = get_pixel_checked(
+            img,
             state.cursor_relative.x as u32,
             state.cursor_relative.y as u32,
         ) {
@@ -535,7 +549,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
-                let uv_center = (
+                uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
@@ -578,6 +592,12 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                     );
                     ui.end_row();
 
+                    ui.label_i(&format!("{PALETTE} Color"));
+                    ui.label_right(
+                        format!("{:?}", color_type)
+                    );
+                    ui.end_row();
+
                     ui.label_i("⊞ Pos");
                     ui.label_right(
                         RichText::new(format!(
@@ -596,54 +616,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
 
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                let uv_size = (scale, scale * ratio);
-                let bbox_tl: Pos2;
-                let bbox_br: Pos2;
-                if texture.texture_count == 1 {
-                    let texture_resonse = texture.get_texture_at_xy(0,0);
-                    ui.add_space(10.);
-                    let preview_rect = ui
-                        .add(
-                            egui::Image::new(texture_resonse.texture.texture_egui)
-                            .maintain_aspect_ratio(false)
-                            .fit_to_exact_size(egui::Vec2::splat(desired_width as f32))
-                            .rounding(ROUNDING)
-                            .uv(egui::Rect::from_x_y_ranges(
-                                (uv_center.0 - uv_size.0) as f32..=(uv_center.0 + uv_size.0) as f32,
-                                (uv_center.1 - uv_size.1) as f32..=(uv_center.1 + uv_size.1) as f32,
-                            )),
-                        )
-                        .rect;
-                    bbox_tl = preview_rect.left_top();
-                    bbox_br = preview_rect.right_bottom();
-                }
-                else {
-                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
-                }
+                uv_size = (scale, scale * ratio);
+                ui.add_space(10.);
 
-                let bg_color = Color32::BLACK.linear_multiply(0.5);
+                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+
+                //Rendering a placeholder rectangle
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));
+                bbox_tl = preview_rect.left_top();
+                bbox_br = preview_rect.right_bottom();
+
                 let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
-
-
-                let stroke_color = Color32::from_white_alpha(240);
-
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.center_bottom(), preview_rect.center_top()],
-                    Stroke::new(4., bg_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.left_center(), preview_rect.right_center()],
-                    Stroke::new(4., bg_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.center_bottom(), preview_rect.center_top()],
-                    Stroke::new(1., stroke_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.left_center(), preview_rect.right_center()],
-                    Stroke::new(1., stroke_color),
-                );
             }
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
@@ -749,140 +733,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                 });
             }
             advanced_ui(ui, state);
+
         });
     });
-}
-
-fn render_info_image_tiled(
-    ui: &mut Ui,
-    uv_center: (f64, f64),
-    uv_size: (f64, f64),
-    desired_width: f64,
-    texture: &crate::texture_wrapper::TexWrap,
-) -> (Pos2, Pos2) {
-    let xy_size = (
-        (texture.width() as f64 * uv_size.0) as i32,
-        (texture.height() as f64 * uv_size.1) as i32,
-    );
-
-    let xy_center = (
-        (texture.width() as f64 * uv_center.0) as i32,
-        (texture.height() as f64 * uv_center.1) as i32,
-    ); //(16384,1024);//
-    let sc1 = (
-        2.0 * xy_size.0 as f64 / desired_width,
-        2.0 * xy_size.1 as f64 / desired_width,
-    );
-
-    //coordinates of the image-view
-    let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
-    let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
-
-    //Ui position to start at
-    let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
-    let mut curr_ui_curs = base_ui_curs;
-    //our start position
-
-    //Loop control variables, start end end coordinates of interest
-    let x_coordinate_end = (xy_center.0 + xy_size.0) as i32;
-    let mut y_coordinate = xy_center.1 - xy_size.1;
-    let y_coordinate_end = (xy_center.1 + xy_size.1) as i32;
-
-    while y_coordinate <= y_coordinate_end {
-        let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
-        let mut x_coordinate = xy_center.0 - xy_size.0;
-        curr_ui_curs.x = base_ui_curs.x;
-        let mut last_display_size_y: f64 = 0.0;
-        while x_coordinate <= x_coordinate_end {
-            //get texture tile
-            let curr_tex_response =
-                texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-
-            //increment coordinates by usable width/height
-            y_coordinate_increment = curr_tex_response.offset_height;
-            x_coordinate += curr_tex_response.offset_width;
-
-            //Handling last texture in a row or col
-            let mut curr_tex_end = nalgebra::Vector2::new(
-                i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
-                i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
-            );
-
-            //Handling positive coordinate overflow
-            if curr_tex_response.x_tex_right_global as f32 >= texture.width() - 1.0f32 {
-                x_coordinate = x_coordinate_end + 1;
-                curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
-            }
-
-            if curr_tex_response.y_tex_bottom_global as f32 >= texture.height() - 1.0f32 {
-                y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
-                curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
-            }
-
-            //Usable tile size, depending on offsets
-            let tile_size = nalgebra::Vector2::new(
-                curr_tex_end.x
-                    - curr_tex_response.x_offset_texture
-                    - curr_tex_response.x_tex_left_global
-                    + 1,
-                curr_tex_end.y
-                    - curr_tex_response.y_offset_texture
-                    - curr_tex_response.y_tex_top_global
-                    + 1,
-            );
-
-            //Display size - tile size scaled
-            let display_size =
-                nalgebra::Vector2::new(tile_size.x as f64 / sc1.0, tile_size.y as f64 / sc1.1);
-
-            //Texture display range
-            let uv_start = nalgebra::Vector2::new(
-                curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
-                curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64,
-            );
-
-            let uv_end = nalgebra::Vector2::new(
-                (curr_tex_end.x - curr_tex_response.x_tex_left_global + 1) as f64
-                    / curr_tex_response.texture_width as f64,
-                (curr_tex_end.y - curr_tex_response.y_tex_top_global + 1) as f64
-                    / curr_tex_response.texture_height as f64,
-            );
-
-            //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
-            let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-            let draw_br_32 = Pos2::new(
-                (curr_ui_curs.x + display_size.x) as f32,
-                (curr_ui_curs.y + display_size.y) as f32,
-            );
-            let r_ret = egui::Rect::from_min_max(draw_tl_32, draw_br_32);
-
-            egui::Image::new(curr_tex_response.texture.texture_egui)
-                .maintain_aspect_ratio(false)
-                .fit_to_exact_size(egui::Vec2::new(
-                    display_size.x as f32,
-                    display_size.y as f32,
-                ))
-                .uv(egui::Rect::from_x_y_ranges(
-                    uv_start.x as f32..=uv_end.x as f32,
-                    uv_start.y as f32..=uv_end.y as f32,
-                ))
-                .paint_at(ui, r_ret);
-
-            //Update display cursor
-            curr_ui_curs.x += display_size.x;
-            last_display_size_y = display_size.y;
-
-            //Update coordinates for preview rectangle
-            bbox_tl.x = bbox_tl.x.min(r_ret.left());
-            bbox_tl.y = bbox_tl.y.min(r_ret.top());
-            bbox_br.x = bbox_br.x.max(r_ret.right());
-            bbox_br.y = bbox_br.y.max(r_ret.bottom());
-        }
-        //Update y coordinates
-        y_coordinate += y_coordinate_increment;
-        curr_ui_curs.y += last_display_size_y;
-    }
-    (bbox_tl, bbox_br)
+    return (bbox_tl, bbox_br);
 }
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
@@ -1168,23 +1022,42 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .show_separator_line(false)
         .show(ctx, |ui| {
 
+
+
+
             // A flag to indicate that the image needs to be rebuilt
             let mut image_changed = false;
             let mut pixels_changed = false;
 
             if let Some(img) = &state.current_image {
+
+                if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+                    ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator was added. You can edit it later.");
+                    let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op {true} else {false}).unwrap_or_default();
+                    if !op_present {
+                        state.edit_state.image_op_stack.insert(0, ImageOperation::ColorConverter(ColorTypeExt::Rgba8));
+                        image_changed = true;
+                        pixels_changed = true;
+                        state.send_message_info("Color conversion operator added.");
+                    }
+                }
+
+
                 // Ensure that edit result image is always filled
                 if state.edit_state.result_pixel_op.width() == 0 {
                     debug!("Edit state pixel comp buffer is default, cloning from image");
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_pixel_op = img.clone();
                     pixels_changed = true;
                 }
                 if state.edit_state.result_image_op.width() == 0 {
                     debug!("Edit state image comp buffer is default, cloning from image");
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
                     image_changed = true;
                 }
             }
+
 
             egui::Grid::new("editing")
                 .num_columns(2)
@@ -1212,6 +1085,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
                         ImageOperation::Posterize(8),
                         ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
+                        ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
 
                         // Mathematical
                         ImageOperation::MMult,
@@ -1283,6 +1157,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
 
+
                     ui.label_i(&format!("Reset"));
                     ui.centered_and_justified(|ui| {
                         if ui.button("Reset all edits").clicked() {
@@ -1305,7 +1180,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         {
                             if let Some(img) = &state.current_image {
                                 state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
+                                state.current_texture.set_image(img, gfx, &state.persistent_settings);
                             }
                         }
                         if ui
@@ -1326,11 +1201,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     if ctx.input(|i|i.pointer.secondary_down()) {
                         if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
-                                state.cursor_relative.x as u32,
-                                state.cursor_relative.y as u32,
-                            ) {
-                                debug!("{:?}", p);
+                            if let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -1519,14 +1390,18 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             // Do the processing
 
             // If expensive operations happened (modifying image geometry), process them here
+            let mut message: Option<String> = None;
             if image_changed {
                 if let Some(img) = &mut state.current_image {
                     let stamp = Instant::now();
                     // start with a fresh copy of the unmodified image
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
-                    for operation in &mut state.edit_state.image_op_stack {
+                    for operation in &state.edit_state.image_op_stack {
                         if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}")
+                            error!("{e}");
+                            state.send_message_warn(&format!("{e}"));
+                            message = Some(e.to_string())
                         }
                     }
                     debug!(
@@ -1552,8 +1427,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
                     let ops = &state.edit_state.pixel_op_stack;
-                    process_pixels(&mut state.edit_state.result_pixel_op, ops);
+                    if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
+                        state.send_message_warn(&format!("{e}"));
+                        message = Some(e.to_string())
 
+                    }
                 }
 
                     debug!(
@@ -1564,10 +1442,16 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
                     if !stroke.committed {
-                        stroke.render(
-                            &mut state.edit_state.result_pixel_op,
-                            &state.edit_state.brushes,
-                        );
+
+                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+
+                            stroke.render(
+                                compatible_buffer,
+                                &state.edit_state.brushes,
+                            );
+                        }
+
+
                     }
                 }
 
@@ -1594,10 +1478,15 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
                         if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-                            stroke.render(
-                                &mut state.edit_state.result_image_op,
-                                &state.edit_state.brushes,
-                            );
+
+                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                                stroke.render(
+                                    compatible_buffer,
+                                    &state.edit_state.brushes,
+                                );
+                            }
+
+
                             stroke.committed = true;
                             debug!("Committed stroke {}", i);
                         }
@@ -1709,7 +1598,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             |p| {
 
 
-                                let dynimage = DynamicImage::ImageRgba8(state.edit_state.result_pixel_op.clone());
+                                let dynimage = state.edit_state.result_pixel_op.clone();
                                 let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
                                     match encoding_options.save(&dynimage, p) {
 
@@ -1794,10 +1683,25 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                             }
+                        }
+                    }
 
+                    #[cfg(debug_assertions)]
+                    {
+                        ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+                        ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
+                        ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
+                        if let Some(img) = &state.current_image {
+
+                        ui.label(format!("current_image: {:?}", img.color()));
+
+                            if img.color() != ColorType::Rgba8 {
+                                ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
+                            }
                         }
 
                     }
+
                 }
             });
 
@@ -1955,6 +1859,10 @@ fn modifier_stack_ui(
     mouse_grab: &mut bool,
     settings: &mut VolatileSettings,
 ) {
+
+
+
+
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
@@ -1980,8 +1888,7 @@ fn modifier_stack_ui(
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                if egui::Button::new("")
-                    .small()
+                if egui::Button::new(RichText::new("").size(24.))
                     .frame(false)
                     .ui(ui)
                     .on_hover_text("Remove operator")
@@ -1994,31 +1901,33 @@ fn modifier_stack_ui(
                 let up = i != 0;
                 let down = i != stack_len - 1;
 
+                let arrow_size = 8.;
+                let arrows_rect = ui.allocate_space(vec2(20., arrow_size));
+
+                let font_size = 8.;
+
                 ui.add_enabled_ui(up, |ui| {
-                    if egui::Button::new("")
-                        .small()
-                        .frame(false)
-                        .ui(ui)
-                        .on_hover_text("Move up")
-                        .clicked()
-                    {
+                    let ur = ui.put(
+                        arrows_rect.1.translate(vec2(0., -7.)),
+                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
+                    );
+                    if ur.on_hover_text("Move up").clicked() {
                         swap = Some(((i as i32 - 1).max(0) as usize, i));
                         *image_changed = true;
                     }
                 });
 
                 ui.add_enabled_ui(down, |ui| {
-                    if egui::Button::new("")
-                        .small()
-                        .frame(false)
-                        .ui(ui)
-                        .on_hover_text("Move down")
-                        .clicked()
-                    {
+                    let dr = ui.put(
+                        arrows_rect.1.translate(vec2(0., 2.)),
+                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
+                    );
+                    if dr.on_hover_text("Move down").clicked() {
                         swap = Some((i, i + 1));
                         *image_changed = true;
                     }
                 });
+                ui.add_space(80.);
             });
 
             ui.end_row();
@@ -2353,26 +2262,27 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // TODO: remove redundancy
         if changed_channels {
+            //TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture.set(
-                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state.current_texture.set_image(
+                            &unpremult(img),
                             gfx,
+                            &state.persistent_settings,
                         );
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state
+                            .current_texture
+                            .set_image(img, gfx, &state.persistent_settings);
                     }
                     _ => {
-                        state.current_texture.set(
-                            solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        let solo_im =
+                            solo_channel(img, state.persistent_settings.current_channel as usize);
+                        state
+                            .current_texture
+                            .set_image(&solo_im, gfx, &state.persistent_settings);
                     }
                 }
             }
@@ -2623,7 +2533,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     .clicked()
                     || copy_pressed
                 {
-                    clipboard_copy(img);
+                    clipboard_copy(&img);
                     ui.close_menu();
                 }
             }
@@ -2664,28 +2574,22 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.right_bottom().x + 200., r.left_top().y),
+                    Pos2::new(r.right_bottom().x + 100., r.left_top().y),
                     Pos2::new(
                         r.left_bottom().x - ui.available_width(),
-                        r.left_top().y + 300.,
+                        r.left_top().y + 100.,
                     ),
                 );
 
                 ui.allocate_ui_at_rect(recent_rect, |ui| {
-                    for r in &state.volatile_settings.recent_images.clone() {
-                        ui.horizontal(|ui| {
-                            render_file_icon(&r, ui);
-                            // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
-                            ui.vertical_centered_justified(|ui| {
-                                if let Some(filename) = r.file_name() {
-                                    if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(r, state);
-                                        ui.close_menu();
-                                    }
-                                }
-                            });
-                        });
-                    }
+                    ui.horizontal_wrapped(|ui| {
+                        for r in &state.volatile_settings.recent_images.clone() {
+                            if render_file_icon(&r, ui, &mut state.thumbnails).clicked() {
+                                load_image_from_path(r, state);
+                                ui.close_menu();
+                            }
+                        }
+                    });
                 });
             });
 
@@ -2751,22 +2655,82 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
         }
     }
 }
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
-    let size = 30.;
-    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
-    ui.painter()
-        .rect_filled(rect, Rounding::same(size / 4.), Color32::GRAY);
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        icon_path
-            .extension()
-            .map(|e| e.to_string_lossy().to_string().to_uppercase())
-            .unwrap_or_default(),
-        FontId::proportional(10.),
-        Color32::BLACK,
+pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
+    let mut zoom = ui
+        .data_mut(|w| w.get_temp::<f32>("ZM".into()))
+        .unwrap_or(0.997);
+    let delta = ui.input(|r| r.zoom_delta()).clamp(0.9999, 1.0001);
+    debug!("d {:?}", delta);
+    zoom *= delta;
+    zoom = zoom.clamp(0.5, 1.3);
+    ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
+    debug!("z {:?}", zoom);
+    let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32) * zoom;
+    let response = ui.allocate_response(size, Sense::click());
+    let rounding = Rounding::same(4.);
+    let margin = 4.0;
+
+    match thumbnails.get(icon_path) {
+        Ok(tp) => {
+            let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
+            image.paint_at(ui, response.rect);
+        }
+        Err(e) => {
+            // warn!("{e}");
+            ui.painter()
+                .rect_filled(response.rect, rounding, Color32::from_gray(80).to_opaque());
+            ui.painter().text(
+                response.rect.center(),
+                Align2::CENTER_CENTER,
+                icon_path
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_string().to_uppercase())
+                    .unwrap_or_default(),
+                FontId::proportional(25.),
+                Color32::WHITE,
+            );
+        }
+    }
+
+    let mut caption_rect = response.rect;
+    *caption_rect.top_mut() -= THUMB_SIZE[0] as f32 + 10.;
+
+    let text = icon_path
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut job = LayoutJob::simple(
+        text,
+        FontId::proportional(13.),
+        ui.style().visuals.text_color(),
+        THUMB_SIZE[0] as f32 - margin * 2.,
     );
-    // ui.add(egui::Label::new(""))
+
+    job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32 - margin);
+    let galley = ui.painter().layout_job(job);
+    let text_rect = galley.rect;
+    let mut text_pos = response.rect.left_bottom();
+    text_pos.y -= text_rect.size().y + margin / 3.;
+    text_pos.x += margin;
+
+    ui.painter().rect(
+        response.rect.with_min_y(text_pos.y - margin / 3.),
+        Rounding {
+            nw: 0.0,
+            ne: 0.0,
+            sw: rounding.sw,
+            se: rounding.se,
+        },
+        Color32::from_white_alpha(150),
+        Stroke::NONE,
+    );
+
+    ui.painter().galley(text_pos, galley, Color32::RED);
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
+    }
     response
 }
 

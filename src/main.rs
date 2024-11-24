@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use image::GenericImageView;
 use log::debug;
 use log::error;
 use log::info;
@@ -44,9 +45,8 @@ mod image_loader;
 use appstate::*;
 #[cfg(not(feature = "file_open"))]
 mod filebrowser;
-mod texture_wrapper;
-
 pub mod ktx2_loader;
+mod texture_wrapper;
 // mod events;
 #[cfg(target_os = "macos")]
 mod mac;
@@ -57,12 +57,11 @@ mod tests;
 mod ui;
 #[cfg(feature = "update")]
 mod update;
-use ui::*;
-
 use crate::image_editing::EditState;
-
+use ui::*;
 mod image_editing;
 pub mod paint;
+mod thumbnails;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -296,7 +295,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                             .texture_channel
                             .0
                             .clone()
-                            .send(utils::Frame::new_reset(i.to_rgba8()));
+                            .send(utils::Frame::new_reset(i));
                     }
                     Err(e) => error!("ERR loading from stdin: {e} - for now, oculante only supports data that can be decoded by the image crate."),
                 }
@@ -803,7 +802,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
-
+    let mut zoom_image = gfx.create_draw();
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
@@ -853,8 +852,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             _ => {}
         }
-
- 
 
         match &frame {
             Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
@@ -947,39 +944,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                if let Some(tex) = &mut state.current_texture.get() {
-                    if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                        debug!("Re-using texture as it is the same size.");
-                        img.update_texture_with_texwrap(gfx, tex);
-                    } else {
-                        debug!("Updating texture with new size.");
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
-                    }
-                } else {
-                    debug!("No current texture. Creating and setting texture");
-                    state.current_texture.set(
-                        img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                        gfx,
-                    );
-                }
+                state
+                    .current_texture
+                    .set_image(&img, gfx, &state.persistent_settings);
 
                 match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
-                    ColorChannel::Rgb => state.current_texture.set(
-                        unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    ColorChannel::Rgb => state.current_texture.set_image(
+                        &unpremult(&img),
                         gfx,
+                        &state.persistent_settings,
                     ),
                     // Do nuttin'
                     ColorChannel::Rgba => (),
                     // Display the channel
                     _ => {
-                        state.current_texture.set(
-                            solo_channel(&img, state.persistent_settings.current_channel as usize)
-                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state.current_texture.set_image(
+                            &solo_channel(&img, state.persistent_settings.current_channel as usize),
                             gfx,
+                            &state.persistent_settings,
                         );
                     }
                 }
@@ -987,21 +970,20 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             Frame::UpdateTexture => {
                 // Only update the texture.
-                
+
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set(
-                        state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    state.current_texture.set_image(
+                        &state.edit_state.result_pixel_op,
                         gfx,
-                    );
-
+                        &state.persistent_settings,
+                    )
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state
+                            .current_texture
+                            .set_image(&img, gfx, &state.persistent_settings);
                     }
                 }
             }
@@ -1036,7 +1018,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
-
+    let mut bbox_tl: egui::Pos2 = Default::default();
+    let mut bbox_br: egui::Pos2 = Default::default();
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
@@ -1102,7 +1085,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1161,12 +1144,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .size(
+                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                    )
                     .blend_mode(BlendMode::ADD)
-                    .translate(aligned_offset_x, aligned_offset_y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
+                    .translate(aligned_offset_x, aligned_offset_y);
             }
         }
         if state.tiling < 2 {
@@ -1211,18 +1194,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.show_minimap {
+        if state.persistent_settings.info_enabled {
             // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
-            let offset_x = 0.0;
 
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_geometry.dimensions.0 as f32
-                * state.image_geometry.scale
-                > app.window().size().0 as f32;
+            // let center = (text)
 
-            if show_minimap {
-                texture.draw_textures(&mut draw, offset_x, 100., scale);
-            }
+            texture.draw_zoomed(
+                &mut zoom_image,
+                bbox_tl.x,
+                bbox_tl.y,
+                bbox_br.x - bbox_tl.x,
+                (state.cursor_relative.x, state.cursor_relative.y),
+                8.0,
+            );
         }
 
         // Draw a brush preview when paint mode is on
@@ -1270,6 +1254,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);
+    gfx.render(&zoom_image);
 }
 
 // Show file browser to select image to load

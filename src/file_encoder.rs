@@ -6,10 +6,11 @@ use crate::ui::EguiExt;
 use anyhow::Result;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, PngEncoder};
-use image::DynamicImage;
+use image::{DynamicImage, ImageEncoder};
 use notan::egui::Ui;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
+use std::io::{BufWriter, Cursor, Write};
 use std::path::Path;
 use strum::{Display, EnumIter};
 
@@ -69,18 +70,23 @@ impl FileEncoder {
                 JpegEncoder::new_with_quality(w, *quality as u8).encode_image(image)?;
             }
             FileEncoder::Png { compressionlevel } => {
-                let w = File::create(path)?;
-
-                PngEncoder::new_with_quality(
-                    w,
+                let file = File::create(path)?;
+                let writer = BufWriter::new(file);
+                let encoder = PngEncoder::new_with_quality(
+                    writer,
                     match compressionlevel {
                         CompressionLevel::Best => CompressionType::Best,
                         CompressionLevel::Default => CompressionType::Default,
                         CompressionLevel::Fast => CompressionType::Fast,
                     },
-                    image::codecs::png::FilterType::Adaptive,
+                    image::codecs::png::FilterType::default(),
                 );
-                image.save_with_format(path, image::ImageFormat::Png)?;
+                encoder.write_image(
+                    image.as_bytes(),
+                    image.width(),
+                    image.height(),
+                    image::ExtendedColorType::Rgba8,
+                )?;
             }
             FileEncoder::Bmp => {
                 image.save_with_format(path, image::ImageFormat::Bmp)?;
