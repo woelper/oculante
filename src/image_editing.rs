@@ -441,10 +441,10 @@ impl ImageOperation {
                 ui.vertical(|ui| {
                     use egui::epaint::*;
 
-                    const RECT_WIDTH: usize = 255;
+                    let rect_width = 255.;
 
                     let (gradient_rect, mut response) =
-                        ui.allocate_at_least(vec2(RECT_WIDTH as f32, 50.), Sense::click_and_drag());
+                        ui.allocate_at_least(vec2(rect_width, 50.), Sense::click_and_drag());
 
                     let mut len_with_extra_pts = pts.len();
                     let len = pts.len();
@@ -484,7 +484,7 @@ impl ImageOperation {
                         }
 
                         // if last point is shifted, insert extra one at end
-                        if i == len_with_extra_pts - 1 && color.pos < RECT_WIDTH as u8 {
+                        if i == len_with_extra_pts - 1 && color.pos < rect_width as u8 {
                             let x = gradient_rect.right();
                             mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
                             mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
@@ -505,7 +505,7 @@ impl ImageOperation {
 
                         if let Some(hover) = response.hover_pos() {
                             let mouse_pos_in_gradient =
-                                (hover.x - gradient_rect.left()).clamp(0.0, 255.) as i32;
+                                (hover.x - gradient_rect.left()).clamp(0.0, rect_width) as i32;
 
                             // check which point is closest
 
@@ -871,48 +871,48 @@ impl ImageOperation {
             } => {
                 let ratio = dimensions.1 as f32 / dimensions.0 as f32;
 
-                ui.horizontal(|ui| {
-                    let mut r0 = ui.add(
-                        egui::DragValue::new(&mut dimensions.0)
-                            .speed(4.)
-                            .clamp_range(1..=10000)
-                            .prefix("X "),
-                    );
-                    let r1 = ui.add(
-                        egui::DragValue::new(&mut dimensions.1)
-                            .speed(4.)
-                            .clamp_range(1..=10000)
-                            .prefix("Y "),
-                    );
+                let mut r = ui.allocate_response(Vec2::ZERO, Sense::hover());
 
-                    if r0.changed() && *aspect {
-                        dimensions.1 = (dimensions.0 as f32 * ratio) as u32
-                    }
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        let r0 = ui.add(
+                            egui::DragValue::new(&mut dimensions.0)
+                                .speed(4.)
+                                .clamp_range(1..=10000)
+                                .prefix("X "),
+                        );
+                        let r1 = ui.add(
+                            egui::DragValue::new(&mut dimensions.1)
+                                .speed(4.)
+                                .clamp_range(1..=10000)
+                                .prefix("Y "),
+                        );
 
-                    if r1.changed() {
-                        r0.changed = true;
-                        if *aspect {
-                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
-                        }
-                    }
-
-                    let r2 = ui
-                        .styled_checkbox(aspect, "🔗")
-                        .on_hover_text("Lock aspect ratio");
-
-                    if r2.changed() {
-                        r0.changed = true;
-
-                        if *aspect {
+                        if r0.changed() && *aspect {
                             dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
-                    }
 
-                    // For this operator, we want to update on release, not on change.
-                    // Since all operators are processed the same, we use the hack to emit `changed` just on release.
-                    // Users dragging the resize values will now only trigger a resize on release, which feels
-                    // more snappy.
-                    r0.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
+                        if r1.changed() {
+                            if *aspect {
+                                dimensions.0 = (dimensions.1 as f32 / ratio) as u32
+                            }
+                        }
+                        let r2 = ui
+                            .styled_checkbox(aspect, "🔗")
+                            .on_hover_text("Lock aspect ratio");
+    
+                        if r2.changed() {
+                            if *aspect {
+                                dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
+                            }
+                        }
+                        // For this operator, we want to update on release, not on change.
+                        // Since all operators are processed the same, we use the hack to emit `changed` just on release.
+                        // Users dragging the resize values will now only trigger a resize on release, which feels
+                        // more snappy.
+                        r.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
+                    });
+
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
@@ -926,12 +926,12 @@ impl ImageOperation {
                                 ScaleFilter::Lanczos3,
                             ] {
                                 if ui.selectable_value(filter, f, format!("{f:?}")).clicked() {
-                                    r0.changed = true;
+                                    r.changed = true;
                                 }
                             }
                         });
 
-                    r0
+                    r
                 })
                 .inner
             }

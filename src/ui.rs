@@ -1157,6 +1157,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
 
+
                     ui.label_i(&format!("Reset"));
                     ui.centered_and_justified(|ui| {
                         if ui.button("Reset all edits").clicked() {
@@ -1858,6 +1859,10 @@ fn modifier_stack_ui(
     mouse_grab: &mut bool,
     settings: &mut VolatileSettings,
 ) {
+
+
+
+
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
@@ -1883,8 +1888,7 @@ fn modifier_stack_ui(
                 ui.style_mut().spacing.interact_size = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                if egui::Button::new("")
-                    .small()
+                if egui::Button::new(RichText::new("").size(24.))
                     .frame(false)
                     .ui(ui)
                     .on_hover_text("Remove operator")
@@ -1897,31 +1901,33 @@ fn modifier_stack_ui(
                 let up = i != 0;
                 let down = i != stack_len - 1;
 
+                let arrow_size = 8.;
+                let arrows_rect = ui.allocate_space(vec2(20., arrow_size));
+
+                let font_size = 8.;
+
                 ui.add_enabled_ui(up, |ui| {
-                    if egui::Button::new("")
-                        .small()
-                        .frame(false)
-                        .ui(ui)
-                        .on_hover_text("Move up")
-                        .clicked()
-                    {
+                    let ur = ui.put(
+                        arrows_rect.1.translate(vec2(0., -7.)),
+                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
+                    );
+                    if ur.on_hover_text("Move up").clicked() {
                         swap = Some(((i as i32 - 1).max(0) as usize, i));
                         *image_changed = true;
                     }
                 });
 
                 ui.add_enabled_ui(down, |ui| {
-                    if egui::Button::new("")
-                        .small()
-                        .frame(false)
-                        .ui(ui)
-                        .on_hover_text("Move down")
-                        .clicked()
-                    {
+                    let dr = ui.put(
+                        arrows_rect.1.translate(vec2(0., 2.)),
+                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
+                    );
+                    if dr.on_hover_text("Move down").clicked() {
                         swap = Some((i, i + 1));
                         *image_changed = true;
                     }
                 });
+                ui.add_space(80.);
             });
 
             ui.end_row();

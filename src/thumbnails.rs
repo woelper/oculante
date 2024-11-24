@@ -11,7 +11,6 @@ use image::{DynamicImage, GenericImageView};
 use log::{debug, error, trace, warn};
 
 use crate::{
-    file_encoder::{CompressionLevel, FileEncoder},
     image_editing::ImageOperation,
     image_loader::open_image,
 };
