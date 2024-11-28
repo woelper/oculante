@@ -551,18 +551,18 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
 
     if !fullscreen {
         let mut window_pos = app.window().position();
+        let dpi = app.window().dpi();
         window_pos.1 += 40;
 
         debug!("Not fullscreen. Storing offset: {:?}", window_pos);
 
-        let dpi = app.window().dpi();
         debug!("{:?}", dpi);
         window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
         window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
         #[cfg(target_os = "macos")]
         {
             // tweak for osx titlebars
-            window_pos.1 += 8;
+            window_pos.1 -= 30;
         }
 
         // if going from window to fullscreen, offset by window pos
@@ -571,7 +571,8 @@ pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
 
         // save old window pos
         state.fullscreen_offset = Some(window_pos);
-    } else if let Some(sf) = state.fullscreen_offset {
+    } 
+     else if let Some(sf) = state.fullscreen_offset {
         state.image_geometry.offset.x -= sf.0 as f32;
         state.image_geometry.offset.y -= sf.1 as f32;
     }
