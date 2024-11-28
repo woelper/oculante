@@ -216,8 +216,8 @@ impl EguiExt for Ui {
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             // self.horizontal(|ui| {
-            ui.add_sized(
-                egui::Vec2::new(8., ui.available_height()),
+            ui.add(
+                // egui::Vec2::new(8., ui.available_height()),
                 egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
             );
             ui.label(
@@ -1017,184 +1017,140 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 /// Everything related to image editing
 #[allow(unused_variables)]
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+    // A flag to indicate that the image needs to be rebuilt
+    let mut image_changed = false;
+    let mut pixels_changed = false;
+
+    if let Some(img) = &state.current_image {
+        // Ensure that edit result image is always filled
+        if state.edit_state.result_pixel_op.width() == 0 {
+            debug!("Edit state pixel comp buffer is default, cloning from image");
+            // FIXME This needs to go, and we need to implement operators for DynamicImage
+            state.edit_state.result_pixel_op = img.clone();
+            pixels_changed = true;
+        }
+        if state.edit_state.result_image_op.width() == 0 {
+            debug!("Edit state image comp buffer is default, cloning from image");
+            // FIXME This needs to go, and we need to implement operators for DynamicImage
+            state.edit_state.result_image_op = img.clone();
+            image_changed = true;
+        }
+    }
+
+    let mut ops = [
+        // General Image Adjustments
+        ImageOperation::Brightness(0),
+        ImageOperation::Contrast(0),
+        ImageOperation::Exposure(20),
+        ImageOperation::Desaturate(0),
+        ImageOperation::Invert,
+
+        // Colour and Hue
+        ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
+        ImageOperation::Equalize((0, 255)),
+        ImageOperation::HSV((0, 100, 100)),
+        ImageOperation::Add([0, 0, 0]),
+        ImageOperation::Mult([255, 255, 255]),
+        ImageOperation::Fill([255, 255, 255, 255]),
+
+        // Colour Mapping and Conversion
+        ImageOperation::LUT("Lomography Redscale 100".into()),
+        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
+        ImageOperation::Posterize(8),
+        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
+        ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
+
+        // Mathematical
+        ImageOperation::MMult,
+        ImageOperation::MDiv,
+        ImageOperation::Expression("r = 1.0".into()),
+        ImageOperation::ScaleImageMinMax,
+
+        // Effects
+        ImageOperation::Blur(0),
+        ImageOperation::Noise {
+            amt: 50,
+            mono: false,
+        },
+        ImageOperation::ChromaticAberration(15),
+
+        // Geometry and Transformations
+        ImageOperation::Flip(false),
+        ImageOperation::Rotate(90),
+        ImageOperation::Resize {
+            dimensions: state.image_geometry.dimensions,
+            aspect: true,
+            filter: ScaleFilter::Hamming,
+        },
+        ImageOperation::Crop([0, 0, 0, 0]),
+        ImageOperation::CropPerspective{points: [
+            (0,0),
+            (state.image_geometry.dimensions.0, 0),
+            (0, state.image_geometry.dimensions.1),
+            (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
+            ]
+        , original_size : state.image_geometry.dimensions
+        },
+    ];
+
     egui::SidePanel::right("editing")
         .min_width(100.)
         .show_separator_line(false)
         .show(ctx, |ui| {
 
+            ui.styled_collapsing("Filters", |ui| {
+                dark_panel(ui, |ui| {
+                    egui::ScrollArea::vertical().max_height(300.).show(ui, |ui|{
+                        for op in &mut ops {
+                            if ui.label_i_selected(false, &format!("{op}")).clicked() {
+                                if op.is_per_pixel() {
+                                    state.edit_state.pixel_op_stack.push(op.clone());
+                                } else {
+                                    state.edit_state.image_op_stack.push(op.clone());
+                                }
+                                image_changed = true;
+                            }
+                        }
+                    });
+                });
+            });
 
 
+            ui.vertical_centered_justified(|ui|{
+                modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
-            // A flag to indicate that the image needs to be rebuilt
-            let mut image_changed = false;
-            let mut pixels_changed = false;
-
-            if let Some(img) = &state.current_image {
-
-                if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-                    ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator was added. You can edit it later.");
-                    let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op {true} else {false}).unwrap_or_default();
-                    if !op_present {
-                        state.edit_state.image_op_stack.insert(0, ImageOperation::ColorConverter(ColorTypeExt::Rgba8));
-                        image_changed = true;
-                        pixels_changed = true;
-                        state.send_message_info("Color conversion operator added.");
+                // draw a line between different operator types
+                if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                    ui.separator();
+                }
+    
+                modifier_stack_ui(
+                    &mut state.edit_state.pixel_op_stack,
+                    &mut pixels_changed,
+                    ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
+                );
+    
+                if ui.button("Reset all edits").clicked() {
+                    state.edit_state = Default::default();
+                    pixels_changed = true
+                }
+                // ui.label_i(&format!("Compare"));
+        
+                if ui.button("Original").clicked()
+                {
+                    if let Some(img) = &state.current_image {
+                        state.image_geometry.dimensions = img.dimensions();
+                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
                     }
                 }
-
-
-                // Ensure that edit result image is always filled
-                if state.edit_state.result_pixel_op.width() == 0 {
-                    debug!("Edit state pixel comp buffer is default, cloning from image");
-                    // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_pixel_op = img.clone();
+                if ui.button("Modified").clicked()
+                {
                     pixels_changed = true;
                 }
-                if state.edit_state.result_image_op.width() == 0 {
-                    debug!("Edit state image comp buffer is default, cloning from image");
-                    // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = img.clone();
-                    image_changed = true;
-                }
-            }
 
+            });
 
-            egui::Grid::new("editing")
-                .num_columns(2)
-                .striped(true)
-                .show(ui, |ui| {
-                    let mut ops = [
-
-                        // General Image Adjustments
-                        ImageOperation::Brightness(0),
-                        ImageOperation::Contrast(0),
-                        ImageOperation::Exposure(20),
-                        ImageOperation::Desaturate(0),
-                        ImageOperation::Invert,
-
-                        // Colour and Hue
-                        ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-                        ImageOperation::Equalize((0, 255)),
-                        ImageOperation::HSV((0, 100, 100)),
-                        ImageOperation::Add([0, 0, 0]),
-                        ImageOperation::Mult([255, 255, 255]),
-                        ImageOperation::Fill([255, 255, 255, 255]),
-
-                        // Colour Mapping and Conversion
-                        ImageOperation::LUT("Lomography Redscale 100".into()),
-                        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
-                        ImageOperation::Posterize(8),
-                        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
-                        ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
-
-                        // Mathematical
-                        ImageOperation::MMult,
-                        ImageOperation::MDiv,
-                        ImageOperation::Expression("r = 1.0".into()),
-                        ImageOperation::ScaleImageMinMax,
-
-                        // Effects
-                        ImageOperation::Blur(0),
-                        ImageOperation::Noise {
-                            amt: 50,
-                            mono: false,
-                        },
-                        ImageOperation::ChromaticAberration(15),
-
-                        // Geometry and Transformations
-                        ImageOperation::Flip(false),
-                        ImageOperation::Rotate(90),
-                        ImageOperation::Resize {
-                            dimensions: state.image_geometry.dimensions,
-                            aspect: true,
-                            filter: ScaleFilter::Hamming,
-                        },
-                        ImageOperation::Crop([0, 0, 0, 0]),
-                        ImageOperation::CropPerspective{points: [
-                            (0,0),
-                            (state.image_geometry.dimensions.0, 0),
-                            (0, state.image_geometry.dimensions.1),
-                            (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
-                            ]
-                        , original_size : state.image_geometry.dimensions
-                        },
-                    ];
-
-                    ui.label_i("➕ Filter");
-                    let available_w_single_spacing =
-                        ui.available_width();
-                        //  - ui.style().spacing.item_spacing.x;
-
-                    egui::ComboBox::from_id_source("Imageops")
-                        .selected_text("Select a filter to add...")
-                        .width(available_w_single_spacing)
-                        .show_ui(ui, |ui| {
-                            for op in &mut ops {
-                                if ui.label_i_selected(false, &format!("{op}")).clicked() {
-                                    if op.is_per_pixel() {
-                                        state.edit_state.pixel_op_stack.push(op.clone());
-                                        pixels_changed = true;
-                                    } else {
-                                        state.edit_state.image_op_stack.push(op.clone());
-                                        image_changed = true;
-                                    }
-                                }
-                            }
-                        });
-                    ui.end_row();
-
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
-
-                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
-                        ui.separator();
-                        ui.separator();
-                        ui.end_row();
-                    }
-
-                    modifier_stack_ui(
-                        &mut state.edit_state.pixel_op_stack,
-                        &mut pixels_changed,
-                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
-                    );
-
-
-                    ui.label_i(&format!("Reset"));
-                    ui.centered_and_justified(|ui| {
-                        if ui.button("Reset all edits").clicked() {
-                            state.edit_state = Default::default();
-                            pixels_changed = true
-                        }
-                    });
-                    ui.end_row();
-
-                    ui.label_i(&format!("Compare"));
-                    let available_w_single_spacing =
-                        ui.available_width() - ui.style().spacing.item_spacing.x;
-                    ui.horizontal(|ui| {
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Original"),
-                            )
-                            .clicked()
-                        {
-                            if let Some(img) = &state.current_image {
-                                state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture.set_image(img, gfx, &state.persistent_settings);
-                            }
-                        }
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Modified"),
-                            )
-                            .clicked()
-                        {
-                            pixels_changed = true;
-                        }
-                    });
-                    ui.end_row();
-                });
+            
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
@@ -1339,7 +1295,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                ui.end_row();
 
                 // If we have no lines, create an empty one
                 if state.edit_state.paint_strokes.is_empty() {
@@ -1369,7 +1324,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
             }
-            ui.end_row();
 
             ui.vertical_centered_justified(|ui| {
                 if ui
@@ -1686,6 +1640,17 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         }
                     }
 
+                    if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+                        ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator is added in this case.");
+                        let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op {true} else {false}).unwrap_or_default();
+                        if !op_present {
+                            state.edit_state.image_op_stack.insert(0, ImageOperation::ColorConverter(ColorTypeExt::Rgba8));
+                            image_changed = true;
+                            pixels_changed = true;
+                            state.send_message_info("Color conversion operator added.");
+                        }
+                    }
+
                     #[cfg(debug_assertions)]
                     {
                         ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
@@ -1860,80 +1825,69 @@ fn modifier_stack_ui(
     settings: &mut VolatileSettings,
 ) {
 
-
-
-
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
     let stack_len = stack.len();
 
     for (i, operation) in stack.iter_mut().enumerate() {
-        ui.label_i(&format!("{operation}"));
 
-        // let op draw itself and check for response
+        ui.horizontal(|ui|{
+            let up = i != 0;
+            let down = i != stack_len - 1;
+            let caret_size = 12.;
+
+            ui.add_enabled_ui(up, |ui| {
+                let ur = ui.add(
+                    egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                );
+                if ur.on_hover_text("Move up").clicked() {
+                    swap = Some(((i as i32 - 1).max(0) as usize, i));
+                    *image_changed = true;
+                }
+            });
+
+            ui.add_enabled_ui(down, |ui| {
+                let dr = ui.add(
+                    egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                );
+                if dr.on_hover_text("Move down").clicked() {
+                    swap = Some((i, i + 1));
+                    *image_changed = true;
+                }
+            });
+
+
+            if egui::Button::new(RichText::new("").size(18.))
+                .frame(false)
+                .ui(ui)
+                .on_hover_text("Remove operator")
+                .clicked()
+            {
+                delete = Some(i);
+                *image_changed = true;
+            }
+            ui.label(&format!("{operation}"));
+        });
+
 
         ui.push_id(i, |ui| {
             // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
+            ui.style_mut().spacing.slider_width = ui.available_width() * 1.6;
             if operation.ui(ui, geo, mouse_grab, settings).changed() {
                 *image_changed = true;
             }
 
-            ui.add_space(ui.style().spacing.icon_spacing);
-
-            ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                ui.style_mut().spacing.icon_spacing = 0.;
-                ui.style_mut().spacing.button_padding = Vec2::ZERO;
-                ui.style_mut().spacing.interact_size = Vec2::ZERO;
-                ui.style_mut().spacing.indent = 0.0;
-                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                if egui::Button::new(RichText::new("").size(24.))
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Remove operator")
-                    .clicked()
-                {
-                    delete = Some(i);
-                    *image_changed = true;
-                }
-
-                let up = i != 0;
-                let down = i != stack_len - 1;
-
-                let arrow_size = 8.;
-                let arrows_rect = ui.allocate_space(vec2(20., arrow_size));
-
-                let font_size = 8.;
-
-                ui.add_enabled_ui(up, |ui| {
-                    let ur = ui.put(
-                        arrows_rect.1.translate(vec2(0., -7.)),
-                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
-                    );
-                    if ur.on_hover_text("Move up").clicked() {
-                        swap = Some(((i as i32 - 1).max(0) as usize, i));
-                        *image_changed = true;
-                    }
-                });
-
-                ui.add_enabled_ui(down, |ui| {
-                    let dr = ui.put(
-                        arrows_rect.1.translate(vec2(0., 2.)),
-                        egui::Button::new(RichText::new("").size(font_size)).frame(false),
-                    );
-                    if dr.on_hover_text("Move down").clicked() {
-                        swap = Some((i, i + 1));
-                        *image_changed = true;
-                    }
-                });
-                ui.add_space(80.);
-            });
-
-            ui.end_row();
+            ui.style_mut().spacing.icon_spacing = 0.;
+            ui.style_mut().spacing.button_padding = Vec2::ZERO;
+            ui.style_mut().spacing.interact_size = Vec2::ZERO;
+            ui.style_mut().spacing.indent = 0.0;
+            ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+            
+            // ui.add_space(80.);
+            
         });
 
-        ui.end_row();
     }
 
     if let Some(delete) = delete {
