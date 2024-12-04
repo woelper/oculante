@@ -44,7 +44,7 @@ pub fn open_image(
         .replace("tiff", "tif")
         .replace("jpeg", "jpg");
 
-    let unchecked_extensions = ["svg", "kra"];
+    let unchecked_extensions = ["svg", "kra", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
