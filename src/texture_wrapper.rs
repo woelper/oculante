@@ -215,25 +215,32 @@ impl TexWrap {
 
     }*/
 
+    fn image_color_supported(img: &DynamicImage) -> bool {
+        let supported_type =
+            img.color() == image::ColorType::L8 || img.color() == image::ColorType::Rgba8;
+        return supported_type;
+    }
+
     fn get_dyn_image_part(
         image: &DynamicImage,
         offset: (u32, u32),
         size: (u32, u32),
     ) -> Option<DynamicImage> {
+        let color_supported = Self::image_color_supported(image);
+        if !color_supported {
+            debug!(
+                "Current image pixel type {:?} is not supported, will convert to rgba8",
+                image.color()
+            );
+        }
         if offset.0 == 0 && offset.1 == 0 && size.0 == image.width() && size.1 == image.height() {
             //Whole image
-            match image {
-                DynamicImage::ImageRgb8(_rgb8_image) => {
-                    let img_rgba = image.to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(img_rgba));
-                }
-                /*DynamicImage::ImageLumaA8(_la8_image) => {
-                    let img_rgba = image.to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(img_rgba));
-                }*/
-                _other_image_type => {
-                    return None;
-                }
+            if color_supported {
+                return None;
+            } else {
+                //Convert to rgba8 if current image is not supported
+                let img_rgba = image.to_rgba8();
+                return Some(DynamicImage::ImageRgba8(img_rgba));
             }
         } else {
             match image {
@@ -258,6 +265,7 @@ impl TexWrap {
                     return Some(DynamicImage::ImageLuma8(gi));
                 }
                 other_image_type => {
+                    //rgba8 automatically
                     let sub_img =
                         imageops::crop_imm(other_image_type, offset.0, offset.1, size.0, size.1);
                     let my_img = sub_img.to_image();
