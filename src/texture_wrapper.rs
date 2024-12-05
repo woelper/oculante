@@ -7,6 +7,7 @@ use log::error;
 use log::warn;
 use notan::draw::*;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
+use zune_png::zune_core::bit_depth::ByteEndian;
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
     pub col_count: u32,
@@ -48,7 +49,7 @@ impl TextureWrapperManager {
                 && tex.height() as u32 == img.height()
                 && img.color() == tex.image_format
             {
-                debug!("Re-using texture as it is the same size.");
+                debug!("Re-using texture as it is the same size and type.");
                 tex.update_textures(gfx, img);
                 return;
             }
@@ -221,6 +222,38 @@ impl TexWrap {
         return supported_type;
     }
 
+    fn image_bytesize_expected(img: &DynamicImage) -> usize {
+        let pixel_count = (img.width() * img.height()) as usize;
+        let mut byte_count: usize;
+        match img.color() {
+            image::ColorType::L8 => byte_count = pixel_count,
+            image::ColorType::Rgba8 => byte_count = pixel_count * 4,
+            _ => {
+                error!("Passed non supported colored image!");
+                byte_count = 0;
+            }
+        }
+
+        if img.as_bytes().len() < byte_count {
+            error!("Pixel buffer is smaller than expected!");
+            byte_count = 0;
+        }
+        return byte_count;
+    }
+
+    fn image_bytes_slice(img: &DynamicImage) -> Option<&[u8]> {
+        let byte_buffer = img.as_bytes();
+        let byte_count = Self::image_bytesize_expected(img);
+        if byte_count == 0 {
+            return None;
+        }
+        if byte_count < byte_buffer.len() {
+            warn!("Image byte buffer is bigger than expected. Will truncate.");
+        }
+        let (buff, _) = byte_buffer.split_at(byte_count);
+        return Some(buff);
+    }
+
     fn get_dyn_image_part(
         image: &DynamicImage,
         offset: (u32, u32),
@@ -348,7 +381,7 @@ impl TexWrap {
                 let tex_start_x = col_index * col_increment;
                 let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);
 
-                let tex: Option<Texture>;
+                let mut tex: Option<Texture> = None;
 
                 let sub_img_opt = Self::get_dyn_image_part(
                     image,
@@ -357,25 +390,31 @@ impl TexWrap {
                 );
 
                 if let Some(suba_img) = sub_img_opt {
-                    tex = texture_generator_function(
-                        gfx,
-                        suba_img.as_bytes(),
-                        tex_width,
-                        tex_height,
-                        format,
-                        settings,
-                        allow_mipmap,
-                    );
+                    let byte_slice = Self::image_bytes_slice(&suba_img);
+                    if let Some(bt_slice) = byte_slice {
+                        tex = texture_generator_function(
+                            gfx,
+                            bt_slice,
+                            tex_width,
+                            tex_height,
+                            format,
+                            settings,
+                            allow_mipmap,
+                        );
+                    }
                 } else {
-                    tex = texture_generator_function(
-                        gfx,
-                        image.as_bytes(),
-                        tex_width,
-                        tex_height,
-                        format,
-                        settings,
-                        allow_mipmap,
-                    );
+                    let byte_slice = Self::image_bytes_slice(&image);
+                    if let Some(bt_slice) = byte_slice {
+                        tex = texture_generator_function(
+                            gfx,
+                            bt_slice,
+                            tex_width,
+                            tex_height,
+                            format,
+                            settings,
+                            allow_mipmap,
+                        );
+                    }
                 }
 
                 if let Some(t) = tex {
@@ -574,21 +613,33 @@ impl TexWrap {
                 );
 
                 if let Some(suba_img) = sub_img_opt {
-                    if let Err(e) = gfx
-                        .update_texture(&mut self.texture_array[tex_index].texture)
-                        .with_data(suba_img.as_bytes())
-                        .update()
-                    {
-                        error!("{e}");
+                    let byte_slice = Self::image_bytes_slice(&suba_img);
+                    if let Some(bt_slice) = byte_slice {
+                        if let Err(e) = gfx
+                            .update_texture(&mut self.texture_array[tex_index].texture)
+                            .with_data(bt_slice)
+                            .update()
+                        {
+                            error!("{e}");
+                            return;
+                        }
+                    } else {
+                        //Error!
                         return;
                     }
                 } else {
-                    if let Err(e) = gfx
-                        .update_texture(&mut self.texture_array[tex_index].texture)
-                        .with_data(image.as_bytes())
-                        .update()
-                    {
-                        error!("{e}");
+                    let byte_slice = Self::image_bytes_slice(&image);
+                    if let Some(bt_slice) = byte_slice {
+                        if let Err(e) = gfx
+                            .update_texture(&mut self.texture_array[tex_index].texture)
+                            .with_data(bt_slice)
+                            .update()
+                        {
+                            error!("{e}");
+                            return;
+                        }
+                    } else {
+                        //Error!
                         return;
                     }
                 }
