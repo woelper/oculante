@@ -57,7 +57,8 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        .default_width(750.)
+        //TODO: Change default_width to 815 after folder misalignment fix, discord this comment and use another closest to reference design value if the slider can be combined into the image area BG
+        .default_width(818.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
@@ -237,7 +238,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         };
 
         let cp = path.clone();
-        // Too  many folders make the dialog too large, cap them at this amount
+        // Too many folders make the dialog too large, cap them at this amount
         let max_nav_items = 6;
         let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
         ancestors.reverse();
@@ -385,7 +386,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     egui::Frame::none()
                         .fill(panel_bg_color)
                         .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
-                        .inner_margin(Margin::same(6.))
+                        .inner_margin(Margin::same(10.))
                         .show(ui, |ui| {
                             if state.listview_active {
                             } else {
