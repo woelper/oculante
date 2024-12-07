@@ -6,7 +6,7 @@ use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_SM
 
 use anyhow::{Context, Result};
 use dirs;
-use log::debug;
+use log::{debug, info};
 use notan::egui::{self, *};
 use std::io::Write;
 use std::{
@@ -379,29 +379,52 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 false => Color32::from_gray(217),
             };
 
-            egui::ScrollArea::new([false, true])
-                .min_scrolled_height(400.)
-                .auto_shrink([false, false])
+            let r = ui.available_rect_before_wrap();
+            let spacing = ui.style().spacing.item_spacing.x;
+            let w = r.width() - spacing * 3.;
+
+            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor();
+            let num_rows = entries.len() / thumbs_per_row as usize;
+
+            info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
+            // let all_rows = THUMB_SIZE
+
+            // ui.painter().debug_rect(r, Color32::LIGHT_RED, "yo");
+
+            egui::Frame::none()
+                .fill(panel_bg_color)
+                .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
+                .inner_margin(Margin::same(10.))
                 .show(ui, |ui| {
-                    egui::Frame::none()
-                        .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
-                        .inner_margin(Margin::same(10.))
-                        .show(ui, |ui| {
+                    egui::ScrollArea::new([false, true])
+                        .min_scrolled_height(400.)
+                        .auto_shrink([false, false])
+                        // .show_viewport(ui, |ui, rect| {
+                        .show_rows(ui, THUMB_SIZE[1] as f32, num_rows, |ui, row_range| {
+                            // .show(ui, |ui| {
+                            // ui.painter().debug_rect(rect, Color32::LIGHT_GREEN, "scroll rect");
+
+                            info!("range {:?}", row_range);
+                            let entries = entries
+                                .clone()
+                                .drain(
+                                    (row_range.start * thumbs_per_row as usize)
+                                        ..(row_range.end * thumbs_per_row as usize),
+                                )
+                                .collect::<Vec<_>>();
+
                             if state.listview_active {
                             } else {
                                 ui.horizontal_wrapped(|ui| {
                                     if entries.is_empty() {
                                         ui.label("Empty directory");
                                     } else {
-                                        let dirs = entries
-                                            .iter()
-                                            .filter(|d| d.is_dir())
-                                            .collect::<Vec<_>>();
-
-                                        for de in dirs.iter() {
+                                        for de in entries.iter().filter(|e| e.is_dir()) {
                                             let folder_response = ui.allocate_response(
-                                                Vec2::new(THUMB_SIZE[0] as f32, 30.),
+                                                Vec2::new(
+                                                    THUMB_SIZE[0] as f32,
+                                                    THUMB_SIZE[1] as f32,
+                                                ),
                                                 Sense::click(),
                                             );
 
@@ -438,10 +461,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     .map(|n| n.to_string_lossy().to_string())
                                                     .unwrap_or_default(),
                                             );
-                                        }
-
-                                        if !dirs.is_empty() {
-                                            ui.end_row();
                                         }
 
                                         for de in entries {

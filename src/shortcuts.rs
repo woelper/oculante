@@ -253,7 +253,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                         if format!("{:?}", dn) == key {
                             debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
                             debug!("Matched {:?} / {:?}", command, key);
-                            debug!("d {}", app.system_timer.delta_f32());
                             return true;
                         }
                     }
