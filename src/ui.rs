@@ -791,21 +791,21 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                     ui.end_row();
 
                     ui
-                    .styled_checkbox(&mut state.persistent_settings.vsync, "Enable vsync")
+                    .styled_checkbox(&mut state.persistent_settings.vsync, "VSync")
                     .on_hover_text(
-                        "Vsync reduces tearing and saves CPU. Toggling it off will make some operations such as panning/zooming more snappy. This needs a restart to take effect.",
+                        "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.",
                     );
                 ui
                 .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
                 .on_hover_text(
-                    "Enable an index slider to quickly scrub through lots of images",
+                    "Enables an index slider to quickly scrub through lots of images.",
                 );
                     ui.end_row();
 
                     if ui
                     .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
                     .on_hover_text(
-                        "When you move past the first or last image in a folder, should oculante continue or stop?",
+                        "Repeats the current directory when you move past the first or last file in the current directory.",
                     )
                     .changed()
                 {
@@ -830,19 +830,19 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 ui
                     .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
                     .on_hover_text(
-                        "When a new image is loaded, keep current zoom and offset",
+                        "When a new image is loaded, keep the current zoom and offset.",
                     );
 
                 ui
                     .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
                     .on_hover_text(
-                        "When a new image is loaded, keep current edits",
+                        "When a new image is loaded, keep current edits on the previously edited image.",
                     );
                 ui.end_row();
                 ui
-                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Show checker background where transparent")
+                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Transparency Grid")
                     .on_hover_text(
-                        "Show checker pattern as backdrop.",
+                        "Replaces transparency with a checker background.",
                     );
 
                 ui
@@ -851,10 +851,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                         "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
                     );
                     ui.end_row();
-                if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Turn on Zen mode").on_hover_text("Zen mode hides all UI and fits the image to the frame.").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Zen mode").on_hover_text("Hides all UI and fits images to the frame.").changed(){
                     set_title(app, state);
                 }
-                if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Requires a restart. Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback, for example if new images come in or if modifications are made.").changed(){
+                if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.").changed(){
                     app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
                 }
 
@@ -875,9 +875,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
                 ui.end_row();
 
-                ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Adjust how much you zoom when you use the mouse wheel or the trackpad.");
+                ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Multiplier of zoom when you use the mouse wheel or the trackpad.");
                 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. Needs restart.");
+                ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. A restart is required to take effect.");
                 ui.end_row();
 
                 ui.label("Minimum window size");
@@ -892,11 +892,11 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                 // TODO: add more options here
                 ui.horizontal(|ui| {
-                    ui.label("Configure window title");
+                    ui.label("Window title");
                     if ui
                     .text_edit_singleline(&mut state.persistent_settings.title_format)
                     .on_hover_text(
-                        "Configure the title. Use {APP}, {VERSION}, {FULLPATH}, {FILENAME} and {RES} as placeholders.",
+                        "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
                     )
                     .changed()
                     {
@@ -904,7 +904,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                     }
                 });
 
-                if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
+                if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");
                 }
 
@@ -912,7 +912,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 ui.vertical_centered_justified(|ui| {
 
                     #[cfg(feature = "update")]
-                    if ui.button("Check for updates").on_hover_text("Check and install update if available. You will need to restart the app to use the new version.").clicked() {
+                    if ui.button("Check for updates").on_hover_text("Check and install the latest update if available. A restart is required to use a newly installed version.").clicked() {
                         state.send_message_info("Checking for updates...");
                         crate::update::update(Some(state.message_channel.0.clone()));
                         state.settings_enabled = false;
@@ -1231,7 +1231,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 egui::Grid::new("paint").show(ui, |ui| {
                     ui.label("📜 Keep history");
                     ui.styled_checkbox(&mut state.edit_state.non_destructive_painting, "")
-                        .on_hover_text("Keep all paint history and edit it. Slower.");
+                        .on_hover_text("Keeps all paint history and edit it. Slower.");
                     ui.end_row();
 
                     if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
@@ -1500,7 +1500,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if let Some(path) = &state.current_path {
                     if ui
                         .button(format!("Restore original"))
-                        .on_hover_text("Completely reload image, destroying all edits.")
+                        .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
                         state.is_loaded = false;
@@ -1644,7 +1644,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         format!("Save")
                     };
 
-                    if ui.button(text).on_hover_text("Save the image. This will create a new file or overwrite.").clicked() {
+                    if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite.").clicked() {
                         match state
                         .edit_state
                         .result_pixel_op
@@ -2471,7 +2471,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         ui.add_space(ui.available_width() - ICON_SIZE * 2. - ICON_SIZE / 2.);
 
         if unframed_button(FOLDER, ui)
-            .on_hover_text("Browse for image")
+            .on_hover_text("Browse for an image")
             .clicked()
         {
             #[cfg(feature = "file_open")]
