@@ -2614,11 +2614,9 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         .data_mut(|w| w.get_temp::<f32>("ZM".into()))
         .unwrap_or(0.997);
     let delta = ui.input(|r| r.zoom_delta()).clamp(0.9999, 1.0001);
-    debug!("d {:?}", delta);
     zoom *= delta;
     zoom = zoom.clamp(0.5, 1.3);
     ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
-    debug!("z {:?}", zoom);
     let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32) * zoom;
     let response = ui.allocate_response(size, Sense::click());
     let rounding = Rounding::same(4.);
