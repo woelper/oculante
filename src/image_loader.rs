@@ -9,8 +9,7 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader,
-    Rgb32FImage, RgbImage, RgbaImage,
+    buffer, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, Rgb32FImage, RgbImage, RgbaImage
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
@@ -44,7 +43,7 @@ pub fn open_image(
         .replace("tiff", "tif")
         .replace("jpeg", "jpg");
 
-    let unchecked_extensions = ["svg", "kra", "tga"];
+    let unchecked_extensions = ["svg", "kra", "tga", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
@@ -758,29 +757,42 @@ fn u16_to_u8(p: u16) -> u8 {
 }
 
 fn load_raw(img_location: &Path) -> Result<RgbaImage> {
-    let export_job = Export::new(
-        Input::ByFile(&img_location.to_string_lossy()),
-        Output::new(
-            DemosaicingMethod::SuperPixel,
-            data::XYZ2SRGB,
-            data::GAMMA_SRGB,
-            OutputType::Raw16,
-            true,
-            true,
-        ),
-    )?;
 
-    let (image, width, height) = export_job.export_16bit_image();
-    let image = image
-        .into_par_iter()
-        .map(|x| tonemap_f32(x as f32 / 65536.))
-        .collect::<Vec<_>>();
 
-    // Construct rgb image
-    let x = RgbImage::from_raw(width as u32, height as u32, image)
-        .context("can't decode raw output as image")?;
-    // make it a Dynamic image
-    Ok(DynamicImage::ImageRgb8(x).to_rgba8())
+    let raw_data = std::fs::read(img_location)?;
+    let (thumbnail_data, orientation) = Export::export_thumbnail_data(&raw_data).unwrap();
+
+    let i = image::load_from_memory(&thumbnail_data)?;
+    Ok(i.to_rgba8())
+
+    // let export_job = Export::new(
+    //     Input::ByFile(&img_location.to_string_lossy()),
+    //     Output::new(
+    //         DemosaicingMethod::SuperPixel,
+    //         data::XYZ2SRGB,
+    //         data::GAMMA_SRGB,
+    //         OutputType::Raw16,
+    //         true,
+    //         true,
+    //     ),
+    // )?;
+
+
+    // let mut buf = vec![];
+    // let x = quickraw::Export::export_thumbnail_data(&buf)?;
+    // image::load_from_memory(&buf)?;
+
+    // let (image, width, height) = export_job.export_16bit_image();
+    // let image = image
+    //     .into_par_iter()
+    //     .map(|x| tonemap_f32(x as f32 / 65536.))
+    //     .collect::<Vec<_>>();
+
+    // // Construct rgb image
+    // let x = RgbImage::from_raw(width as u32, height as u32, image)
+    //     .context("can't decode raw output as image")?;
+    // // make it a Dynamic image
+    // Ok(DynamicImage::ImageRgb8(x).to_rgba8())
 }
 
 fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
