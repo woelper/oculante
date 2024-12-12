@@ -515,7 +515,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 browse_for_image_path(state);
                 #[cfg(not(feature = "file_open"))]
                 {
-                    state.filebrowser_id = Some("OPEN_SHORTCUT".into());
+                    state.filebrowser_id = Some("OPEN".into());
                 }
             }
 
@@ -1042,15 +1042,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
         }
+    
         #[cfg(not(feature = "file_open"))]
         {
-            if ctx.memory(|w| w.is_popup_open(Id::new("OPEN_SHORTCUT"))) {
+            if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
                 filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
                     &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
+                        ctx.memory_mut(|w| w.close_popup());
                     },
                     ctx,
                 );
