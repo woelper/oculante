@@ -846,7 +846,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             .volatile_settings
                             .recent_images
                             .insert(0, path.clone());
-                        state.volatile_settings.recent_images.truncate(10);
+                        state.volatile_settings.recent_images.truncate(12);
                     }
                 }
             }
