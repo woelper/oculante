@@ -396,6 +396,9 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 }
 
 fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
+    if state.key_grab {
+        return;
+    }
     match evt {
         Event::KeyUp { .. } => {
             // Fullscreen needs to be on key up on mac (bug)

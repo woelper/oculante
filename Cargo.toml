@@ -39,6 +39,7 @@ notan = { version = "0.12", default-features = false, features = [
     "draw",
     "drop_files",
     "egui",
+    "clipboard"
 ] }
 egui_plot = "0.27"
 palette = "0.7"

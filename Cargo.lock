@@ -4582,6 +4582,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95509984caebcaf39276e2497656a9f0319c9251acd1845d970e840f2382ee32"
 dependencies = [
+ "arboard",
  "glutin",
  "glutin-winit",
  "image 0.24.9",
@@ -4590,6 +4591,7 @@ dependencies = [
  "notan_app",
  "notan_core",
  "notan_glow",
+ "notan_input",
  "raw-window-handle 0.5.2",
  "winit",
 ]

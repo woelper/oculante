@@ -190,6 +190,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .desired_width(textinput_width as f32)
                         .vertical_align(Align::Center),
                 );
+
+
+         
+
+
                 if lock_search_focus {
                     ui.memory_mut(|r| r.request_focus(resp.id));
                 }
