@@ -379,6 +379,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 false => Color32::from_gray(217),
             };
 
+            const THUMB_HEIGHT_WITH_CAPTION: u32 = THUMB_SIZE[1] + 32;
+
+
             let r = ui.available_rect_before_wrap();
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
@@ -399,8 +402,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
                         .auto_shrink([false, false])
-                        // .show_viewport(ui, |ui, rect| {
-                        .show_rows(ui, THUMB_SIZE[1] as f32, num_rows, |ui, row_range| {
+                        .show_rows(ui, THUMB_HEIGHT_WITH_CAPTION as f32, num_rows, |ui, row_range| {
                             // .show(ui, |ui| {
                             // ui.painter().debug_rect(rect, Color32::LIGHT_GREEN, "scroll rect");
 
@@ -420,47 +422,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                         ui.label("Empty directory");
                                     } else {
                                         for de in entries.iter().filter(|e| e.is_dir()) {
-                                            let folder_response = ui.allocate_response(
-                                                Vec2::new(
-                                                    THUMB_SIZE[0] as f32,
-                                                    THUMB_SIZE[1] as f32,
-                                                ),
-                                                Sense::click(),
-                                            );
-
-                                            ui.painter().rect(
-                                                folder_response.rect,
-                                                4.,
-                                                ui.style().visuals.widgets.inactive.bg_fill,
-                                                Stroke::NONE,
-                                            );
-
-                                            let folder_name = format!(
-                                                "{FOLDER} {}",
-                                                de.file_name()
-                                                    .map(|n| n.to_string_lossy())
-                                                    .unwrap_or_default()
-                                                    .chars()
-                                                    .take(12)
-                                                    .collect::<String>()
-                                            );
-
-                                            ui.painter().text(
-                                                folder_response.rect.shrink(4.).left_center(),
-                                                Align2::LEFT_CENTER,
-                                                folder_name,
-                                                FontId::proportional(13.),
-                                                ui.style().visuals.text_color(),
-                                            );
-
-                                            if folder_response.clicked() {
+                                            if render_file_icon(&de, ui, &mut state.thumbnails).clicked() {
                                                 *path = de.to_path_buf();
                                             }
-                                            folder_response.on_hover_text(
-                                                de.file_name()
-                                                    .map(|n| n.to_string_lossy().to_string())
-                                                    .unwrap_or_default(),
-                                            );
                                         }
 
                                         for de in entries {
