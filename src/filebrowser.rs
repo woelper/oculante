@@ -1,12 +1,12 @@
 use super::icons::*;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::thumbnails::{Thumbnails, THUMB_SIZE};
-use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_SMALL};
+use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
+use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use anyhow::{Context, Result};
 use dirs;
-use log::{debug, info};
+use log::debug;
 use notan::egui::{self, *};
 use std::io::Write;
 use std::{
@@ -379,14 +379,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 false => Color32::from_gray(217),
             };
 
-            const THUMB_HEIGHT_WITH_CAPTION: u32 = THUMB_SIZE[1] + 32;
-
             let r = ui.available_rect_before_wrap();
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
 
-            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor();
-            let num_rows = entries.len() / thumbs_per_row as usize;
+            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.);
+            let num_rows = entries.len() / (thumbs_per_row as usize).max(1);
 
             // info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
 
@@ -400,10 +398,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .auto_shrink([false, false])
                         .show_rows(
                             ui,
-                            THUMB_HEIGHT_WITH_CAPTION as f32,
+                            (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
                             num_rows,
                             |ui, row_range| {
-                                info!("range {:?}", row_range);
                                 let entries = entries
                                     .clone()
                                     .drain(
@@ -416,7 +413,14 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                 } else {
                                     ui.horizontal_wrapped(|ui| {
                                         if entries.is_empty() {
-                                            ui.label("Empty directory");
+                                            let r = ui.label("Empty directory");
+                                            let r = r.interact(Sense::click());
+                                            if r.clicked() {
+                                                if let Some(parent) = path.parent() {
+                                                    *path = parent.to_path_buf();
+                                                }
+
+                                            }
                                         } else {
                                             for de in entries.iter().filter(|e| e.is_dir()) {
                                                 if render_file_icon(&de, ui, &mut state.thumbnails)

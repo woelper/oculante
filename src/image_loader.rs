@@ -9,12 +9,12 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    buffer, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader,
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader,
     Rgb32FImage, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
-use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
-use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use quickraw::Export;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -759,7 +759,7 @@ fn u16_to_u8(p: u16) -> u8 {
 
 fn load_raw(img_location: &Path) -> Result<RgbaImage> {
     let raw_data = std::fs::read(img_location)?;
-    let (thumbnail_data, orientation) = Export::export_thumbnail_data(&raw_data).unwrap();
+    let (thumbnail_data, _orientation) = Export::export_thumbnail_data(&raw_data)?;
 
     let i = image::load_from_memory(&thumbnail_data)?;
     Ok(i.to_rgba8())

@@ -12,7 +12,6 @@ use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
 use anyhow::{bail, Result};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::codecs::png::FilterType;
 use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};

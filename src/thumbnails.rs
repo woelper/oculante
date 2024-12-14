@@ -1,4 +1,5 @@
-pub const THUMB_SIZE: [u32; 2] = [120, 80];
+pub const THUMB_SIZE: [u32; 2] = [120, 90];
+pub const THUMB_CAPTION_HEIGHT: u32 = 32;
 
 use std::{
     fs::create_dir_all,
@@ -84,7 +85,7 @@ pub fn generate<P: AsRef<Path>>(source_path: P) -> Result<()> {
 
 pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Result<()> {
     let (mut width, mut height) = image.dimensions();
-    let mut x = 0;
+    let x = 0;
     let mut y = 0;
 
     if width < height {
@@ -120,6 +121,6 @@ fn test_thumbs() {
     std::env::set_var("RUST_LOG", "debug");
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
-    thumbs.get("tests/rust.png");
+    thumbs.get("tests/rust.png").unwrap();
     std::thread::sleep_ms(3000);
 }

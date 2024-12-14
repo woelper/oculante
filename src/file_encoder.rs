@@ -10,7 +10,7 @@ use image::{DynamicImage, ImageEncoder};
 use notan::egui::Ui;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufWriter, Cursor, Write};
+use std::io::BufWriter;
 use std::path::Path;
 use strum::{Display, EnumIter};
 

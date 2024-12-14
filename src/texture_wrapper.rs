@@ -7,7 +7,6 @@ use log::error;
 use log::warn;
 use notan::draw::*;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
-use zune_png::zune_core::bit_depth::ByteEndian;
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
     pub col_count: u32,

@@ -10,7 +10,7 @@ use crate::{
     set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
-    thumbnails::{Thumbnails, THUMB_SIZE},
+    thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
@@ -18,7 +18,7 @@ use crate::{
     },
 };
 #[cfg(not(feature = "file_open"))]
-use crate::{filebrowser, SUPPORTED_EXTENSIONS};
+use crate::{filebrowser};
 
 use std::io::Write;
 
@@ -32,7 +32,7 @@ use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{ColorType, GenericImageView, RgbaImage};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use notan::{
@@ -1424,7 +1424,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             // Do the processing
 
             // If expensive operations happened (modifying image geometry), process them here
-            let mut message: Option<String> = None;
+            let message: Option<String> = None;
             if image_changed {
                 if let Some(img) = &mut state.current_image {
                     let stamp = Instant::now();
@@ -1435,7 +1435,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
                             error!("{e}");
                             state.send_message_warn(&format!("{e}"));
-                            message = Some(e.to_string())
                         }
                     }
                     debug!(
@@ -1463,8 +1462,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     let ops = &state.edit_state.pixel_op_stack;
                     if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
                         state.send_message_warn(&format!("{e}"));
-                        message = Some(e.to_string())
-
                     }
                 }
 
@@ -2667,15 +2664,15 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
-    let caption_size = 24.;
+    // let caption_size = 24.;
     let mut zoom = ui
         .data_mut(|w| w.get_temp::<f32>("ZM".into()))
-        .unwrap_or(0.997);
-    let delta = ui.input(|r| r.zoom_delta()).clamp(0.9999, 1.0001);
+        .unwrap_or(1.);
+    let delta = ui.input(|r| r.zoom_delta()).clamp(0.999, 1.001);
     zoom *= delta;
     zoom = zoom.clamp(0.5, 1.3);
     ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
-    let size = Vec2::new(THUMB_SIZE[0] as f32, THUMB_SIZE[1] as f32 + 32.) * zoom;
+    let size = Vec2::new(THUMB_SIZE[0] as f32, (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32) * zoom;
     let response = ui.allocate_response(size, Sense::click());
     let rounding = Rounding::same(4.);
     let margin = 4.0;
@@ -2690,7 +2687,11 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         );
     } else {
         let mut image_rect = response.rect;
-        image_rect.set_bottom(image_rect.max.y - caption_size);
+        image_rect.max.x = image_rect.max.x.round();
+        image_rect.max.y = image_rect.max.y.round();
+        image_rect.min.y = image_rect.min.y.round();
+        image_rect.min.x = image_rect.min.x.round();
+        image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
 
         match thumbnails.get(icon_path) {
             Ok(tp) => {
