@@ -117,10 +117,14 @@ pub fn browse<F: FnMut(&PathBuf)>(
 ) {
     let mut prev_path = path.clone();
 
+    
     let mut state = ui
         .ctx()
         .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
         .unwrap_or_default();
+
+
+  
 
     if state.entries.is_none() {
         // mark prev_path as dirty. This is to cause a reload at first start,
@@ -472,6 +476,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                             .min_size(Vec2::new(10., 28.)),
                     );
                     for f in FileEncoder::iter() {
+                        if !filter.contains(&f.ext().as_str()) {
+                            continue;
+                        }
                         let e = f.ext();
                         if ui.selectable_label(ext == e, &e).clicked() {
                             state.filename = Path::new(&state.filename)
