@@ -117,14 +117,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
 ) {
     let mut prev_path = path.clone();
 
-    
     let mut state = ui
         .ctx()
         .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
         .unwrap_or_default();
-
-
-  
 
     if state.entries.is_none() {
         // mark prev_path as dirty. This is to cause a reload at first start,
@@ -385,7 +381,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
             const THUMB_HEIGHT_WITH_CAPTION: u32 = THUMB_SIZE[1] + 32;
 
-
             let r = ui.available_rect_before_wrap();
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
@@ -393,10 +388,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor();
             let num_rows = entries.len() / thumbs_per_row as usize;
 
-            info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
-            // let all_rows = THUMB_SIZE
-
-            // ui.painter().debug_rect(r, Color32::LIGHT_RED, "yo");
+            // info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
 
             egui::Frame::none()
                 .fill(panel_bg_color)
@@ -406,62 +398,64 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
                         .auto_shrink([false, false])
-                        .show_rows(ui, THUMB_HEIGHT_WITH_CAPTION as f32, num_rows, |ui, row_range| {
-                            // .show(ui, |ui| {
-                            // ui.painter().debug_rect(rect, Color32::LIGHT_GREEN, "scroll rect");
+                        .show_rows(
+                            ui,
+                            THUMB_HEIGHT_WITH_CAPTION as f32,
+                            num_rows,
+                            |ui, row_range| {
+                                info!("range {:?}", row_range);
+                                let entries = entries
+                                    .clone()
+                                    .drain(
+                                        (row_range.start * thumbs_per_row as usize)
+                                            ..(row_range.end * thumbs_per_row as usize),
+                                    )
+                                    .collect::<Vec<_>>();
 
-                            info!("range {:?}", row_range);
-                            let entries = entries
-                                .clone()
-                                .drain(
-                                    (row_range.start * thumbs_per_row as usize)
-                                        ..(row_range.end * thumbs_per_row as usize),
-                                )
-                                .collect::<Vec<_>>();
-
-                            if state.listview_active {
-                            } else {
-                                ui.horizontal_wrapped(|ui| {
-                                    if entries.is_empty() {
-                                        ui.label("Empty directory");
-                                    } else {
-                                        for de in entries.iter().filter(|e| e.is_dir()) {
-                                            if render_file_icon(&de, ui, &mut state.thumbnails).clicked() {
-                                                *path = de.to_path_buf();
-                                            }
-                                        }
-
-                                        for de in entries {
-                                            if de.is_file() {
+                                if state.listview_active {
+                                } else {
+                                    ui.horizontal_wrapped(|ui| {
+                                        if entries.is_empty() {
+                                            ui.label("Empty directory");
+                                        } else {
+                                            for de in entries.iter().filter(|e| e.is_dir()) {
                                                 if render_file_icon(&de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
-                                                    _ = save_recent_dir(&de);
-                                                    if !save {
-                                                        state.search_active = false;
-                                                        state.search_term.clear();
-                                                        callback(&de);
-                                                    } else {
-                                                        state.filename = de
-                                                            .file_name()
-                                                            .map(|f| {
-                                                                f.to_string_lossy().to_string()
-                                                            })
-                                                            .unwrap_or_default();
-                                                        // ui.ctx().data_mut(|w| {
-                                                        //     w.insert_temp(
-                                                        //         Id::new("FBFILENAME"),
-                                                        //         state.filename.clone(),
-                                                        //     )
-                                                        // });
+                                                    *path = de.to_path_buf();
+                                                }
+                                            }
+
+                                            for de in entries {
+                                                if de.is_file() {
+                                                    if render_file_icon(
+                                                        &de,
+                                                        ui,
+                                                        &mut state.thumbnails,
+                                                    )
+                                                    .clicked()
+                                                    {
+                                                        _ = save_recent_dir(&de);
+                                                        if !save {
+                                                            state.search_active = false;
+                                                            state.search_term.clear();
+                                                            callback(&de);
+                                                        } else {
+                                                            state.filename = de
+                                                                .file_name()
+                                                                .map(|f| {
+                                                                    f.to_string_lossy().to_string()
+                                                                })
+                                                                .unwrap_or_default();
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                });
-                            }
-                        });
+                                    });
+                                }
+                            },
+                        );
                 });
 
             // ui.add_space(10.);

@@ -624,8 +624,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 
                 let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
 
+                let sampled = state.sampled_color;
                 //Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgba_premultiplied(0, 0, 0, 0), egui::Stroke::new(0.0, egui::Color32::default()));
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgb(sampled[0] as u8, sampled[1] as u8, sampled[2] as u8), egui::Stroke::new(0.0, egui::Color32::default()));
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
 
@@ -728,7 +729,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 });
 
                 palette_ui(ui, state);
-                
+
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -743,84 +744,82 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 }
 
 fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
-        ui.styled_collapsing("Palette", |ui| {
-            ui.vertical_centered_justified(|ui| {
-                dark_panel(ui, |ui| {
-                    ui.allocate_space(vec2(ui.available_width(), 0.));
-                        if let Some(sampled_colors) = ui
-                            .ctx()
-                            .memory(|r| r.data.get_temp::<Vec<[f32; 4]>>("picker".into()))
-                        {
-                            ui.horizontal_wrapped(|ui| {
-                                ui.spacing_mut().item_spacing = Vec2::splat(6.);
-                                for color in &sampled_colors {
-                                    let (rect, resp) =
-                                        ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
-                                    ui.painter().rect_filled(
-                                        rect,
-                                        1.,
-                                        Color32::from_rgb(
-                                            (color[0]) as u8,
-                                            (color[1]) as u8,
-                                            (color[2]) as u8,
-                                        ),
-                                    );
-                                    resp.on_hover_ui(|ui| {
-                                        ui.label(format!("RGBA: {}", disp_col(*color)));
-                                    });
-                                }
+    ui.styled_collapsing("Palette", |ui| {
+        ui.vertical_centered_justified(|ui| {
+            dark_panel(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.));
+                if let Some(sampled_colors) = ui
+                    .ctx()
+                    .memory(|r| r.data.get_temp::<Vec<[f32; 4]>>("picker".into()))
+                {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = Vec2::splat(6.);
+                        for color in &sampled_colors {
+                            let (rect, resp) =
+                                ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
+                            ui.painter().rect_filled(
+                                rect,
+                                1.,
+                                Color32::from_rgb(
+                                    (color[0]) as u8,
+                                    (color[1]) as u8,
+                                    (color[2]) as u8,
+                                ),
+                            );
+                            resp.on_hover_ui(|ui| {
+                                ui.label(format!("RGBA: {}", disp_col(*color)));
                             });
-                            if ui.button("Clear").clicked() {
-                                ui.ctx().memory_mut(|w| {
-                                    w.data.remove_temp::<Vec<[f32; 4]>>("picker".into())
-                                });
-                            }
-                            if ui.button("Save ASE").clicked() {
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
-                            }
-                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
-                                filebrowser::browse_modal(
-                                    true,
-                                    &["ase"],
-                                    &mut state.volatile_settings,
-                                    |p| {
-                                        let swatches = sampled_colors
-                                            .iter()
-                                            .map(|c| ObjectColor {
-                                                name: "".into(),
-                                                object_type:
-                                                    ase_swatch::types::ObjectColorType::Global,
-                                                data: Color {
-                                                    mode: ase_swatch::types::ColorMode::Rgb,
-                                                    values: [c[0]/255., c[1]/255., c[2]/255.].to_vec(),
-                                                },
-                                            })
-                                            .collect::<Vec<_>>();
+                        }
+                    });
+                    if ui.button("Clear").clicked() {
+                        ui.ctx()
+                            .memory_mut(|w| w.data.remove_temp::<Vec<[f32; 4]>>("picker".into()));
+                    }
+                    if ui.button("Save ASE").clicked() {
+                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                    }
+                    if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                        filebrowser::browse_modal(
+                            true,
+                            &["ase"],
+                            &mut state.volatile_settings,
+                            |p| {
+                                let swatches = sampled_colors
+                                    .iter()
+                                    .map(|c| ObjectColor {
+                                        name: "".into(),
+                                        object_type: ase_swatch::types::ObjectColorType::Global,
+                                        data: Color {
+                                            mode: ase_swatch::types::ColorMode::Rgb,
+                                            values: [c[0] / 255., c[1] / 255., c[2] / 255.]
+                                                .to_vec(),
+                                        },
+                                    })
+                                    .collect::<Vec<_>>();
 
-                                        let s = ase_swatch::create_ase(&vec![], &swatches);
-                                        if let Ok(mut f) = std::fs::File::create(p) {
-                                            _ = f.write_all(&s);
-                                        }
-                                    },
-                                    ui.ctx(),
-                                );
-                            }
-                        } else {
-                            ui.label("Right click to sample color");
-                        }
-                        if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
-                            ui.ctx().memory_mut(|w| {
-                                let cols = w
-                                    .data
-                                    .get_temp_mut_or_default::<Vec<[f32; 4]>>("picker".into());
-                                cols.push(state.sampled_color);
-                            });
-                        }
-                });
+                                let s = ase_swatch::create_ase(&vec![], &swatches);
+                                if let Ok(mut f) = std::fs::File::create(p) {
+                                    _ = f.write_all(&s);
+                                }
+                            },
+                            ui.ctx(),
+                        );
+                    }
+                } else {
+                    ui.label("Right click to sample color");
+                }
+                if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                    ui.ctx().memory_mut(|w| {
+                        let cols = w
+                            .data
+                            .get_temp_mut_or_default::<Vec<[f32; 4]>>("picker".into());
+                        cols.push(state.sampled_color);
+                    });
+                }
             });
         });
+    });
 }
-
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
     let mut settings_enabled = state.settings_enabled;
@@ -1127,7 +1126,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         ImageOperation::Exposure(20),
         ImageOperation::Desaturate(0),
         ImageOperation::Invert,
-
         // Colour and Hue
         ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
         ImageOperation::Equalize((0, 255)),
@@ -1135,20 +1133,21 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         ImageOperation::Add([0, 0, 0]),
         ImageOperation::Mult([255, 255, 255]),
         ImageOperation::Fill([255, 255, 255, 255]),
-
         // Colour Mapping and Conversion
         ImageOperation::LUT("Lomography Redscale 100".into()),
-        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
+        ImageOperation::GradientMap(vec![
+            GradientStop::new(0, [155, 33, 180]),
+            GradientStop::new(128, [255, 83, 0]),
+            GradientStop::new(255, [224, 255, 0]),
+        ]),
         ImageOperation::Posterize(8),
-        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
+        ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
         ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
-
         // Mathematical
         ImageOperation::MMult,
         ImageOperation::MDiv,
         ImageOperation::Expression("r = 1.0".into()),
         ImageOperation::ScaleImageMinMax,
-
         // Effects
         ImageOperation::Blur(0),
         ImageOperation::Noise {
@@ -1156,7 +1155,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             mono: false,
         },
         ImageOperation::ChromaticAberration(15),
-
         // Geometry and Transformations
         ImageOperation::Flip(false),
         ImageOperation::Rotate(90),
@@ -1166,13 +1164,17 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             filter: ScaleFilter::Hamming,
         },
         ImageOperation::Crop([0, 0, 0, 0]),
-        ImageOperation::CropPerspective{points: [
-            (0,0),
-            (state.image_geometry.dimensions.0, 0),
-            (0, state.image_geometry.dimensions.1),
-            (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
-            ]
-        , original_size : state.image_geometry.dimensions
+        ImageOperation::CropPerspective {
+            points: [
+                (0, 0),
+                (state.image_geometry.dimensions.0, 0),
+                (0, state.image_geometry.dimensions.1),
+                (
+                    state.image_geometry.dimensions.0,
+                    state.image_geometry.dimensions.1,
+                ),
+            ],
+            original_size: state.image_geometry.dimensions,
         },
     ];
 
@@ -1206,19 +1208,15 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
                     ui.separator();
                 }
-    
                 modifier_stack_ui(
                     &mut state.edit_state.pixel_op_stack,
                     &mut pixels_changed,
                     ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                 );
-    
                 if ui.button("Reset all edits").clicked() {
                     state.edit_state = Default::default();
                     pixels_changed = true
                 }
-                // ui.label_i(&format!("Compare"));
-        
                 if ui.button("Original").clicked()
                 {
                     if let Some(img) = &state.current_image {
@@ -1233,7 +1231,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             });
 
-            
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
@@ -1907,23 +1904,20 @@ fn modifier_stack_ui(
     mouse_grab: &mut bool,
     settings: &mut VolatileSettings,
 ) {
-
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
     let stack_len = stack.len();
 
     for (i, operation) in stack.iter_mut().enumerate() {
-
-        ui.horizontal(|ui|{
+        ui.horizontal(|ui| {
             let up = i != 0;
             let down = i != stack_len - 1;
             let caret_size = 12.;
 
             ui.add_enabled_ui(up, |ui| {
-                let ur = ui.add(
-                    egui::Button::new(RichText::new("").size(caret_size)).frame(false),
-                );
+                let ur =
+                    ui.add(egui::Button::new(RichText::new("").size(caret_size)).frame(false));
                 if ur.on_hover_text("Move up").clicked() {
                     swap = Some(((i as i32 - 1).max(0) as usize, i));
                     *image_changed = true;
@@ -1931,15 +1925,13 @@ fn modifier_stack_ui(
             });
 
             ui.add_enabled_ui(down, |ui| {
-                let dr = ui.add(
-                    egui::Button::new(RichText::new("").size(caret_size)).frame(false),
-                );
+                let dr =
+                    ui.add(egui::Button::new(RichText::new("").size(caret_size)).frame(false));
                 if dr.on_hover_text("Move down").clicked() {
                     swap = Some((i, i + 1));
                     *image_changed = true;
                 }
             });
-
 
             if egui::Button::new(RichText::new("").size(18.))
                 .frame(false)
@@ -1953,7 +1945,6 @@ fn modifier_stack_ui(
             ui.label(&format!("{operation}"));
         });
 
-
         ui.push_id(i, |ui| {
             // draw the image operator
             ui.style_mut().spacing.slider_width = ui.available_width() * 1.6;
@@ -1966,11 +1957,9 @@ fn modifier_stack_ui(
             ui.style_mut().spacing.interact_size = Vec2::ZERO;
             ui.style_mut().spacing.indent = 0.0;
             ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-            
-            // ui.add_space(80.);
-            
-        });
 
+            // ui.add_space(80.);
+        });
     }
 
     if let Some(delete) = delete {
@@ -2693,14 +2682,13 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
 
     if icon_path.is_dir() {
         ui.painter().text(
-        response.rect.center(),
-        Align2::CENTER_CENTER,
-        FOLDER,
-        FontId::proportional(85.),
-        ui.style().visuals.text_color(),
+            response.rect.center(),
+            Align2::CENTER_CENTER,
+            FOLDER,
+            FontId::proportional(85.),
+            ui.style().visuals.text_color(),
         );
-    }
-    else {
+    } else {
         let mut image_rect = response.rect;
         image_rect.set_bottom(image_rect.max.y - caption_size);
 

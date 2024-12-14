@@ -900,7 +900,7 @@ impl ImageOperation {
                         let r2 = ui
                             .styled_checkbox(aspect, "🔒")
                             .on_hover_text("Lock aspect ratio");
-    
+
                         if r2.changed() {
                             if *aspect {
                                 dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
@@ -912,7 +912,6 @@ impl ImageOperation {
                         // more snappy.
                         r.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
                     });
-
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))

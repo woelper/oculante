@@ -10,10 +10,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use image::{DynamicImage, GenericImageView};
 use log::{debug, error, trace, warn};
 
-use crate::{
-    image_editing::ImageOperation,
-    image_loader::open_image,
-};
+use crate::{image_editing::ImageOperation, image_loader::open_image};
 
 #[derive(Debug, Default, Clone)]
 pub struct Thumbnails {

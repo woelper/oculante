@@ -1020,12 +1020,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let mut bbox_tl: egui::Pos2 = Default::default();
     let mut bbox_br: egui::Pos2 = Default::default();
+    let mut browser_open = false;
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
         }
-    
+
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
@@ -1082,6 +1083,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         {
             edit_ui(app, ctx, state, gfx);
         }
+
+        browser_open = ctx.memory(|w| w.is_popup_open(Id::new("SAVE")))
+            || ctx.memory(|w| w.is_popup_open(Id::new("OPEN")))
+            || ctx.memory(|w| w.is_popup_open(Id::new("LUT")));
 
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
@@ -1196,11 +1201,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.info_enabled {
-            // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
-
-            // let center = (text)
-
+        if state.persistent_settings.info_enabled && !browser_open {
             texture.draw_zoomed(
                 &mut zoom_image,
                 bbox_tl.x,
