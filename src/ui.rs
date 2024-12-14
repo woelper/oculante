@@ -16,6 +16,8 @@ use crate::{
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
+use std::io::Write;
+
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
