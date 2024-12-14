@@ -1,5 +1,5 @@
 pub const THUMB_SIZE: [u32; 2] = [120, 90];
-pub const THUMB_CAPTION_HEIGHT: u32 = 32;
+pub const THUMB_CAPTION_HEIGHT: u32 = 24;
 
 use std::{
     fs::create_dir_all,
