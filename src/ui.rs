@@ -16,12 +16,15 @@ use crate::{
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
+use std::io::Write;
+
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
+use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{DynamicImage, RgbaImage};
@@ -739,9 +742,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                         });
                     });
                 });
-            }
 
-            if state.current_texture.get().is_some() {
+                palette_ui(ui, state);
+                
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -751,6 +754,85 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
             advanced_ui(ui, state);
         });
     });
+}
+
+fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
+        ui.styled_collapsing("Palette", |ui| {
+            ui.vertical_centered_justified(|ui| {
+                dark_panel(ui, |ui| {
+                    ui.allocate_space(vec2(ui.available_width(), 0.));
+                        if let Some(sampled_colors) = ui
+                            .ctx()
+                            .memory(|r| r.data.get_temp::<Vec<[f32; 4]>>("picker".into()))
+                        {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing = Vec2::splat(6.);
+                                for color in &sampled_colors {
+                                    let (rect, resp) =
+                                        ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
+                                    ui.painter().rect_filled(
+                                        rect,
+                                        1.,
+                                        Color32::from_rgb(
+                                            (color[0]) as u8,
+                                            (color[1]) as u8,
+                                            (color[2]) as u8,
+                                        ),
+                                    );
+                                    resp.on_hover_ui(|ui| {
+                                        ui.label(format!("RGBA: {}", disp_col(*color)));
+                                    });
+                                }
+                            });
+                            if ui.button("Clear").clicked() {
+                                ui.ctx().memory_mut(|w| {
+                                    w.data.remove_temp::<Vec<[f32; 4]>>("picker".into())
+                                });
+                            }
+                            if ui.button("Save ASE").clicked() {
+                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                            }
+                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                                filebrowser::browse_modal(
+                                    true,
+                                    &["ase"],
+                                    &mut state.volatile_settings,
+                                    |p| {
+                                        let swatches = sampled_colors
+                                            .iter()
+                                            .map(|c| ObjectColor {
+                                                name: "".into(),
+                                                object_type:
+                                                    ase_swatch::types::ObjectColorType::Global,
+                                                data: Color {
+                                                    mode: ase_swatch::types::ColorMode::Rgb,
+                                                    values: [c[0]/255., c[1]/255., c[2]/255.].to_vec(),
+                                                },
+                                            })
+                                            .collect::<Vec<_>>();
+
+                                        let s = ase_swatch::create_ase(&vec![], &swatches);
+                                        if let Ok(mut f) = std::fs::File::create(p) {
+                                            _ = f.write_all(&s);
+                                        }
+                                    },
+                                    ui.ctx(),
+                                );
+                            }
+                        } else {
+                            ui.label("Right click to sample color");
+                        }
+                        if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                            ui.ctx().memory_mut(|w| {
+                                let cols = w
+                                    .data
+                                    .get_temp_mut_or_default::<Vec<[f32; 4]>>("picker".into());
+                                cols.push(state.sampled_color);
+                            });
+                        }
+                });
+            });
+        });
 }
 
 fn render_info_image_tiled(
@@ -2570,21 +2652,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
         }
 
-        #[cfg(not(feature = "file_open"))]
-        {
-            if ui.ctx().memory(|w| w.is_popup_open(Id::new("OPEN"))) {
-                filebrowser::browse_modal(
-                    false,
-                    SUPPORTED_EXTENSIONS,
-                    &mut state.volatile_settings,
-                    |p| {
-                        let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        ui.ctx().memory_mut(|w| w.close_popup());
-                    },
-                    ui.ctx(),
-                );
-            }
-        }
         draw_hamburger_menu(ui, state, app);
     });
 }

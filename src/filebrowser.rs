@@ -95,6 +95,14 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
         .unwrap_or(String::from("unnamed.png"));
 
+    if let Some(ext) = Path::new(&filename).extension() {
+        if !filter.contains(&ext.to_string_lossy().as_str()) {
+            if let Some(f) = filter.first() {
+                filename = Path::new(&filename).with_extension(f).to_string_lossy().to_string();
+            }
+        }   
+    }
+
     let mut search_term = ui
         .ctx()
         .data(|r| r.get_temp::<String>(Id::new("FBSEARCH")))
@@ -408,6 +416,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     ui.add(egui::TextEdit::singleline(&mut filename).min_size(Vec2::new(10., 28.)));
 
                     for f in FileEncoder::iter() {
+                        if !filter.contains(&f.ext().as_str()) {
+                            continue;
+                        }
                         let e = f.ext();
                         if ui.selectable_label(ext == e, &e).clicked() {
                             filename = Path::new(&filename)
