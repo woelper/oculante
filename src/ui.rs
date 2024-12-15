@@ -1,3 +1,5 @@
+#[cfg(not(feature = "file_open"))]
+use crate::filebrowser;
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     clear_image, clipboard_to_image, delete_file,
@@ -17,8 +19,6 @@ use crate::{
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
 };
-#[cfg(not(feature = "file_open"))]
-use crate::{filebrowser};
 
 use std::io::Write;
 
@@ -2672,7 +2672,10 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     zoom *= delta;
     zoom = zoom.clamp(0.5, 1.3);
     ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
-    let size = Vec2::new(THUMB_SIZE[0] as f32, (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32) * zoom;
+    let size = Vec2::new(
+        THUMB_SIZE[0] as f32,
+        (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
+    ) * zoom;
     let response = ui.allocate_response(size, Sense::click());
     let rounding = Rounding::same(4.);
     let margin = 4.0;

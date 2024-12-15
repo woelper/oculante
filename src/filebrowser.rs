@@ -191,10 +191,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .vertical_align(Align::Center),
                 );
 
-
-         
-
-
                 if lock_search_focus {
                     ui.memory_mut(|r| r.request_focus(resp.id));
                 }
@@ -424,7 +420,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 if let Some(parent) = path.parent() {
                                                     *path = parent.to_path_buf();
                                                 }
-
                                             }
                                         } else {
                                             for de in entries.iter().filter(|e| e.is_dir()) {

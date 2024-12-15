@@ -177,7 +177,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         trace!("Keyboard down: {:?}", app.keyboard.down);
     }
 
-
     // if nothing is down, just return
     if app.keyboard.down.is_empty() && app.keyboard.released.is_empty() {
         return false;
