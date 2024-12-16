@@ -13,8 +13,8 @@ use image::{
     Rgb32FImage, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
-use quickraw::{data, DemosaicingMethod, Export, Input, Output, OutputType};
-use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use quickraw::Export;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rgb::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -44,7 +44,7 @@ pub fn open_image(
         .replace("tiff", "tif")
         .replace("jpeg", "jpg");
 
-    let unchecked_extensions = ["svg", "kra", "dng"];
+    let unchecked_extensions = ["svg", "kra", "tga", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
@@ -82,7 +82,8 @@ pub fn open_image(
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
                         .context("Can't create DDS ImageBuffer with given res")?;
-                _ = sender.send(Frame::new_still(buf));
+                let d = DynamicImage::ImageRgba8(buf);
+                _ = sender.send(Frame::new_still(d));
                 return Ok(receiver);
             }
         }
@@ -90,18 +91,13 @@ pub fn open_image(
             // let file = File::open(img_location)?;
             let data = std::fs::read(img_location)?;
 
-            // let c = Cursor::new(file);
-            // let b = BufReader::new(file);
-            // file.re
-            // let mut reader = ktx2::Reader::new(reader.).expect("Can't create reader"); // Crate instance of reader.
-
             let ktx = ktx2_loader::ktx2_buffer_to_image(
                 data.as_bytes(),
                 CompressedImageFormats::all(),
                 true,
             )?;
             let d = ktx.try_into_dynamic()?;
-            _ = sender.send(Frame::new_still(d.into_rgba8()));
+            _ = sender.send(Frame::new_still(d));
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
@@ -111,7 +107,7 @@ pub fn open_image(
             let mut buf = vec![];
             file.read_to_end(&mut buf)?;
             let i = libavif_image::read(buf.as_slice())?;
-            _ = sender.send(Frame::new_still(i.to_rgba8()));
+            _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
 
             // col.add_still(i.to_rgba8());
@@ -127,16 +123,15 @@ pub fn open_image(
                     let image_buffer =
                         RgbImage::from_raw(jp2_image.width(), jp2_image.height(), data)
                             .context("Can't decode jp2k buffer")?;
-                    _ = sender.send(Frame::new_still(
-                        DynamicImage::ImageRgb8(image_buffer).to_rgba8(),
-                    ));
+                    _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(image_buffer)));
                     return Ok(receiver);
                 }
                 jpeg2k::ImagePixelData::Rgba8(data) => {
                     let image_buffer =
                         RgbaImage::from_raw(jp2_image.width(), jp2_image.height(), data)
                             .context("Can't decode jp2k buffer")?;
-                    _ = sender.send(Frame::new_still(image_buffer));
+                    let i = DynamicImage::ImageRgba8(image_buffer);
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 jpeg2k::ImagePixelData::L16(_) => bail!("jpeg2k L16 unsupported"),
@@ -180,7 +175,9 @@ pub fn open_image(
             }
             let buf = image::ImageBuffer::from_vec(width as u32, height as u32, res)
                 .context("Can't create HEIC/HEIF ImageBuffer with given res")?;
-            _ = sender.send(Frame::new_still(buf));
+            let i = DynamicImage::ImageRgba8(buf);
+
+            _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
         #[cfg(feature = "avif_native")]
@@ -200,7 +197,9 @@ pub fn open_image(
                     }
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    _ = sender.send(Frame::new_still(buf));
+                    let i = DynamicImage::ImageRgba8(buf);
+
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 avif_decode::Image::Rgba8(img) => {
@@ -214,7 +213,9 @@ pub fn open_image(
                     }
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    _ = sender.send(Frame::new_still(buf));
+                    let i = DynamicImage::ImageRgba8(buf);
+
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 avif_decode::Image::Rgb16(img) => {
@@ -228,7 +229,9 @@ pub fn open_image(
                     }
                     let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
                         .context("Can't create avif ImageBuffer with given res")?;
-                    _ = sender.send(Frame::new_still(buf));
+                    let i = DynamicImage::ImageRgba8(buf);
+
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 avif_decode::Image::Rgba16(_) => {
@@ -285,7 +288,9 @@ pub fn open_image(
                         pixmap.data().to_vec(),
                     )
                     .context("Can't create image buffer from SVG render")?;
-                    _ = sender.send(Frame::new_still(buf));
+                    let i = DynamicImage::ImageRgba8(buf);
+
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
             }
@@ -323,7 +328,9 @@ pub fn open_image(
             match maybe_image {
                 Ok(image) => {
                     let buf = image.layer_data.channel_data.pixels;
-                    _ = sender.send(Frame::new_still(buf));
+                    let i = DynamicImage::ImageRgba8(buf);
+
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 Err(e) => {
@@ -343,7 +350,7 @@ pub fn open_image(
                                 .context("Can't decode gray alpha buffer")?;
 
                                 let d = DynamicImage::ImageLuma8(gray_image);
-                                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                                _ = sender.send(Frame::new_still(d));
                                 return Ok(receiver);
                             }
                             FlatSamples::U32(_) => bail!("U32 color mode not supported"),
@@ -357,7 +364,10 @@ pub fn open_image(
         "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
         | "braw" | "r3d" | "nrw" | "raw" => {
             debug!("Loading RAW");
-            _ = sender.send(Frame::new_still(load_raw(&img_location)?));
+            let buf = load_raw(&img_location)?;
+            let i = DynamicImage::ImageRgba8(buf);
+
+            _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
         "jxl" => {
@@ -374,26 +384,36 @@ pub fn open_image(
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
             let meta = hdr_decoder.metadata();
 
-            let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
-                DynamicImage::ImageRgb32F(image) => image,
-                _ => bail!("expected rgb32f image"),
-            };
+            #[cfg(feature = "hdr")]
+            {
+                let d = DynamicImage::from_decoder(hdr_decoder)?;
+                _ = sender.send(Frame::new_still(d));
+                return Ok(receiver);
+            }
 
-            let rgba_image = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
-                let pixel = hdr_img.get_pixel(x, y);
-                image::Rgba(tonemap_rgb(pixel.0))
-            });
-
-            _ = sender.send(Frame::new_still(rgba_image));
-            return Ok(receiver);
+            #[cfg(not(feature = "hdr"))]
+            {
+                let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
+                    DynamicImage::ImageRgb32F(image) => image,
+                    _ => bail!("expected rgb32f image"),
+                };
+                let buf = RgbaImage::from_fn(meta.width, meta.height, |x, y| {
+                    let pixel = hdr_img.get_pixel(x, y);
+                    image::Rgba(tonemap_rgb(pixel.0))
+                });
+                let i = DynamicImage::ImageRgba8(buf);
+                _ = sender.send(Frame::new_still(i));
+                return Ok(receiver);
+            }
         }
         "psd" => {
             let contents = std::fs::read(img_location)?;
             let psd = Psd::from_bytes(&contents).map_err(|e| anyhow!("{:?}", e))?;
             let buf = image::ImageBuffer::from_raw(psd.width(), psd.height(), psd.rgba())
                 .context("Can't create imagebuffer from PSD")?;
+            let i = DynamicImage::ImageRgba8(buf);
 
-            _ = sender.send(Frame::new_still(buf));
+            _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
         "webp" => {
@@ -407,7 +427,7 @@ pub fn open_image(
                     image::ImageFormat::WebP,
                 )
                 .decode()?;
-                _ = sender.send(Frame::new_still(img.to_rgba8()));
+                _ = sender.send(Frame::new_still(img));
                 return Ok(receiver);
             }
 
@@ -427,7 +447,8 @@ pub fn open_image(
                     let delay = t - last_timestamp;
                     debug!("time {t} {delay}");
                     last_timestamp = t;
-                    let frame = Frame::new_animation(buf, delay as u16);
+                    let i = DynamicImage::ImageRgba8(buf);
+                    let frame = Frame::new_animation(i, delay as u16);
                     _ = sender.send(frame);
                 } else {
                     break;
@@ -504,11 +525,10 @@ pub fn open_image(
                     let mut out = vec![];
                     _ = zune_png::PngEncoder::new(&output, encoder_opts).encode(&mut out);
                     let img = image::load_from_memory(&out)?;
-                    let buf = img.to_rgba8();
 
                     let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
 
-                    _ = sender.send(Frame::new_animation(buf, delay as u16));
+                    _ = sender.send(Frame::new_animation(img, delay as u16));
                     background = Some(output.clone());
                 }
                 return Ok(receiver);
@@ -536,7 +556,7 @@ pub fn open_image(
                             image::ImageBuffer::from_raw(width as u32, height as u32, imgdata_8bpp)
                                 .context("Can't interpret image as grayscale")?;
                         let image_result = DynamicImage::ImageLuma8(buf);
-                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        _ = sender.send(Frame::new_still(image_result));
                         return Ok(receiver);
                     }
 
@@ -544,17 +564,13 @@ pub fn open_image(
                         let float_image =
                             RgbaImage::from_raw(width as u32, height as u32, imgdata_8bpp)
                                 .context("Can't decode rgba buffer")?;
-                        _ = sender.send(Frame::new_still(
-                            DynamicImage::ImageRgba8(float_image).to_rgba8(),
-                        ));
+                        _ = sender.send(Frame::new_still(DynamicImage::ImageRgba8(float_image)));
                         return Ok(receiver);
                     } else {
                         let float_image =
                             RgbImage::from_raw(width as u32, height as u32, imgdata_8bpp)
                                 .context("Can't decode rgba buffer")?;
-                        _ = sender.send(Frame::new_still(
-                            DynamicImage::ImageRgb8(float_image).to_rgba8(),
-                        ));
+                        _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(float_image)));
                         return Ok(receiver);
                     }
                 }
@@ -569,7 +585,7 @@ pub fn open_image(
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;
                         let image_result = DynamicImage::ImageLuma8(buf);
-                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        _ = sender.send(Frame::new_still(image_result));
                         return Ok(receiver);
                     }
 
@@ -578,7 +594,7 @@ pub fn open_image(
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as grayscale")?;
                         let image_result = DynamicImage::ImageLumaA8(buf);
-                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        _ = sender.send(Frame::new_still(image_result));
                         return Ok(receiver);
                     }
 
@@ -586,14 +602,16 @@ pub fn open_image(
                         let buf: RgbaImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as rgba")?;
-                        _ = sender.send(Frame::new_still(buf));
+                        let i = DynamicImage::ImageRgba8(buf);
+
+                        _ = sender.send(Frame::new_still(i));
                         return Ok(receiver);
                     } else {
                         let buf: RgbImage =
                             image::ImageBuffer::from_raw(width as u32, height as u32, value)
                                 .context("Can't interpret image as rgb")?;
                         let image_result = DynamicImage::ImageRgb8(buf);
-                        _ = sender.send(Frame::new_still(image_result.to_rgba8()));
+                        _ = sender.send(Frame::new_still(image_result));
                         return Ok(receiver);
                     }
                 }
@@ -619,10 +637,9 @@ pub fn open_image(
                             dim.1,
                             screen.pixels_rgba().buf().as_bytes().to_vec(),
                         );
-                        _ = sender.send(Frame::new_animation(
-                            buf.context("Can't read gif frame")?,
-                            frame.delay * 10,
-                        ));
+                        let buf = buf.context("Can't read gif frame")?;
+                        let i = DynamicImage::ImageRgba8(buf);
+                        _ = sender.send(Frame::new_animation(i, frame.delay * 10));
                     } else {
                         break;
                     }
@@ -648,21 +665,21 @@ pub fn open_image(
         "jpg" | "jpeg" => {
             match load_jpeg_turbojpeg(&img_location) {
                 Ok(i) => {
-                    _ = sender.send(Frame::new_still(i.to_rgba8()));
+                    _ = sender.send(Frame::new_still(i));
                 }
                 Err(e) => {
                     error!(
                         "Could not load using turbojpeg: {e}. Trying to load with image library."
                     );
                     let img = image::open(img_location)?;
-                    _ = sender.send(Frame::new_still(img.to_rgba8()));
+                    _ = sender.send(Frame::new_still(img));
                 }
             }
             return Ok(receiver);
         }
         "kra" => {
             let i = load_kra(&img_location)?;
-            _ = sender.send(Frame::new_still(i.to_rgba8()));
+            _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
         "icns" => {
@@ -680,19 +697,21 @@ pub fn open_image(
                 let image = icon_family.get_icon_with_type(icon_type)?;
                 image.write_png(&mut target)?;
                 let d = image::load_from_memory(&target).context("Load icns mem")?;
-                _ = sender.send(Frame::new_still(d.to_rgba8()));
+                _ = sender.send(Frame::new_still(d));
                 return Ok(receiver);
             }
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
-            Ok(tiff) => {
-                _ = sender.send(Frame::new_still(tiff));
+            Ok(buf) => {
+                _ = sender.send(Frame::new_still(buf));
                 return Ok(receiver);
             }
             Err(tiff_error) => match load_raw(&img_location) {
-                Ok(raw) => {
+                Ok(buf) => {
+                    let i = DynamicImage::ImageRgba8(buf);
+
                     info!("This image is a raw image with tiff format.");
-                    _ = sender.send(Frame::new_still(raw));
+                    _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
                 }
                 Err(raw_error) => {
@@ -705,7 +724,7 @@ pub fn open_image(
             debug!("Loading using generic image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
-            _ = sender.send(Frame::new_still(img.to_rgba8()));
+            _ = sender.send(Frame::new_still(img));
             return Ok(receiver);
         }
     }
@@ -739,32 +758,42 @@ fn u16_to_u8(p: u16) -> u8 {
 }
 
 fn load_raw(img_location: &Path) -> Result<RgbaImage> {
-    let export_job = Export::new(
-        Input::ByFile(&img_location.to_string_lossy()),
-        Output::new(
-            DemosaicingMethod::SuperPixel,
-            data::XYZ2SRGB,
-            data::GAMMA_SRGB,
-            OutputType::Raw16,
-            true,
-            true,
-        ),
-    )?;
+    let raw_data = std::fs::read(img_location)?;
+    let (thumbnail_data, _orientation) = Export::export_thumbnail_data(&raw_data)?;
 
-    let (image, width, height) = export_job.export_16bit_image();
-    let image = image
-        .into_par_iter()
-        .map(|x| tonemap_f32(x as f32 / 65536.))
-        .collect::<Vec<_>>();
+    let i = image::load_from_memory(&thumbnail_data)?;
+    Ok(i.to_rgba8())
 
-    // Construct rgb image
-    let x = RgbImage::from_raw(width as u32, height as u32, image)
-        .context("can't decode raw output as image")?;
-    // make it a Dynamic image
-    Ok(DynamicImage::ImageRgb8(x).to_rgba8())
+    // let export_job = Export::new(
+    //     Input::ByFile(&img_location.to_string_lossy()),
+    //     Output::new(
+    //         DemosaicingMethod::SuperPixel,
+    //         data::XYZ2SRGB,
+    //         data::GAMMA_SRGB,
+    //         OutputType::Raw16,
+    //         true,
+    //         true,
+    //     ),
+    // )?;
+
+    // let mut buf = vec![];
+    // let x = quickraw::Export::export_thumbnail_data(&buf)?;
+    // image::load_from_memory(&buf)?;
+
+    // let (image, width, height) = export_job.export_16bit_image();
+    // let image = image
+    //     .into_par_iter()
+    //     .map(|x| tonemap_f32(x as f32 / 65536.))
+    //     .collect::<Vec<_>>();
+
+    // // Construct rgb image
+    // let x = RgbImage::from_raw(width as u32, height as u32, image)
+    //     .context("can't decode raw output as image")?;
+    // // make it a Dynamic image
+    // Ok(DynamicImage::ImageRgb8(x).to_rgba8())
 }
 
-fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
+fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
     // TODO: Probe if dng
     let data = File::open(img_location)?;
 
@@ -831,29 +860,25 @@ fn load_tiff(img_location: &Path) -> Result<RgbaImage> {
             debug!("Loading gray color");
             let i =
                 image::GrayImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load gray img")?;
-            // col.add_still(DynamicImage::ImageLuma8(i).into_rgba8());
-            return Ok(DynamicImage::ImageLuma8(i).into_rgba8());
+            return Ok(DynamicImage::ImageLuma8(i));
         }
         tiff::ColorType::RGB(_) => {
             debug!("Loading rgb color");
             let i =
                 image::RgbImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGB img")?;
-            // col.add_still(DynamicImage::ImageRgb8(i).into_rgba8());
-            return Ok(DynamicImage::ImageRgb8(i).into_rgba8());
+            return Ok(DynamicImage::ImageRgb8(i));
         }
         tiff::ColorType::RGBA(_) => {
             debug!("Loading rgba color");
             let i =
                 image::RgbaImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGBA img")?;
-            // col.add_still(i);
-            return Ok(i);
+            return Ok(image::DynamicImage::ImageRgba8(i));
         }
         tiff::ColorType::GrayA(_) => {
             debug!("Loading gray color with alpha");
             let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                 .context("Can't load gray alpha img")?;
-            // col.add_still(image::DynamicImage::ImageLumaA8(i).into_rgba8());
-            return Ok(image::DynamicImage::ImageLumaA8(i).into_rgba8());
+            return Ok(image::DynamicImage::ImageLumaA8(i));
         }
         _ => {
             bail!(
@@ -982,14 +1007,9 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 
         // Dispatch to still or animation
         if is_jxl_anim {
-            // col.add_anim_frame(image_result.to_rgba8(), frame_duration);
-            _ = frame_sender.send(Frame::new_animation(
-                image_result.to_rgba8(),
-                frame_duration
-            ));
+            _ = frame_sender.send(Frame::new_animation(image_result, frame_duration));
         } else {
-            // col.add_still(image_result.to_rgba8());
-            _ = frame_sender.send(Frame::new_still(image_result.to_rgba8()));
+            _ = frame_sender.send(Frame::new_still(image_result));
         }
     }
     debug!("Done decoding JXL");
@@ -997,13 +1017,13 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     Ok(())
 }
 
-#[allow(unused)]
 pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     di.apply_orientation(decoder.orientation()?);
     Ok(())
 }
 
+#[allow(unused)]
 pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage> {
     let mut decoder = ImageReader::open(path)?.into_decoder()?;
     let orientation = decoder.orientation()?;

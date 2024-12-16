@@ -1,7 +1,8 @@
 use super::icons::*;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::ui::{EguiExt, BUTTON_HEIGHT_LARGE};
+use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
+use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use anyhow::{Context, Result};
 use dirs;
@@ -56,7 +57,8 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        .default_width(750.)
+        //TODO: Change default_width to 815 after folder misalignment fix, discord this comment and use another closest to reference design value if the slider can be combined into the image area BG
+        .default_width(818.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
@@ -80,6 +82,30 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         ctx.memory_mut(|w| w.close_popup());
     }
 }
+#[derive(Debug, Clone)]
+struct BrowserState {
+    filename: String,
+    thumbnails: Thumbnails,
+    search_term: String,
+    search_active: bool,
+    listview_active: bool,
+    path_active: bool,
+    entries: Option<Vec<PathBuf>>,
+}
+
+impl Default for BrowserState {
+    fn default() -> Self {
+        Self {
+            filename: "unnamed.png".into(),
+            thumbnails: Default::default(),
+            search_term: Default::default(),
+            search_active: Default::default(),
+            listview_active: Default::default(),
+            path_active: Default::default(),
+            entries: Default::default(),
+        }
+    }
+}
 
 pub fn browse<F: FnMut(&PathBuf)>(
     path: &mut PathBuf,
@@ -90,38 +116,19 @@ pub fn browse<F: FnMut(&PathBuf)>(
     ui: &mut Ui,
 ) {
     let mut prev_path = path.clone();
-    let mut filename = ui
-        .ctx()
-        .data(|r| r.get_temp::<String>(Id::new("FBFILENAME")))
-        .unwrap_or(String::from("unnamed.png"));
 
-    if let Some(ext) = Path::new(&filename).extension() {
-        if !filter.contains(&ext.to_string_lossy().as_str()) {
-            if let Some(f) = filter.first() {
-                filename = Path::new(&filename).with_extension(f).to_string_lossy().to_string();
-            }
-        }   
-    }
-
-    let mut search_term = ui
+    let mut state = ui
         .ctx()
-        .data(|r| r.get_temp::<String>(Id::new("FBSEARCH")))
-        .unwrap_or_default();
-    let mut search_active = ui
-        .ctx()
-        .data(|r| r.get_temp::<bool>(Id::new("FBSEARCHACTIVE")))
+        .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
         .unwrap_or_default();
 
-    // read cached entries
-    let entries = ui
-        .ctx()
-        .data(|r| r.get_temp::<Vec<PathBuf>>(Id::new("FBDIRS")));
-
-    if entries.is_none() {
+    if state.entries.is_none() {
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
     }
-    let entries = entries
+    let mut entries = state
+        .entries
+        .clone()
         .unwrap_or_default()
         .into_iter()
         .filter(|e| {
@@ -129,9 +136,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_default()
                 .to_lowercase()
-                .contains(&search_term.to_lowercase())
+                .contains(&state.search_term.to_lowercase())
         })
         .collect::<Vec<_>>();
+
+    entries.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -140,7 +149,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
     ui.horizontal_wrapped(|ui| {
         ui.add_space(item_spacing);
 
-        let search_icon = if search_active { BOLDX } else { SEARCH };
+        let search_icon = if state.search_active { BOLDX } else { SEARCH };
+        let mut lock_search_focus = false;
 
         if ui
             .add(
@@ -153,18 +163,19 @@ pub fn browse<F: FnMut(&PathBuf)>(
             )
             .clicked()
         {
-            search_active = !search_active;
-            if !search_active {
-                search_term = Default::default();
+            lock_search_focus = true;
+            state.search_active = !state.search_active;
+            if !state.search_active {
+                state.search_term.clear();
             }
         }
-        let textinput_width = if search_term.len() < 10 {
-            (ui.ctx().animate_bool("id".into(), search_active) * 88.) as usize
+        let textinput_width = if state.search_term.len() < 10 {
+            (ui.ctx().animate_bool("id".into(), state.search_active) * 88.) as usize
         } else {
             ui.available_width() as usize
         };
 
-        if search_active {
+        if state.search_active {
             ui.scope(|ui| {
                 ui.visuals_mut().selection.stroke = Stroke::NONE;
                 ui.visuals_mut().widgets.active.rounding =
@@ -174,15 +185,18 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 ui.visuals_mut().widgets.hovered.rounding =
                     Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
                 let resp = ui.add(
-                    TextEdit::singleline(&mut search_term)
+                    TextEdit::singleline(&mut state.search_term)
                         .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
                         .desired_width(textinput_width as f32)
                         .vertical_align(Align::Center),
                 );
-                ui.memory_mut(|r| r.request_focus(resp.id));
+
+                if lock_search_focus {
+                    ui.memory_mut(|r| r.request_focus(resp.id));
+                }
             });
         }
-        if search_term.len() >= 10 {
+        if state.search_term.len() >= 10 {
             ui.end_row();
             ui.add_space(item_spacing);
         }
@@ -203,6 +217,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
             }
         }
 
+        let path_icon = if state.path_active { FOLDER } else { "$" };
+
+        if ui
+            .add(
+                egui::Button::new(
+                    RichText::new(path_icon).color(ui.style().visuals.selection.bg_fill),
+                )
+                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
+            )
+            .clicked()
+        {
+            state.path_active = !state.path_active;
+        }
+
         let current_dir = if path.is_dir() {
             path.clone()
         } else {
@@ -210,21 +239,48 @@ pub fn browse<F: FnMut(&PathBuf)>(
         };
 
         let cp = path.clone();
-        // Too  many folders make the dialog too large, cap them at this amount
+        // Too many folders make the dialog too large, cap them at this amount
         let max_nav_items = 6;
         let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
         ancestors.reverse();
 
-        for c in ancestors {
-            let label = c
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or("Computer".into());
-            if ui
-                .styled_selectable_label(&current_dir == &c, &format!("{label}  {CARET_RIGHT}"))
-                .clicked()
-            {
-                *path = PathBuf::from(c);
+        if state.path_active {
+            ui.scope(|ui| {
+                let textinput_width = (ui.ctx().animate_bool("path".into(), state.path_active)
+                    * ui.available_width()) as usize;
+                let mut path_string = path.to_string_lossy().to_string();
+                ui.visuals_mut().selection.stroke = Stroke::NONE;
+                ui.visuals_mut().widgets.active.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.rounding =
+                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                let resp = ui.add(
+                    TextEdit::singleline(&mut path_string)
+                        .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
+                        .desired_width(textinput_width as f32)
+                        .vertical_align(Align::Center),
+                );
+
+                if resp.changed() {
+                    *path = PathBuf::from(path_string);
+                }
+            });
+
+            // let r = ui.add(TextEdit::singleline(&mut path_string));
+        } else {
+            for c in ancestors {
+                let label = c
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or("Computer".into());
+                if ui
+                    .styled_selectable_label(&current_dir == &c, &format!("{label}  {CARET_RIGHT}"))
+                    .clicked()
+                {
+                    *path = PathBuf::from(c);
+                }
             }
         }
     });
@@ -292,7 +348,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                 settings.folder_bookmarks.remove(folder);
                             }
                         }
-
                         if ui.input(|r| r.pointer.secondary_released()) {
                             settings.folder_bookmarks.remove(folder);
                         }
@@ -325,103 +380,106 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 false => Color32::from_gray(217),
             };
 
-            egui::ScrollArea::new([false, true])
-                .min_scrolled_height(400.)
-                .auto_shrink([false, false])
+            let r = ui.available_rect_before_wrap();
+            let spacing = ui.style().spacing.item_spacing.x;
+            let w = r.width() - spacing * 3.;
+
+            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.);
+            let num_rows = entries.len() / (thumbs_per_row as usize).max(1);
+
+            // info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
+
+            egui::Frame::none()
+                .fill(panel_bg_color)
+                .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
+                .inner_margin(Margin::same(10.))
                 .show(ui, |ui| {
-                    egui::Frame::none()
-                        .fill(panel_bg_color)
-                        .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
-                        .inner_margin(Margin::same(6.))
-                        .show(ui, |ui| {
-                            egui::Grid::new("browser")
-                                .striped(true)
-                                .num_columns(0)
-                                .min_col_width(ui.available_width())
-                                .show(ui, |ui| {
-                                    if entries.is_empty() {
-                                        ui.label("Empty directory");
-                                    } else {
-                                        for de in entries {
-                                            if de.is_dir() {
-                                                if ui
-                                                    .add(
-                                                        egui::Button::new(format!(
-                                                            "{FOLDER} {}",
-                                                            de.file_name()
-                                                                .map(|n| n.to_string_lossy())
-                                                                .unwrap_or_default()
-                                                                .chars()
-                                                                .take(50)
-                                                                .collect::<String>()
-                                                        ))
-                                                        .frame(false),
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    *path = de;
+                    egui::ScrollArea::new([false, true])
+                        .min_scrolled_height(400.)
+                        .auto_shrink([false, false])
+                        .show_rows(
+                            ui,
+                            (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
+                            num_rows,
+                            |ui, row_range| {
+                                let entries = entries
+                                    .clone()
+                                    .drain(
+                                        (row_range.start * thumbs_per_row as usize)
+                                            ..(row_range.end * thumbs_per_row as usize),
+                                    )
+                                    .collect::<Vec<_>>();
+
+                                if state.listview_active {
+                                } else {
+                                    ui.horizontal_wrapped(|ui| {
+                                        if entries.is_empty() {
+                                            let r = ui.label("Empty directory");
+                                            let r = r.interact(Sense::click());
+                                            if r.clicked() {
+                                                if let Some(parent) = path.parent() {
+                                                    *path = parent.to_path_buf();
                                                 }
-                                            } else {
-                                                if ui
-                                                    .add(
-                                                        egui::Button::new(format!(
-                                                            "{IMAGE_SQUARE} {}",
-                                                            de.file_name()
-                                                                .map(|f| f.to_string_lossy())
-                                                                .unwrap_or_default()
-                                                                .chars()
-                                                                .take(50)
-                                                                .collect::<String>()
-                                                        ))
-                                                        .frame(false),
-                                                    )
+                                            }
+                                        } else {
+                                            for de in entries.iter().filter(|e| e.is_dir()) {
+                                                if render_file_icon(&de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
-                                                    _ = save_recent_dir(&de);
-                                                    if !save {
-                                                        search_active = false;
-                                                        search_term.clear();
-                                                        callback(&de);
-                                                    } else {
-                                                        filename = de
-                                                            .file_name()
-                                                            .map(|f| {
-                                                                f.to_string_lossy().to_string()
-                                                            })
-                                                            .unwrap_or_default();
-                                                        ui.ctx().data_mut(|w| {
-                                                            w.insert_temp(
-                                                                Id::new("FBFILENAME"),
-                                                                filename.clone(),
-                                                            )
-                                                        });
+                                                    *path = de.to_path_buf();
+                                                }
+                                            }
+
+                                            for de in entries {
+                                                if de.is_file() {
+                                                    if render_file_icon(
+                                                        &de,
+                                                        ui,
+                                                        &mut state.thumbnails,
+                                                    )
+                                                    .clicked()
+                                                    {
+                                                        _ = save_recent_dir(&de);
+                                                        if !save {
+                                                            state.search_active = false;
+                                                            state.search_term.clear();
+                                                            callback(&de);
+                                                        } else {
+                                                            state.filename = de
+                                                                .file_name()
+                                                                .map(|f| {
+                                                                    f.to_string_lossy().to_string()
+                                                                })
+                                                                .unwrap_or_default();
+                                                        }
                                                     }
                                                 }
                                             }
-                                            ui.end_row();
                                         }
-                                    }
-                                });
-                        });
+                                    });
+                                }
+                            },
+                        );
                 });
 
-            ui.add_space(10.);
+            // ui.add_space(10.);
 
             if save {
-                let ext = Path::new(&filename).ext();
+                let ext = Path::new(&state.filename).ext();
                 ui.label("Filename");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().button_padding = Vec2::new(2., 5.);
-
-                    ui.add(egui::TextEdit::singleline(&mut filename).min_size(Vec2::new(10., 28.)));
-
+                    ui.add(
+                        egui::TextEdit::singleline(&mut state.filename)
+                            .min_size(Vec2::new(10., 28.)),
+                    );
                     for f in FileEncoder::iter() {
                         if !filter.contains(&f.ext().as_str()) {
                             continue;
                         }
                         let e = f.ext();
                         if ui.selectable_label(ext == e, &e).clicked() {
-                            filename = Path::new(&filename)
+                            state.filename = Path::new(&state.filename)
                                 .with_extension(&e)
                                 .to_string_lossy()
                                 .to_string();
@@ -429,9 +487,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if ui.button(format!("   Save file   ")).clicked() {
-                        search_active = false;
-                        search_term.clear();
-                        callback(&path.join(filename.clone()));
+                        state.search_active = false;
+                        state.search_term.clear();
+                        callback(&path.join(state.filename.clone()));
                     }
                 });
 
@@ -441,9 +499,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 }
             }
-
-            ui.ctx()
-                .data_mut(|w| w.insert_temp(Id::new("FBFILENAME"), filename.clone()));
 
             if prev_path != *path {
                 if let Ok(contents) = fs::read_dir(&path) {
@@ -472,16 +527,16 @@ pub fn browse<F: FnMut(&PathBuf)>(
                             )
                     });
 
-                    ui.ctx()
-                        .data_mut(|r| r.insert_temp::<Vec<PathBuf>>(Id::new("FBDIRS"), contents));
+                    // ui.ctx()
+                    //     .data_mut(|r| r.insert_temp::<Vec<PathBuf>>(Id::new("FBDIRS"), contents));
+                    state.entries = Some(contents);
                 }
             }
         });
     });
+
     ui.ctx()
-        .data_mut(|r| r.insert_temp::<String>(Id::new("FBSEARCH"), search_term));
-    ui.ctx()
-        .data_mut(|r| r.insert_temp::<bool>(Id::new("FBSEARCHACTIVE"), search_active));
+        .data_mut(|r| r.insert_temp::<BrowserState>(Id::new("FBSTATE"), state));
 }
 
 trait PathExt {

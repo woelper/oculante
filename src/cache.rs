@@ -4,10 +4,10 @@ use std::{
     time::Instant,
 };
 
-use image::RgbaImage;
+use image::DynamicImage;
 use log::debug;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Cache {
     pub data: HashMap<PathBuf, CachedImage>,
     pub cache_size: usize,
@@ -15,12 +15,12 @@ pub struct Cache {
 
 #[derive(Debug)]
 pub struct CachedImage {
-    data: RgbaImage,
+    data: DynamicImage,
     created: Instant,
 }
 
 impl Cache {
-    pub fn get(&self, path: &Path) -> Option<RgbaImage> {
+    pub fn get(&self, path: &Path) -> Option<DynamicImage> {
         self.data.get(path).map(|c| c.data.clone())
     }
 
@@ -28,7 +28,7 @@ impl Cache {
         self.data.clear()
     }
 
-    pub fn insert(&mut self, path: &Path, img: RgbaImage) {
+    pub fn insert(&mut self, path: &Path, img: DynamicImage) {
         self.data.insert(
             path.into(),
             CachedImage {
