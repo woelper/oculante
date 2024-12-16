@@ -2664,7 +2664,8 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
-    // let caption_size = 24.;
+    let scroll = false;
+
     let mut zoom = ui
         .data_mut(|w| w.get_temp::<f32>("ZM".into()))
         .unwrap_or(1.);
@@ -2678,7 +2679,11 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     ) * zoom;
     let response = ui.allocate_response(size, Sense::click());
     let rounding = Rounding::same(4.);
-    let margin = 4.0;
+
+    let mut image_rect = response.rect;
+    image_rect.max = image_rect.max.round();
+    image_rect.min = image_rect.min.round();
+    image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
 
     if icon_path.is_dir() {
         ui.painter().text(
@@ -2689,13 +2694,6 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
             ui.style().visuals.text_color(),
         );
     } else {
-        let mut image_rect = response.rect;
-        image_rect.max.x = image_rect.max.x.round();
-        image_rect.max.y = image_rect.max.y.round();
-        image_rect.min.y = image_rect.min.y.round();
-        image_rect.min.x = image_rect.min.x.round();
-        image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
-
         match thumbnails.get(icon_path) {
             Ok(tp) => {
                 let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
@@ -2725,23 +2723,60 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         .unwrap_or_default();
 
     let mut job = LayoutJob::simple(
-        text,
+        text.clone(),
         FontId::proportional(13.),
         ui.style().visuals.text_color(),
-        THUMB_SIZE[0] as f32 - margin * 2.,
+        // THUMB_SIZE[0] as f32 - margin * 2.,
+        THUMB_SIZE[0] as f32 * 10.,
     );
     job.halign = Align::Center;
-    job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32 - margin);
-    let galley = ui.painter().layout_job(job);
-    let text_rect = galley.rect;
-    let mut text_pos = response.rect.center_bottom();
-    text_pos.y -= text_rect.size().y + margin / 3.;
-    text_pos.x += margin;
 
-    ui.painter().galley(text_pos, galley, Color32::RED);
     if response.hovered() {
+        // the generic hover effect, a rect over everything
         ui.painter()
             .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
+
+        let mut text_pos = image_rect.expand(6.).center_bottom();
+        if scroll {
+            fn sawtooth_wave(x: f32, period: f32, amp: f32) -> f32 {
+                ((x / period) - (x / period).floor()) * amp
+            }
+            let galley = ui.painter().layout_job(job);
+            if galley.rect.width() > response.rect.width() {
+                // align text left
+                text_pos.x += galley.rect.width() / 2. - response.rect.width() / 2. + 10.;
+                // repaint for smooth animation
+                ui.ctx().request_repaint();
+                text_pos.x = text_pos.x
+                    - sawtooth_wave(ui.ctx().frame_nr() as f32 * 0.003, 1., galley.rect.width());
+                ui.painter_at(response.rect)
+                    .galley(text_pos, galley, Color32::RED);
+            }
+        } else {
+            let mut job = LayoutJob::simple(
+                text,
+                FontId::proportional(13.),
+                ui.style().visuals.text_color(),
+                THUMB_SIZE[0] as f32,
+            );
+            job.halign = Align::Center;
+            let galley = ui.painter().layout_job(job);
+            let painter = ui
+                .ctx()
+                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()));
+
+            let c = ui.style().visuals.extreme_bg_color;
+            let mut right_bottom = image_rect.right_bottom();
+            right_bottom.y += galley.rect.height() + 14.;
+            let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom);
+            painter.rect_filled(r, rounding, c);
+            painter.galley(text_pos, galley, Color32::RED);
+        }
+    } else {
+        job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
+        let galley = ui.painter().layout_job(job);
+        ui.painter()
+            .galley(image_rect.expand(6.).center_bottom(), galley, Color32::RED);
     }
     response
 }
