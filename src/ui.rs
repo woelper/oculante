@@ -2517,7 +2517,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
-            ui.set_width(350.);
             if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
                 state.reset_image = true;
                 ui.close_menu();
