@@ -2517,10 +2517,12 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
+            ui.set_width(350.);
             if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
                 state.reset_image = true;
                 ui.close_menu();
             }
+
             if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
                 set_zoom(
                     1.0,
@@ -2583,36 +2585,59 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
 
                 let recent_rect = Rect::from_two_pos(
                     Pos2::new(r.right_bottom().x + 100., r.left_top().y),
-                    Pos2::new(
-                        r.left_bottom().x - ui.available_width(),
-                        r.left_top().y + 100.,
-                    ),
+                    Pos2::new(r.left_bottom().x, r.left_top().y + 0.),
                 );
 
+                let panel_bg_color = match ui.style().visuals.dark_mode {
+                    true => Color32::from_gray(31),
+                    false => Color32::from_gray(247),
+                };
+
                 ui.allocate_ui_at_rect(recent_rect, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        for r in &state.volatile_settings.recent_images.clone() {
-                            if render_file_icon(&r, ui, &mut state.thumbnails).clicked() {
-                                load_image_from_path(r, state);
-                                ui.close_menu();
-                            }
-                        }
-                    });
+                    for r in &state.volatile_settings.recent_images.clone() {
+                        let ext = r
+                            .extension()
+                            .map(|e| e.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                            .to_uppercase();
+
+                        ui.horizontal(|ui| {
+                            egui::Frame::none()
+                                .fill(panel_bg_color)
+                                .rounding(ui.style().visuals.widgets.active.rounding)
+                                .inner_margin(Margin::same(6.))
+                                .show(ui, |ui| {
+                                    let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
+
+                                    ui.painter().rect(
+                                        icon_rect,
+                                        ui.get_rounding(BUTTON_HEIGHT_SMALL),
+                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
+                                        Stroke::NONE,
+                                    );
+
+                                    ui.painter().text(
+                                        icon_rect.center(),
+                                        Align2::CENTER_CENTER,
+                                        ext,
+                                        FontId::proportional(10.),
+                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.8),
+                                    );
+
+                                    ui.vertical_centered_justified(|ui| {
+                                        if let Some(filename) = r.file_stem() {
+                                            let res = ui.button(filename.to_string_lossy());
+                                            if res.clicked() {
+                                                load_image_from_path(r, state);
+                                                ui.close_menu();
+                                            }
+                                        }
+                                    });
+                                });
+                        });
+                    }
                 });
             });
-
-            // TODO: expose favourites with a tool button
-            // ui.menu_button("Favourites", |ui| {
-            //     for r in &state.persistent_settings.favourite_images.clone() {
-            //         if let Some(filename) = r.file_name() {
-            //             if ui.button(filename.to_string_lossy()).clicked() {
-            //ui.close_menu();
-
-            //             }
-            //         }
-            //     }
-
-            // });
         });
 
         // });
