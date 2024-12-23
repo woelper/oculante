@@ -1180,6 +1180,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
     egui::SidePanel::right("editing")
         .min_width(100.)
+        // safeguard to not expand too much
+        .max_width(500.)
         .show_separator_line(false)
         .show(ctx, |ui| {
 
@@ -1201,7 +1203,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             });
 
 
-            ui.vertical_centered_justified(|ui|{
+            ui.vertical_centered_justified(|ui| {
                 modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
                 // draw a line between different operator types
@@ -1944,7 +1946,7 @@ fn modifier_stack_ui(
 
         ui.push_id(i, |ui| {
             // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() * 1.6;
+            ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
             if operation.ui(ui, geo, mouse_grab, settings).changed() {
                 *image_changed = true;
             }
