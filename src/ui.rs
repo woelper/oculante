@@ -2249,6 +2249,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 };
                 ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., color);
 
+                if !ui.style().visuals.dark_mode {
+                    ui.style_mut().visuals.override_text_color = Some(Color32::WHITE);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::BLACK;
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
+                }
+
+                // ui.style_mut().visuals.noninteractive().bg_fill = Color32::GREEN;
+
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
                     .selected_text(
@@ -2309,6 +2317,34 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     }
                 }
             }
+        }
+
+        let label_rect = ui.ctx().available_rect().shrink(50.);
+
+        if state.persistent_settings.current_channel != ColorChannel::Rgba {
+            let mut job = LayoutJob::simple(
+                format!(
+                    "Viewing {} channel. Press '{}' to revert.",
+                    state.persistent_settings.current_channel,
+                    ColorChannel::Rgba.hotkey(&state.persistent_settings.shortcuts)
+                ),
+                FontId::proportional(13.),
+                ui.style().visuals.text_color(),
+                1000.,
+            );
+            job.halign = Align::Center;
+            let galley = ui.painter().layout_job(job);
+            let tr = galley
+                .rect
+                .translate(label_rect.center_bottom().to_vec2())
+                .expand(8.);
+            ui.painter().rect_filled(
+                tr,
+                ui.get_rounding(BUTTON_HEIGHT_SMALL),
+                ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
+            );
+            ui.painter()
+                .galley(label_rect.center_bottom(), galley, Color32::RED);
         }
 
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
