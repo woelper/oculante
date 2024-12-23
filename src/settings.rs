@@ -52,6 +52,7 @@ pub struct PersistentSettings {
     pub show_checker_background: bool,
     pub show_minimap: bool,
     pub show_frame: bool,
+    #[serde(skip)]
     pub current_channel: ColorChannel,
     /// How much to scale SVG images when rendering
     pub svg_scale: f32,

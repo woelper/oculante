@@ -19,7 +19,7 @@ fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) -> Result
                 Ok(i) => {
                     // println!("got image");
                     imgbuf.clear();
-                    let _ = texture_sender.send(Frame::new_still(i.to_rgba8()));
+                    let _ = texture_sender.send(Frame::new_still(i));
                     std::thread::sleep(std::time::Duration::from_millis(30));
                     false
                 }
