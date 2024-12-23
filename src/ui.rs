@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-use std::io::Write;
+use std::{collections::HashSet, io::Write};
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
@@ -750,8 +750,9 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                 ui.allocate_space(vec2(ui.available_width(), 0.));
                 if let Some(sampled_colors) = ui
                     .ctx()
-                    .memory(|r| r.data.get_temp::<Vec<[f32; 4]>>("picker".into()))
+                    .memory(|r| r.data.get_temp::<HashSet<[u8; 4]>>("picker".into()))
                 {
+                    // sampled_colors = sampled_colors.iter().map(|c|c as u8).collect();
                     ui.horizontal_wrapped(|ui| {
                         ui.spacing_mut().item_spacing = Vec2::splat(6.);
                         for color in &sampled_colors {
@@ -767,13 +768,18 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 ),
                             );
                             resp.on_hover_ui(|ui| {
-                                ui.label(format!("RGBA: {}", disp_col(*color)));
+                                ui.label(format!("RGBA: {}", disp_col([
+                                    color[0] as f32,
+                                    color[1] as f32,
+                                    color[2] as f32,
+                                    color[3] as f32,
+                                ])));
                             });
                         }
                     });
                     if ui.button("Clear").clicked() {
                         ui.ctx()
-                            .memory_mut(|w| w.data.remove_temp::<Vec<[f32; 4]>>("picker".into()));
+                            .memory_mut(|w| w.data.remove_temp::<HashSet<[f32; 4]>>("picker".into()));
                     }
                     if ui.button("Save ASE").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
@@ -791,7 +797,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         object_type: ase_swatch::types::ObjectColorType::Global,
                                         data: Color {
                                             mode: ase_swatch::types::ColorMode::Rgb,
-                                            values: [c[0] / 255., c[1] / 255., c[2] / 255.]
+                                            values: [c[0] as f32 / 255., c[1] as f32 / 255., c[2] as f32 / 255.]
                                                 .to_vec(),
                                         },
                                     })
@@ -812,8 +818,13 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     ui.ctx().memory_mut(|w| {
                         let cols = w
                             .data
-                            .get_temp_mut_or_default::<Vec<[f32; 4]>>("picker".into());
-                        cols.push(state.sampled_color);
+                            .get_temp_mut_or_default::<HashSet<[u8; 4]>>("picker".into());
+                        cols.insert([
+                            state.sampled_color[0] as u8,
+                            state.sampled_color[1] as u8,
+                            state.sampled_color[2] as u8,
+                            state.sampled_color[3] as u8,
+                        ]);
                     });
                 }
             });
