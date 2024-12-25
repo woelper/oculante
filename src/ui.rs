@@ -766,7 +766,17 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 (color[3]) as u8,
                             );
 
+                            let sampled_color = [
+                                state.sampled_color[0] as u8,
+                                state.sampled_color[1] as u8,
+                                state.sampled_color[2] as u8,
+                                state.sampled_color[3] as u8,
+                            ];
+
                             ui.painter().rect_filled(rect, 1., egui_color);
+                            if color == &sampled_color {
+                                ui.painter().rect_stroke(rect, 1., Stroke::new(2., ui.style().visuals.selection.bg_fill));
+                            }
                             if resp.hovered() {
                                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
                                     ui.ctx().memory_mut(|w| {
@@ -777,6 +787,10 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                             cols.remove(i);
                                         }
                                     });
+                                }
+                                if ui.ctx().input(|r| r.pointer.primary_clicked()) {
+                                    ui.ctx().output_mut(|w|w.copied_text = egui_color.to_hex());
+                                    state.send_message_info(&format!("Copied color: {}", egui_color.to_hex()));
                                 }
                             }
                             resp.on_hover_ui(|ui| {
@@ -790,6 +804,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         color[3] as f32,
                                     ])
                                 ));
+                                ui.label("Left click to copy Hex, right click to remove.");
                             });
                         }
                     });
@@ -858,6 +873,8 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                             if !cols.contains(&sampled_color) {
                                 cols.push(sampled_color);
+                            } else {
+                                state.send_message_info("Color already in palette");
                             }
                         });
                     }
