@@ -31,7 +31,7 @@ use crate::icons::*;
 use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{ColorType, GenericImageView, RgbaImage};
+use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -39,6 +39,7 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
+use quantette::{ColorSpace, ImagePipeline, PalettePipeline, QuantizeMethod};
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
@@ -775,7 +776,11 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                             ui.painter().rect_filled(rect, 1., egui_color);
                             if color == &sampled_color {
-                                ui.painter().rect_stroke(rect, 1., Stroke::new(2., ui.style().visuals.selection.bg_fill));
+                                ui.painter().rect_stroke(
+                                    rect,
+                                    1.,
+                                    Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                );
                             }
                             if resp.hovered() {
                                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
@@ -789,8 +794,11 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     });
                                 }
                                 if ui.ctx().input(|r| r.pointer.primary_clicked()) {
-                                    ui.ctx().output_mut(|w|w.copied_text = egui_color.to_hex());
-                                    state.send_message_info(&format!("Copied color: {}", egui_color.to_hex()));
+                                    ui.ctx().output_mut(|w| w.copied_text = egui_color.to_hex());
+                                    state.send_message_info(&format!(
+                                        "Copied color: {}",
+                                        egui_color.to_hex()
+                                    ));
                                 }
                             }
                             resp.on_hover_ui(|ui| {
@@ -820,6 +828,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                             cols.sort();
                         });
                     }
+
                     if ui.button("Save ASE").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
                     }
@@ -857,6 +866,50 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                 } else {
                     ui.label("Right click to sample color");
                 }
+                if let Some(img) = &state.current_image {
+                    if ui.button("From image").clicked() {
+                        ui.ctx()
+                        .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+
+                        if let Ok(mut pipeline) =
+                            PalettePipeline::try_from(&img.clone().into_rgb8())
+                        {
+                            let palette = pipeline
+                                .palette_size(32)
+                                .colorspace(ColorSpace::Oklab)
+                                .quantize_method(quantette::KmeansOptions::new())
+                                .palette_par();
+
+                            for col in palette {
+                                ui.ctx().memory_mut(|w| {
+                                    let cols = w
+                                        .data
+                                        .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                    cols.push([col.red, col.green, col.blue, 255]);
+                                });
+                            }
+                        }
+                    }
+                }
+                // if let Some(img) = state.current_image.clone() {
+                //     if ui.button("To image").clicked() {
+                //         let img = img.into_rgb8();
+                //         let mut pipeline = ImagePipeline::try_from(&img).unwrap();
+
+                //         let pipeline = pipeline
+                //         .palette_size(12)
+                //         .colorspace(ColorSpace::Oklab)
+                //         .quantize_method(QuantizeMethod::kmeans())
+                //         .dither_error_diffusion(0.8)
+                //         ;
+
+                //         let image = pipeline.quantized_rgbimage_par();
+
+                //         state.edit_state.result_pixel_op = DynamicImage::ImageRgb8(image);
+                //         state.send_frame(crate::Frame::UpdateTexture);
+                //         ui.ctx().request_repaint();
+                //     }
+                // }
                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
                     if !state.pointer_over_ui {
                         ui.ctx().memory_mut(|w| {

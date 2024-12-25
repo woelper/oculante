@@ -94,6 +94,7 @@ libblur = "0.13.5"
 egui-modal = "0.3.6"
 zip = "2.2.0"
 ase-swatch = "0.1.0"
+quantette = { version = "0.3.0", features = ["threads"] }
 
 [features]
 default = [
