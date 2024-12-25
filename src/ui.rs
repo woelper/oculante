@@ -750,7 +750,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                 ui.allocate_space(vec2(ui.available_width(), 0.));
                 if let Some(sampled_colors) = ui
                     .ctx()
-                    .memory(|r| r.data.get_temp::<HashSet<[u8; 4]>>("picker".into()))
+                    .memory(|r| r.data.get_temp::<Vec<[u8; 4]>>("picker".into()))
                 {
                     // sampled_colors = sampled_colors.iter().map(|c|c as u8).collect();
                     ui.horizontal_wrapped(|ui| {
@@ -758,28 +758,52 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         for color in &sampled_colors {
                             let (rect, resp) =
                                 ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
-                            ui.painter().rect_filled(
-                                rect,
-                                1.,
-                                Color32::from_rgb(
-                                    (color[0]) as u8,
-                                    (color[1]) as u8,
-                                    (color[2]) as u8,
-                                ),
+
+                            let egui_color = Color32::from_rgba_premultiplied(
+                                (color[0]) as u8,
+                                (color[1]) as u8,
+                                (color[2]) as u8,
+                                (color[3]) as u8,
                             );
+
+                            ui.painter().rect_filled(rect, 1., egui_color);
+                            if resp.hovered() {
+                                if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                                    ui.ctx().memory_mut(|w| {
+                                        let cols = w.data.get_temp_mut_or_default::<Vec<[u8; 4]>>(
+                                            "picker".into(),
+                                        );
+                                        if let Some(i) = cols.iter().position(|c| c == color) {
+                                            cols.remove(i);
+                                        }
+                                    });
+                                }
+                            }
                             resp.on_hover_ui(|ui| {
-                                ui.label(format!("RGBA: {}", disp_col([
-                                    color[0] as f32,
-                                    color[1] as f32,
-                                    color[2] as f32,
-                                    color[3] as f32,
-                                ])));
+                                ui.label(format!("HEX: {}", egui_color.to_hex()));
+                                ui.label(format!(
+                                    "RGBA: {}",
+                                    disp_col([
+                                        color[0] as f32,
+                                        color[1] as f32,
+                                        color[2] as f32,
+                                        color[3] as f32,
+                                    ])
+                                ));
                             });
                         }
                     });
                     if ui.button("Clear").clicked() {
                         ui.ctx()
-                            .memory_mut(|w| w.data.remove_temp::<HashSet<[f32; 4]>>("picker".into()));
+                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+                    }
+                    if ui.button("Sort").clicked() {
+                        ui.ctx().memory_mut(|w| {
+                            let cols = w
+                                .data
+                                .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                            cols.sort();
+                        });
                     }
                     if ui.button("Save ASE").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
@@ -797,8 +821,12 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         object_type: ase_swatch::types::ObjectColorType::Global,
                                         data: Color {
                                             mode: ase_swatch::types::ColorMode::Rgb,
-                                            values: [c[0] as f32 / 255., c[1] as f32 / 255., c[2] as f32 / 255.]
-                                                .to_vec(),
+                                            values: [
+                                                c[0] as f32 / 255.,
+                                                c[1] as f32 / 255.,
+                                                c[2] as f32 / 255.,
+                                            ]
+                                            .to_vec(),
                                         },
                                     })
                                     .collect::<Vec<_>>();
@@ -815,17 +843,24 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     ui.label("Right click to sample color");
                 }
                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
-                    ui.ctx().memory_mut(|w| {
-                        let cols = w
-                            .data
-                            .get_temp_mut_or_default::<HashSet<[u8; 4]>>("picker".into());
-                        cols.insert([
-                            state.sampled_color[0] as u8,
-                            state.sampled_color[1] as u8,
-                            state.sampled_color[2] as u8,
-                            state.sampled_color[3] as u8,
-                        ]);
-                    });
+                    if !state.pointer_over_ui {
+                        ui.ctx().memory_mut(|w| {
+                            let cols = w
+                                .data
+                                .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+
+                            let sampled_color = [
+                                state.sampled_color[0] as u8,
+                                state.sampled_color[1] as u8,
+                                state.sampled_color[2] as u8,
+                                state.sampled_color[3] as u8,
+                            ];
+
+                            if !cols.contains(&sampled_color) {
+                                cols.push(sampled_color);
+                            }
+                        });
+                    }
                 }
             });
         });
