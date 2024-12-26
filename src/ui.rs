@@ -754,7 +754,8 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     .ctx()
                     .memory(|r| r.data.get_temp::<Vec<[u8; 4]>>("picker".into()))
                 {
-                    // sampled_colors = sampled_colors.iter().map(|c|c as u8).collect();
+                    if !sampled_colors.is_empty() {
+                       
                     ui.horizontal_wrapped(|ui| {
                         ui.spacing_mut().item_spacing = Vec2::splat(6.);
                         for color in &sampled_colors {
@@ -829,7 +830,6 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                             cols.sort();
                         });
                     }
-
                     if ui.button("Save ASE").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
                     }
@@ -864,6 +864,10 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                             ui.ctx(),
                         );
                     }
+
+                }
+
+
                 } else {
                     ui.label("Right click to sample color");
                 }
