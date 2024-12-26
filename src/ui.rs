@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-use std::{collections::HashSet, io::Write};
+use std::io::Write;
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
@@ -31,7 +31,7 @@ use crate::icons::*;
 use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
+use image::{ColorType, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -39,7 +39,7 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
-use quantette::{ColorSpace, ImagePipeline, PalettePipeline, QuantizeMethod};
+use quantette::{ColorSpace, PalettePipeline};
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
@@ -48,7 +48,7 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
-const PANEL_WIDTH: f32 = 240.0;
+pub const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 #[cfg(feature = "turbo")]
@@ -542,14 +542,15 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
         }
     }
 
-    egui::SidePanel::left("side_panel")
+    egui::SidePanel::left("info")
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
+    .frame(Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
     .show(ctx, |ui| {
-
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
+
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
@@ -625,9 +626,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 
                 let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
 
-                let sampled = state.sampled_color;
+                // let sampled = state.sampled_color;
                 //Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::from_rgb(sampled[0] as u8, sampled[1] as u8, sampled[2] as u8), egui::Stroke::new(0.0, egui::Color32::default()));
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
 
@@ -869,7 +870,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                 if let Some(img) = &state.current_image {
                     if ui.button("From image").clicked() {
                         ui.ctx()
-                        .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
                         if let Ok(mut pipeline) =
                             PalettePipeline::try_from(&img.clone().into_rgb8())

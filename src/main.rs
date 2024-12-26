@@ -21,6 +21,7 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
+use oculante::ui::PANEL_WIDTH;
 use oculante::BOLD_FONT;
 use oculante::FONT;
 use shortcuts::key_pressed;
@@ -1023,13 +1024,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let mut bbox_tl: egui::Pos2 = Default::default();
     let mut bbox_br: egui::Pos2 = Default::default();
-    let mut browser_open = false;
+    let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(id)));
         }
 
+        // set info panel color dynamically
+        info_panel_color = ctx.style().visuals.panel_fill;
+
+        // open a file browser if requested
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
@@ -1087,13 +1092,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        browser_open = ctx.memory(|w| w.is_popup_open(Id::new("SAVE")))
-            || ctx.memory(|w| w.is_popup_open(Id::new("OPEN")))
-            || ctx.memory(|w| w.is_popup_open(Id::new("LUT")));
-
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
+            && state.current_image.is_some()
         {
             (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
@@ -1145,6 +1147,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // Settings come last, as they block keyboard grab (for hotkey assigment)
         settings_ui(app, ctx, state, gfx);
     });
+
+
 
     if let Some(texture) = &state.current_texture.get() {
         // align to pixel to prevent distortion
@@ -1204,7 +1208,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.info_enabled && !browser_open {
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+                .color(Color::from_rgb(
+                    info_panel_color.r() as f32 / 255.,
+                    info_panel_color.g() as f32 / 255.,
+                    info_panel_color.b() as f32 / 255.,
+                ));
+
             texture.draw_zoomed(
                 &mut zoom_image,
                 bbox_tl.x,
@@ -1259,8 +1273,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         c[2] as f32 / 255.,
     ));
     gfx.render(&draw);
-    gfx.render(&egui_output);
     gfx.render(&zoom_image);
+    gfx.render(&egui_output);
 }
 
 // Show file browser to select image to load
