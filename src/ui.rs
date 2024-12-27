@@ -6,10 +6,11 @@ use crate::{
     file_encoder::FileEncoder,
     get_pixel_checked,
     image_editing::{
-        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ScaleFilter,
+        self, process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
+        ScaleFilter,
     },
     paint::PaintStroke,
-    set_zoom,
+    pos_from_coord, set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
@@ -35,6 +36,7 @@ use image::{ColorType, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
+use nalgebra::Vector2;
 use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
@@ -732,6 +734,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 
                 palette_ui(ui, state);
 
+                if state.persistent_settings.experimental_features {
+                    measure_ui(ui, state);
+                }
+
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -755,119 +761,118 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     .memory(|r| r.data.get_temp::<Vec<[u8; 4]>>("picker".into()))
                 {
                     if !sampled_colors.is_empty() {
-                       
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = Vec2::splat(6.);
-                        for color in &sampled_colors {
-                            let (rect, resp) =
-                                ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = Vec2::splat(6.);
+                            for color in &sampled_colors {
+                                let (rect, resp) =
+                                    ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
 
-                            let egui_color = Color32::from_rgba_premultiplied(
-                                (color[0]) as u8,
-                                (color[1]) as u8,
-                                (color[2]) as u8,
-                                (color[3]) as u8,
-                            );
-
-                            let sampled_color = [
-                                state.sampled_color[0] as u8,
-                                state.sampled_color[1] as u8,
-                                state.sampled_color[2] as u8,
-                                state.sampled_color[3] as u8,
-                            ];
-
-                            ui.painter().rect_filled(rect, 1., egui_color);
-                            if color == &sampled_color {
-                                ui.painter().rect_stroke(
-                                    rect,
-                                    1.,
-                                    Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                let egui_color = Color32::from_rgba_premultiplied(
+                                    (color[0]) as u8,
+                                    (color[1]) as u8,
+                                    (color[2]) as u8,
+                                    (color[3]) as u8,
                                 );
-                            }
-                            if resp.hovered() {
-                                if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
-                                    ui.ctx().memory_mut(|w| {
-                                        let cols = w.data.get_temp_mut_or_default::<Vec<[u8; 4]>>(
-                                            "picker".into(),
-                                        );
-                                        if let Some(i) = cols.iter().position(|c| c == color) {
-                                            cols.remove(i);
-                                        }
-                                    });
+
+                                let sampled_color = [
+                                    state.sampled_color[0] as u8,
+                                    state.sampled_color[1] as u8,
+                                    state.sampled_color[2] as u8,
+                                    state.sampled_color[3] as u8,
+                                ];
+
+                                ui.painter().rect_filled(rect, 1., egui_color);
+                                if color == &sampled_color {
+                                    ui.painter().rect_stroke(
+                                        rect,
+                                        1.,
+                                        Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                    );
                                 }
-                                if ui.ctx().input(|r| r.pointer.primary_clicked()) {
-                                    ui.ctx().output_mut(|w| w.copied_text = egui_color.to_hex());
-                                    state.send_message_info(&format!(
-                                        "Copied color: {}",
-                                        egui_color.to_hex()
+                                if resp.hovered() {
+                                    if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                                        ui.ctx().memory_mut(|w| {
+                                            let cols =
+                                                w.data.get_temp_mut_or_default::<Vec<[u8; 4]>>(
+                                                    "picker".into(),
+                                                );
+                                            if let Some(i) = cols.iter().position(|c| c == color) {
+                                                cols.remove(i);
+                                            }
+                                        });
+                                    }
+                                    if ui.ctx().input(|r| r.pointer.primary_clicked()) {
+                                        ui.ctx()
+                                            .output_mut(|w| w.copied_text = egui_color.to_hex());
+                                        state.send_message_info(&format!(
+                                            "Copied color: {}",
+                                            egui_color.to_hex()
+                                        ));
+                                    }
+                                }
+                                resp.on_hover_ui(|ui| {
+                                    ui.label(format!("HEX: {}", egui_color.to_hex()));
+                                    ui.label(format!(
+                                        "RGBA: {}",
+                                        disp_col([
+                                            color[0] as f32,
+                                            color[1] as f32,
+                                            color[2] as f32,
+                                            color[3] as f32,
+                                        ])
                                     ));
-                                }
+                                    ui.label("Left click to copy Hex, right click to remove.");
+                                });
                             }
-                            resp.on_hover_ui(|ui| {
-                                ui.label(format!("HEX: {}", egui_color.to_hex()));
-                                ui.label(format!(
-                                    "RGBA: {}",
-                                    disp_col([
-                                        color[0] as f32,
-                                        color[1] as f32,
-                                        color[2] as f32,
-                                        color[3] as f32,
-                                    ])
-                                ));
-                                ui.label("Left click to copy Hex, right click to remove.");
+                        });
+                        if ui.button("Clear").clicked() {
+                            ui.ctx().memory_mut(|w| {
+                                w.data.remove_temp::<Vec<[u8; 4]>>("picker".into())
                             });
                         }
-                    });
-                    if ui.button("Clear").clicked() {
-                        ui.ctx()
-                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
-                    }
-                    if ui.button("Sort").clicked() {
-                        ui.ctx().memory_mut(|w| {
-                            let cols = w
-                                .data
-                                .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
-                            cols.sort();
-                        });
-                    }
-                    if ui.button("Save ASE").clicked() {
-                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
-                    }
-                    if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
-                        filebrowser::browse_modal(
-                            true,
-                            &["ase"],
-                            &mut state.volatile_settings,
-                            |p| {
-                                let swatches = sampled_colors
-                                    .iter()
-                                    .map(|c| ObjectColor {
-                                        name: "".into(),
-                                        object_type: ase_swatch::types::ObjectColorType::Global,
-                                        data: Color {
-                                            mode: ase_swatch::types::ColorMode::Rgb,
-                                            values: [
-                                                c[0] as f32 / 255.,
-                                                c[1] as f32 / 255.,
-                                                c[2] as f32 / 255.,
-                                            ]
-                                            .to_vec(),
-                                        },
-                                    })
-                                    .collect::<Vec<_>>();
+                        if ui.button("Sort").clicked() {
+                            ui.ctx().memory_mut(|w| {
+                                let cols = w
+                                    .data
+                                    .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                cols.sort();
+                            });
+                        }
+                        if ui.button("Save ASE").clicked() {
+                            ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                        }
+                        if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                            filebrowser::browse_modal(
+                                true,
+                                &["ase"],
+                                &mut state.volatile_settings,
+                                |p| {
+                                    let swatches = sampled_colors
+                                        .iter()
+                                        .map(|c| ObjectColor {
+                                            name: "".into(),
+                                            object_type: ase_swatch::types::ObjectColorType::Global,
+                                            data: Color {
+                                                mode: ase_swatch::types::ColorMode::Rgb,
+                                                values: [
+                                                    c[0] as f32 / 255.,
+                                                    c[1] as f32 / 255.,
+                                                    c[2] as f32 / 255.,
+                                                ]
+                                                .to_vec(),
+                                            },
+                                        })
+                                        .collect::<Vec<_>>();
 
-                                let s = ase_swatch::create_ase(&vec![], &swatches);
-                                if let Ok(mut f) = std::fs::File::create(p) {
-                                    _ = f.write_all(&s);
-                                }
-                            },
-                            ui.ctx(),
-                        );
+                                    let s = ase_swatch::create_ase(&vec![], &swatches);
+                                    if let Ok(mut f) = std::fs::File::create(p) {
+                                        _ = f.write_all(&s);
+                                    }
+                                },
+                                ui.ctx(),
+                            );
+                        }
                     }
-
-                }
-
-
                 } else {
                     ui.label("Right click to sample color");
                 }
@@ -942,7 +947,119 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
     });
 }
 
+fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
+    ui.styled_collapsing("Measure", |ui| {
+        ui.vertical_centered_justified(|ui| {
+            dark_panel(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.));
+                // draw a line using egui with the mouse
+
+                let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+
+                let cursor_relative = pos_from_coord(
+                    state.image_geometry.offset,
+                    Vector2::new(cursor_abs.x, cursor_abs.y),
+                    Vector2::new(
+                        state.image_geometry.dimensions.0 as f32,
+                        state.image_geometry.dimensions.1 as f32,
+                    ),
+                    state.image_geometry.scale,
+                );
+
+                let x = state
+                    .edit_state
+                    .image_op_stack
+                    .iter()
+                    .filter(|op| matches!(op, ImageOperation::Measure { .. }))
+                    .collect::<Vec<_>>();
+                if x.len() != 1 {
+                    state
+                        .edit_state
+                        .image_op_stack
+                        .push(ImageOperation::Measure {
+                            shapes: vec![MeasureShape::new_rect(vec![(0, 0), (0, 0)])],
+                        });
+                }
+
+                if ui.ctx().input(|r| r.pointer.secondary_pressed()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        match op {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[0].0 = cursor_relative.x as u32;
+                                            points[0].1 = cursor_relative.y as u32;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                if ui.ctx().input(|r| r.pointer.secondary_down()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        match op {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[1].0 = cursor_relative.x as u32;
+                                            points[1].1 = cursor_relative.y as u32;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                if ui.ctx().input(|r| r.pointer.secondary_released()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        match op {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[1].0 = cursor_relative.x as u32;
+                                            points[1].1 = cursor_relative.y as u32;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            });
+        });
+
+        for op in &mut state.edit_state.image_op_stack {
+            op.ui(
+                ui,
+                &state.image_geometry,
+                &mut state.mouse_grab,
+                &mut state.volatile_settings,
+            );
+        }
+    });
+}
+
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+    #[derive(Debug, PartialEq)]
+    enum SettingsState {
+        General,
+        Visual,
+        Input,
+        Debug,
+        None,
+    }
+
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
             .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
@@ -952,184 +1069,258 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
             .default_width(600.)
             .show(ctx, |ui| {
 
-                #[cfg(debug_assertions)]
-                if ui.button("send test msg").clicked() {
-                    state.send_message_info("Test");
-                }
-
-                egui::ComboBox::from_label("Color theme")
-                .selected_text(format!("{:?}", state.persistent_settings.theme))
-                .show_ui(ui, |ui| {
-                    let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
-                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
-                        r.mark_changed();
-                    }
-                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
-                        r.mark_changed();
-                    }
-
-                    if r.changed() {
-                        apply_theme(state, ctx);
-                    }
-                }
-                );
+                let mut scroll_to = SettingsState::None;
 
 
-                egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        if ui
-                            .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                            .changed()
-                        {
-                          apply_theme(state, ctx);
+                ui.horizontal(|ui|{
+                    ui.vertical(|ui| {
+                        if ui.styled_button(format!("{OPTIONS} General")).clicked() {
+                            scroll_to = SettingsState::General;
                         }
-                        ui.label("Accent color");
+                        if ui.styled_button(format!("{DISPLAY} Visual")).clicked() {
+                            scroll_to = SettingsState::Visual;
+                        }
+                        if ui.styled_button(format!("{MOUSE} Input")).clicked() {
+                            scroll_to = SettingsState::Input;
+                        }
+                        if ui.styled_button(format!("{DEBUG} Debug")).clicked() {
+                            scroll_to = SettingsState::Debug;
+                        }
                     });
 
-                    ui.horizontal(|ui| {
-                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
-                        ui.label("Background color");
+                    dark_panel(ui, |ui| {
+                        // ui.add_space(ui.available_width());
+                        egui::ScrollArea::vertical().auto_shrink([false,false]).min_scrolled_height(400.).min_scrolled_width(400.).show(ui, |ui| {
+
+                            ui.vertical(|ui| {
+
+                           
+
+                                let general = ui.heading("General");
+                                if SettingsState::General == scroll_to {
+                                    general.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.vsync, "VSync")
+                                    .on_hover_text(
+                                        "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.",
+                                    );
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
+                                    .on_hover_text(
+                                        "Enables an index slider to quickly scrub through lots of images.",
+                                    );
+
+
+                                    if ui
+                                    .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
+                                    .on_hover_text(
+                                        "Repeats the current directory when you move past the first or last file in the current directory.",
+                                    )
+                                    .changed()
+                                    {
+                                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                                    }
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Number of images to cache");
+                                        if ui
+                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
+                                        .on_hover_text(
+                                            "Keeps this many images in memory for faster opening.",
+                                        )
+                                        .changed()
+                                        {
+                                            state.player.cache.cache_size = state.persistent_settings.max_cache;
+                                            state.player.cache.clear();
+                                        }
+                                    });
+
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
+                                    .on_hover_text(
+                                        "When a new image is loaded, keep the current zoom and offset.",
+                                    );
+
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
+                                    .on_hover_text(
+                                        "When a new image is loaded, keep current edits on the previously edited image.",
+                                    );
+
+                                    if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.").changed(){
+                                        app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
+                                    }
+
+                                                   
+                                    if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
+                                        state.send_frame(crate::Frame::UpdateTexture);
+                                    }
+
+                                    ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
+                                    ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Multiplier of zoom when you use the mouse wheel or the trackpad.");
+                                    #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
+                                    ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. A restart is required to take effect.");
+                    
+                                    ui.label("Minimum window size");
+                                    ui.horizontal(|ui| {
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                    });
+
+       
+
+                                        #[cfg(feature = "update")]
+                                        if ui.button("Check for updates").on_hover_text("Check and install the latest update if available. A restart is required to use a newly installed version.").clicked() {
+                                            state.send_message_info("Checking for updates...");
+                                            crate::update::update(Some(state.message_channel.0.clone()));
+                                            state.settings_enabled = false;
+                                        }
+                    
+                                        if ui.button("Reset all settings").clicked() {
+                                            state.persistent_settings = Default::default();
+                                            apply_theme(state, ctx);
+                                        }
+
+
+                                        if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
+                                            _ = webbrowser::open("https://github.com/woelper/oculante");
+                                        }
+                        
+
+                                  
+
+
+                                  
+
+
+                                });
+
+                                let visual = ui.heading("Visual");
+                                if SettingsState::Visual == scroll_to {
+                                    visual.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+
+                                    egui::ComboBox::from_label("Color theme")
+                                    .selected_text(format!("{:?}", state.persistent_settings.theme))
+                                    .show_ui(ui, |ui| {
+                                        let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
+                                        if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
+                                            r.mark_changed();
+                                        }
+                                        if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
+                                            r.mark_changed();
+                                        }
+
+                                        if r.changed() {
+                                            apply_theme(state, ctx);
+                                        }
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        if ui
+                                            .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                                            .changed()
+                                        {
+                                          apply_theme(state, ctx);
+                                        }
+                                        ui.label("Accent color");
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
+                                        ui.label("Background color");
+                                    });
+
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Transparency Grid")
+                                    .on_hover_text(
+                                        "Replaces transparency with a checker background.",
+                                    );
+
+                                    ui
+                                    .styled_checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
+                                    .on_hover_text(
+                                        "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
+                                    );
+
+                                    if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
+                                        state.send_frame(crate::Frame::UpdateTexture);
+                                    }
+
+                                    if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
+                                        state.send_frame(crate::Frame::UpdateTexture);
+                                    }
+
+                                    if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Zen mode").on_hover_text("Hides all UI and fits images to the frame.").changed(){
+                                        set_title(app, state);
+                                    }
+
+                                    // TODO: add more options here
+                                    ui.horizontal(|ui| {
+                                        ui.label("Window title");
+                                        if ui
+                                        .text_edit_singleline(&mut state.persistent_settings.title_format)
+                                        .on_hover_text(
+                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
+                                        )
+                                        .changed()
+                                        {
+                                            set_title(app, state);
+                                        }
+                                    });
+
+                                });
+
+
+                                let input = ui.heading("Input");
+                                if SettingsState::Input == scroll_to {
+                                    input.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                        keybinding_ui(app, state, ui);
+                                });
+
+                                let debug = ui.heading("Debug");
+                                if SettingsState::Debug == scroll_to {
+                                    debug.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    #[cfg(debug_assertions)]
+                                    if ui.button("send test msg").clicked() {
+                                        state.send_message_info("Test");
+                                    }
+                                    ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "Enable experimental features").on_hover_text("Turn on features that are not yet finished and need to be hidden from scared users :)");
+
+                                });
+
+
+                            });
+
+                        });
+
+
                     });
 
-                    ui.end_row();
-
-                    ui
-                    .styled_checkbox(&mut state.persistent_settings.vsync, "VSync")
-                    .on_hover_text(
-                        "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.",
-                    );
-                ui
-                .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
-                .on_hover_text(
-                    "Enables an index slider to quickly scrub through lots of images.",
-                );
-                    ui.end_row();
-
-                    if ui
-                    .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
-                    .on_hover_text(
-                        "Repeats the current directory when you move past the first or last file in the current directory.",
-                    )
-                    .changed()
-                {
-                    state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                }
-                ui.horizontal(|ui| {
-                    ui.label("Number of images to cache");
-                    if ui
-                    .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
-
-                    .on_hover_text(
-                        "Keeps this many images in memory for faster opening.",
-                    )
-                    .changed()
-                {
-                    state.player.cache.cache_size = state.persistent_settings.max_cache;
-                    state.player.cache.clear();
-                }
                 });
 
-                ui.end_row();
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
-                    .on_hover_text(
-                        "When a new image is loaded, keep the current zoom and offset.",
-                    );
-
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
-                    .on_hover_text(
-                        "When a new image is loaded, keep current edits on the previously edited image.",
-                    );
-                ui.end_row();
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Transparency Grid")
-                    .on_hover_text(
-                        "Replaces transparency with a checker background.",
-                    );
-
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
-                    .on_hover_text(
-                        "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
-                    );
-                    ui.end_row();
-                if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Zen mode").on_hover_text("Hides all UI and fits images to the frame.").changed(){
-                    set_title(app, state);
-                }
-                if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.").changed(){
-                    app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
-                }
-
-                // ui.label(format!("lazy {}", app.window().lazy_loop()));
-                ui.end_row();
-                if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-                if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-                ui.end_row();
-
-                if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-
-                ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
-                ui.end_row();
-
-                ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Multiplier of zoom when you use the mouse wheel or the trackpad.");
-                #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. A restart is required to take effect.");
-                ui.end_row();
-
-                ui.label("Minimum window size");
-                ui.horizontal(|ui| {
-                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
-                });
-                ui.end_row();
 
 
-            });
-
-                // TODO: add more options here
-                ui.horizontal(|ui| {
-                    ui.label("Window title");
-                    if ui
-                    .text_edit_singleline(&mut state.persistent_settings.title_format)
-                    .on_hover_text(
-                        "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
-                    )
-                    .changed()
-                    {
-                        set_title(app, state);
-                    }
-                });
-
-                if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
-                    _ = webbrowser::open("https://github.com/woelper/oculante");
-                }
 
 
-                ui.vertical_centered_justified(|ui| {
 
-                    #[cfg(feature = "update")]
-                    if ui.button("Check for updates").on_hover_text("Check and install the latest update if available. A restart is required to use a newly installed version.").clicked() {
-                        state.send_message_info("Checking for updates...");
-                        crate::update::update(Some(state.message_channel.0.clone()));
-                        state.settings_enabled = false;
-                    }
 
-                    if ui.button("Reset all settings").clicked() {
-                        state.persistent_settings = Default::default();
-                        apply_theme(state, ctx);
-                    }
-                });
+           
 
-                ui.styled_collapsing("Keybindings",|ui| {
-                    keybinding_ui(app, state, ui);
-                });
+      
+
+             
+
+  
+
+              
 
             });
     state.settings_enabled = settings_enabled;
@@ -2274,42 +2465,37 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .map(|k| format!("{:?}", k.0))
         .collect::<BTreeSet<String>>();
 
-    egui::ScrollArea::vertical()
-        .auto_shrink([false, true])
-        .show(ui, |ui| {
-            let s = state.persistent_settings.shortcuts.clone();
-            let mut ordered_shortcuts = state
-                .persistent_settings
-                .shortcuts
-                .iter_mut()
-                .collect::<Vec<_>>();
-            ordered_shortcuts
-                .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    let s = state.persistent_settings.shortcuts.clone();
+    let mut ordered_shortcuts = state
+        .persistent_settings
+        .shortcuts
+        .iter_mut()
+        .collect::<Vec<_>>();
+    ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-            egui::Grid::new("info").num_columns(2).show(ui, |ui| {
-                for (event, keys) in ordered_shortcuts {
-                    ui.label(format!("{event:?}"));
+    egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+        for (event, keys) in ordered_shortcuts {
+            ui.label(format!("{event:?}"));
 
-                    ui.label(lookup(&s, event));
-                    if !no_keys_pressed {
-                        if ui
-                            .button(format!("Assign {}", keypresses_as_string(&k)))
-                            .clicked()
-                        {
-                            *keys = app
-                                .keyboard
-                                .down
-                                .iter()
-                                .map(|(k, _)| format!("{k:?}"))
-                                .collect();
-                        }
-                    } else {
-                        ui.add_enabled(false, egui::Button::new("Press key(s)..."));
-                    }
-                    ui.end_row();
+            ui.label(lookup(&s, event));
+            if !no_keys_pressed {
+                if ui
+                    .button(format!("Assign {}", keypresses_as_string(&k)))
+                    .clicked()
+                {
+                    *keys = app
+                        .keyboard
+                        .down
+                        .iter()
+                        .map(|(k, _)| format!("{k:?}"))
+                        .collect();
                 }
-            });
-        });
+            } else {
+                ui.add_enabled(false, egui::Button::new("Press key(s)..."));
+            }
+            ui.end_row();
+        }
+    });
 }
 
 // fn keystrokes(ui: &mut Ui) {
@@ -3093,6 +3279,27 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     ui.painter().add(text);
 }
 
+fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+    let panel_bg_color = match ui.style().visuals.dark_mode {
+        true => Color32::from_gray(25),
+        false => Color32::from_gray(230),
+    };
+
+    let button_color = match ui.style().visuals.dark_mode {
+        true => Color32::from_gray(25),
+        false => Color32::from_gray(230),
+    };
+
+    egui::Frame::none()
+        .fill(panel_bg_color)
+        .rounding(ui.style().visuals.widgets.active.rounding)
+        .inner_margin(Margin::same(6.))
+        .show(ui, |ui| {
+            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
+            ui.scope(add_contents);
+        });
+}
+
 fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
     let panel_bg_color = match ui.style().visuals.dark_mode {
         true => Color32::from_gray(13),
@@ -3110,11 +3317,6 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
             ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
-
             ui.scope(add_contents);
-            // let mut prepared = ui.begin(ui);
-            // let ret = add_contents(&mut prepared.content_ui);
-            // let response = prepared.end(ui);
-            // InnerResponse::new(ret, response)
         });
 }
