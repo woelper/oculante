@@ -325,13 +325,15 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
+        info!("This Display has DPI {:?}", gfx.dpi());
+        let offset = if gfx.dpi() > 1.0 { 0.0 } else { -1.4 };
+
         fonts.font_data.insert(
             "inter".to_owned(),
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                // mac needs 0
-                y_offset: -1.4,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -341,7 +343,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -0.0,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );

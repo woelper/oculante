@@ -1222,9 +1222,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     visual.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-
-
-
                                     configuration_item_ui("Color theme", "Customize look and feel", |ui| {
                                         egui::ComboBox::from_id_source("Color theme")
                                         .selected_text(format!("{:?}", state.persistent_settings.theme))
@@ -1243,8 +1240,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         });
                                     }, ui);
 
-
-
                                    configuration_item_ui("Accent color", "Customize the primary color used in the UI", |ui| {
                                         if ui
                                         .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
@@ -1253,6 +1248,15 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                             apply_theme(state, ctx);
                                         }
                                     }, ui);
+
+                                    // This does not work, it just scales the texture in Notan.
+                                    // https://docs.rs/egui/latest/egui/struct.Context.html#method.set_zoom_factor
+                                    // configuration_item_ui("Zoom", "UI global zoom factor", |ui| {
+                                    //     let mut z = ui.ctx().zoom_factor();
+                                    //     if ui.add(egui::DragValue::new(&mut z).clamp_range(0.1..=4.0).speed(0.01)).changed() {
+                                    //         ui.ctx().set_zoom_factor(z);
+                                    //     }
+                                    // }, ui);
 
                                     configuration_item_ui("Background color", "The color used as a background for images", |ui| {
                                         ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
