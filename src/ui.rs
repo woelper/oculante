@@ -1060,17 +1060,32 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         None,
     }
 
+    fn configuration_item_ui<R>(
+        title: &str,
+        description: &str,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+        ui: &mut Ui,
+    ) {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(title));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.scope(add_contents);
+            });
+        });
+        ui.small(RichText::new(description).color(ui.style().visuals.weak_text_color()));
+        ui.add_space(14.);
+    }
+
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
-            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+            // .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable([false, true])
+            .resizable([true, true])
             .default_width(600.)
             .show(ctx, |ui| {
 
                 let mut scroll_to = SettingsState::None;
-
 
                 ui.horizontal(|ui|{
                     ui.vertical(|ui| {
@@ -1094,106 +1109,105 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                             ui.vertical(|ui| {
 
-                           
-
                                 let general = ui.heading("General");
                                 if SettingsState::General == scroll_to {
                                     general.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
 
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.vsync, "VSync")
-                                    .on_hover_text(
-                                        "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.",
-                                    );
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
-                                    .on_hover_text(
-                                        "Enables an index slider to quickly scrub through lots of images.",
-                                    );
+                                    configuration_item_ui("Vsync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.vsync, "");
+                                    }, ui);
 
+                                    configuration_item_ui("Show index slider", "Enables an index slider to quickly scrub through lots of images.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "")
+                                        ;
+                                    }, ui);
 
-                                    if ui
-                                    .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
-                                    .on_hover_text(
-                                        "Repeats the current directory when you move past the first or last file in the current directory.",
-                                    )
-                                    .changed()
-                                    {
-                                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                                    }
+                                    configuration_item_ui("Wrap images at folder boundaries", "Repeats the current directory when you move past the first or last file in the current directory.", |ui| {
+                                        if ui
+                                        .styled_checkbox(&mut state.persistent_settings.wrap_folder, "")
+                                        .changed()
+                                        {
+                                            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                                        }
+                                    }, ui);
 
-                                    ui.horizontal(|ui| {
-                                        ui.label("Number of images to cache");
+                                    configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
                                         if ui
                                         .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
-                                        .on_hover_text(
-                                            "Keeps this many images in memory for faster opening.",
-                                        )
                                         .changed()
                                         {
                                             state.player.cache.cache_size = state.persistent_settings.max_cache;
                                             state.player.cache.clear();
                                         }
-                                    });
+                                    }, ui);
 
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
-                                    .on_hover_text(
-                                        "When a new image is loaded, keep the current zoom and offset.",
-                                    );
+                                    configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
+                                    }, ui);
+                            
+                                    configuration_item_ui("Keep image edits", "When a new image is loaded, keep current edits on the previously edited image.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.keep_edits, "");
+                                    }, ui);
 
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
-                                    .on_hover_text(
-                                        "When a new image is loaded, keep current edits on the previously edited image.",
-                                    );
+                                    configuration_item_ui("Redraw every frame", "Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "").changed(){
+                                            app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
+                                        }
+                                    }, ui);
 
-                                    if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.").changed(){
-                                        app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
-                                    }
+                                    configuration_item_ui("Use mipmaps", "When zooming out, less memory will be used. Faster performance, but blurry.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "").changed(){
+                                            state.send_frame(crate::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
 
-                                                   
-                                    if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
-                                        state.send_frame(crate::Frame::UpdateTexture);
-                                    }
+                                    configuration_item_ui("Fit image on window resize", "When you resize the main window, do you want to fit the image with it?", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "");
+                                    }, ui);
 
-                                    ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
-                                    ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Multiplier of zoom when you use the mouse wheel or the trackpad.");
+                                    configuration_item_ui("Zoom multiplier", "Multiplier of zoom when you use the mouse wheel or the trackpad.", |ui| {
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
+                                    }, ui);
+
                                     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                                    ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. A restart is required to take effect.");
-                    
-                                    ui.label("Minimum window size");
-                                    ui.horizontal(|ui| {
-                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
-                                    });
+                                    configuration_item_ui("Borderless moder", "Don't draw OS window decorations. A restart is required to take effect.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.borderless, "");
+                                    }, ui);
 
-       
+                                    configuration_item_ui("Minimum window size", "Set the minimum size of the main window.", |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                        });
+                                        
+                                    }, ui);
 
-                                        #[cfg(feature = "update")]
-                                        if ui.button("Check for updates").on_hover_text("Check and install the latest update if available. A restart is required to use a newly installed version.").clicked() {
+                                    #[cfg(feature = "update")]
+                                    configuration_item_ui("Check for updates", "Check and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
+                                        if ui.button("Check").clicked() {
                                             state.send_message_info("Checking for updates...");
                                             crate::update::update(Some(state.message_channel.0.clone()));
                                             state.settings_enabled = false;
                                         }
-                    
-                                        if ui.button("Reset all settings").clicked() {
+                                    }, ui);
+
+                                  
+
+
+                                    configuration_item_ui("Visit github repo", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
+                                        if ui.link("Check it out").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
+                                            _ = webbrowser::open("https://github.com/woelper/oculante");
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Reset all settings", "Reset Oculante to default", |ui| {
+                                        if ui.button("Reset").clicked() {
                                             state.persistent_settings = Default::default();
                                             apply_theme(state, ctx);
                                         }
-
-
-                                        if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
-                                            _ = webbrowser::open("https://github.com/woelper/oculante");
-                                        }
-                        
-
-                                  
-
-
-                                  
+                                    }, ui);
 
 
                                 });
@@ -1204,59 +1218,78 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
 
-                                    egui::ComboBox::from_label("Color theme")
-                                    .selected_text(format!("{:?}", state.persistent_settings.theme))
-                                    .show_ui(ui, |ui| {
-                                        let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
-                                        if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
-                                            r.mark_changed();
-                                        }
-                                        if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
-                                            r.mark_changed();
-                                        }
 
-                                        if r.changed() {
+
+                                    configuration_item_ui("Color theme", "Customize look and feel", |ui| {
+                                        egui::ComboBox::from_id_source("Color theme")
+                                        .selected_text(format!("{:?}", state.persistent_settings.theme))
+                                        .show_ui(ui, |ui| {
+                                            let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
+                                            if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
+                                                r.mark_changed();
+                                            }
+                                            if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
+                                                r.mark_changed();
+                                            }
+    
+                                            if r.changed() {
+                                                apply_theme(state, ctx);
+                                            }
+                                        });
+                                    }, ui);
+
+
+
+                                   configuration_item_ui("Accent color", "Customize the primary color used in the UI", |ui| {
+                                        if ui
+                                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                                        .changed()
+                                        {
                                             apply_theme(state, ctx);
                                         }
-                                    });
+                                    }, ui);
 
-                                    ui.horizontal(|ui| {
-                                        if ui
-                                            .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                                            .changed()
-                                        {
-                                          apply_theme(state, ctx);
-                                        }
-                                        ui.label("Accent color");
-                                    });
-                                    ui.horizontal(|ui| {
+                                    configuration_item_ui("Background color", "The color used as a background for images", |ui| {
                                         ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
-                                        ui.label("Background color");
-                                    });
+                                    }, ui);
 
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Transparency Grid")
-                                    .on_hover_text(
-                                        "Replaces transparency with a checker background.",
-                                    );
+                                    configuration_item_ui("Transparency Grid", "Replaces image transparency with a checker background.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_checker_background, "");
+                                    }, ui);
 
-                                    ui
-                                    .styled_checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
-                                    .on_hover_text(
-                                        "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
-                                    );
+                                    configuration_item_ui("Draw frame around image", "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.", |ui| {
+                                        ui
+                                        .styled_checkbox(&mut state.persistent_settings.show_frame, "");
+                                    }, ui);
 
-                                    if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
-                                        state.send_frame(crate::Frame::UpdateTexture);
-                                    }
+                                    configuration_item_ui("Interpolate when zooming in", "When zooming in, do you prefer to see individual pixels or an interpolation?", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "").changed(){
+                                            state.send_frame(crate::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
 
-                                    if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
-                                        state.send_frame(crate::Frame::UpdateTexture);
-                                    }
+                                    configuration_item_ui("Interpolate when zooming out", "When zooming out, do you prefer crisper or smoother pixels?", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "").changed() {
+                                            state.send_frame(crate::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
 
-                                    if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Zen mode").on_hover_text("Hides all UI and fits images to the frame.").changed(){
-                                        set_title(app, state);
-                                    }
+                                    configuration_item_ui("Zen mode", "Hides all UI and fits images to the frame.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "").changed(){
+                                            set_title(app, state);
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("T", "D", |ui| {
+                                        
+                                    }, ui);
+
+                                    configuration_item_ui("T", "D", |ui| {
+                                        
+                                    }, ui);
+
+
+                                  
 
                                     // TODO: add more options here
                                     ui.horizontal(|ui| {
@@ -1289,38 +1322,29 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
                                     #[cfg(debug_assertions)]
-                                    if ui.button("send test msg").clicked() {
-                                        state.send_message_info("Test");
-                                    }
-                                    ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "Enable experimental features").on_hover_text("Turn on features that are not yet finished and need to be hidden from scared users :)");
+                                    configuration_item_ui("Send test message", "Send some messages", |ui| {
+                                        if ui.button("Info").clicked() {
+                                            state.send_message_info("Test");
+                                        }
+                                        if ui.button("Warn").clicked() {
+                                            state.send_message_warn("Test");
+                                        }
+                                        if ui.button("Err").clicked() {
+                                            state.send_message_err("Test");
+                                        }
+                                    }, ui);
 
+                                    configuration_item_ui("Enable experimental features", "Turn on features that are not yet finished", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "");
+                                    }, ui);
                                 });
-
-
                             });
-
                         });
-
-
                     });
-
                 });
 
 
 
-
-
-
-
-           
-
-      
-
-             
-
-  
-
-              
 
             });
     state.settings_enabled = settings_enabled;
