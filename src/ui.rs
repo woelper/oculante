@@ -60,6 +60,10 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn label_unselectable(&mut self, _text: impl Into<WidgetText>) -> Response {
+        unimplemented!()
+    }
+
     fn label_right(&mut self, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
@@ -231,6 +235,11 @@ impl EguiExt for Ui {
             );
         })
         .response
+    }
+
+       /// Unselectable label
+       fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
+        self.add(egui::Label::new(text).selectable(false))
     }
 
     fn styled_menu_button(
@@ -1067,12 +1076,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         ui: &mut Ui,
     ) {
         ui.horizontal(|ui| {
-            ui.label(RichText::new(title));
+            ui.add(egui::Label::new(RichText::new(title)).selectable(false));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.scope(add_contents);
             });
         });
-        ui.small(RichText::new(description).color(ui.style().visuals.weak_text_color()));
+        ui.add(egui::Label::new(RichText::new(description).small().color(ui.style().visuals.weak_text_color())).selectable(false));
         ui.add_space(14.);
     }
 
@@ -1193,9 +1202,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                  
-
-
                                     configuration_item_ui("Visit github repo", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
                                         if ui.link("Check it out").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
                                             _ = webbrowser::open("https://github.com/woelper/oculante");
@@ -1280,16 +1286,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("T", "D", |ui| {
-                                        
-                                    }, ui);
-
-                                    configuration_item_ui("T", "D", |ui| {
-                                        
-                                    }, ui);
-
-
-                                  
 
                                     // TODO: add more options here
                                     ui.horizontal(|ui| {
@@ -1313,7 +1309,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     input.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-                                        keybinding_ui(app, state, ui);
+                                    keybinding_ui(app, state, ui);
                                 });
 
                                 let debug = ui.heading("Debug");
@@ -2476,9 +2472,9 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     let no_keys_pressed = app.keyboard.down.is_empty();
 
     ui.horizontal(|ui| {
-        ui.label("While this is open, regular shortcuts will not work.");
+        ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
-            ui.label(egui::RichText::new("Please press & hold a key").color(Color32::RED));
+            ui.label_unselectable(egui::RichText::new("Please press & hold a key").color(Color32::RED));
         }
     });
 
@@ -2499,9 +2495,8 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
 
     egui::Grid::new("info").num_columns(2).show(ui, |ui| {
         for (event, keys) in ordered_shortcuts {
-            ui.label(format!("{event:?}"));
-
-            ui.label(lookup(&s, event));
+            ui.label_unselectable(format!("{event:?}"));
+            ui.label_unselectable(lookup(&s, event));
             if !no_keys_pressed {
                 if ui
                     .button(format!("Assign {}", keypresses_as_string(&k)))
