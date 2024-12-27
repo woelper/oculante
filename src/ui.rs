@@ -1201,8 +1201,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Visit github repo", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
-                                        if ui.link("Check it out").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
+                                    configuration_item_ui("Visit GitHub Repository", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
+                                        if ui.link("Check it out!").on_hover_text("https://github.com/woelper/oculante").clicked() {
                                             _ = webbrowser::open("https://github.com/woelper/oculante");
                                         }
                                     }, ui);
