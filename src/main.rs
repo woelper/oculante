@@ -331,7 +331,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 // mac needs 0
-                y_offset: -0.0,
+                y_offset: -1.4,
                 baseline_offset_factor: 0.0,
             }),
         );

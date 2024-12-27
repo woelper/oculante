@@ -362,7 +362,6 @@ impl EguiExt for Ui {
         self.style_mut().visuals.indent_has_left_vline = false;
 
         CollapsingHeader::new(heading)
-            // .show_background(true)
             .icon(caret_icon)
             .show_unindented(self, add_contents)
     }
@@ -3285,12 +3284,12 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
-                ..=r.size().x + ui.style().spacing.icon_spacing - 4.0 + x_offset,
+                ..=r.size().x + ui.style().spacing.icon_spacing - 3.0 + x_offset,
             openness,
         ),
         egui::lerp(
             -ui.style().spacing.icon_spacing + y_offset
-                ..=-ui.style().spacing.icon_spacing + y_offset,
+                ..=-ui.style().spacing.icon_spacing + y_offset + 1.,
             openness,
         ),
     ));
