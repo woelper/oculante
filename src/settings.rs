@@ -65,6 +65,7 @@ pub struct PersistentSettings {
     pub zoom_multiplier: f32,
     pub borderless: bool,
     pub min_window_size: (u32, u32),
+    pub experimental_features: bool,
 }
 
 impl Default for PersistentSettings {
@@ -97,6 +98,7 @@ impl Default for PersistentSettings {
             zoom_multiplier: 1.0,
             borderless: false,
             min_window_size: (100, 100),
+            experimental_features: false,
         }
     }
 }
