@@ -60,7 +60,7 @@ mod ui;
 mod update;
 use crate::image_editing::EditState;
 use ui::*;
-mod image_editing;
+pub mod image_editing;
 pub mod paint;
 mod thumbnails;
 
@@ -1147,8 +1147,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // Settings come last, as they block keyboard grab (for hotkey assigment)
         settings_ui(app, ctx, state, gfx);
     });
-
-
 
     if let Some(texture) = &state.current_texture.get() {
         // align to pixel to prevent distortion
