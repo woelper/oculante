@@ -330,7 +330,8 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                // mac needs 0
+                y_offset: -0.0,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -340,7 +341,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                y_offset: -0.0,
                 baseline_offset_factor: 0.0,
             }),
         );
