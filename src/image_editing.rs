@@ -17,7 +17,9 @@ use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use notan::egui::epaint::PathShape;
-use notan::egui::{self, lerp, vec2, Color32, DragValue, Id, Pos2, Rect, Sense, Stroke, Vec2};
+use notan::egui::{
+    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke, Vec2,
+};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
@@ -147,7 +149,41 @@ pub enum ImageOperation {
         points: [(u32, u32); 4],
         original_size: (u32, u32),
     },
+    Measure {
+        shapes: Vec<MeasureShape>,
+    },
     LUT(String),
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+pub enum MeasureShape {
+    Line {
+        points: Vec<(u32, u32)>,
+        color: [u8; 4],
+        width: u8,
+    },
+    Rect {
+        points: Vec<(u32, u32)>,
+        color: [u8; 4],
+        width: u8,
+    },
+}
+
+impl MeasureShape {
+    pub fn new_line(points: Vec<(u32, u32)>) -> Self {
+        Self::Line {
+            points,
+            color: [255, 255, 255, 255],
+            width: 1,
+        }
+    }
+    pub fn new_rect(points: Vec<(u32, u32)>) -> Self {
+        Self::Rect {
+            points,
+            color: [255, 255, 255, 255],
+            width: 1,
+        }
+    }
 }
 
 impl fmt::Display for ImageOperation {
@@ -167,6 +203,7 @@ impl fmt::Display for ImageOperation {
             Self::Blur(_) => write!(f, "{DROP} Blur"),
             Self::Crop(_) => write!(f, "{CROP} Crop"),
             Self::CropPerspective { .. } => write!(f, "{CROP} Perspective crop"),
+            Self::Measure { .. } => write!(f, "Measure"),
             Self::Flip(_) => write!(f, "{SWAP} Flip"),
             Self::Rotate(_) => write!(f, "{ARROW_CLOCKWISE} Rotate"),
             Self::Invert => write!(f, "{SELECTION_INVERSE} Invert"),
@@ -735,6 +772,147 @@ impl ImageOperation {
                         r.changed = true;
                     }
                 }
+
+                r
+            }
+            Self::Measure { shapes } => {
+                let id = Id::new("shapes");
+                // create a fake response to alter
+                let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+
+                let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+
+                let cursor_relative = pos_from_coord(
+                    geo.offset,
+                    Vector2::new(cursor_abs.x, cursor_abs.y),
+                    Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
+                    geo.scale,
+                );
+
+                // if ui.button("Add line").clicked() {
+                //     shapes.push(MeasureShape::new_line(vec![(0, 0), (100, 100)]));
+                // }
+
+                // draw shapes
+                for shape in shapes {
+                    match shape {
+                        MeasureShape::Line {
+                            points,
+                            color,
+                            width,
+                        } => {
+                            let points_transformed = points
+                                .iter()
+                                .map(|p| {
+                                    (
+                                        geo.scale * p.0 as f32 + geo.offset.x,
+                                        geo.scale * p.1 as f32 + geo.offset.y,
+                                    )
+                                })
+                                .collect::<Vec<_>>();
+                            for p in points.chunks(2) {
+                                ui.painter().line_segment(
+                                    [
+                                        Pos2::new(p[0].0 as f32, p[0].1 as f32),
+                                        Pos2::new(p[1].0 as f32, p[1].1 as f32),
+                                    ],
+                                    Stroke::new(2., Color32::WHITE),
+                                );
+                            }
+                        }
+                        MeasureShape::Rect {
+                            points,
+                            color,
+                            width,
+                        } => {
+                            let points_transformed = points
+                                .iter()
+                                .map(|p| {
+                                    (
+                                        geo.scale * p.0 as f32 + geo.offset.x,
+                                        geo.scale * p.1 as f32 + geo.offset.y,
+                                    )
+                                })
+                                .collect::<Vec<_>>();
+
+                            let rect = Rect {
+                                min: Pos2::new(points_transformed[0].0, points_transformed[0].1),
+                                max: Pos2::new(points_transformed[1].0, points_transformed[1].1),
+                            };
+
+                            let rect_orig = Rect {
+                                min: Pos2::new(points[0].0 as f32, points[0].1 as f32),
+                                max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
+                            };
+
+                            ui.painter().rect_stroke(
+                                rect,
+                                0.0,
+                                Stroke::new(*width as f32, Color32::BLACK),
+                            );
+                            ui.painter().rect_stroke(
+                                rect,
+                                0.0,
+                                Stroke::new(*width as f32 / 2., Color32::WHITE),
+                            );
+
+                            ui.painter().text(
+                                rect.expand(14.).center_bottom(),
+                                Align2::CENTER_CENTER,
+                                format!(
+                                    "{}x{}",
+                                    rect_orig.width() as i32,
+                                    rect_orig.height() as i32
+                                ),
+                                FontId::proportional(14.),
+                                Color32::WHITE,
+                            );
+
+                            ui.painter().line_segment(
+                                [rect.left_center(), rect.right_center()],
+                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                            );
+
+                            ui.painter().line_segment(
+                                [rect.center_top(), rect.center_bottom()],
+                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                            );
+                        }
+                    }
+                }
+
+                // for (i, pt) in points_transformed.iter().enumerate() {
+                //     let maxdist = 20.;
+                //     let d = Pos2::new(pt.0, pt.1).distance(cursor_abs);
+
+                //     if d < maxdist {
+                //         if ui.input(|i| i.pointer.any_down()) {
+                //             *block_panning = true;
+                //             ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                //         }
+                //         if ui.input(|r| r.pointer.any_released()) {
+                //             *block_panning = false;
+                //             ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
+                //         }
+                //     }
+
+                //     let col = if d < maxdist {
+                //         Color32::LIGHT_BLUE
+                //     } else {
+                //         Color32::GOLD
+                //     };
+
+                //     ui.painter().rect_filled(
+                //         Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
+                //         2.,
+                //         col,
+                //     );
+                // }
+
+                // if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                //     points[pt].0 = cursor_relative.x as u32;
+                //     points[pt].1 = cursor_relative.y as u32;
+                // }
 
                 r
             }
