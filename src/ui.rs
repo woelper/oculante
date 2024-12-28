@@ -346,8 +346,6 @@ impl EguiExt for Ui {
     /// Draw a justified icon from a string starting with an emoji
     fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
         self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-            // self.horizontal(|ui| {
-
             ui.label(text);
         })
         .response
@@ -488,8 +486,6 @@ impl EguiExt for Ui {
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture.get() {
-        //let tex_id = gfx.egui_register_texture(&texture.texture_array[0]); //TODO: Adapt if needed
-
         let image_rect = Rect::from_center_size(
             Pos2::new(
                 state.image_geometry.offset.x
@@ -543,12 +539,15 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
             img
         };
 
-        if let Some(p) = get_pixel_checked(
-            img,
-            state.cursor_relative.x as u32,
-            state.cursor_relative.y as u32,
-        ) {
-            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+        // don't do this every frame for performance reasons
+        if ctx.frame_nr() % 5 == 0 {
+            if let Some(p) = get_pixel_checked(
+                img,
+                state.cursor_relative.x as u32,
+                state.cursor_relative.y as u32,
+            ) {
+                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+            }
         }
     }
 
