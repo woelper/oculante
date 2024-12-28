@@ -529,6 +529,8 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     let mut uv_center: (f64, f64) = Default::default();
     let mut uv_size: (f64, f64) = Default::default();
 
+
+
     if let Some(img) = &state.current_image {
         color_type = img.color();
 
@@ -559,6 +561,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
+
+            // Force-expand to prevent spacing issue with scroll bar
+            ui.allocate_space(egui::Vec2::new(PANEL_WIDTH - PANEL_WIDGET_OFFSET, 0.));
 
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
@@ -633,15 +638,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 uv_size = (scale, scale * ratio);
                 ui.add_space(10.);
 
-                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
 
-                // let sampled = state.sampled_color;
+                let offset = (ui.available_width() - preview_rect.width())/2.;
+                preview_rect = preview_rect.translate(vec2(offset, 0.));
                 //Rendering a placeholder rectangle
                 ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
 
-                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+                // let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
             }
             ui.add_space(10.);
