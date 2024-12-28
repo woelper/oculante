@@ -9,6 +9,7 @@ use notan::draw::*;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<TexturePair>,
+    texture_boundary: TexturePair,
     pub col_count: u32,
     pub row_count: u32,
     pub col_translation: u32,
@@ -26,16 +27,6 @@ pub struct TextureWrapperManager {
 }
 
 impl TextureWrapperManager {
-    /*#[deprecated(note = "please use `set_image` instead")]
-    pub fn set(&mut self, tex: Option<TexWrap>, gfx: &mut Graphics) {
-        let mut texture_taken: Option<TexWrap> = self.current_texture.take();
-        if let Some(texture) = &mut texture_taken {
-            texture.unregister_textures(gfx);
-        }
-
-        self.current_texture = tex;
-    }*/
-
     pub fn set_image(
         &mut self,
         img: &DynamicImage,
@@ -122,14 +113,6 @@ impl TexWrap {
         Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_standard)
     }
 
-    /*pub fn from_rgbaimage_premult(
-        gfx: &mut Graphics,
-        settings: &PersistentSettings,
-        image: &DynamicImage,
-    ) -> Option<TexWrap> {
-        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_premult)
-    }*/
-
     fn gen_texture_standard(
         gfx: &mut Graphics,
         bytes: &[u8],
@@ -156,8 +139,7 @@ impl TexWrap {
                 } else {
                     TextureFilter::Nearest
                 },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
+            )                        
             .build();
 
         let _ = match texture_result {
@@ -166,58 +148,10 @@ impl TexWrap {
         };
     }
 
-    /*fn gen_texture_premult(
-        gfx: &mut Graphics,
-        bytes: &[u8],
-        width: u32,
-        height: u32,
-        _format:notan::prelude::TextureFormat,
-        settings: &PersistentSettings,
-        size_ok: bool,
-    ) -> Option<Texture> {
-        gfx.create_texture()
-            .from_bytes(bytes, width, height)
-            .with_premultiplied_alpha()
-            .with_mipmaps(settings.use_mipmaps && size_ok)
-            // .with_format(notan::prelude::TextureFormat::SRgba8)
-            // .with_premultiplied_alpha()
-            .with_filter(
-                if settings.linear_min_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-                if settings.linear_mag_filter {
-                    TextureFilter::Linear
-                } else {
-                    TextureFilter::Nearest
-                },
-            )
-            // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
-            .build()
-            .ok()
-    }*/
-
-    /*fn gen_single_from_dynamic_image(gfx: &mut Graphics,
-        settings: &PersistentSettings,
-        image: &DynamicImage,
-        texture_generator_function: fn(
-            &mut Graphics,
-            &[u8],
-            u32,
-            u32,
-            notan::prelude::TextureFormat,
-            &PersistentSettings,
-            bool,
-        ) -> Option<Texture>,
-    ) -> Option<Texture>
-    {
-
-    }*/
-
     fn image_color_supported(img: &DynamicImage) -> bool {
-        let supported_type =
-            img.color() == image::ColorType::L8 || img.color() == image::ColorType::Rgba8;
+        let supported_type = img.color() == image::ColorType::L8
+            || img.color() == image::ColorType::Rgba8
+            || img.color() == image::ColorType::Rgba32F;
         return supported_type;
     }
 
@@ -227,6 +161,7 @@ impl TexWrap {
         match img.color() {
             image::ColorType::L8 => byte_count = pixel_count,
             image::ColorType::Rgba8 => byte_count = pixel_count * 4,
+            image::ColorType::Rgba32F => byte_count = pixel_count * 4 * 4,
             _ => {
                 error!("Passed non supported colored image!");
                 byte_count = 0;
@@ -321,6 +256,9 @@ impl TexWrap {
             image::ColorType::L8 => {
                 format = notan::prelude::TextureFormat::R8;
                 pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+            }
+            image::ColorType::Rgba32F => {
+                format = notan::prelude::TextureFormat::Rgba32Float;
             }
             _ => {}
         }
@@ -433,9 +371,18 @@ impl TexWrap {
             }
         }
 
+
+        let bts: [u8; 4] = [0, 0, 0, 255];
+        let aa  = gfx
+            .create_texture()
+            .from_bytes(&bts, 1, 1)            
+            .with_format(notan::app::TextureFormat::Rgba32)
+            .build();
+
         if fine {
             let texture_count = texture_vec.len();
             Some(TexWrap {
+                texture_boundary: TexturePair{texture:aa.unwrap()},
                 size_vec: im_size,
                 col_count: col_count,
                 row_count: row_count,
@@ -555,7 +502,7 @@ impl TexWrap {
                     ((tile_size.x - 1) as f64 / (2 * width_tex) as f64) * width as f64,
                     ((tile_size.y - 1) as f64 / (2 * width_tex) as f64) * width as f64,
                 );
-
+                
                 draw.image(&curr_tex_response.texture.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
@@ -589,12 +536,6 @@ impl TexWrap {
             (width, 2.0 * half_width),
         );
     }
-
-    /*pub fn unregister_textures(&mut self, gfx: &mut Graphics) {
-        for text in &self.texture_array {
-            gfx.egui_remove_texture(text.texture_egui.id);
-        }
-    }*/
 
     pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
         let mut tex_index = 0;
@@ -649,18 +590,39 @@ impl TexWrap {
     }
 
     pub fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
-        let x = xa.max(0).min(self.width() as i32 - 1);
-        let y = ya.max(0).min(self.height() as i32 - 1);
+        /*let x = xa.max(0).min(self.width() as i32 - 1);
+        let y = ya.max(0).min(self.height() as i32 - 1);*/
+        let x = xa;
+        let y = ya;
 
         //Div by zero possible, never allow zero sized textures!
         let x_idx = x / self.col_translation as i32;
         let y_idx = y / self.row_translation as i32;
         let tex_idx =
             (y_idx * self.col_count as i32 + x_idx).min(self.texture_array.len() as i32 - 1);
-        let my_tex_pair = &self.texture_array[tex_idx as usize];
-        let my_tex = &my_tex_pair.texture;
-        let width = my_tex.width() as i32;
-        let height = my_tex.height() as i32;
+
+        let my_tex_pair: &TexturePair;
+        let my_tex: &Texture;
+
+        let width: i32;
+        let height: i32;
+
+        //TODO: Underflow-Stuff
+        if x<0 || y<0{
+            my_tex_pair = &self.texture_boundary;
+            width = if x<0 {x.abs()} else {self.col_translation as i32};
+            height = if y<0 {y.abs()} else {self.row_translation as i32};
+        }
+        else{
+            my_tex_pair = &self.texture_array[tex_idx as usize];
+            my_tex = &my_tex_pair.texture;
+            width = my_tex.width() as i32;
+            height = my_tex.height() as i32;
+        }
+        
+
+
+        
 
         let tex_left = x_idx * self.col_translation as i32;
         let tex_top = y_idx * self.row_translation as i32;
