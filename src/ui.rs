@@ -1094,7 +1094,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
             // .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable([true, true])
+            .resizable(true)
             .default_width(600.)
             .show(ctx, |ui| {
 
