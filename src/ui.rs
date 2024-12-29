@@ -1463,7 +1463,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         // General Image Adjustments
         ImageOperation::Brightness(0),
         ImageOperation::Contrast(0),
-        ImageOperation::Exposure(20),
+        ImageOperation::Exposure(0),
         ImageOperation::Desaturate(0),
         ImageOperation::Invert,
         // Colour and Hue
