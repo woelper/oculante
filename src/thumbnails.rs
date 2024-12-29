@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use image::{DynamicImage, GenericImageView};
+use image::{imageops, DynamicImage, GenericImageView};
 use log::{debug, error, trace, warn};
 
 use crate::{image_editing::ImageOperation, image_loader::open_image};
@@ -104,12 +104,14 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
     let mut d = DynamicImage::ImageRgba8(image.crop_imm(x, y, width, height).to_rgba8());
     debug!("\tDim: {:?}", d.dimensions());
 
-    let op = ImageOperation::Resize {
-        dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
-        aspect: true,
-        filter: crate::image_editing::ScaleFilter::Bilinear,
-    };
-    op.process_image(&mut d)?;
+    // let op = ImageOperation::Resize {
+    //     dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
+    //     aspect: false,
+    //     filter: crate::image_editing::ScaleFilter::Bilinear,
+    // };
+    // op.process_image(&mut d)?;
+
+    d = d.resize(THUMB_SIZE[0], THUMB_SIZE[1], imageops::FilterType::CatmullRom);
     debug!("\tDim: {:?}", d.dimensions());
     d.save(&dest_path)?;
     debug!("\tSaved to {}.", dest_path.as_ref().display());
