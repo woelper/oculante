@@ -2572,12 +2572,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if window_x > ui.cursor().left() + 110. {
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(10., 0.);
-                // ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
                 ui.spacing_mut().interact_size.y = BUTTON_HEIGHT_SMALL;
                 ui.spacing_mut().combo_width = 1.;
                 ui.spacing_mut().icon_width = 0.;
 
-                // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
                 let color = if ui.style().visuals.dark_mode {
                     Color32::WHITE
                 } else {
@@ -2602,14 +2600,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 .current_channel
                                 .to_string()
                                 .to_uppercase(),
-                        ), // .size(combobox_text_size),
+                        ),
                     )
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
                             let r = ui.selectable_value(
                                 &mut state.persistent_settings.current_channel,
                                 channel,
-                                RichText::new(channel.to_string().to_uppercase()), // .size(combobox_text_size),
+                                RichText::new(channel.to_string().to_uppercase()),
                             );
 
                             if tooltip(
@@ -2655,7 +2653,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        let label_rect = ui.ctx().available_rect().shrink(50.);
+        // FIXME clip text
+        let label_rect = ui.ctx().available_rect().shrink(200.);
 
         if state.persistent_settings.current_channel != ColorChannel::Rgba {
             let mut job = LayoutJob::simple(
@@ -2672,7 +2671,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             let galley = ui.painter().layout_job(job);
             let tr = galley
                 .rect
-                .translate(label_rect.center_bottom().to_vec2())
+                .translate(label_rect.right_bottom().to_vec2())
                 .expand(8.);
             ui.painter().rect_filled(
                 tr,
@@ -2680,7 +2679,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
             );
             ui.painter()
-                .galley(label_rect.center_bottom(), galley, Color32::RED);
+                .galley(label_rect.right_bottom(), galley, Color32::RED);
         }
 
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
@@ -3188,7 +3187,7 @@ pub fn blank_icon(
 }
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
-    let mut button_color = Color32::from_gray(38);
+    let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
     let mut panel_color = Color32::from_gray(25);
 
     match state.persistent_settings.theme {
@@ -3199,8 +3198,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
-    
     if style.visuals.dark_mode {
+        // Text color
         style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
@@ -3211,6 +3210,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
+        // Text color
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
         style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
 
@@ -3315,17 +3315,11 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(230),
     };
 
-    let button_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(25),
-        false => Color32::from_gray(230),
-    };
-
     egui::Frame::none()
         .fill(panel_bg_color)
         .rounding(ui.style().visuals.widgets.active.rounding)
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
-            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
             ui.scope(add_contents);
         });
 }
@@ -3336,17 +3330,11 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(217),
     };
 
-    let button_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(25),
-        false => Color32::from_gray(230),
-    };
-
     egui::Frame::none()
         .fill(panel_bg_color)
         .rounding(ui.style().visuals.widgets.active.rounding)
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
-            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
             ui.scope(add_contents);
         });
 }
