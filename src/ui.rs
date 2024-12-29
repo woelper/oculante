@@ -1094,7 +1094,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
             // .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable([true, true])
+            .resizable(true)
             .default_width(600.)
             .show(ctx, |ui| {
 
@@ -3085,7 +3085,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
-            FOLDER,
+            FOLDERFILL,
             FontId::proportional(85.),
             ui.style().visuals.text_color(),
         );

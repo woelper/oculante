@@ -217,7 +217,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             }
         }
 
-        let path_icon = if state.path_active { FOLDER } else { "$" };
+        let path_icon = if state.path_active { FOLDER } else { TERMINAL };
 
         if ui
             .add(
