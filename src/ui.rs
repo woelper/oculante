@@ -3159,7 +3159,8 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
             let galley = ui.painter().layout_job(job);
             let painter = ui
                 .ctx()
-                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()));
+                
+                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into())).with_clip_rect(ui.clip_rect());
 
             let c = ui.style().visuals.extreme_bg_color;
             let mut right_bottom = image_rect.right_bottom();
