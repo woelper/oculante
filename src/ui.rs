@@ -3199,8 +3199,9 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
-
+    
     if style.visuals.dark_mode {
+        style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
@@ -3211,6 +3212,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         }
     } else {
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
+        style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
