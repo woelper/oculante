@@ -381,13 +381,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
             };
 
             let r = ui.available_rect_before_wrap();
+
+            // ui.painter().debug_rect(r, Color32::LIGHT_RED, format!("{:?}", r));
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
 
-            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.);
+            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.).min(entries.len() as f32);
             let num_rows = entries.len() / (thumbs_per_row as usize).max(1);
 
-            // info!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
+            // debug!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
 
             egui::Frame::none()
                 .fill(panel_bg_color)
