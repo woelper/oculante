@@ -382,14 +382,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
             let r = ui.available_rect_before_wrap();
 
-            // ui.painter().debug_rect(r, Color32::LIGHT_RED, format!("{:?}", r));
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
 
             let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.).min(entries.len() as f32);
-            let num_rows = entries.len() / (thumbs_per_row as usize).max(1);
-
-            // debug!("tpr {thumbs_per_row} {w}, rows: {num_rows}");
+            let num_rows = (entries.len() as f32 / (thumbs_per_row).max(1.)).ceil() as usize;
 
             egui::Frame::none()
                 .fill(panel_bg_color)
@@ -408,7 +405,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                     .clone()
                                     .drain(
                                         (row_range.start * thumbs_per_row as usize)
-                                            ..(row_range.end * thumbs_per_row as usize),
+                                            ..(row_range.end * thumbs_per_row as usize).min(entries.len()),
                                     )
                                     .collect::<Vec<_>>();
 
