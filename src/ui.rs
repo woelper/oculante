@@ -670,6 +670,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                 crate::browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
                                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+
+                                state.is_loaded = false;
+                                // tag to add new image
+                                ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
+                            }
+                            
+                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
+                                if state.is_loaded && state.reset_image == false {
+                                    if let Some(path) = &state.current_path {
+                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
+                                    }
+                                }
                             }
                             let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
                             compare_list.sort_by(|a,b| a.0.cmp(&b.0));
