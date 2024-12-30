@@ -1031,7 +1031,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
-            ctx.memory_mut(|w| w.open_popup(Id::new(id)));
+            ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
 
         // set info panel color dynamically
