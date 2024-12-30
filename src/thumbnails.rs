@@ -11,7 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use image::{imageops, DynamicImage, GenericImageView};
 use log::{debug, error, trace, warn};
 
-use crate::{image_editing::ImageOperation, image_loader::open_image};
+use crate::image_loader::open_image;
 
 #[derive(Debug, Default, Clone)]
 pub struct Thumbnails {
@@ -111,7 +111,11 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
     // };
     // op.process_image(&mut d)?;
 
-    d = d.resize(THUMB_SIZE[0], THUMB_SIZE[1], imageops::FilterType::CatmullRom);
+    d = d.resize(
+        THUMB_SIZE[0],
+        THUMB_SIZE[1],
+        imageops::FilterType::CatmullRom,
+    );
     debug!("\tDim: {:?}", d.dimensions());
     d.save(&dest_path)?;
     debug!("\tSaved to {}.", dest_path.as_ref().display());
@@ -124,5 +128,5 @@ fn test_thumbs() {
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
     thumbs.get("tests/rust.png").unwrap();
-    std::thread::sleep_ms(3000);
+    std::thread::sleep(std::time::Duration::from_millis(3000));
 }

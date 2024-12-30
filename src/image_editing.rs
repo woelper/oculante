@@ -776,22 +776,19 @@ impl ImageOperation {
                 r
             }
             Self::Measure { shapes } => {
-                let id = Id::new("shapes");
                 // create a fake response to alter
-                let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // enable this if this is used to draw
+                // let id = Id::new("shapes");
 
-                let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+                // let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
-                let cursor_relative = pos_from_coord(
-                    geo.offset,
-                    Vector2::new(cursor_abs.x, cursor_abs.y),
-                    Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
-                    geo.scale,
-                );
-
-                // if ui.button("Add line").clicked() {
-                //     shapes.push(MeasureShape::new_line(vec![(0, 0), (100, 100)]));
-                // }
+                // let cursor_relative = pos_from_coord(
+                //     geo.offset,
+                //     Vector2::new(cursor_abs.x, cursor_abs.y),
+                //     Vector2::new(geo.dimensions.0 as f32, geo.dimensions.1 as f32),
+                //     geo.scale,
+                // );
 
                 // draw shapes
                 for shape in shapes {
@@ -810,13 +807,16 @@ impl ImageOperation {
                                     )
                                 })
                                 .collect::<Vec<_>>();
-                            for p in points.chunks(2) {
+                            for p in points_transformed.chunks(2) {
                                 ui.painter().line_segment(
                                     [
                                         Pos2::new(p[0].0 as f32, p[0].1 as f32),
                                         Pos2::new(p[1].0 as f32, p[1].1 as f32),
                                     ],
-                                    Stroke::new(2., Color32::WHITE),
+                                    Stroke::new(
+                                        *width as f32,
+                                        Color32::from_rgb(color[0], color[1], color[2]),
+                                    ),
                                 );
                             }
                         }
@@ -865,7 +865,7 @@ impl ImageOperation {
                                     rect_orig.height() as i32
                                 ),
                                 FontId::proportional(14.),
-                                Color32::WHITE,
+                                Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
                             ui.painter().line_segment(

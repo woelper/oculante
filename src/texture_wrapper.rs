@@ -139,7 +139,7 @@ impl TexWrap {
                 } else {
                     TextureFilter::Nearest
                 },
-            )                        
+            )
             .build();
 
         let _ = match texture_result {
@@ -371,18 +371,19 @@ impl TexWrap {
             }
         }
 
-
         let bts: [u8; 4] = [0, 0, 0, 255];
-        let aa  = gfx
+        let aa = gfx
             .create_texture()
-            .from_bytes(&bts, 1, 1)            
+            .from_bytes(&bts, 1, 1)
             .with_format(notan::app::TextureFormat::Rgba32)
             .build();
 
         if fine {
             let texture_count = texture_vec.len();
             Some(TexWrap {
-                texture_boundary: TexturePair{texture:aa.unwrap()},
+                texture_boundary: TexturePair {
+                    texture: aa.unwrap(),
+                },
                 size_vec: im_size,
                 col_count: col_count,
                 row_count: row_count,
@@ -502,7 +503,7 @@ impl TexWrap {
                     ((tile_size.x - 1) as f64 / (2 * width_tex) as f64) * width as f64,
                     ((tile_size.y - 1) as f64 / (2 * width_tex) as f64) * width as f64,
                 );
-                
+
                 draw.image(&curr_tex_response.texture.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
@@ -608,21 +609,24 @@ impl TexWrap {
         let height: i32;
 
         //TODO: Underflow-Stuff
-        if x<0 || y<0{
+        if x < 0 || y < 0 {
             my_tex_pair = &self.texture_boundary;
-            width = if x<0 {x.abs()} else {self.col_translation as i32};
-            height = if y<0 {y.abs()} else {self.row_translation as i32};
-        }
-        else{
+            width = if x < 0 {
+                x.abs()
+            } else {
+                self.col_translation as i32
+            };
+            height = if y < 0 {
+                y.abs()
+            } else {
+                self.row_translation as i32
+            };
+        } else {
             my_tex_pair = &self.texture_array[tex_idx as usize];
             my_tex = &my_tex_pair.texture;
             width = my_tex.width() as i32;
             height = my_tex.height() as i32;
         }
-        
-
-
-        
 
         let tex_left = x_idx * self.col_translation as i32;
         let tex_top = y_idx * self.row_translation as i32;

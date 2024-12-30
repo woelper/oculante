@@ -6,7 +6,7 @@ use crate::{
     file_encoder::FileEncoder,
     get_pixel_checked,
     image_editing::{
-        self, process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
         ScaleFilter,
     },
     paint::PaintStroke,
@@ -237,8 +237,8 @@ impl EguiExt for Ui {
         .response
     }
 
-       /// Unselectable label
-       fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
+    /// Unselectable label
+    fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
         self.add(egui::Label::new(text).selectable(false))
     }
 
@@ -528,8 +528,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     let mut bbox_br: Pos2 = Default::default();
     let mut uv_center: (f64, f64) = Default::default();
     let mut uv_size: (f64, f64) = Default::default();
-
-
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -1092,7 +1090,14 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 ui.scope(add_contents);
             });
         });
-        ui.add(egui::Label::new(RichText::new(description).small().color(ui.style().visuals.weak_text_color())).selectable(false));
+        ui.add(
+            egui::Label::new(
+                RichText::new(description)
+                    .small()
+                    .color(ui.style().visuals.weak_text_color()),
+            )
+            .selectable(false),
+        );
         ui.add_space(14.);
     }
 
@@ -1166,7 +1171,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
                                     }, ui);
-                            
+
                                     configuration_item_ui("Keep image edits", "When a new image is loaded, keep current edits on the previously edited image.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_edits, "");
                                     }, ui);
@@ -1201,7 +1206,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                             ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
                                             ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
                                         });
-                                        
+
                                     }, ui);
 
                                     #[cfg(feature = "update")]
@@ -1245,7 +1250,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                             if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
                                                 r.mark_changed();
                                             }
-    
+
                                             if r.changed() {
                                                 apply_theme(state, ctx);
                                             }
@@ -2143,12 +2148,7 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             .frame(false),
         )
     } else {
-        ui.add(
-            egui::Button::new(
-                RichText::new(text).size(ICON_SIZE),
-            )
-            .frame(false),
-        )
+        ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)).frame(false))
     }
 }
 
@@ -2488,7 +2488,9 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
-            ui.label_unselectable(egui::RichText::new("Please press & hold a key").color(Color32::RED));
+            ui.label_unselectable(
+                egui::RichText::new("Please press & hold a key").color(Color32::RED),
+            );
         }
     });
 
@@ -2599,15 +2601,13 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
-                    .selected_text(
-                        RichText::new(
-                            state
-                                .persistent_settings
-                                .current_channel
-                                .to_string()
-                                .to_uppercase(),
-                        ),
-                    )
+                    .selected_text(RichText::new(
+                        state
+                            .persistent_settings
+                            .current_channel
+                            .to_string()
+                            .to_uppercase(),
+                    ))
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
                             let r = ui.selectable_value(
@@ -3164,8 +3164,8 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
             let galley = ui.painter().layout_job(job);
             let painter = ui
                 .ctx()
-                
-                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into())).with_clip_rect(ui.clip_rect());
+                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
+                .with_clip_rect(ui.clip_rect());
 
             let c = ui.style().visuals.extreme_bg_color;
             let mut right_bottom = image_rect.right_bottom();
@@ -3206,9 +3206,11 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut style: egui::Style = (*ctx.style()).clone();
     if style.visuals.dark_mode {
         // Text color for label
-        style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
         // Text color for buttons
-        style.visuals.widgets.inactive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
@@ -3220,9 +3222,11 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     } else {
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
         // Text color for label
-        style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
         // Text color for buttons
-       style.visuals.widgets.inactive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);

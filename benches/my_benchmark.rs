@@ -22,14 +22,14 @@ fn process_pixel_ops() {
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
 
     let mut buffer = f.recv().unwrap().get_image().unwrap();
-    process_pixels(&mut buffer, &ops);
+    _ = process_pixels(&mut buffer, &ops);
 }
 
 fn blur() {
     let ops = vec![ImageOperation::Blur(200)];
     let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
     let mut buffer = f.recv().unwrap().get_image().unwrap();
-    process_pixels(&mut buffer, &ops);
+    _ = process_pixels(&mut buffer, &ops);
 }
 
 fn resize() {
