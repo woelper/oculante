@@ -182,7 +182,7 @@ impl EguiExt for Ui {
                 if *checked {
                     color.gamma_multiply(0.3)
                 } else {
-                    visuals.bg_fill
+                    visuals.weak_bg_fill
                 },
                 visuals.bg_stroke,
             ));
