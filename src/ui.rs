@@ -611,6 +611,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
+                    ui.label_i(&format!("{PALETTE} HEX"));
+                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                    ui.label_right(
+                        RichText::new(hex)
+                    );
+                    ui.end_row();
+
                     ui.label_i(&format!("{PALETTE} Color"));
                     ui.label_right(
                         format!("{:?}", color_type)
@@ -2131,7 +2138,6 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             egui::Button::new(
                 RichText::new(text)
                     .size(ICON_SIZE)
-                    // .heading()
                     .color(ui.style().visuals.selection.bg_fill),
             )
             .frame(false),
@@ -2139,7 +2145,7 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
     } else {
         ui.add(
             egui::Button::new(
-                RichText::new(text).size(ICON_SIZE), // .heading()
+                RichText::new(text).size(ICON_SIZE),
             )
             .frame(false),
         )
@@ -3199,8 +3205,10 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
     if style.visuals.dark_mode {
-        // Text color
+        // Text color for label
         style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
+        // Text color for buttons
+        style.visuals.widgets.inactive.fg_stroke.color = Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
@@ -3210,9 +3218,11 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
-        // Text color
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
+        // Text color for label
         style.visuals.widgets.noninteractive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
+        // Text color for buttons
+       style.visuals.widgets.inactive.fg_stroke.color = Color32::from_hex("#333333").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
