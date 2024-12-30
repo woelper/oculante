@@ -2509,10 +2509,11 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .collect::<Vec<_>>();
     ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-    egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+    egui::Grid::new("info").num_columns(4).show(ui, |ui| {
         for (event, keys) in ordered_shortcuts {
             ui.label_unselectable(format!("{event:?}"));
             ui.label_unselectable(lookup(&s, event));
+            ui.add_space(200.);
             if !no_keys_pressed {
                 if ui
                     .button(format!("Assign {}", keypresses_as_string(&k)))
