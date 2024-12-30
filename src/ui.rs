@@ -2633,7 +2633,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         // TODO: remove redundancy
-        if changed_channels {
+        if changed_channels && !state.persistent_settings.edit_enabled {
             //TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
