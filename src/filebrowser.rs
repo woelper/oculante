@@ -5,6 +5,7 @@ use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
 use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use anyhow::{Context, Result};
+use core::num;
 use dirs;
 use log::debug;
 use notan::egui::{self, *};
@@ -126,10 +127,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
     }
-    let mut entries = state
+
+    let b_entries: Vec<PathBuf> = vec![];
+
+    let entries = state
         .entries
-        .clone()
-        .unwrap_or_default()
+        .as_ref()
+        .unwrap_or(&b_entries)
+        // .clone()
+        // .unwrap_or_default()
         .into_iter()
         .filter(|e| {
             e.file_name()
@@ -140,7 +146,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
         })
         .collect::<Vec<_>>();
 
-    entries.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
+    let num_entries = entries.len();
+
+    // entries.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -385,8 +393,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
             let spacing = ui.style().spacing.item_spacing.x;
             let w = r.width() - spacing * 3.;
 
-            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing)).floor().max(1.).min(entries.len() as f32);
-            let num_rows = (entries.len() as f32 / (thumbs_per_row).max(1.)).ceil() as usize;
+            let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing))
+                .floor()
+                .max(1.)
+                .min(num_entries as f32);
+            let num_rows = (num_entries as f32 / (thumbs_per_row).max(1.)).ceil() as usize;
 
             egui::Frame::none()
                 .fill(panel_bg_color)
@@ -401,18 +412,18 @@ pub fn browse<F: FnMut(&PathBuf)>(
                             (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
                             num_rows,
                             |ui, row_range| {
-                                let entries = entries
-                                    .clone()
-                                    .drain(
-                                        (row_range.start * thumbs_per_row as usize)
-                                            ..(row_range.end * thumbs_per_row as usize).min(entries.len()),
-                                    )
-                                    .collect::<Vec<_>>();
-
+                                let range = (row_range.start * thumbs_per_row as usize)
+                                    ..(row_range.end * thumbs_per_row as usize).min(num_entries);
+                                let mut visible_entries: Vec<&PathBuf> = vec![];
+                                for i in range {
+                                    if let Some(e) = entries.get(i) {
+                                        visible_entries.push(e);
+                                    }
+                                }
                                 if state.listview_active {
                                 } else {
                                     ui.horizontal_wrapped(|ui| {
-                                        if entries.is_empty() {
+                                        if visible_entries.is_empty() {
                                             let r = ui.label("Empty directory");
                                             let r = r.interact(Sense::click());
                                             if r.clicked() {
@@ -421,7 +432,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 }
                                             }
                                         } else {
-                                            for de in entries.iter().filter(|e| e.is_dir()) {
+                                            for de in visible_entries.iter().filter(|e| e.is_dir())
+                                            {
                                                 if render_file_icon(&de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
@@ -429,7 +441,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 }
                                             }
 
-                                            for de in entries {
+                                            for de in visible_entries {
                                                 if de.is_file() {
                                                     if render_file_icon(
                                                         &de,
@@ -498,41 +510,38 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 }
             }
-
-            if prev_path != *path {
-                if let Ok(contents) = fs::read_dir(&path) {
-                    debug!("read {}", path.display());
-                    let mut contents = contents
-                        .into_iter()
-                        .flat_map(|x| x)
-                        .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
-                        .filter(|de| {
-                            de.path().is_dir()
-                                || filter.contains(&de.path().ext().to_lowercase().as_str())
-                        })
-                        .map(|d| d.path())
-                        .collect::<Vec<_>>();
-
-                    contents.sort_by(|a, b| {
-                        a.file_name()
-                            .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                            .to_lowercase()
-                            .cmp(
-                                &b.file_name()
-                                    .map(|f| f.to_string_lossy().to_string())
-                                    .unwrap_or_default()
-                                    .to_lowercase(),
-                            )
-                    });
-
-                    // ui.ctx()
-                    //     .data_mut(|r| r.insert_temp::<Vec<PathBuf>>(Id::new("FBDIRS"), contents));
-                    state.entries = Some(contents);
-                }
-            }
         });
     });
+
+    if prev_path != *path {
+        if let Ok(contents) = fs::read_dir(&path) {
+            debug!("read {}", path.display());
+            let mut contents = contents
+                .into_iter()
+                .flat_map(|x| x)
+                .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
+                .filter(|de| {
+                    de.path().is_dir() || filter.contains(&de.path().ext().to_lowercase().as_str())
+                })
+                .map(|d| d.path())
+                .collect::<Vec<_>>();
+
+            contents.sort_by(|a, b| {
+                a.file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_default()
+                    .to_lowercase()
+                    .cmp(
+                        &b.file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                            .to_lowercase(),
+                    )
+            });
+
+            state.entries = Some(contents);
+        }
+    }
 
     ui.ctx()
         .data_mut(|r| r.insert_temp::<BrowserState>(Id::new("FBSTATE"), state));

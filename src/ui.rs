@@ -675,7 +675,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                 // tag to add new image
                                 ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
                             }
-                            
+
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
                                 if state.is_loaded && state.reset_image == false {
                                     if let Some(path) = &state.current_path {
