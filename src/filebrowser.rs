@@ -5,7 +5,6 @@ use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
 use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use anyhow::{Context, Result};
-use core::num;
 use dirs;
 use log::debug;
 use notan::egui::{self, *};
