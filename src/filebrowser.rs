@@ -128,13 +128,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
     }
 
     let b_entries: Vec<PathBuf> = vec![];
-
     let entries = state
         .entries
         .as_ref()
         .unwrap_or(&b_entries)
-        // .clone()
-        // .unwrap_or_default()
         .into_iter()
         .filter(|e| {
             e.file_name()
@@ -146,8 +143,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .collect::<Vec<_>>();
 
     let num_entries = entries.len();
-
-    // entries.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
 
     let item_spacing = 6.;
     ui.add_space(item_spacing);
@@ -538,6 +533,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     )
             });
 
+            contents.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
             state.entries = Some(contents);
         }
     }
