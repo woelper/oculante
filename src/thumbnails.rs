@@ -1,10 +1,12 @@
 pub const THUMB_SIZE: [u32; 2] = [120, 90];
 pub const THUMB_CAPTION_HEIGHT: u32 = 24;
+pub const MAX_THREADS: usize = 4;
 
 use std::{
     fs::create_dir_all,
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
+    sync::{Arc, Mutex}, time::Duration,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -17,6 +19,8 @@ use crate::image_loader::open_image;
 pub struct Thumbnails {
     /// The known thumbnail ids. This is used to avoid re-generating known thumbnails
     ids: Vec<PathBuf>,
+    /// Number of thumbnails being created at a given time
+    pool: Arc<Mutex<usize>>,
 }
 
 impl Thumbnails {
@@ -36,10 +40,22 @@ impl Thumbnails {
             }
             debug!("\tThumbnail missing");
             let fp = path.as_ref().to_path_buf();
+            let pool = self.pool.clone();
             std::thread::spawn(move || {
+                loop {
+                    let num = *pool.lock().unwrap();
+                    if num > MAX_THREADS {
+                        std::thread::sleep(Duration::from_millis(100));
+                    } else {
+                        break;
+                    }
+                }
+                *pool.lock().unwrap() += 1;
                 if let Err(e) = generate(&fp) {
                     error!("Error generating thumbnail: {e}");
                 }
+                let num = *pool.lock().unwrap();
+                *pool.lock().unwrap() = num.saturating_sub(1);
             });
             self.ids.push(cached_path);
             bail!("Thumbnail not yet present.");
