@@ -138,12 +138,12 @@ chrono = "0.4.38"
 criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
 [profile.release]
-# codegen-units = 1
+codegen-units = 1
 # incremental = false
-# lto = true
+lto = true
 strip = true
 # opt-level = 3
-panic = "abort"
+# panic = "abort"
 
 [profile.dev]
 debug = false
