@@ -2673,9 +2673,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        // FIXME clip text
-        let label_rect = ui.ctx().available_rect().shrink(200.);
+        let label_rect = ui.ctx().available_rect().shrink(50.);
 
+        // TODO Center toast to image viewing area (Shift to the left / Right if the info or edit panel gets opened)
         if state.persistent_settings.current_channel != ColorChannel::Rgba {
             let mut job = LayoutJob::simple(
                 format!(
@@ -2691,7 +2691,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             let galley = ui.painter().layout_job(job);
             let tr = galley
                 .rect
-                .translate(label_rect.right_bottom().to_vec2())
+                .translate(label_rect.center_bottom().to_vec2())
                 .expand(8.);
             ui.painter().rect_filled(
                 tr,
@@ -2699,7 +2699,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
             );
             ui.painter()
-                .galley(label_rect.right_bottom(), galley, Color32::RED);
+                .galley(label_rect.center_bottom(), galley, Color32::RED);
         }
 
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
