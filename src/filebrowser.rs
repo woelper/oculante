@@ -14,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
+use wgpu::core::device::DeviceDescriptor;
 
 fn load_recent_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(read_to_string(
@@ -91,6 +92,7 @@ struct BrowserState {
     listview_active: bool,
     path_active: bool,
     entries: Option<Vec<PathBuf>>,
+    drives: Option<Vec<rs_drivelist::device::DeviceDescriptor>>,
 }
 
 impl Default for BrowserState {
@@ -103,6 +105,7 @@ impl Default for BrowserState {
             listview_active: Default::default(),
             path_active: Default::default(),
             entries: Default::default(),
+            drives: Default::default(),
         }
     }
 }
@@ -125,6 +128,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
     if state.entries.is_none() {
         // mark prev_path as dirty. This is to cause a reload at first start,
         prev_path = Default::default();
+    }
+
+    if state.drives.is_none() {
+        state.drives = Some(rs_drivelist::drive_list().unwrap_or_default());
     }
 
     let b_entries: Vec<PathBuf> = vec![];
@@ -331,6 +338,19 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                 }
 
+                if let Some(drives) = state.drives.as_ref() {
+                    for drive in drives {
+                        for mountpoint in &drive.mountpoints {
+                            if ui
+                                .styled_button(&format!("{FOLDERIMAGE} {}", mountpoint.path))
+                                .clicked()
+                            {
+                                *path = Path::new(&mountpoint.path).to_path_buf();
+                            }
+                        }
+                    }
+                }
+
                 for folder in &settings.folder_bookmarks.clone() {
                     let res = ui.styled_button(&format!(
                         "{FOLDERBOOKMARK} {}",
@@ -508,33 +528,38 @@ pub fn browse<F: FnMut(&PathBuf)>(
     });
 
     if prev_path != *path {
-        if let Ok(contents) = fs::read_dir(&path) {
-            debug!("read {}", path.display());
-            let mut contents = contents
-                .into_iter()
-                .flat_map(|x| x)
-                .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
-                .filter(|de| {
-                    de.path().is_dir() || filter.contains(&de.path().ext().to_lowercase().as_str())
-                })
-                .map(|d| d.path())
-                .collect::<Vec<_>>();
+        match fs::read_dir(&path) {
+            Ok(contents) => {
+                debug!("Successfully read {}", path.display());
+                let mut contents = contents
+                    .into_iter()
+                    .flat_map(|x| x)
+                    .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
+                    .filter(|de| {
+                        de.path().is_dir()
+                            || filter.contains(&de.path().ext().to_lowercase().as_str())
+                    })
+                    .map(|d| d.path())
+                    .collect::<Vec<_>>();
 
-            contents.sort_by(|a, b| {
-                a.file_name()
-                    .map(|f| f.to_string_lossy().to_string())
-                    .unwrap_or_default()
-                    .to_lowercase()
-                    .cmp(
-                        &b.file_name()
-                            .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                            .to_lowercase(),
-                    )
-            });
-
-            contents.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
-            state.entries = Some(contents);
+                contents.sort_by(|a, b| {
+                    a.file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                        .to_lowercase()
+                        .cmp(
+                            &b.file_name()
+                                .map(|f| f.to_string_lossy().to_string())
+                                .unwrap_or_default()
+                                .to_lowercase(),
+                        )
+                });
+                contents.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
+                state.entries = Some(contents);
+            }
+            Err(e) => {
+                state.entries = None;
+            }
         }
     }
 

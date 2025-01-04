@@ -95,6 +95,7 @@ egui-modal = "0.3.6"
 zip = "2.2.0"
 ase-swatch = "0.1.0"
 quantette = { version = "0.3.0", features = ["threads"] }
+rs-drivelist = "0.9.4"
 
 [features]
 default = [
