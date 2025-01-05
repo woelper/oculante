@@ -69,11 +69,6 @@ pub struct TextureResponse<'a> {
     pub x_offset_texture: i32,
     pub y_offset_texture: i32,
 
-    pub texture_width: i32,
-    pub texture_height: i32,
-    pub offset_width: i32,
-    pub offset_height: i32,
-
     pub x_tex_left_global: i32,
     pub y_tex_top_global: i32,
     pub x_tex_right_global: i32,
@@ -139,7 +134,7 @@ impl TexWrap {
                 } else {
                     TextureFilter::Nearest
                 },
-            )                        
+            )
             .build();
 
         let _ = match texture_result {
@@ -371,18 +366,19 @@ impl TexWrap {
             }
         }
 
-
         let bts: [u8; 4] = [0, 0, 0, 255];
-        let aa  = gfx
+        let aa = gfx
             .create_texture()
-            .from_bytes(&bts, 1, 1)            
+            .from_bytes(&bts, 1, 1)
             .with_format(notan::app::TextureFormat::Rgba32)
             .build();
 
         if fine {
             let texture_count = texture_vec.len();
             Some(TexWrap {
-                texture_boundary: TexturePair{texture:aa.unwrap()},
+                texture_boundary: TexturePair {
+                    texture: aa.unwrap(),
+                },
                 size_vec: im_size,
                 col_count: col_count,
                 row_count: row_count,
@@ -451,58 +447,46 @@ impl TexWrap {
         let x_coordinate_end = (xy_tex_center.0 + xy_tex_size.0) as i32;
         let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
         let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
-
+        //print!("Start x: {}, y: {}\n",xy_tex_center.0 - xy_tex_size.0,y_coordinate);
+       
         while y_coordinate <= y_coordinate_end {
-            let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
+            let mut y_coordinate_new = i32::MAX; //increment for y coordinate after x loop
             let mut x_coordinate = xy_tex_center.0 - xy_tex_size.0;
             curr_ui_curs.x = base_ui_curs.x;
-            let mut last_display_size_y: f64 = 0.0;
+            let mut last_display_size_y = f64::MAX;
             while x_coordinate <= x_coordinate_end {
                 //get texture tile
                 let curr_tex_response =
                     self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
 
-                //increment coordinates by usable width/height
-                y_coordinate_increment = curr_tex_response.offset_height;
-                x_coordinate += curr_tex_response.offset_width;
-
+                //print!("x: {} y: {} ", x_coordinate, y_coordinate);
+                //print!("top: {} left: {} ", curr_tex_response.y_tex_top_global, curr_tex_response.x_tex_left_global);
+                //print!("bottom: {} right: {} \n", curr_tex_response.y_tex_bottom_global, curr_tex_response.x_tex_right_global);
+                
+                
                 //Handling last texture in a row or col
-                let mut curr_tex_end = nalgebra::Vector2::new(
+                let curr_tex_end = nalgebra::Vector2::new(
                     i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
                     i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
                 );
 
-                //Handling positive coordinate overflow
-                if curr_tex_response.x_tex_right_global as f32 >= self.width() - 1.0f32 {
-                    x_coordinate = x_coordinate_end + 1;
-                    curr_tex_end.x +=
-                        (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
-                }
-
-                if curr_tex_response.y_tex_bottom_global as f32 >= self.height() - 1.0f32 {
-                    y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
-                    curr_tex_end.y +=
-                        (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
-                }
-
                 //Usable tile size, depending on offsets
                 let tile_size = nalgebra::Vector2::new(
                     curr_tex_end.x
-                        - curr_tex_response.x_offset_texture
-                        - curr_tex_response.x_tex_left_global
-                        + 1,
+                    - x_coordinate+1
+                        ,
                     curr_tex_end.y
-                        - curr_tex_response.y_offset_texture
-                        - curr_tex_response.y_tex_top_global
-                        + 1,
+                    - y_coordinate+1
+                        ,
                 );
+
 
                 //Display size - tile size scaled
                 let display_size = nalgebra::Vector2::new(
-                    ((tile_size.x - 1) as f64 / (2 * width_tex) as f64) * width as f64,
-                    ((tile_size.y - 1) as f64 / (2 * width_tex) as f64) * width as f64,
+                    ((tile_size.x) as f64 / (2 * width_tex+1) as f64) * width as f64,
+                    ((tile_size.y) as f64 / (2 * width_tex+1) as f64) * width as f64,
                 );
-                
+
                 draw.image(&curr_tex_response.texture.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
@@ -514,15 +498,19 @@ impl TexWrap {
                         ((tile_size.x) as f32, (tile_size.y) as f32),
                     )
                     .translate(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-
+                
+                x_coordinate = curr_tex_response.x_tex_right_global+1;
+                y_coordinate_new = y_coordinate_new.min(curr_tex_response.y_tex_bottom_global+1);
                 //Update display cursor
                 curr_ui_curs.x += display_size.x;
-                last_display_size_y = display_size.y;
+                last_display_size_y = last_display_size_y.min(display_size.y);
             }
             //Update y coordinates
-            y_coordinate += y_coordinate_increment;
+            //print!("new y: {}, old y: {} \n", y_coordinate_new, y_coordinate);
+            y_coordinate = y_coordinate_new;            
             curr_ui_curs.y += last_display_size_y;
         }
+        //print!("\n");
         self.remove_draw_shader(draw);
 
         //Draw crosshair
@@ -589,40 +577,50 @@ impl TexWrap {
         }
     }
 
+    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+        let my_tex_pair: &TexturePair;
+        let tex_width_int = self.width() as i32;
+        let tex_height_int = self.height() as i32;
+
+        let width: i32;
+        let height: i32;
+
+        my_tex_pair = &self.texture_boundary;
+        width = if xa < 0 { xa.abs()} else { tex_width_int};
+        height = if ya < 0 { ya.abs()} else { tex_height_int};
+
+        TextureResponse {
+            texture: my_tex_pair,
+            x_offset_texture: 0,
+            y_offset_texture: 0,            
+            x_tex_left_global: xa,
+            y_tex_top_global: ya,
+            x_tex_right_global: xa + width-1,
+            y_tex_bottom_global: ya + height-1
+        }
+    }
+
     pub fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
-        /*let x = xa.max(0).min(self.width() as i32 - 1);
-        let y = ya.max(0).min(self.height() as i32 - 1);*/
-        let x = xa;
-        let y = ya;
+        let width_int = self.width() as i32;
+        let height_int = self.height() as i32;
+
+        //Dummy texture for outside of boundary
+        if xa < 0 || ya < 0 || xa >= width_int || ya >= height_int {
+            return self.get_dummy_texture_at_xy(xa, ya);
+        }
+
+        let x = xa.max(0).min(self.width() as i32 - 1);
+        let y = ya.max(0).min(self.height() as i32 - 1);
 
         //Div by zero possible, never allow zero sized textures!
         let x_idx = x / self.col_translation as i32;
         let y_idx = y / self.row_translation as i32;
         let tex_idx =
             (y_idx * self.col_count as i32 + x_idx).min(self.texture_array.len() as i32 - 1);
-
-        let my_tex_pair: &TexturePair;
-        let my_tex: &Texture;
-
-        let width: i32;
-        let height: i32;
-
-        //TODO: Underflow-Stuff
-        if x<0 || y<0{
-            my_tex_pair = &self.texture_boundary;
-            width = if x<0 {x.abs()} else {self.col_translation as i32};
-            height = if y<0 {y.abs()} else {self.row_translation as i32};
-        }
-        else{
-            my_tex_pair = &self.texture_array[tex_idx as usize];
-            my_tex = &my_tex_pair.texture;
-            width = my_tex.width() as i32;
-            height = my_tex.height() as i32;
-        }
-        
-
-
-        
+        let my_tex_pair = &self.texture_array[tex_idx as usize];
+        let my_tex = &my_tex_pair.texture;
+        let width = my_tex.width() as i32;
+        let height = my_tex.height() as i32;
 
         let tex_left = x_idx * self.col_translation as i32;
         let tex_top = y_idx * self.row_translation as i32;
@@ -632,24 +630,14 @@ impl TexWrap {
         let x_offset_texture = xa - tex_left;
         let y_offset_texture = ya - tex_top;
 
-        let remaining_width = width - x_offset_texture;
-        let remaining_height = height - y_offset_texture;
-
         TextureResponse {
             texture: my_tex_pair,
             x_offset_texture: x_offset_texture,
             y_offset_texture: y_offset_texture,
-
-            texture_width: width,
-            texture_height: height,
-
             x_tex_left_global: tex_left,
             y_tex_top_global: tex_top,
             x_tex_right_global: tex_right,
             y_tex_bottom_global: tex_bottom,
-
-            offset_width: remaining_width,
-            offset_height: remaining_height,
         }
     }
 
