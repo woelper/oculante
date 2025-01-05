@@ -357,7 +357,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 if let Some(drives) = state.drives.as_ref() {
                     for drive in drives {
                         if ui
-                            .styled_button(&format!("{FOLDERIMAGE} {}", drive.name))
+                            .styled_button(&format!("{DRIVE} {}", drive.name))
                             .clicked()
                         {
                             *path = drive.path.clone();
