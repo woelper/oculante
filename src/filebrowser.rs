@@ -83,10 +83,10 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct Disk {
     name: String,
-    path: String,
+    path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -132,15 +132,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .unwrap_or_default();
 
     if state.entries.is_none() {
-        // mark prev_path as dirty. This is to cause a reload at first start,
+        // mark prev_path as dirty. This is to cause a reload at first start
         prev_path = Default::default();
     }
 
     if state.drives.is_none() {
-        #[cfg(not(target_os = "macos"))]
-        {
-            // state.drives = Some(rs_drivelist::drive_list().unwrap_or_default().into_iter().map(|p|p));
-        }
+        let mut disks: Vec<Disk> = sysinfo::Disks::new_with_refreshed_list()
+            .iter()
+            .map(|i| Disk {
+                name: i.name().to_string_lossy().to_string(),
+                path: i.mount_point().to_path_buf(),
+            })
+            .collect();
+        disks.sort();
+        disks.dedup_by(|a, b| a.name == b.name);
+        state.drives = Some(disks);
     }
 
     let b_entries: Vec<PathBuf> = vec![];
@@ -267,16 +273,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .file_name()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or("Computer".to_string());
-            let ancestor_len = ancestor_stem.len() as f32 * 11.5 + ui.spacing().button_padding.x * 2. + ui.spacing().item_spacing.x * 2.;
+            let ancestor_len = ancestor_stem.len() as f32 * 11.5
+                + ui.spacing().button_padding.x * 2.
+                + ui.spacing().item_spacing.x * 2.;
             if available_width - ancestor_len > 0. {
                 max_nav_items += 1;
                 available_width -= ancestor_len;
             } else {
-                break
+                break;
             }
         }
 
-        let mut ancestors = cp.ancestors().take(max_nav_items.max(1)).collect::<Vec<_>>();
+        let mut ancestors = cp
+            .ancestors()
+            .take(max_nav_items.max(1))
+            .collect::<Vec<_>>();
         ancestors.reverse();
 
         if state.path_active {
@@ -326,9 +337,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
             |ui| {
+          
+
                 if let Some(d) = dirs::home_dir() {
                     if ui.styled_button(&format!("{FOLDER} Home")).clicked() {
                         *path = d;
+                    }
+                }
+                if let Some(drives) = state.drives.as_ref() {
+                    for drive in drives {
+                        if ui
+                            .styled_button(&format!("{FOLDERIMAGE} {}", drive.name))
+                            .clicked()
+                        {
+                            *path = drive.path.clone();
+                        }
                     }
                 }
                 if let Some(d) = dirs::desktop_dir() {
@@ -361,17 +384,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         .clicked()
                     {
                         *path = d;
-                    }
-                }
-
-                if let Some(drives) = state.drives.as_ref() {
-                    for drive in drives {
-                        if ui
-                            .styled_button(&format!("{FOLDERIMAGE} {}", drive.path))
-                            .clicked()
-                        {
-                            *path = Path::new(&drive.path).to_path_buf();
-                        }
                     }
                 }
 
@@ -581,7 +593,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 contents.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
                 state.entries = Some(contents);
             }
-            Err(e) => {
+            Err(_e) => {
                 state.entries = None;
             }
         }
