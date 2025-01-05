@@ -53,7 +53,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
     let mut open = true;
 
     egui::Window::new(if save { "Save" } else { "Open" })
-        .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        //.anchor(Align2::CENTER_CENTER, [0.0, 0.0])
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
