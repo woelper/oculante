@@ -14,7 +14,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
-use wgpu::core::device::DeviceDescriptor;
 
 fn load_recent_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(read_to_string(
@@ -83,6 +82,13 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         ctx.memory_mut(|w| w.close_popup());
     }
 }
+
+#[derive(Debug, Clone)]
+struct Disk {
+    name: String,
+    path: String,
+}
+
 #[derive(Debug, Clone)]
 struct BrowserState {
     filename: String,
@@ -92,7 +98,7 @@ struct BrowserState {
     listview_active: bool,
     path_active: bool,
     entries: Option<Vec<PathBuf>>,
-    drives: Option<Vec<rs_drivelist::device::DeviceDescriptor>>,
+    drives: Option<Vec<Disk>>,
 }
 
 impl Default for BrowserState {
@@ -131,7 +137,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
     }
 
     if state.drives.is_none() {
-        state.drives = Some(rs_drivelist::drive_list().unwrap_or_default());
+        #[cfg(not(target_os = "macos"))]
+        {
+            // state.drives = Some(rs_drivelist::drive_list().unwrap_or_default().into_iter().map(|p|p));
+        }
     }
 
     let b_entries: Vec<PathBuf> = vec![];
@@ -249,8 +258,25 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
         let cp = path.clone();
         // Too many folders make the dialog too large, cap them at this amount
-        let max_nav_items = 6;
-        let mut ancestors = cp.ancestors().take(max_nav_items).collect::<Vec<_>>();
+        // the width, minus the left buttons roughly
+        let mut available_width = ui.available_size_before_wrap().x;
+        let mut max_nav_items = 0;
+        // go through ancestors from the back
+        for ancestor in cp.ancestors() {
+            let ancestor_stem = ancestor
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or("Computer".to_string());
+            let ancestor_len = ancestor_stem.len() as f32 * 11.5 + ui.spacing().button_padding.x * 2. + ui.spacing().item_spacing.x * 2.;
+            if available_width - ancestor_len > 0. {
+                max_nav_items += 1;
+                available_width -= ancestor_len;
+            } else {
+                break
+            }
+        }
+
+        let mut ancestors = cp.ancestors().take(max_nav_items.max(1)).collect::<Vec<_>>();
         ancestors.reverse();
 
         if state.path_active {
@@ -340,13 +366,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
                 if let Some(drives) = state.drives.as_ref() {
                     for drive in drives {
-                        for mountpoint in &drive.mountpoints {
-                            if ui
-                                .styled_button(&format!("{FOLDERIMAGE} {}", mountpoint.path))
-                                .clicked()
-                            {
-                                *path = Path::new(&mountpoint.path).to_path_buf();
-                            }
+                        if ui
+                            .styled_button(&format!("{FOLDERIMAGE} {}", drive.path))
+                            .clicked()
+                        {
+                            *path = Path::new(&drive.path).to_path_buf();
                         }
                     }
                 }
