@@ -139,9 +139,21 @@ pub fn browse<F: FnMut(&PathBuf)>(
     if state.drives.is_none() {
         let mut disks: Vec<Disk> = sysinfo::Disks::new_with_refreshed_list()
             .iter()
-            .map(|i| Disk {
-                name: i.name().to_string_lossy().to_string(),
-                path: i.mount_point().to_path_buf(),
+            .inspect(|d| debug!("d {:?}", d))
+            .filter(|d| {
+                if cfg!(target_os = "windows") {
+                    true
+                } else {
+                    d.is_removable()
+                }
+            })
+            .map(|d| Disk {
+                name: if cfg!(target_os = "windows") {
+                    d.mount_point().to_string_lossy().to_string()
+                } else {
+                    d.name().to_string_lossy().to_string()
+                },
+                path: d.mount_point().to_path_buf(),
             })
             .collect();
         disks.sort();
@@ -337,8 +349,6 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
             |ui| {
-          
-
                 if let Some(d) = dirs::home_dir() {
                     if ui.styled_button(&format!("{FOLDER} Home")).clicked() {
                         *path = d;
