@@ -55,6 +55,12 @@ pub const GHLOGO: &str = "\u{E933}";
 pub const CIRCLESQUARE: &str = "\u{E932}";
 pub const GRID: &str = "\u{E934}";
 pub const BEZEIR: &str = "\u{E935}";
+pub const HEART: &str = "\u{E936}";
+pub const HEARTFILL: &str = "\u{E937}";
+pub const FOLDERFAVOURITES: &str = "\u{E938}";
+pub const FOLDERFILL: &str = "\u{E93a}";
+pub const TERMINAL: &str = "\u{E939}";
+pub const DRIVE: &str = "\u{E93d}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.

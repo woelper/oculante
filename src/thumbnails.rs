@@ -1,22 +1,26 @@
 pub const THUMB_SIZE: [u32; 2] = [120, 90];
 pub const THUMB_CAPTION_HEIGHT: u32 = 24;
+pub const MAX_THREADS: usize = 4;
 
 use std::{
     fs::create_dir_all,
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
+    sync::{Arc, Mutex}, time::Duration,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use image::{DynamicImage, GenericImageView};
+use image::{imageops, DynamicImage, GenericImageView};
 use log::{debug, error, trace, warn};
 
-use crate::{image_editing::ImageOperation, image_loader::open_image};
+use crate::image_loader::open_image;
 
 #[derive(Debug, Default, Clone)]
 pub struct Thumbnails {
     /// The known thumbnail ids. This is used to avoid re-generating known thumbnails
     ids: Vec<PathBuf>,
+    /// Number of thumbnails being created at a given time
+    pool: Arc<Mutex<usize>>,
 }
 
 impl Thumbnails {
@@ -36,10 +40,22 @@ impl Thumbnails {
             }
             debug!("\tThumbnail missing");
             let fp = path.as_ref().to_path_buf();
+            let pool = self.pool.clone();
             std::thread::spawn(move || {
+                loop {
+                    let num = *pool.lock().unwrap();
+                    if num > MAX_THREADS {
+                        std::thread::sleep(Duration::from_millis(100));
+                    } else {
+                        break;
+                    }
+                }
+                *pool.lock().unwrap() += 1;
                 if let Err(e) = generate(&fp) {
                     error!("Error generating thumbnail: {e}");
                 }
+                let num = *pool.lock().unwrap();
+                *pool.lock().unwrap() = num.saturating_sub(1);
             });
             self.ids.push(cached_path);
             bail!("Thumbnail not yet present.");
@@ -104,12 +120,18 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
     let mut d = DynamicImage::ImageRgba8(image.crop_imm(x, y, width, height).to_rgba8());
     debug!("\tDim: {:?}", d.dimensions());
 
-    let op = ImageOperation::Resize {
-        dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
-        aspect: true,
-        filter: crate::image_editing::ScaleFilter::Bilinear,
-    };
-    op.process_image(&mut d)?;
+    // let op = ImageOperation::Resize {
+    //     dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
+    //     aspect: false,
+    //     filter: crate::image_editing::ScaleFilter::Bilinear,
+    // };
+    // op.process_image(&mut d)?;
+
+    d = d.resize(
+        THUMB_SIZE[0],
+        THUMB_SIZE[1],
+        imageops::FilterType::CatmullRom,
+    );
     debug!("\tDim: {:?}", d.dimensions());
     d.save(&dest_path)?;
     debug!("\tSaved to {}.", dest_path.as_ref().display());
@@ -122,5 +144,5 @@ fn test_thumbs() {
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
     thumbs.get("tests/rust.png").unwrap();
-    std::thread::sleep_ms(3000);
+    std::thread::sleep(std::time::Duration::from_millis(3000));
 }

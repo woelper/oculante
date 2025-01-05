@@ -6,7 +6,7 @@ use crate::{
     file_encoder::FileEncoder,
     get_pixel_checked,
     image_editing::{
-        self, process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
         ScaleFilter,
     },
     paint::PaintStroke,
@@ -182,7 +182,7 @@ impl EguiExt for Ui {
                 if *checked {
                     color.gamma_multiply(0.3)
                 } else {
-                    visuals.bg_fill
+                    visuals.weak_bg_fill
                 },
                 visuals.bg_stroke,
             ));
@@ -237,8 +237,8 @@ impl EguiExt for Ui {
         .response
     }
 
-       /// Unselectable label
-       fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
+    /// Unselectable label
+    fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
         self.add(egui::Label::new(text).selectable(false))
     }
 
@@ -529,8 +529,6 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     let mut uv_center: (f64, f64) = Default::default();
     let mut uv_size: (f64, f64) = Default::default();
 
-
-
     if let Some(img) = &state.current_image {
         color_type = img.color();
 
@@ -611,6 +609,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
+                    ui.label_i(&format!("{PALETTE} HEX"));
+                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                    ui.label_right(
+                        RichText::new(hex)
+                    );
+                    ui.end_row();
+
                     ui.label_i(&format!("{PALETTE} Color"));
                     ui.label_right(
                         format!("{:?}", color_type)
@@ -665,6 +670,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                 crate::browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
                                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+
+                                state.is_loaded = false;
+                                // tag to add new image
+                                ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
+                            }
+
+                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
+                                if state.is_loaded && state.reset_image == false {
+                                    if let Some(path) = &state.current_path {
+                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
+                                    }
+                                }
                             }
                             let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
                             compare_list.sort_by(|a,b| a.0.cmp(&b.0));
@@ -1085,7 +1103,14 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 ui.scope(add_contents);
             });
         });
-        ui.add(egui::Label::new(RichText::new(description).small().color(ui.style().visuals.weak_text_color())).selectable(false));
+        ui.add(
+            egui::Label::new(
+                RichText::new(description)
+                    .small()
+                    .color(ui.style().visuals.weak_text_color()),
+            )
+            .selectable(false),
+        );
         ui.add_space(14.);
     }
 
@@ -1159,7 +1184,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
                                     }, ui);
-                            
+
                                     configuration_item_ui("Keep image edits", "When a new image is loaded, keep current edits on the previously edited image.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_edits, "");
                                     }, ui);
@@ -1194,7 +1219,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                             ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
                                             ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
                                         });
-                                        
+
                                     }, ui);
 
                                     #[cfg(feature = "update")]
@@ -1238,7 +1263,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                             if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
                                                 r.mark_changed();
                                             }
-    
+
                                             if r.changed() {
                                                 apply_theme(state, ctx);
                                             }
@@ -1463,7 +1488,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         // General Image Adjustments
         ImageOperation::Brightness(0),
         ImageOperation::Contrast(0),
-        ImageOperation::Exposure(20),
+        ImageOperation::Exposure(0),
         ImageOperation::Desaturate(0),
         ImageOperation::Invert,
         // Colour and Hue
@@ -2131,18 +2156,12 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             egui::Button::new(
                 RichText::new(text)
                     .size(ICON_SIZE)
-                    // .heading()
                     .color(ui.style().visuals.selection.bg_fill),
             )
             .frame(false),
         )
     } else {
-        ui.add(
-            egui::Button::new(
-                RichText::new(text).size(ICON_SIZE), // .heading()
-            )
-            .frame(false),
-        )
+        ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)).frame(false))
     }
 }
 
@@ -2482,7 +2501,9 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
-            ui.label_unselectable(egui::RichText::new("Please press & hold a key").color(Color32::RED));
+            ui.label_unselectable(
+                egui::RichText::new("Please press & hold a key").color(Color32::RED),
+            );
         }
     });
 
@@ -2501,10 +2522,11 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .collect::<Vec<_>>();
     ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-    egui::Grid::new("info").num_columns(2).show(ui, |ui| {
+    egui::Grid::new("info").num_columns(4).show(ui, |ui| {
         for (event, keys) in ordered_shortcuts {
             ui.label_unselectable(format!("{event:?}"));
             ui.label_unselectable(lookup(&s, event));
+            ui.add_space(200.);
             if !no_keys_pressed {
                 if ui
                     .button(format!("Assign {}", keypresses_as_string(&k)))
@@ -2572,12 +2594,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         if window_x > ui.cursor().left() + 110. {
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(10., 0.);
-                // ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
                 ui.spacing_mut().interact_size.y = BUTTON_HEIGHT_SMALL;
                 ui.spacing_mut().combo_width = 1.;
                 ui.spacing_mut().icon_width = 0.;
 
-                // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
                 let color = if ui.style().visuals.dark_mode {
                     Color32::WHITE
                 } else {
@@ -2595,21 +2615,19 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
-                    .selected_text(
-                        RichText::new(
-                            state
-                                .persistent_settings
-                                .current_channel
-                                .to_string()
-                                .to_uppercase(),
-                        ), // .size(combobox_text_size),
-                    )
+                    .selected_text(RichText::new(
+                        state
+                            .persistent_settings
+                            .current_channel
+                            .to_string()
+                            .to_uppercase(),
+                    ))
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
                             let r = ui.selectable_value(
                                 &mut state.persistent_settings.current_channel,
                                 channel,
-                                RichText::new(channel.to_string().to_uppercase()), // .size(combobox_text_size),
+                                RichText::new(channel.to_string().to_uppercase()),
                             );
 
                             if tooltip(
@@ -2628,7 +2646,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         // TODO: remove redundancy
-        if changed_channels {
+        if changed_channels && !state.persistent_settings.edit_enabled {
             //TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
@@ -2657,6 +2675,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         let label_rect = ui.ctx().available_rect().shrink(50.);
 
+        // TODO Center toast to image viewing area (Shift to the left / Right if the info or edit panel gets opened)
         if state.persistent_settings.current_channel != ColorChannel::Rgba {
             let mut job = LayoutJob::simple(
                 format!(
@@ -3085,7 +3104,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
-            FOLDER,
+            FOLDERFILL,
             FontId::proportional(85.),
             ui.style().visuals.text_color(),
         );
@@ -3159,7 +3178,8 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
             let galley = ui.painter().layout_job(job);
             let painter = ui
                 .ctx()
-                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()));
+                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
+                .with_clip_rect(ui.clip_rect());
 
             let c = ui.style().visuals.extreme_bg_color;
             let mut right_bottom = image_rect.right_bottom();
@@ -3187,7 +3207,7 @@ pub fn blank_icon(
 }
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
-    let mut button_color = Color32::from_gray(38);
+    let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
     let mut panel_color = Color32::from_gray(25);
 
     match state.persistent_settings.theme {
@@ -3198,8 +3218,13 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
-
     if style.visuals.dark_mode {
+        // Text color for label
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
+        // Text color for buttons
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
@@ -3210,6 +3235,12 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         }
     } else {
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
+        // Text color for label
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
+        // Text color for buttons
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
@@ -3312,17 +3343,11 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(230),
     };
 
-    let button_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(25),
-        false => Color32::from_gray(230),
-    };
-
     egui::Frame::none()
         .fill(panel_bg_color)
         .rounding(ui.style().visuals.widgets.active.rounding)
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
-            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
             ui.scope(add_contents);
         });
 }
@@ -3333,17 +3358,11 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(217),
     };
 
-    let button_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(25),
-        false => Color32::from_gray(230),
-    };
-
     egui::Frame::none()
         .fill(panel_bg_color)
         .rounding(ui.style().visuals.widgets.active.rounding)
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
-            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
             ui.scope(add_contents);
         });
 }
