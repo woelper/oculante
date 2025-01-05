@@ -448,7 +448,7 @@ impl TexWrap {
         let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
         let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
         //print!("Start x: {}, y: {}\n",xy_tex_center.0 - xy_tex_size.0,y_coordinate);
-       
+
         while y_coordinate <= y_coordinate_end {
             let mut y_coordinate_new = i32::MAX; //increment for y coordinate after x loop
             let mut x_coordinate = xy_tex_center.0 - xy_tex_size.0;
@@ -462,8 +462,7 @@ impl TexWrap {
                 //print!("x: {} y: {} ", x_coordinate, y_coordinate);
                 //print!("top: {} left: {} ", curr_tex_response.y_tex_top_global, curr_tex_response.x_tex_left_global);
                 //print!("bottom: {} right: {} \n", curr_tex_response.y_tex_bottom_global, curr_tex_response.x_tex_right_global);
-                
-                
+
                 //Handling last texture in a row or col
                 let curr_tex_end = nalgebra::Vector2::new(
                     i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
@@ -472,19 +471,14 @@ impl TexWrap {
 
                 //Usable tile size, depending on offsets
                 let tile_size = nalgebra::Vector2::new(
-                    curr_tex_end.x
-                    - x_coordinate+1
-                        ,
-                    curr_tex_end.y
-                    - y_coordinate+1
-                        ,
+                    curr_tex_end.x - x_coordinate + 1,
+                    curr_tex_end.y - y_coordinate + 1,
                 );
-
 
                 //Display size - tile size scaled
                 let display_size = nalgebra::Vector2::new(
-                    ((tile_size.x) as f64 / (2 * width_tex+1) as f64) * width as f64,
-                    ((tile_size.y) as f64 / (2 * width_tex+1) as f64) * width as f64,
+                    ((tile_size.x) as f64 / (2 * width_tex + 1) as f64) * width as f64,
+                    ((tile_size.y) as f64 / (2 * width_tex + 1) as f64) * width as f64,
                 );
 
                 draw.image(&curr_tex_response.texture.texture)
@@ -498,16 +492,16 @@ impl TexWrap {
                         ((tile_size.x) as f32, (tile_size.y) as f32),
                     )
                     .translate(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-                
-                x_coordinate = curr_tex_response.x_tex_right_global+1;
-                y_coordinate_new = y_coordinate_new.min(curr_tex_response.y_tex_bottom_global+1);
+
+                x_coordinate = curr_tex_response.x_tex_right_global + 1;
+                y_coordinate_new = y_coordinate_new.min(curr_tex_response.y_tex_bottom_global + 1);
                 //Update display cursor
                 curr_ui_curs.x += display_size.x;
                 last_display_size_y = last_display_size_y.min(display_size.y);
             }
             //Update y coordinates
             //print!("new y: {}, old y: {} \n", y_coordinate_new, y_coordinate);
-            y_coordinate = y_coordinate_new;            
+            y_coordinate = y_coordinate_new;
             curr_ui_curs.y += last_display_size_y;
         }
         //print!("\n");
@@ -586,17 +580,17 @@ impl TexWrap {
         let height: i32;
 
         my_tex_pair = &self.texture_boundary;
-        width = if xa < 0 { xa.abs()} else { tex_width_int};
-        height = if ya < 0 { ya.abs()} else { tex_height_int};
+        width = if xa < 0 { xa.abs() } else { tex_width_int };
+        height = if ya < 0 { ya.abs() } else { tex_height_int };
 
         TextureResponse {
             texture: my_tex_pair,
             x_offset_texture: 0,
-            y_offset_texture: 0,            
+            y_offset_texture: 0,
             x_tex_left_global: xa,
             y_tex_top_global: ya,
-            x_tex_right_global: xa + width-1,
-            y_tex_bottom_global: ya + height-1
+            x_tex_right_global: xa + width - 1,
+            y_tex_bottom_global: ya + height - 1,
         }
     }
 
