@@ -61,6 +61,8 @@ pub const FOLDERFAVOURITES: &str = "\u{E938}";
 pub const FOLDERFILL: &str = "\u{E93a}";
 pub const TERMINAL: &str = "\u{E939}";
 pub const DRIVE: &str = "\u{E93d}";
+pub const EYE: &str = "\u{E93e}";
+pub const EYEOFF: &str = "\u{E93f}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.
