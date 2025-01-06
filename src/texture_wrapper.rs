@@ -436,8 +436,7 @@ impl TexWrap {
         let width_tex = (width / scale) as i32;
 
         let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
-
-        let xy_tex_center = ((center.0) as i32, (center.1) as i32);
+        let xy_tex_center = ((center.0.round()) as i32, (center.1.round()) as i32);
 
         //Ui position to start at
         let base_ui_curs = nalgebra::Vector2::new(translation_x as f64, translation_y as f64);
