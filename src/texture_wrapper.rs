@@ -508,7 +508,7 @@ impl TexWrap {
         self.remove_draw_shader(draw);
 
         //Draw crosshair
-        let half_width = 1.0;
+        let half_width = 2.0;
         draw.rect(
             (translation_x + width / 2.0 - half_width, translation_y),
             (2.0 * half_width, width),
