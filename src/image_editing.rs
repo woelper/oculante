@@ -110,14 +110,14 @@ pub enum ScaleFilter {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct ImgOpItem {
     pub active: bool,
-    pub operation: ImageOperation
+    pub operation: ImageOperation,
 }
 
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
             active: true,
-            operation: op
+            operation: op,
         }
     }
 }

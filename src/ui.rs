@@ -1563,28 +1563,48 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         .show_separator_line(false)
         .show(ctx, |ui| {
 
-            ui.styled_collapsing("Filters", |ui| {
-                dark_panel(ui, |ui| {
-                    egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
 
-                        ui.vertical_centered_justified(|ui|{
-                            for op in &mut ops {
-                                if ui.button( &format!("{op}")).clicked() {
-                                    if op.operation.is_per_pixel() {
-                                        state.edit_state.pixel_op_stack.push(op.clone());
-                                    } else {
-                                        state.edit_state.image_op_stack.push(op.clone());
+            let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
+
+            ui.scope(|ui|{
+                ui.style_mut().visuals.collapsing_header_frame = true;
+                ui.style_mut().visuals.indent_has_left_vline = false;
+                CollapsingHeader::new("Filters")
+                    .icon(caret_icon)
+                    .open(open)
+                    .show_unindented(ui, |ui| {
+                        dark_panel(ui, |ui| {
+                            egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+        
+                                ui.vertical_centered_justified(|ui|{
+                                    for op in &mut ops {
+                                        if ui.button( &format!("{op}")).clicked() {
+                                            if op.operation.is_per_pixel() {
+                                                state.edit_state.pixel_op_stack.push(op.clone());
+                                            } else {
+                                                state.edit_state.image_op_stack.push(op.clone());
+                                            }
+                                            image_changed = true;
+                                            ui.ctx().data_mut(|w|w.insert_temp("filter_open".into(), false));
+                                        }
                                     }
-                                    image_changed = true;
-                                }
-                            }
-
+                                });
+                            });
                         });
-
                     });
-                });
             });
 
+            if open.is_some() {
+                ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
+
+            }
+
+            // ui.styled_collapsing("Filters", |ui| {
+                
+            // });
+
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
 
             ui.vertical_centered_justified(|ui| {
                 modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
@@ -1806,115 +1826,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             });
 
-            // Do the processing
-
-            // If expensive operations happened (modifying image geometry), process them here
-            let message: Option<String> = None;
-            if image_changed {
-                if let Some(img) = &mut state.current_image {
-                    let stamp = Instant::now();
-                    // start with a fresh copy of the unmodified image
-                    // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = img.clone();
-                    for operation in &state.edit_state.image_op_stack {
-                        if !operation.active {
-                            continue;
-                        }
-                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}");
-                            state.send_message_warn(&format!("{e}"));
-                        }
-                    }
-                    debug!(
-                        "Image changed. Finished evaluating in {}s",
-                        stamp.elapsed().as_secs_f32()
-                    );
-
-                    // tag strokes as uncommitted as they need to be rendered again
-                    for stroke in &mut state.edit_state.paint_strokes {
-                        stroke.committed = false;
-                    }
-                }
-                pixels_changed = true;
-            }
-
-            if pixels_changed {
-                // init result as a clean copy of image operation result
-                let stamp = Instant::now();
-
-                // start from the result of the image operations
-                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
-
-                // only process pixel stack if it is empty so we don't run through pixels without need
-                if !state.edit_state.pixel_op_stack.is_empty() {
-                    let ops = &state.edit_state.pixel_op_stack.iter().filter(|op|op.active).map(|op| op.operation.clone()).collect();
-                    if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
-                        state.send_message_warn(&format!("{e}"));
-                    }
-                }
-
-                    debug!(
-                    "Finished Pixel op stack in {} s",
-                    stamp.elapsed().as_secs_f32()
-                );
-
-                // draw paint lines
-                for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed {
-
-                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-
-                            stroke.render(
-                                compatible_buffer,
-                                &state.edit_state.brushes,
-                            );
-                        }
-
-
-                    }
-                }
-
-                state.send_frame(crate::Frame::UpdateTexture);
-                debug!(
-                    "Done updating tex after pixel; ops in {} s",
-                    stamp.elapsed().as_secs_f32()
-                );
-            }
-
-            // render uncommitted strokes if destructive to speed up painting
-            if state.edit_state.painting {
-                // render previous strokes
-                if state
-                    .edit_state
-                    .paint_strokes
-                    .iter()
-                    .filter(|l| !l.points.is_empty())
-                    .count()
-                    > 1
-                    && !state.edit_state.non_destructive_painting
-                {
-                    let stroke_count = state.edit_state.paint_strokes.len();
-
-                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
-                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-
-                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                                stroke.render(
-                                    compatible_buffer,
-                                    &state.edit_state.brushes,
-                                );
-                            }
-
-
-                            stroke.committed = true;
-                            debug!("Committed stroke {}", i);
-                        }
-                    }
-                }
-            }
-
-            state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
-
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
@@ -2135,6 +2046,120 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             });
 
+        });
+
+
+            // Do the processing
+
+            // If expensive operations happened (modifying image geometry), process them here
+            let message: Option<String> = None;
+            if image_changed {
+                if let Some(img) = &mut state.current_image {
+                    let stamp = Instant::now();
+                    // start with a fresh copy of the unmodified image
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
+                    state.edit_state.result_image_op = img.clone();
+                    for operation in &state.edit_state.image_op_stack {
+                        if !operation.active {
+                            continue;
+                        }
+                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
+                            error!("{e}");
+                            state.send_message_warn(&format!("{e}"));
+                        }
+                    }
+                    debug!(
+                        "Image changed. Finished evaluating in {}s",
+                        stamp.elapsed().as_secs_f32()
+                    );
+
+                    // tag strokes as uncommitted as they need to be rendered again
+                    for stroke in &mut state.edit_state.paint_strokes {
+                        stroke.committed = false;
+                    }
+                }
+                pixels_changed = true;
+            }
+
+            if pixels_changed {
+                // init result as a clean copy of image operation result
+                let stamp = Instant::now();
+
+                // start from the result of the image operations
+                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
+
+                // only process pixel stack if it is empty so we don't run through pixels without need
+                if !state.edit_state.pixel_op_stack.is_empty() {
+                    let ops = &state.edit_state.pixel_op_stack.iter().filter(|op|op.active).map(|op| op.operation.clone()).collect();
+                    if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
+                        state.send_message_warn(&format!("{e}"));
+                    }
+                }
+
+                    debug!(
+                    "Finished Pixel op stack in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
+
+                // draw paint lines
+                for stroke in &state.edit_state.paint_strokes {
+                    if !stroke.committed {
+
+                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+
+                            stroke.render(
+                                compatible_buffer,
+                                &state.edit_state.brushes,
+                            );
+                        }
+
+
+                    }
+                }
+
+                state.send_frame(crate::Frame::UpdateTexture);
+                debug!(
+                    "Done updating tex after pixel; ops in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
+            }
+
+            // render uncommitted strokes if destructive to speed up painting
+            if state.edit_state.painting {
+                // render previous strokes
+                if state
+                    .edit_state
+                    .paint_strokes
+                    .iter()
+                    .filter(|l| !l.points.is_empty())
+                    .count()
+                    > 1
+                    && !state.edit_state.non_destructive_painting
+                {
+                    let stroke_count = state.edit_state.paint_strokes.len();
+
+                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
+                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
+
+                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                                stroke.render(
+                                    compatible_buffer,
+                                    &state.edit_state.brushes,
+                                );
+                            }
+
+
+                            stroke.committed = true;
+                            debug!("Committed stroke {}", i);
+                        }
+                    }
+                }
+            }
+
+            state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
+
+
+
             if pixels_changed && state.persistent_settings.info_enabled {
                 state.image_info = None;
                 send_extended_info(
@@ -2331,7 +2356,7 @@ fn modifier_stack_ui(
                         *image_changed = true;
                     }
 
-                    if egui::Button::new(RichText::new("").size(caret_size*1.5))
+                    if egui::Button::new(RichText::new("").size(caret_size * 1.5))
                         .frame(false)
                         .ui(ui)
                         .on_hover_text("Remove operator")
@@ -2340,7 +2365,7 @@ fn modifier_stack_ui(
                         delete = Some(i);
                         *image_changed = true;
                     }
-                    ui.add_space(caret_size/2.);
+                    ui.add_space(caret_size / 2.);
                     ui.add_enabled_ui(operation.active, |ui| {
                         ui.label(&format!("{operation}"));
                     });
