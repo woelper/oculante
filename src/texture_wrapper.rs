@@ -431,12 +431,12 @@ impl TexWrap {
         center: (f32, f32),
         scale: f32,
     ) {
-        self.add_draw_shader(draw);
-
+        self.add_draw_shader(draw);        
+        
         let width_tex = (width / scale) as i32;
 
         let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
-        let xy_tex_center = ((center.0.round()) as i32, (center.1.round()) as i32);
+        let xy_tex_center = ((center.0) as i32, (center.1) as i32);
 
         //Ui position to start at
         let base_ui_curs = nalgebra::Vector2::new(translation_x as f64, translation_y as f64);
@@ -507,15 +507,23 @@ impl TexWrap {
         self.remove_draw_shader(draw);
 
         //Draw crosshair
-        let half_width = 2.0;
+        //let stroke_width = 0.5;
+        let half_width = scale/4.0/*-stroke_width*/;
+        
         draw.rect(
             (translation_x + width / 2.0 - half_width, translation_y),
             (2.0 * half_width, width),
-        );
+        )
+        /*.fill()
+        .stroke(stroke_width)
+        .stroke_color(notan::app::Color { r: (0.0), g: (0.0), b: (0.0), a: (1.0) }) */;
         draw.rect(
             (translation_x, translation_y + width / 2.0 - half_width),
             (width, 2.0 * half_width),
-        );
+        )
+        /* .fill()
+        .stroke(stroke_width)
+        .stroke_color(notan::app::Color { r: (0.0), g: (0.0), b: (0.0), a: (1.0) })*/;
     }
 
     pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
