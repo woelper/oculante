@@ -43,8 +43,8 @@ pub struct EditState {
     pub paint_fade: bool,
     #[serde(skip, default = "default_brushes")]
     pub brushes: Vec<RgbaImage>,
-    pub pixel_op_stack: Vec<ImageOperation>,
-    pub image_op_stack: Vec<ImageOperation>,
+    pub pixel_op_stack: Vec<ImgOpItem>,
+    pub image_op_stack: Vec<ImgOpItem>,
     pub export_extension: String,
 }
 
@@ -105,6 +105,27 @@ pub enum ScaleFilter {
     CatmullRom,
     Mitchell,
     Lanczos3,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+pub struct ImgOpItem {
+    pub active: bool,
+    pub operation: ImageOperation
+}
+
+impl ImgOpItem {
+    pub fn new(op: ImageOperation) -> Self {
+        Self {
+            active: true,
+            operation: op
+        }
+    }
+}
+
+impl fmt::Display for ImgOpItem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.operation)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -189,35 +210,35 @@ impl MeasureShape {
 impl fmt::Display for ImageOperation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::ColorConverter(_) => write!(f, "{PAINT_BUCKET} Color Type"),
-            Self::Brightness(_) => write!(f, "{SUN} Brightness"),
-            Self::Noise { .. } => write!(f, "〰 Noise"),
-            Self::Desaturate(_) => write!(f, "🌁 Desaturate"),
-            Self::Posterize(_) => write!(f, "🖼 Posterize"),
-            Self::Contrast(_) => write!(f, "◑ Contrast"),
-            Self::Exposure(_) => write!(f, "{APERTURE} Exposure"),
-            Self::Equalize(_) => write!(f, "☯ Equalize"),
-            Self::Mult(_) => write!(f, "✖ Mult color"),
-            Self::Add(_) => write!(f, "➕ Add color"),
-            Self::Fill(_) => write!(f, "{PAINT_BUCKET} Fill color"),
-            Self::Blur(_) => write!(f, "{DROP} Blur"),
-            Self::Crop(_) => write!(f, "{CROP} Crop"),
-            Self::CropPerspective { .. } => write!(f, "{CROP} Perspective crop"),
+            Self::ColorConverter(_) => write!(f, "Color Type"),
+            Self::Brightness(_) => write!(f, "Brightness"),
+            Self::Noise { .. } => write!(f, "Noise"),
+            Self::Desaturate(_) => write!(f, "Desaturate"),
+            Self::Posterize(_) => write!(f, "Posterize"),
+            Self::Contrast(_) => write!(f, "Contrast"),
+            Self::Exposure(_) => write!(f, "Exposure"),
+            Self::Equalize(_) => write!(f, "Equalize"),
+            Self::Mult(_) => write!(f, "Mult color"),
+            Self::Add(_) => write!(f, "Add color"),
+            Self::Fill(_) => write!(f, "Fill color"),
+            Self::Blur(_) => write!(f, "Blur"),
+            Self::Crop(_) => write!(f, "Crop"),
+            Self::CropPerspective { .. } => write!(f, "Perspective crop"),
             Self::Measure { .. } => write!(f, "Measure"),
-            Self::Flip(_) => write!(f, "{SWAP} Flip"),
-            Self::Rotate(_) => write!(f, "{ARROW_CLOCKWISE} Rotate"),
-            Self::Invert => write!(f, "{SELECTION_INVERSE} Invert"),
-            Self::ChannelSwap(_) => write!(f, "{FLOW_ARROW} Channel Copy"),
-            Self::HSV(_) => write!(f, "◔ HSV"),
-            Self::ChromaticAberration(_) => write!(f, "{CAMERA} Color Fringe"),
-            Self::Resize { .. } => write!(f, "{ARROWS_IN} Resize"),
-            Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
-            Self::Expression(_) => write!(f, "{FUNCTION} Expression"),
-            Self::MMult => write!(f, "✖ Multiply with alpha"),
-            Self::ScaleImageMinMax => write!(f, "\u{2195} Scale image min max"),
-            Self::MDiv => write!(f, "➗ Divide by alpha"),
-            Self::LUT(_) => write!(f, "{FILM_STRIP} Apply Color LUT"),
-            Self::Filter3x3(_) => write!(f, "{DOTS_NINE} 3x3 Filter"),
+            Self::Flip(_) => write!(f, "Flip"),
+            Self::Rotate(_) => write!(f, "Rotate"),
+            Self::Invert => write!(f, "Invert"),
+            Self::ChannelSwap(_) => write!(f, "Channel Copy"),
+            Self::HSV(_) => write!(f, "HSV"),
+            Self::ChromaticAberration(_) => write!(f, "Color Fringe"),
+            Self::Resize { .. } => write!(f, "Resize"),
+            Self::GradientMap { .. } => write!(f, "Gradient Map"),
+            Self::Expression(_) => write!(f, "Expression"),
+            Self::MMult => write!(f, "Multiply with alpha"),
+            Self::ScaleImageMinMax => write!(f, "Scale image min max"),
+            Self::MDiv => write!(f, "Divide by alpha"),
+            Self::LUT(_) => write!(f, "Apply Color LUT"),
+            Self::Filter3x3(_) => write!(f, "3x3 Filter"),
             // _ => write!(f, "Not implemented Display"),
         }
     }

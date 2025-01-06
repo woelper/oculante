@@ -6,8 +6,8 @@ use crate::{
     file_encoder::FileEncoder,
     get_pixel_checked,
     image_editing::{
-        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, MeasureShape,
-        ScaleFilter,
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem,
+        MeasureShape, ScaleFilter,
     },
     paint::PaintStroke,
     pos_from_coord, set_zoom,
@@ -1001,20 +1001,23 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                     .edit_state
                     .image_op_stack
                     .iter()
-                    .filter(|op| matches!(op, ImageOperation::Measure { .. }))
+                    .filter(|op| matches!(op.operation, ImageOperation::Measure { .. }))
                     .collect::<Vec<_>>();
                 if x.len() != 1 {
                     state
                         .edit_state
                         .image_op_stack
-                        .push(ImageOperation::Measure {
+                        .push(ImgOpItem::new(ImageOperation::Measure {
                             shapes: vec![MeasureShape::new_rect(vec![(0, 0), (0, 0)])],
-                        });
+                        }));
                 }
 
                 if ui.ctx().input(|r| r.pointer.secondary_pressed()) {
                     for op in &mut state.edit_state.image_op_stack {
-                        match op {
+                        if !op.active {
+                            continue;
+                        }
+                        match &mut op.operation {
                             ImageOperation::Measure { shapes } => {
                                 for shape in shapes {
                                     match shape {
@@ -1033,7 +1036,10 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                 if ui.ctx().input(|r| r.pointer.secondary_down()) {
                     for op in &mut state.edit_state.image_op_stack {
-                        match op {
+                        if !op.active {
+                            continue;
+                        }
+                        match &mut op.operation {
                             ImageOperation::Measure { shapes } => {
                                 for shape in shapes {
                                     match shape {
@@ -1051,7 +1057,10 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                 }
                 if ui.ctx().input(|r| r.pointer.secondary_released()) {
                     for op in &mut state.edit_state.image_op_stack {
-                        match op {
+                        if !op.active {
+                            continue;
+                        }
+                        match &mut op.operation {
                             ImageOperation::Measure { shapes } => {
                                 for shape in shapes {
                                     match shape {
@@ -1071,7 +1080,7 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
         });
 
         for op in &mut state.edit_state.image_op_stack {
-            op.ui(
+            op.operation.ui(
                 ui,
                 &state.image_geometry,
                 &mut state.mouse_grab,
@@ -1486,50 +1495,54 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
     let mut ops = [
         // General Image Adjustments
-        ImageOperation::Brightness(0),
-        ImageOperation::Contrast(0),
-        ImageOperation::Exposure(0),
-        ImageOperation::Desaturate(0),
-        ImageOperation::Invert,
+        ImgOpItem::new(ImageOperation::Brightness(0)),
+        ImgOpItem::new(ImageOperation::Contrast(0)),
+        ImgOpItem::new(ImageOperation::Exposure(0)),
+        ImgOpItem::new(ImageOperation::Desaturate(0)),
+        ImgOpItem::new(ImageOperation::Invert),
         // Colour and Hue
-        ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-        ImageOperation::Equalize((0, 255)),
-        ImageOperation::HSV((0, 100, 100)),
-        ImageOperation::Add([0, 0, 0]),
-        ImageOperation::Mult([255, 255, 255]),
-        ImageOperation::Fill([255, 255, 255, 255]),
+        ImgOpItem::new(ImageOperation::ChannelSwap((Channel::Red, Channel::Red))),
+        ImgOpItem::new(ImageOperation::Equalize((0, 255))),
+        ImgOpItem::new(ImageOperation::HSV((0, 100, 100))),
+        ImgOpItem::new(ImageOperation::Add([0, 0, 0])),
+        ImgOpItem::new(ImageOperation::Mult([255, 255, 255])),
+        ImgOpItem::new(ImageOperation::Fill([255, 255, 255, 255])),
         // Colour Mapping and Conversion
-        ImageOperation::LUT("Lomography Redscale 100".into()),
-        ImageOperation::GradientMap(vec![
+        ImgOpItem::new(ImageOperation::LUT("Lomography Redscale 100".into())),
+        ImgOpItem::new(ImageOperation::GradientMap(vec![
             GradientStop::new(0, [155, 33, 180]),
             GradientStop::new(128, [255, 83, 0]),
             GradientStop::new(255, [224, 255, 0]),
-        ]),
-        ImageOperation::Posterize(8),
-        ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
-        ImageOperation::ColorConverter(crate::image_editing::ColorTypeExt::Rgba8),
+        ])),
+        ImgOpItem::new(ImageOperation::Posterize(8)),
+        ImgOpItem::new(ImageOperation::Filter3x3([
+            0, -100, 0, -100, 500, -100, 0, -100, 0,
+        ])),
+        ImgOpItem::new(ImageOperation::ColorConverter(
+            crate::image_editing::ColorTypeExt::Rgba8,
+        )),
         // Mathematical
-        ImageOperation::MMult,
-        ImageOperation::MDiv,
-        ImageOperation::Expression("r = 1.0".into()),
-        ImageOperation::ScaleImageMinMax,
+        ImgOpItem::new(ImageOperation::MMult),
+        ImgOpItem::new(ImageOperation::MDiv),
+        ImgOpItem::new(ImageOperation::Expression("r = 1.0".into())),
+        ImgOpItem::new(ImageOperation::ScaleImageMinMax),
         // Effects
-        ImageOperation::Blur(0),
-        ImageOperation::Noise {
+        ImgOpItem::new(ImageOperation::Blur(0)),
+        ImgOpItem::new(ImageOperation::Noise {
             amt: 50,
             mono: false,
-        },
-        ImageOperation::ChromaticAberration(15),
+        }),
+        ImgOpItem::new(ImageOperation::ChromaticAberration(15)),
         // Geometry and Transformations
-        ImageOperation::Flip(false),
-        ImageOperation::Rotate(90),
-        ImageOperation::Resize {
+        ImgOpItem::new(ImageOperation::Flip(false)),
+        ImgOpItem::new(ImageOperation::Rotate(90)),
+        ImgOpItem::new(ImageOperation::Resize {
             dimensions: state.image_geometry.dimensions,
             aspect: true,
             filter: ScaleFilter::Hamming,
-        },
-        ImageOperation::Crop([0, 0, 0, 0]),
-        ImageOperation::CropPerspective {
+        }),
+        ImgOpItem::new(ImageOperation::Crop([0, 0, 0, 0])),
+        ImgOpItem::new(ImageOperation::CropPerspective {
             points: [
                 (0, 0),
                 (state.image_geometry.dimensions.0, 0),
@@ -1540,7 +1553,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 ),
             ],
             original_size: state.image_geometry.dimensions,
-        },
+        }),
     ];
 
     egui::SidePanel::right("editing")
@@ -1552,17 +1565,22 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             ui.styled_collapsing("Filters", |ui| {
                 dark_panel(ui, |ui| {
-                    egui::ScrollArea::vertical().max_height(300.).show(ui, |ui|{
-                        for op in &mut ops {
-                            if ui.label_i_selected(false, &format!("{op}")).clicked() {
-                                if op.is_per_pixel() {
-                                    state.edit_state.pixel_op_stack.push(op.clone());
-                                } else {
-                                    state.edit_state.image_op_stack.push(op.clone());
+                    egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+
+                        ui.vertical_centered_justified(|ui|{
+                            for op in &mut ops {
+                                if ui.button( &format!("{op}")).clicked() {
+                                    if op.operation.is_per_pixel() {
+                                        state.edit_state.pixel_op_stack.push(op.clone());
+                                    } else {
+                                        state.edit_state.image_op_stack.push(op.clone());
+                                    }
+                                    image_changed = true;
                                 }
-                                image_changed = true;
                             }
-                        }
+
+                        });
+
                     });
                 });
             });
@@ -1799,7 +1817,10 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
                     state.edit_state.result_image_op = img.clone();
                     for operation in &state.edit_state.image_op_stack {
-                        if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
+                        if !operation.active {
+                            continue;
+                        }
+                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
                             error!("{e}");
                             state.send_message_warn(&format!("{e}"));
                         }
@@ -1826,7 +1847,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
-                    let ops = &state.edit_state.pixel_op_stack;
+                    let ops = &state.edit_state.pixel_op_stack.iter().filter(|op|op.active).map(|op| op.operation.clone()).collect();
                     if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
                         state.send_message_warn(&format!("{e}"));
                     }
@@ -2086,9 +2107,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
                         ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator is added in this case.");
-                        let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op {true} else {false}).unwrap_or_default();
+                        let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
                         if !op_present {
-                            state.edit_state.image_op_stack.insert(0, ImageOperation::ColorConverter(ColorTypeExt::Rgba8));
+                            state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
                             image_changed = true;
                             pixels_changed = true;
                             state.send_message_info("Color conversion operator added.");
@@ -2255,7 +2276,7 @@ pub fn stroke_ui(
 }
 
 fn modifier_stack_ui(
-    stack: &mut Vec<ImageOperation>,
+    stack: &mut Vec<ImgOpItem>,
     image_changed: &mut bool,
     ui: &mut Ui,
     geo: &ImageGeometry,
@@ -2268,56 +2289,86 @@ fn modifier_stack_ui(
     let stack_len = stack.len();
 
     for (i, operation) in stack.iter_mut().enumerate() {
-        ui.horizontal(|ui| {
-            let up = i != 0;
-            let down = i != stack_len - 1;
-            let caret_size = 12.;
+        egui::Frame::none()
+            .fill(Color32::from_gray(30))
+            .rounding(ui.style().visuals.widgets.active.rounding)
+            .inner_margin(Margin::same(6.))
+            .show(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.0));
+                ui.horizontal(|ui| {
+                    let up = i != 0;
+                    let down = i != stack_len - 1;
+                    let caret_size = 10.;
 
-            ui.add_enabled_ui(up, |ui| {
-                let ur =
-                    ui.add(egui::Button::new(RichText::new("").size(caret_size)).frame(false));
-                if ur.on_hover_text("Move up").clicked() {
-                    swap = Some(((i as i32 - 1).max(0) as usize, i));
-                    *image_changed = true;
-                }
+                    ui.add_enabled_ui(up, |ui| {
+                        let ur = ui.add(
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                        );
+                        if ur.on_hover_text("Move up").clicked() {
+                            swap = Some(((i as i32 - 1).max(0) as usize, i));
+                            *image_changed = true;
+                        }
+                    });
+
+                    ui.add_enabled_ui(down, |ui| {
+                        let dr = ui.add(
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                        );
+                        if dr.on_hover_text("Move down").clicked() {
+                            swap = Some((i, i + 1));
+                            *image_changed = true;
+                        }
+                    });
+
+                    let icon = if operation.active { EYE } else { EYEOFF };
+                    if egui::Button::new(RichText::new(icon).size(caret_size))
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Bypass")
+                        .clicked()
+                    {
+                        operation.active = !operation.active;
+                        *image_changed = true;
+                    }
+
+                    if egui::Button::new(RichText::new("").size(caret_size*1.5))
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Remove operator")
+                        .clicked()
+                    {
+                        delete = Some(i);
+                        *image_changed = true;
+                    }
+                    ui.add_space(caret_size/2.);
+                    ui.add_enabled_ui(operation.active, |ui| {
+                        ui.label(&format!("{operation}"));
+                    });
+                });
+
+                ui.push_id(i, |ui| {
+                    // draw the image operator
+                    ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
+
+                    ui.add_enabled_ui(operation.active, |ui| {
+                        if operation
+                            .operation
+                            .ui(ui, geo, mouse_grab, settings)
+                            .changed()
+                        {
+                            *image_changed = true;
+                        }
+                    });
+
+                    ui.style_mut().spacing.icon_spacing = 0.;
+                    ui.style_mut().spacing.button_padding = Vec2::ZERO;
+                    ui.style_mut().spacing.interact_size = Vec2::ZERO;
+                    ui.style_mut().spacing.indent = 0.0;
+                    ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+
+                    // ui.add_space(80.);
+                });
             });
-
-            ui.add_enabled_ui(down, |ui| {
-                let dr =
-                    ui.add(egui::Button::new(RichText::new("").size(caret_size)).frame(false));
-                if dr.on_hover_text("Move down").clicked() {
-                    swap = Some((i, i + 1));
-                    *image_changed = true;
-                }
-            });
-
-            if egui::Button::new(RichText::new("").size(18.))
-                .frame(false)
-                .ui(ui)
-                .on_hover_text("Remove operator")
-                .clicked()
-            {
-                delete = Some(i);
-                *image_changed = true;
-            }
-            ui.label(&format!("{operation}"));
-        });
-
-        ui.push_id(i, |ui| {
-            // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
-            if operation.ui(ui, geo, mouse_grab, settings).changed() {
-                *image_changed = true;
-            }
-
-            ui.style_mut().spacing.icon_spacing = 0.;
-            ui.style_mut().spacing.button_padding = Vec2::ZERO;
-            ui.style_mut().spacing.interact_size = Vec2::ZERO;
-            ui.style_mut().spacing.indent = 0.0;
-            ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-
-            // ui.add_space(80.);
-        });
     }
 
     if let Some(delete) = delete {
@@ -2410,7 +2461,9 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     .edit_state
                     .image_op_stack
                     .iter()
-                    .filter(|op| matches!(op, ImageOperation::Crop(_)))
+                    .filter(|op|op.active)
+                    .filter(|op| matches!(op.operation, ImageOperation::Crop(_)))
+                    .map(|op|&op.operation)
                     .collect::<Vec<_>>();
 
                 let crop = crop_ops
@@ -2424,7 +2477,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     state
                         .edit_state
                         .image_op_stack
-                        .push(ImageOperation::Crop([0, 0, 0, 0]))
+                        .push(ImgOpItem::new(ImageOperation::Crop([0, 0, 0, 0])))
                 }
 
                 ui.add_enabled_ui(crop != ImageOperation::Crop([0, 0, 0, 0]), |ui| {
