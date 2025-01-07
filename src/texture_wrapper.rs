@@ -9,8 +9,8 @@ use log::warn;
 use notan::draw::*;
 use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
-    texture_array: Vec<TexturePair>,
-    texture_boundary: TexturePair,
+    texture_array: Vec<Texture>,
+    texture_boundary: Texture,
     pub col_count: u32,
     pub row_count: u32,
     pub col_translation: u32,
@@ -65,7 +65,7 @@ impl TextureWrapperManager {
 }
 
 pub struct TextureResponse<'a> {
-    pub texture: &'a TexturePair,
+    pub texture: &'a Texture,
 
     pub x_offset_texture: i32,
     pub y_offset_texture: i32,
@@ -74,10 +74,6 @@ pub struct TextureResponse<'a> {
     pub y_tex_top_global: i32,
     pub x_tex_right_global: i32,
     pub y_tex_bottom_global: i32,
-}
-
-pub struct TexturePair {
-    pub texture: Texture,
 }
 
 //language=glsl
@@ -395,7 +391,7 @@ impl TexWrap {
         let col_count = (im_w as f32 / max_texture_size as f32).ceil() as u32;
         let row_count = (im_h as f32 / max_texture_size as f32).ceil() as u32;
 
-        let mut texture_vec: Vec<TexturePair> = Vec::new();
+        let mut texture_vec: Vec<Texture> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);
         let col_increment = std::cmp::min(max_texture_size, im_w);
         let mut fine = true;
@@ -444,8 +440,7 @@ impl TexWrap {
                 }
 
                 if let Some(t) = tex {
-                    let te = TexturePair { texture: t };
-                    texture_vec.push(te);
+                    texture_vec.push(t);
                 } else {
                     //On error
                     texture_vec.clear();
@@ -470,9 +465,7 @@ impl TexWrap {
         if fine {
             let texture_count = texture_vec.len();
             Some(TexWrap {
-                texture_boundary: TexturePair {
-                    texture: aa.unwrap(),
-                },
+                texture_boundary: aa.unwrap(),
                 size_vec: im_size,
                 col_count: col_count,
                 row_count: row_count,
@@ -505,7 +498,7 @@ impl TexWrap {
             for col_idx in 0..self.col_count {
                 let translate_x = translation_x as f64
                     + scale as f64 * col_idx as f64 * self.col_translation as f64;
-                draw.image(&self.texture_array[tex_idx].texture)
+                draw.image(&self.texture_array[tex_idx])
                     .blend_mode(BlendMode::NORMAL)
                     .scale(scale, scale)
                     .translate(translate_x as f32, translate_y as f32);
@@ -574,7 +567,7 @@ impl TexWrap {
                     ((tile_size.y) as f64 / (2 * width_tex + 1) as f64) * width as f64,
                 );
 
-                draw.image(&curr_tex_response.texture.texture)
+                draw.image(&curr_tex_response.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
                     .crop(
@@ -639,7 +632,7 @@ impl TexWrap {
                     let byte_slice = Self::image_bytes_slice(&suba_img);
                     if let Some(bt_slice) = byte_slice {
                         if let Err(e) = gfx
-                            .update_texture(&mut self.texture_array[tex_index].texture)
+                            .update_texture(&mut self.texture_array[tex_index])
                             .with_data(bt_slice)
                             .update()
                         {
@@ -654,7 +647,7 @@ impl TexWrap {
                     let byte_slice = Self::image_bytes_slice(&image);
                     if let Some(bt_slice) = byte_slice {
                         if let Err(e) = gfx
-                            .update_texture(&mut self.texture_array[tex_index].texture)
+                            .update_texture(&mut self.texture_array[tex_index])
                             .with_data(bt_slice)
                             .update()
                         {
@@ -672,20 +665,17 @@ impl TexWrap {
         }
     }
 
-    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
-        let my_tex_pair: &TexturePair;
+    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {        
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
         let width: i32;
         let height: i32;
-
-        my_tex_pair = &self.texture_boundary;
         width = if xa < 0 { xa.abs() } else { tex_width_int };
         height = if ya < 0 { ya.abs() } else { tex_height_int };
 
         TextureResponse {
-            texture: my_tex_pair,
+            texture: &self.texture_boundary,
             x_offset_texture: 0,
             y_offset_texture: 0,
             x_tex_left_global: xa,
@@ -713,7 +703,7 @@ impl TexWrap {
         let tex_idx =
             (y_idx * self.col_count as i32 + x_idx).min(self.texture_array.len() as i32 - 1);
         let my_tex_pair = &self.texture_array[tex_idx as usize];
-        let my_tex = &my_tex_pair.texture;
+        let my_tex = &my_tex_pair;
         let width = my_tex.width() as i32;
         let height = my_tex.height() as i32;
 
