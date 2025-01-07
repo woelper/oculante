@@ -3287,6 +3287,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
+    style.spacing.scroll = egui::style::ScrollStyle::solid();
+
     if style.visuals.dark_mode {
         // Text color for label
         style.visuals.widgets.noninteractive.fg_stroke.color =
@@ -3322,9 +3324,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = [0, 170, 255];
         }
         style.visuals.widgets.inactive.bg_fill = Color32::WHITE;
+        style.visuals.widgets.hovered.bg_fill = Color32::WHITE.gamma_multiply(0.8);
     }
-
-    style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
     style.spacing.window_margin = 5.0.into();
