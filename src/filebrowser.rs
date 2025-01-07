@@ -536,14 +536,29 @@ pub fn browse<F: FnMut(&PathBuf)>(
             // ui.add_space(10.);
 
             if save {
-                let ext = Path::new(&state.filename).ext();
+                let mut ext = Path::new(&state.filename).ext();
+
+                // Safeguard: if saving as lut, ase etc, make sure the extension matches. If not, choose the first filter item.
+                if !filter.contains(&ext.as_str()) {
+                    ext = filter.first().map(|e| e.to_string()).unwrap_or(ext.clone());
+                    state.filename = Path::new(&state.filename)
+                        .with_extension(&ext)
+                        .to_string_lossy()
+                        .to_string();
+                }
+
                 ui.label("Filename");
                 ui.horizontal(|ui| {
                     ui.spacing_mut().button_padding = Vec2::new(2., 5.);
-                    ui.add(
+                    let textinput = ui.add(
                         egui::TextEdit::singleline(&mut state.filename)
                             .min_size(Vec2::new(10., 28.)),
                     );
+
+                    if prev_path == PathBuf::default() {
+                        textinput.request_focus();
+                    }
+
                     for f in FileEncoder::iter() {
                         if !filter.contains(&f.ext().as_str()) {
                             continue;
