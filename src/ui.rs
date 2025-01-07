@@ -1493,6 +1493,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         }
     }
 
+    // TODO: Move these to image_editing
     let mut ops = [
         // General Image Adjustments
         ImgOpItem::new(ImageOperation::Brightness(0)),
@@ -1566,7 +1567,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
 
-            ui.scope(|ui|{
+            ui.scope(|ui| {
                 ui.style_mut().visuals.collapsing_header_frame = true;
                 ui.style_mut().visuals.indent_has_left_vline = false;
                 CollapsingHeader::new("Filters")
@@ -1596,45 +1597,42 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             if open.is_some() {
                 ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
-
             }
 
-            // ui.styled_collapsing("Filters", |ui| {
-                
-            // });
+    
 
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
 
-            ui.vertical_centered_justified(|ui| {
-                modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
+                ui.vertical_centered_justified(|ui| {
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
-                // draw a line between different operator types
-                if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
-                    ui.separator();
-                }
-                modifier_stack_ui(
-                    &mut state.edit_state.pixel_op_stack,
-                    &mut pixels_changed,
-                    ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
-                );
-                if ui.button("Reset all edits").clicked() {
-                    state.edit_state = Default::default();
-                    pixels_changed = true
-                }
-                if ui.button("Original").clicked()
-                {
-                    if let Some(img) = &state.current_image {
-                        state.image_geometry.dimensions = img.dimensions();
-                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                    // draw a line between different operator types
+                    if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
+                        ui.separator();
                     }
-                }
-                if ui.button("Modified").clicked()
-                {
-                    pixels_changed = true;
-                }
+                    modifier_stack_ui(
+                        &mut state.edit_state.pixel_op_stack,
+                        &mut pixels_changed,
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
+                    );
+                    if ui.button("Reset all edits").clicked() {
+                        state.edit_state = Default::default();
+                        pixels_changed = true
+                    }
+                    if ui.button("Original").clicked()
+                    {
+                        if let Some(img) = &state.current_image {
+                            state.image_geometry.dimensions = img.dimensions();
+                            state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                        }
+                    }
+                    if ui.button("Modified").clicked()
+                    {
+                        pixels_changed = true;
+                    }
 
-            });
+                });
 
 
             ui.vertical_centered_justified(|ui| {
@@ -2015,38 +2013,34 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             }
                         }
                     }
-
-                    if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-                        ui.label("Your image is not RGBA 8 bit. Some operators are not working (yet). A color conversion operator is added in this case.");
-                        let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
-                        if !op_present {
-                            state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
-                            image_changed = true;
-                            pixels_changed = true;
-                            state.send_message_info("Color conversion operator added.");
-                        }
-                    }
-
-                    #[cfg(debug_assertions)]
-                    {
-                        ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
-                        ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
-                        ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
-                        if let Some(img) = &state.current_image {
-
-                        ui.label(format!("current_image: {:?}", img.color()));
-
-                            if img.color() != ColorType::Rgba8 {
-                                ui.label("Your image is not 8 bit RGBA. It is converted to this format while editing.");
-                            }
-                        }
-
-                    }
-
                 }
             });
-
         });
+
+        if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+            let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
+            if !op_present {
+                state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
+                image_changed = true;
+                pixels_changed = true;
+                state.send_message_info("Color conversion operator added.");
+            }
+        }
+
+        if let Some(img) = &state.current_image {
+            if img.color() != ColorType::Rgba8 {
+                ui.add_space(10.);
+                ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
+            }
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+            ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
+            ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
+     
+        }
 
 
             // Do the processing
@@ -2104,15 +2098,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
                     if !stroke.committed {
-
                         if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-
                             stroke.render(
                                 compatible_buffer,
                                 &state.edit_state.brushes,
                             );
                         }
-
 
                     }
                 }
