@@ -161,6 +161,8 @@ impl TexWrap {
                 return None
             }
         }
+        // TODO: we could just do .filter(|byte_count| img.as_bytes().len()< byte_count) here
+        // and have the function return an error
 
         if img.as_bytes().len() < byte_count {
             error!("Pixel buffer is smaller than expected!");
@@ -171,12 +173,12 @@ impl TexWrap {
 
     fn image_bytes_slice(img: &DynamicImage) -> Option<&[u8]> {
         Self::image_bytesize_expected(img).map(|byte_count| {
-                let byte_buffer = img.as_bytes();
-                if byte_count < byte_buffer.len() {
-                    warn!("Image byte buffer is bigger than expected. Will truncate.");
-                }
-                let (buff, _) = byte_buffer.split_at(byte_count);
-                buff
+            let byte_buffer = img.as_bytes();
+            if byte_count < byte_buffer.len() {
+                warn!("Image byte buffer is bigger than expected. Will truncate.");
+            }
+            let (buff, _) = byte_buffer.split_at(byte_count);
+            buff
             }
         )
     }
@@ -320,8 +322,7 @@ impl TexWrap {
                 );
 
                 if let Some(suba_img) = sub_img_opt {
-                    let byte_slice = Self::image_bytes_slice(&suba_img);
-                    if let Some(bt_slice) = byte_slice {
+                    if let Some(bt_slice) = Self::image_bytes_slice(&suba_img) {
                         tex = texture_generator_function(
                             gfx,
                             bt_slice,
@@ -333,8 +334,7 @@ impl TexWrap {
                         );
                     }
                 } else {
-                    let byte_slice = Self::image_bytes_slice(&image);
-                    if let Some(bt_slice) = byte_slice {
+                    if let Some(bt_slice) = Self::image_bytes_slice(&image) {
                         tex = texture_generator_function(
                             gfx,
                             bt_slice,
@@ -429,8 +429,8 @@ impl TexWrap {
         center: (f32, f32),
         scale: f32,
     ) {
-        self.add_draw_shader(draw);        
-        
+        self.add_draw_shader(draw);
+
         let width_tex = (width / scale) as i32;
 
         let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
@@ -507,7 +507,7 @@ impl TexWrap {
         //Draw crosshair
         //let stroke_width = 0.5;
         let half_width = scale/4.0/*-stroke_width*/;
-        
+
         draw.rect(
             (translation_x + width / 2.0 - half_width, translation_y),
             (2.0 * half_width, width),
