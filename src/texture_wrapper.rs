@@ -153,17 +153,8 @@ impl TexWrap {
 
     fn image_bytesize_expected(img: &DynamicImage) -> Option<usize> {
         let pixel_count = (img.width() * img.height()) as usize;
-        let byte_count: usize;
-        match img.color() {
-            image::ColorType::L8 => byte_count = pixel_count,
-            image::ColorType::L16 => byte_count = pixel_count * 2,
-            image::ColorType::Rgba8 => byte_count = pixel_count * 4,
-            image::ColorType::Rgba32F => byte_count = pixel_count * 4 * 4,
-            _ => {
-                error!("Passed non supported colored image!");
-                return None;
-            }
-        }
+        let byte_count: usize = img.color().bytes_per_pixel() as usize * pixel_count;
+
         // TODO: we could just do .filter(|byte_count| img.as_bytes().len()< byte_count) here
         // and have the function return an error
 
