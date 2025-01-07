@@ -144,43 +144,41 @@ impl TexWrap {
     }
 
     fn image_color_supported(img: &DynamicImage) -> bool {
-        let supported_type = img.color() == image::ColorType::L8
+        img.color() == image::ColorType::L8
             || img.color() == image::ColorType::Rgba8
-            || img.color() == image::ColorType::Rgba32F;
-        return supported_type;
+            || img.color() == image::ColorType::Rgba32F
     }
 
-    fn image_bytesize_expected(img: &DynamicImage) -> usize {
+    fn image_bytesize_expected(img: &DynamicImage) -> Option<usize> {
         let pixel_count = (img.width() * img.height()) as usize;
-        let mut byte_count: usize;
+        let byte_count: usize;
         match img.color() {
             image::ColorType::L8 => byte_count = pixel_count,
             image::ColorType::Rgba8 => byte_count = pixel_count * 4,
             image::ColorType::Rgba32F => byte_count = pixel_count * 4 * 4,
             _ => {
                 error!("Passed non supported colored image!");
-                byte_count = 0;
+                return None
             }
         }
 
         if img.as_bytes().len() < byte_count {
             error!("Pixel buffer is smaller than expected!");
-            byte_count = 0;
+            return None
         }
-        return byte_count;
+        return Some(byte_count);
     }
 
     fn image_bytes_slice(img: &DynamicImage) -> Option<&[u8]> {
-        let byte_buffer = img.as_bytes();
-        let byte_count = Self::image_bytesize_expected(img);
-        if byte_count == 0 {
-            return None;
-        }
-        if byte_count < byte_buffer.len() {
-            warn!("Image byte buffer is bigger than expected. Will truncate.");
-        }
-        let (buff, _) = byte_buffer.split_at(byte_count);
-        return Some(buff);
+        Self::image_bytesize_expected(img).map(|byte_count| {
+                let byte_buffer = img.as_bytes();
+                if byte_count < byte_buffer.len() {
+                    warn!("Image byte buffer is bigger than expected. Will truncate.");
+                }
+                let (buff, _) = byte_buffer.split_at(byte_count);
+                buff
+            }
+        )
     }
 
     fn get_dyn_image_part(
