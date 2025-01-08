@@ -166,7 +166,7 @@ fn main() -> Result<(), String> {
         .add_config(window_config)
         .add_config(EguiConfig)
         .add_config(DrawConfig)
-        .event(event)
+        .event(process_events)
         .update(update)
         .draw(drawe)
         .build()
@@ -399,7 +399,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     state
 }
 
-fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
+fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
     if state.key_grab {
         return;
     }
@@ -553,6 +553,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
             if key_pressed(app, state, DeleteFile) {
+                // TODO: needs confirmation
                 delete_file(state);
             }
             if key_pressed(app, state, ClearImage) {
