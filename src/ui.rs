@@ -1,7 +1,7 @@
 #[cfg(not(feature = "file_open"))]
 use crate::filebrowser;
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState},
+    appstate::{ImageGeometry, OculanteState},
     clear_image, clipboard_to_image, delete_file,
     file_encoder::FileEncoder,
     get_pixel_checked,
@@ -29,7 +29,6 @@ pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
-use anyhow::bail;
 use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
@@ -69,6 +68,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    #[allow(unused)]
     fn label_i_selected(&mut self, _selected: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
@@ -174,7 +174,6 @@ impl EguiExt for Ui {
         });
 
         if self.is_rect_visible(rect) {
-            // let visuals = self.style().interact_selectable(&response, *checked); // too colorful
             let visuals = self.style().interact(&response);
             let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
             self.painter().add(epaint::RectShape::new(
@@ -189,7 +188,6 @@ impl EguiExt for Ui {
             ));
             if *checked {
                 // Check mark:
-
                 let mut stroke = visuals.fg_stroke;
                 stroke.color = color;
                 self.painter().add(Shape::line(
