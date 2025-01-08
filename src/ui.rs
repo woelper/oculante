@@ -1576,7 +1576,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     .show_unindented(ui, |ui| {
                         dark_panel(ui, |ui| {
                             egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
-        
+
                                 ui.vertical_centered_justified(|ui|{
                                     for op in &mut ops {
                                         if ui.button( &format!("{op}")).clicked() {
@@ -1599,7 +1599,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
             }
 
-    
+
 
 
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -1963,38 +1963,34 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
 
                 if let Some(p) = &state.current_path {
-                    let text = if p
-                        // .with_extension(&state.edit_state.export_extension)
-                        .exists()
-                    {
-                        format!("Overwrite")
-                    } else {
-                        format!("Save")
-                    };
+                    let text = if p.exists() { "Overwrite" } else { "Save"};
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite.").clicked() {
-                        match state
-                        .edit_state
-                        .result_pixel_op
-                        .save(p) {
+
+                        let encoding_options = state.volatile_settings.encoding_options.clone();
+                        let dynimage = state.edit_state.result_pixel_op.clone();
+                        let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
+                        match encoding_options.save(&dynimage, p) {
                             Ok(_) => {
                                 debug!("Saved to {}", p.display());
-                                state.send_message_info(&format!("Saved to {}", p.display()));
                                 // Re-apply exif
                                 if let Some(info) = &state.image_info {
                                     debug!("Extended image info present");
+
                                     // before doing anything, make sure we have raw exif data
                                     if info.raw_exif.is_some() {
                                         if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
                                             error!("{e}");
                                         } else {
-                                            info!("Saved EXIF.")
+                                            info!("Saved EXIF.");
                                         }
                                     } else {
                                         debug!("No raw exif");
                                     }
                                 }
+                                state.send_message_info(&format!("Saved"));
                             }
+
                             Err(e) => {
                                 state.send_message_err(&format!("Could not save: {e}"));
                             }
@@ -2039,7 +2035,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
             ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
             ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
-     
+
         }
 
 
@@ -2305,8 +2301,13 @@ fn modifier_stack_ui(
     let stack_len = stack.len();
 
     for (i, operation) in stack.iter_mut().enumerate() {
+        let frame_color = if ui.style().visuals.dark_mode {
+            Color32::from_hex("#212121").unwrap()
+        } else {
+            Color32::from_hex("#F2F2F2").unwrap()
+        };
         egui::Frame::none()
-            .fill(Color32::from_gray(30))
+            .fill(frame_color)
             .rounding(ui.style().visuals.widgets.active.rounding)
             .inner_margin(Margin::same(6.))
             .show(ui, |ui| {

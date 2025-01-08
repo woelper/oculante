@@ -6,7 +6,8 @@ use std::{
     fs::create_dir_all,
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex}, time::Duration,
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use anyhow::{anyhow, bail, Context, Result};

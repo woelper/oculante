@@ -665,7 +665,7 @@ impl TexWrap {
         }
     }
 
-    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {        
+    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
