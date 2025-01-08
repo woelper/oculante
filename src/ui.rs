@@ -13,12 +13,12 @@ use crate::{
     pos_from_coord, set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
-    thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
+    thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    },
+    }, ExtendedImageInfo,
 };
 
 use std::io::Write;
@@ -29,10 +29,11 @@ pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
+use anyhow::bail;
 use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{ColorType, GenericImageView, RgbaImage};
+use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
@@ -1914,86 +1915,34 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
                         let msg_sender = state.message_channel.0.clone();
-
-                        // let keys = state.encoding_options.keys().map(|k|k.as_str()).collect::<Vec<&str>>();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
-
+                        let encoders = state.volatile_settings.encoding_options.clone();
                         filebrowser::browse_modal(
                             true,
                             key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-
-
-                                let dynimage = state.edit_state.result_pixel_op.clone();
-                                let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
-                                    match encoding_options.save(&dynimage, p) {
-
-
-                                    // match state.edit_state.result_pixel_op.save(&p) {
-                                        Ok(_) => {
-                                            _ = msg_sender.send(Message::Saved(p.clone()));
-                                            debug!("Saved to {}", p.display());
-                                            // Re-apply exif
-                                            if let Some(info) = &state.image_info {
-                                                debug!("Extended image info present");
-
-                                                // before doing anything, make sure we have raw exif data
-                                                if info.raw_exif.is_some() {
-                                                    if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
-                                                        error!("{e}");
-                                                    } else {
-                                                        info!("Saved EXIF.");
-                                                        _ = msg_sender.send(Message::Info("Exif metadata was saved to file".into()));
-                                                    }
-                                                } else {
-                                                    debug!("No raw exif");
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            _ = msg_sender.send(Message::err(&format!("Error: Could not save: {e}")));
-                                        }
-                                }
+                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &encoders);
                             },
                             ctx,
                         );
                     }
                 }
 
+              
+
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
+                    let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
+                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                    }, "overwrite");
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite.").clicked() {
-
-                        let encoding_options = state.volatile_settings.encoding_options.clone();
-                        let dynimage = state.edit_state.result_pixel_op.clone();
-                        let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
-                        match encoding_options.save(&dynimage, p) {
-                            Ok(_) => {
-                                debug!("Saved to {}", p.display());
-                                // Re-apply exif
-                                if let Some(info) = &state.image_info {
-                                    debug!("Extended image info present");
-
-                                    // before doing anything, make sure we have raw exif data
-                                    if info.raw_exif.is_some() {
-                                        if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
-                                            error!("{e}");
-                                        } else {
-                                            info!("Saved EXIF.");
-                                        }
-                                    } else {
-                                        debug!("No raw exif");
-                                    }
-                                }
-                                state.send_message_info(&format!("Saved"));
-                            }
-
-                            Err(e) => {
-                                state.send_message_err(&format!("Could not save: {e}"));
-                            }
+                        if p.exists() {
+                            modal.open();
+                        } else {
+                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                         }
                     }
 
@@ -2835,52 +2784,26 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
+     
+
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
-            let modal = egui_modal::Modal::new(ui.ctx(), "delete");
-            modal.show(|ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical_centered_justified(|ui| {
-                        ui.add_space(10.);
-
-                        ui.label(
-                            RichText::new(WARNING_CIRCLE)
-                                .size(100.)
-                                .color(ui.style().visuals.warn_fg_color),
-                        );
-                        ui.add_space(20.);
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(format!(
-                                "Are you sure you want to move {} to the trash?",
-                                state
-                                    .current_path
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .file_name()
-                                    .map(|s| s.to_string_lossy())
-                                    .unwrap_or_default()
-                            ));
-                        });
-                        ui.add_space(20.);
-                        ui.scope(|ui| {
-                            let warn_color = Color32::from_rgb(255, 77, 77);
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
-                            ui.style_mut().visuals.widgets.inactive.fg_stroke =
-                                Stroke::new(1., Color32::WHITE);
-                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
-                                warn_color.linear_multiply(0.8);
-
-                            if ui.styled_button("Yes").clicked() {
-                                delete_file(state);
-                                modal.close();
-                            }
-                        });
-
-                        if ui.styled_button("Cancel").clicked() {
-                            modal.close();
-                        }
-                    });
-                });
-            });
+            let modal = show_modal(
+                ui.ctx(),
+                format!(
+                    "Are you sure you want to move {} to the trash?",
+                    state
+                        .current_path
+                        .clone()
+                        .unwrap_or_default()
+                        .file_name()
+                        .map(|s| s.to_string_lossy())
+                        .unwrap_or_default()
+                ),
+                |_| {
+                    delete_file(state);
+                },
+                "delete",
+            );
 
             if tooltip(
                 unframed_button(TRASH, ui),
@@ -3436,4 +3359,68 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         .show(ui, |ui| {
             ui.scope(add_contents);
         });
+}
+
+fn show_modal<R>(
+    ctx: &Context,
+    warning_text: impl Into<WidgetText>,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+    id_source: impl std::fmt::Display,
+) -> egui_modal::Modal {
+    let modal = egui_modal::Modal::new(ctx, id_source);
+    modal.show(|ui| {
+        ui.horizontal(|ui| {
+            ui.vertical_centered_justified(|ui| {
+                ui.add_space(10.);
+
+                ui.label(
+                    RichText::new(WARNING_CIRCLE)
+                        .size(100.)
+                        .color(ui.style().visuals.warn_fg_color),
+                );
+                ui.add_space(20.);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(warning_text);
+                });
+                ui.add_space(20.);
+                ui.scope(|ui| {
+                    let warn_color = Color32::from_rgb(255, 77, 77);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                    ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                        Stroke::new(1., Color32::WHITE);
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                        warn_color.linear_multiply(0.8);
+
+                    if ui.styled_button("Yes").clicked() {
+                        ui.scope(add_contents);
+                        modal.close();
+                    }
+                });
+
+                if ui.styled_button("Cancel").clicked() {
+                    modal.close();
+                }
+            });
+        });
+    });
+    modal
+}
+
+/// Save an image to a path using encoding options and generate a thumbnail
+fn save_with_encoding(image: &DynamicImage, path: &Path, image_info: &Option<ExtendedImageInfo>, encoders: &Vec<FileEncoder>) -> anyhow::Result<()>{
+    let encoding_options = FileEncoder::matching_variant(path, &encoders);
+    encoding_options.save(&image, path)?;
+    debug!("Saved to {}", path.display());
+    // Re-apply exif
+    if let Some(info) = &image_info {
+        debug!("Extended image info present");
+        // before doing anything, make sure we have raw exif data
+        if info.raw_exif.is_some() {
+            fix_exif(&path, info.raw_exif.clone())?;
+        } else {
+            debug!("No raw exif");
+        }
+    }
+    thumbnails::generate(path)?;
+   Ok(())
 }
