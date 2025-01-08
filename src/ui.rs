@@ -2595,8 +2595,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         // Force rgba while edit mode is open.
         // TODO: display of channels should be done through a shader
         if state.persistent_settings.edit_enabled {
-            state.persistent_settings.current_channel = ColorChannel::Rgba;
-            changed_channels = false;
+            if state.persistent_settings.current_channel != ColorChannel::Rgba {
+                state.persistent_settings.current_channel = ColorChannel::Rgba;
+                changed_channels = true;
+            }
         }
 
         if window_x > ui.cursor().left() + 110. {

@@ -759,13 +759,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
-    // make sure that in edit mode, RGBA is set.
-    // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
-    // let's disable it here.
-    if state.persistent_settings.edit_enabled {
-        state.persistent_settings.current_channel = ColorChannel::Rgba;
-    }
-
     // redraw if extended info is missing so we make sure it's promply displayed
     if state.persistent_settings.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
