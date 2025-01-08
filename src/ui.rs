@@ -282,7 +282,7 @@ impl EguiExt for Ui {
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
-                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
+                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)),
         );
 
         let mut icon_pos = r.rect.left_center();
@@ -307,7 +307,6 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
-        // self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
         let spacing = if icon.len() == 0 { "" } else { "  " };
         let r = self.add(
@@ -326,20 +325,7 @@ impl EguiExt for Ui {
             FontId::proportional(icon_size),
             self.style().visuals.selection.bg_fill,
         );
-
         r
-
-        // self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-        //     // self.horizontal(|ui| {
-        //     ui.add_sized(
-        //         egui::Vec2::new(8., ui.available_height()),
-        //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-        //     );
-        //     ui.label(
-        //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
-        //     );
-        // })
-        // .response
     }
 
     /// Draw a justified icon from a string starting with an emoji
@@ -1599,8 +1585,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             }
 
 
-
-
             egui::ScrollArea::vertical().show(ui, |ui| {
 
                 ui.vertical_centered_justified(|ui| {
@@ -2607,6 +2591,13 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             state.persistent_settings.current_channel = ColorChannel::Rgba;
             changed_channels = true;
         }
+        
+        // Force rgba while edit mode is open.
+        // TODO: display of channels should be done through a shader
+        if state.persistent_settings.edit_enabled {
+            state.persistent_settings.current_channel = ColorChannel::Rgba;
+            changed_channels = false;
+        }
 
         if window_x > ui.cursor().left() + 110. {
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
@@ -2628,7 +2619,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
                 }
 
-                // ui.style_mut().visuals.noninteractive().bg_fill = Color32::GREEN;
 
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
@@ -2661,10 +2651,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     });
             });
         }
+        
+     
 
         // TODO: remove redundancy
-        if changed_channels && !state.persistent_settings.edit_enabled {
-            //TODO: Make this dependent of DynamicImage's type
+        if changed_channels {
+            // TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
