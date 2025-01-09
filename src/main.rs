@@ -21,48 +21,27 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
-use oculante::ui::PANEL_WIDTH;
-use oculante::BOLD_FONT;
-use oculante::FONT;
-use shortcuts::key_pressed;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
-pub mod cache;
-pub mod file_encoder;
-pub mod icons;
-pub mod scrubber;
-pub mod settings;
-pub mod shortcuts;
-#[cfg(feature = "turbo")]
-use crate::image_editing::lossless_tx;
-use crate::scrubber::find_first_image_in_directory;
-use crate::shortcuts::InputEvent::*;
-mod utils;
-use utils::*;
-mod appstate;
-mod image_loader;
-use appstate::*;
-#[cfg(not(feature = "file_open"))]
-mod filebrowser;
-pub mod ktx2_loader;
-mod texture_wrapper;
-// mod events;
-#[cfg(target_os = "macos")]
-mod mac;
-mod net;
-use net::*;
-#[cfg(test)]
-mod tests;
-mod ui;
-#[cfg(feature = "update")]
-mod update;
-use crate::image_editing::EditState;
+
+#[cfg(feature = "file_open")]
+use filebrowser::browse_for_image_path;
+use oculante::appstate::*;
+use oculante::utils::*;
+use oculante::*;
+use shortcuts::key_pressed;
+use ui::PANEL_WIDTH;
 use ui::*;
-pub mod image_editing;
-pub mod paint;
-mod thumbnails;
+use BOLD_FONT;
+use FONT;
+
+#[cfg(feature = "turbo")]
+use image_editing::lossless_tx;
+use image_editing::EditState;
+use scrubber::find_first_image_in_directory;
+use shortcuts::InputEvent::*;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -120,7 +99,7 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         // MacOS needs an incredible dance performed just to open a file
-        let _ = mac::launch();
+        let _ = oculante::mac::launch();
     }
 
     // Unfortunately we need to load the volatile settings here, too - the window settings need
@@ -308,7 +287,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         match port.parse::<i32>() {
             Ok(p) => {
                 state.send_message_info(&format!("Listening on {p}"));
-                recv(p, state.texture_channel.0.clone());
+                net::recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
             }
@@ -1270,35 +1249,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     gfx.render(&draw);
     gfx.render(&zoom_image);
     gfx.render(&egui_output);
-}
-
-// Show file browser to select image to load
-#[cfg(feature = "file_open")]
-fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.volatile_settings.last_open_directory.clone();
-    let load_sender = state.load_channel.0.clone();
-    state.redraw = true;
-    std::thread::spawn(move || {
-        let uppercase_lowercase_ext = [
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_lowercase())
-                .collect::<Vec<_>>(),
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_uppercase())
-                .collect::<Vec<_>>(),
-        ]
-        .concat();
-        let file_dialog_result = rfd::FileDialog::new()
-            .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
-            .add_filter("All File Types", &["*"])
-            .set_directory(start_directory)
-            .pick_file();
-        if let Some(file_path) = file_dialog_result {
-            let _ = load_sender.send(file_path);
-        }
-    });
 }
 
 // Make sure offset is restricted to window size so we don't offset to infinity

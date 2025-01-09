@@ -649,3 +649,40 @@ impl PathExt for Path {
             .unwrap_or_default()
     }
 }
+
+
+
+// the native file dialog
+
+#[cfg(feature = "file_open")]
+use crate::appstate::OculanteState;
+
+// Show file browser to select image to load
+#[cfg(feature = "file_open")]
+pub fn browse_for_image_path(state: &mut OculanteState) {
+
+    let start_directory = state.volatile_settings.last_open_directory.clone();
+    let load_sender = state.load_channel.0.clone();
+    state.redraw = true;
+    std::thread::spawn(move || {
+        let uppercase_lowercase_ext = [
+            crate::utils::SUPPORTED_EXTENSIONS
+                .into_iter()
+                .map(|e| e.to_ascii_lowercase())
+                .collect::<Vec<_>>(),
+                crate::utils::SUPPORTED_EXTENSIONS
+                .into_iter()
+                .map(|e| e.to_ascii_uppercase())
+                .collect::<Vec<_>>(),
+        ]
+        .concat();
+        let file_dialog_result = rfd::FileDialog::new()
+            .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
+            .add_filter("All File Types", &["*"])
+            .set_directory(start_directory)
+            .pick_file();
+        if let Some(file_path) = file_dialog_result {
+            let _ = load_sender.send(file_path);
+        }
+    });
+}

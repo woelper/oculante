@@ -1,27 +1,21 @@
 #[cfg(not(feature = "file_open"))]
 use crate::filebrowser;
 use crate::{
-    appstate::{ImageGeometry, OculanteState},
-    clear_image, clipboard_to_image, delete_file,
-    file_encoder::FileEncoder,
-    get_pixel_checked,
-    image_editing::{
+    appstate::{ImageGeometry, OculanteState}, file_encoder::FileEncoder, image_editing::{
         process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem,
         MeasureShape, ScaleFilter,
-    },
-    paint::PaintStroke,
-    pos_from_coord, set_zoom,
-    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
-    thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
-    utils::{
+    }, paint::PaintStroke, settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings}, shortcuts::{key_pressed, keypresses_as_string, lookup}, thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE}, utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }, ExtendedImageInfo,
+    }
 };
 
-use std::io::Write;
+#[cfg(feature = "file_open")]
+use crate::filebrowser::browse_for_image_path;
+
+use crate::utils::*;
+
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
@@ -29,7 +23,6 @@ pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
-use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
 use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
@@ -540,7 +533,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
-    .frame(Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
+    .frame(egui::Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
@@ -652,7 +645,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                             if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
-                                crate::browse_for_image_path(state);
+                                browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
                                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
 
@@ -724,7 +717,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_bleed(img);
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                     ui.ctx().request_repaint();
                                 }
                                 if ui
@@ -735,13 +728,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_semitrans(img);
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                     ui.ctx().request_repaint();
                                 }
                                 if ui.button("Reset image").clicked() {
                                     state.edit_state.result_pixel_op = Default::default();
 
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                 }
                             }
                         });
@@ -854,9 +847,45 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 cols.sort();
                             });
                         }
+                        #[cfg(not(feature = "file_open"))]
                         if ui.button("Save ASE").clicked() {
                             ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
                         }
+
+                        #[cfg(feature = "file_open")]
+                        if ui.button(format!("Save ASE")).clicked() {
+                            let start_directory = state.volatile_settings.last_open_directory.clone();
+                            std::thread::spawn(move || {
+                                let file_dialog_result = rfd::FileDialog::new()
+                                    .set_directory(start_directory)
+                                    .save_file();
+                                    if let Some(p) = file_dialog_result {
+                                        let swatches = sampled_colors
+                                        .iter()
+                                        .map(|c| ase_swatch::types::ObjectColor {
+                                            name: "".into(),
+                                            object_type: ase_swatch::types::ObjectColorType::Global,
+                                            data: ase_swatch::types::Color {
+                                                mode: ase_swatch::types::ColorMode::Rgb,
+                                                values: [
+                                                    c[0] as f32 / 255.,
+                                                    c[1] as f32 / 255.,
+                                                    c[2] as f32 / 255.,
+                                                ]
+                                                .to_vec(),
+                                            },
+                                        })
+                                        .collect::<Vec<_>>();
+                                    let s = ase_swatch::create_ase(&vec![], &swatches);
+                                    if let Ok(mut f) = std::fs::File::create(p) {
+                                        _ = std::io::Write::write_all(&mut f, &s);
+                                    }
+                                }
+                            });
+                            ui.ctx().request_repaint();
+                        }
+                        
+                        #[cfg(not(feature = "file_open"))]
                         if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
                             filebrowser::browse_modal(
                                 true,
@@ -865,10 +894,10 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 |p| {
                                     let swatches = sampled_colors
                                         .iter()
-                                        .map(|c| ObjectColor {
+                                        .map(|c| ase_swatch::types::ObjectColor {
                                             name: "".into(),
                                             object_type: ase_swatch::types::ObjectColorType::Global,
-                                            data: Color {
+                                            data: ase_swatch::types::Color {
                                                 mode: ase_swatch::types::ColorMode::Rgb,
                                                 values: [
                                                     c[0] as f32 / 255.,
@@ -882,7 +911,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                                     let s = ase_swatch::create_ase(&vec![], &swatches);
                                     if let Ok(mut f) = std::fs::File::create(p) {
-                                        _ = f.write_all(&s);
+                                        _ = std::io::Write::write_all(&mut f, &s);
                                     }
                                 },
                                 ui.ctx(),
@@ -1191,7 +1220,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Use mipmaps", "When zooming out, less memory will be used. Faster performance, but blurry.", |ui| {
                                         if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "").changed(){
-                                            state.send_frame(crate::Frame::UpdateTexture);
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
                                         }
                                     }, ui);
 
@@ -1297,13 +1326,13 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Interpolate when zooming in", "When zooming in, do you prefer to see individual pixels or an interpolation?", |ui| {
                                         if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "").changed(){
-                                            state.send_frame(crate::Frame::UpdateTexture);
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
                                         }
                                     }, ui);
 
                                     configuration_item_ui("Interpolate when zooming out", "When zooming out, do you prefer crisper or smoother pixels?", |ui| {
                                         if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "").changed() {
-                                            state.send_frame(crate::Frame::UpdateTexture);
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
                                         }
                                     }, ui);
 
@@ -1857,7 +1886,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
-                                                _ = msg_sender.send(Message::Saved(file_path.clone()));
+                                                _ = msg_sender.send(crate::appstate::Message::Saved(file_path.clone()));
                                                 debug!("Saved to {}", file_path.display());
                                                 // Re-apply exif
                                                 if let Some(info) = &image_info {
@@ -1876,7 +1905,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                 }
                                             }
                                             Err(e) => {
-                                                _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                                _ = err_sender.send(crate::appstate::Message::err(&format!("Error: Could not save: {e}")));
                                             }
                                         }
                                         // state.toast_cooldown = 0.0;
@@ -2035,7 +2064,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                state.send_frame(crate::Frame::UpdateTexture);
+                state.send_frame(crate::utils::Frame::UpdateTexture);
                 debug!(
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
@@ -2874,7 +2903,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
         {
             #[cfg(feature = "file_open")]
-            crate::browse_for_image_path(state);
+            browse_for_image_path(state);
             #[cfg(not(feature = "file_open"))]
             ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
         }
