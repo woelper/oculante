@@ -1627,21 +1627,24 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         &mut pixels_changed,
                         ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
+                    ui.horizontal(|ui|{
+                        if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
+                            if let Some(img) = &state.current_image {
+                                state.image_geometry.dimensions = img.dimensions();
+                                state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                            }
+                        }
+                        if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
+                            pixels_changed = true;
+                          
+                        }
+                    });
+
                     if ui.button("Reset all edits").clicked() {
                         state.edit_state = Default::default();
                         pixels_changed = true
                     }
-                    if ui.button("Original").clicked()
-                    {
-                        if let Some(img) = &state.current_image {
-                            state.image_geometry.dimensions = img.dimensions();
-                            state.current_texture.set_image(img, gfx, &state.persistent_settings);
-                        }
-                    }
-                    if ui.button("Modified").clicked()
-                    {
-                        pixels_changed = true;
-                    }
+
 
                 });
 
