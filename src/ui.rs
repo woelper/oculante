@@ -1139,7 +1139,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
-            // .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
             .resizable(true)

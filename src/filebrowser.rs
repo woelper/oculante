@@ -53,12 +53,10 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
     let mut open = true;
 
     egui::Window::new(if save { "Save" } else { "Open" })
-        //.anchor(Align2::CENTER_CENTER, [0.0, 0.0])
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        //TODO: Change default_width to 815 after folder misalignment fix, discord this comment and use another closest to reference design value if the slider can be combined into the image area BG
-        .default_width(818.)
+        .default_width(822.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
