@@ -573,6 +573,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     if ui.button(format!("   Save file   ")).clicked() {
                         state.search_active = false;
                         state.search_term.clear();
+                        prev_path = Default::default();
                         callback(&path.join(state.filename.clone()));
                     }
                 });
