@@ -1,8 +1,6 @@
 use crate::settings::PersistentSettings;
 use image::imageops;
 use image::DynamicImage;
-use image::EncodableLayout;
-
 use log::debug;
 use log::error;
 use log::warn;
@@ -172,8 +170,13 @@ impl TexWrap {
         })
     }
 
-    fn to_u8_slice(slice: &mut [u16]) -> &mut [u8] {
+    fn u16_to_u8_slice(slice: &mut [u16]) -> &mut [u8] {
         let byte_len = 2 * slice.len();
+        unsafe { std::slice::from_raw_parts_mut(slice.as_mut_ptr().cast::<u8>(), byte_len) }
+    }
+
+    fn f32_to_u8_slice(slice: &mut [f32]) -> &mut [u8] {
+        let byte_len = 4 * slice.len();
         unsafe { std::slice::from_raw_parts_mut(slice.as_mut_ptr().cast::<u8>(), byte_len) }
     }
 
@@ -201,6 +204,56 @@ impl TexWrap {
 
             src_idx_start += row_increment_src;
         }
+    }
+
+    fn image_tile_u8(image: &DynamicImage, offset: (u32, u32), size: (u32, u32)) -> Vec<u8> {
+        let pixel_byte = image.color().bytes_per_pixel() as usize;
+        // Creating luma 8 sub image
+        let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize * pixel_byte];
+        let bytes_src = image.as_bytes();
+        Self::raw_copy_image_tile(
+            &mut buff,
+            bytes_src,
+            image.width() as usize,
+            (offset.0 as usize, offset.1 as usize),
+            (size.0 as usize, size.1 as usize),
+            pixel_byte,
+        );
+        return buff;
+    }
+
+    fn image_tile_u16(image: &DynamicImage, offset: (u32, u32), size: (u32, u32)) -> Vec<u16> {
+        let pixel_byte = image.color().bytes_per_pixel() as usize;
+        let pixel_elements = pixel_byte / size_of::<u16>();
+        let mut buff: Vec<u16> = vec![0; size.0 as usize * size.1 as usize * pixel_elements];
+        let bytes_src = image.as_bytes();
+        let slice: &mut [u8] = Self::u16_to_u8_slice(&mut buff);
+        Self::raw_copy_image_tile(
+            slice,
+            bytes_src,
+            image.width() as usize,
+            (offset.0 as usize, offset.1 as usize),
+            (size.0 as usize, size.1 as usize),
+            pixel_byte,
+        );
+        return buff;
+    }
+
+    fn image_tile_f32(image: &DynamicImage, offset: (u32, u32), size: (u32, u32)) -> Vec<f32> {
+        let pixel_byte = image.color().bytes_per_pixel() as usize;
+        let pixel_elements = pixel_byte / size_of::<f32>();
+        let mut buff: Vec<f32> = vec![0.0; size.0 as usize * size.1 as usize * pixel_elements];
+        let bytes_src = image.as_bytes();
+        let slice: &mut [u8] = Self::f32_to_u8_slice(&mut buff);
+        Self::raw_copy_image_tile(
+            slice,
+            bytes_src,
+            image.width() as usize,
+            (offset.0 as usize, offset.1 as usize),
+            (size.0 as usize, size.1 as usize),
+            pixel_byte,
+        );
+        return buff;
     }
 
     fn get_dyn_image_part(
@@ -235,76 +288,108 @@ impl TexWrap {
                 }
             }
         } else {
-            let pixel_byte = image.color().bytes_per_pixel() as usize;
-
             match image {
-                DynamicImage::ImageLuma8(luma8_image) => {
-                    // Creating luma 8 sub image
-                    let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize];
-                    let bytes_src = luma8_image.as_bytes();
-                    Self::raw_copy_image_tile(
-                        &mut buff,
-                        bytes_src,
-                        image.width() as usize,
-                        (offset.0 as usize, offset.1 as usize),
-                        (size.0 as usize, size.1 as usize),
-                        pixel_byte,
-                    );
+                //8 Bit types
+                DynamicImage::ImageLuma8(_) => {
+                    let bytes = Self::image_tile_u8(image, offset, size);
+                    debug!("tiling {:?} to l8", image.color());
                     let gi: image::GrayImage =
-                        image::GrayImage::from_raw(size.0, size.1, buff).unwrap();
+                        image::GrayImage::from_raw(size.0, size.1, bytes).unwrap();
                     return Some(DynamicImage::ImageLuma8(gi));
                 }
-                DynamicImage::ImageLuma16(luma16_image) => {
-                    // Creating luma 16 sub image
-                    let mut buff: Vec<u16> = vec![0; size.0 as usize * size.1 as usize];
-                    let bytes_src = luma16_image.as_bytes();
-                    let slice: &mut [u8] = Self::to_u8_slice(&mut buff);
-                    Self::raw_copy_image_tile(
-                        slice,
-                        bytes_src,
-                        image.width() as usize,
-                        (offset.0 as usize, offset.1 as usize),
-                        (size.0 as usize, size.1 as usize),
-                        pixel_byte,
-                    );
-                    let gi = image::ImageBuffer::<image::Luma<u16>, Vec<u16>>::from_raw(
-                        size.0, size.1, buff,
-                    )
-                    .unwrap();
-                    return Some(DynamicImage::ImageLuma16(gi));
-                }
-                DynamicImage::ImageRgba8(rgba8_image) => {
-                    let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize * pixel_byte];
-                    let bytes_src = rgba8_image.as_bytes();
-                    Self::raw_copy_image_tile(
-                        &mut buff,
-                        bytes_src,
-                        image.width() as usize,
-                        (offset.0 as usize, offset.1 as usize),
-                        (size.0 as usize, size.1 as usize),
-                        pixel_byte,
-                    );
-                    let gi: image::RgbaImage =
-                        image::RgbaImage::from_raw(size.0, size.1, buff).unwrap();
-                    return Some(DynamicImage::ImageRgba8(gi));
-                }
-                DynamicImage::ImageRgb8(rgb8_image) => {
-                    let mut buff: Vec<u8> = vec![0; size.0 as usize * size.1 as usize * pixel_byte];
-                    let bytes_src = rgb8_image.as_bytes();
-                    Self::raw_copy_image_tile(
-                        &mut buff,
-                        bytes_src,
-                        image.width() as usize,
-                        (offset.0 as usize, offset.1 as usize),
-                        (size.0 as usize, size.1 as usize),
-                        pixel_byte,
-                    );
-                    let gi = DynamicImage::ImageRgb8(
-                        image::RgbImage::from_raw(size.0, size.1, buff).unwrap(),
+
+                DynamicImage::ImageLumaA8(_) => {
+                    let bytes = Self::image_tile_u8(image, offset, size);
+                    debug!("tiling {:?} to rgba8", image.color());
+                    let gi = DynamicImage::ImageLumaA8(
+                        image::GrayAlphaImage::from_raw(size.0, size.1, bytes).unwrap(),
                     )
                     .to_rgba8();
                     return Some(DynamicImage::ImageRgba8(gi));
                 }
+
+                DynamicImage::ImageRgba8(_) => {
+                    let bytes = Self::image_tile_u8(image, offset, size);
+                    debug!("tiling {:?} to rgba8", image.color());
+                    let gi: image::RgbaImage =
+                        image::RgbaImage::from_raw(size.0, size.1, bytes).unwrap();
+                    return Some(DynamicImage::ImageRgba8(gi));
+                }
+                DynamicImage::ImageRgb8(_) => {
+                    let bytes = Self::image_tile_u8(image, offset, size);
+                    debug!("tiling {:?} to rgba8", image.color());
+                    let gi = DynamicImage::ImageRgb8(
+                        image::RgbImage::from_raw(size.0, size.1, bytes).unwrap(),
+                    )
+                    .to_rgba8();
+                    return Some(DynamicImage::ImageRgba8(gi));
+                }
+
+                //16 Bit types
+                DynamicImage::ImageLuma16(_) => {
+                    // Creating luma 16 sub image
+                    let raw_data = Self::image_tile_u16(image, offset, size);
+                    debug!("tiling {:?} to l16", image.color());
+                    let gi = image::ImageBuffer::<image::Luma<u16>, Vec<u16>>::from_raw(
+                        size.0, size.1, raw_data,
+                    )
+                    .unwrap();
+                    return Some(DynamicImage::ImageLuma16(gi));
+                }
+
+                DynamicImage::ImageLumaA16(_) => {
+                    let raw_data = Self::image_tile_u16(image, offset, size);
+                    debug!("tiling {:?} to rgba32f", image.color());
+                    let gi = image::ImageBuffer::<image::LumaA<u16>, Vec<u16>>::from_raw(
+                        size.0, size.1, raw_data,
+                    )
+                    .unwrap();
+                    let converted_image = DynamicImage::ImageLumaA16(gi).to_rgba32f();
+                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                }
+
+                DynamicImage::ImageRgb16(_) => {
+                    let raw_data = Self::image_tile_u16(image, offset, size);
+                    debug!("tiling {:?} to rgba32f", image.color());
+
+                    let gi = image::ImageBuffer::<image::Rgb<u16>, Vec<u16>>::from_raw(
+                        size.0, size.1, raw_data,
+                    )
+                    .unwrap();
+                    let converted_image = DynamicImage::ImageRgb16(gi).to_rgba32f();
+                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                }
+
+                DynamicImage::ImageRgba16(_) => {
+                    let raw_data = Self::image_tile_u16(image, offset, size);
+                    debug!("tiling {:?} to rgba32f", image.color());
+
+                    let gi = image::ImageBuffer::<image::Rgba<u16>, Vec<u16>>::from_raw(
+                        size.0, size.1, raw_data,
+                    )
+                    .unwrap();
+                    let converted_image = DynamicImage::ImageRgba16(gi).to_rgba32f();
+                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                }
+
+                //32 Bit types
+                DynamicImage::ImageRgb32F(_) => {
+                    let raw_data = Self::image_tile_f32(image, offset, size);
+                    debug!("tiling {:?} to rgba32f", image.color());
+                    let gi = DynamicImage::ImageRgb32F(
+                        image::Rgb32FImage::from_raw(size.0, size.1, raw_data).unwrap(),
+                    )
+                    .to_rgba32f();
+                    return Some(DynamicImage::ImageRgba32F(gi));
+                }
+
+                DynamicImage::ImageRgba32F(_) => {
+                    let raw_data = Self::image_tile_f32(image, offset, size);
+                    debug!("tiling {:?} to rgba32f", image.color());
+                    let gi = image::Rgba32FImage::from_raw(size.0, size.1, raw_data).unwrap();
+                    return Some(DynamicImage::ImageRgba32F(gi));
+                }
+
                 other_image_type => {
                     //will be converted to rgba8 automatically
                     let sub_img =
@@ -338,11 +423,12 @@ impl TexWrap {
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
             }
-            _ => {//All non supported formats will be converted, make sure we set the right type then. Everything deeper than 1 byte per pixel will be rgba32f then.
+            _ => {
+                //All non supported formats will be converted, make sure we set the right type then. Everything deeper than 1 byte per pixel will be rgba32f then.
                 let depth = image.color().bytes_per_pixel() / image.color().channel_count();
                 if depth > 1 {
-                   format = notan::prelude::TextureFormat::Rgba32Float;
-                } 
+                    format = notan::prelude::TextureFormat::Rgba32Float;
+                }
             }
         }
         return (format, pipeline);
@@ -363,11 +449,6 @@ impl TexWrap {
         ) -> Option<Texture>,
     ) -> Option<TexWrap> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
-
-        //Botch job for testing luma16
-        /*let converted_image = imagoe.to_luma16();
-        let imagea = DynamicImage::ImageLuma16(converted_image);
-        let image = &imagea;*/
 
         let image = src_image;
 
@@ -461,7 +542,7 @@ impl TexWrap {
         }
 
         let boundary_pixels_bytes: [u8; 4] = [0, 0, 0, 255];
-        let aa: Result<Texture, String> = gfx
+        let texture_boundary: Result<Texture, String> = gfx
             .create_texture()
             .from_bytes(&boundary_pixels_bytes, 1, 1)
             .with_format(notan::app::TextureFormat::Rgba32)
@@ -470,7 +551,7 @@ impl TexWrap {
         if fine {
             let texture_count = texture_vec.len();
             Some(TexWrap {
-                texture_boundary: aa.unwrap(),
+                texture_boundary: texture_boundary.unwrap(),
                 size_vec: im_size,
                 col_count: col_count,
                 row_count: row_count,
