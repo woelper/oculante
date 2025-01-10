@@ -3,6 +3,7 @@ use std::{sync::mpsc::Sender, thread};
 
 use crate::appstate::Message;
 
+#[allow(unused)]
 fn gh_update() -> Result<String, Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "linux"))]
     let target = "";

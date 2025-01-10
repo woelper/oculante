@@ -21,47 +21,27 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
-use oculante::BOLD_FONT;
-use oculante::FONT;
-use shortcuts::key_pressed;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
-pub mod cache;
-pub mod file_encoder;
-pub mod icons;
-pub mod scrubber;
-pub mod settings;
-pub mod shortcuts;
-#[cfg(feature = "turbo")]
-use crate::image_editing::lossless_tx;
-use crate::scrubber::find_first_image_in_directory;
-use crate::shortcuts::InputEvent::*;
-mod utils;
-use utils::*;
-mod appstate;
-mod image_loader;
-use appstate::*;
-#[cfg(not(feature = "file_open"))]
-mod filebrowser;
-pub mod ktx2_loader;
-mod texture_wrapper;
-// mod events;
-#[cfg(target_os = "macos")]
-mod mac;
-mod net;
-use net::*;
-#[cfg(test)]
-mod tests;
-mod ui;
-#[cfg(feature = "update")]
-mod update;
-use crate::image_editing::EditState;
+
+#[cfg(feature = "file_open")]
+use filebrowser::browse_for_image_path;
+use oculante::appstate::*;
+use oculante::utils::*;
+use oculante::*;
+use shortcuts::key_pressed;
+use ui::PANEL_WIDTH;
 use ui::*;
-mod image_editing;
-pub mod paint;
-mod thumbnails;
+use BOLD_FONT;
+use FONT;
+
+#[cfg(feature = "turbo")]
+use image_editing::lossless_tx;
+use image_editing::EditState;
+use scrubber::find_first_image_in_directory;
+use shortcuts::InputEvent::*;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -119,7 +99,7 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         // MacOS needs an incredible dance performed just to open a file
-        let _ = mac::launch();
+        let _ = oculante::mac::launch();
     }
 
     // Unfortunately we need to load the volatile settings here, too - the window settings need
@@ -165,7 +145,7 @@ fn main() -> Result<(), String> {
         .add_config(window_config)
         .add_config(EguiConfig)
         .add_config(DrawConfig)
-        .event(event)
+        .event(process_events)
         .update(update)
         .draw(drawe)
         .build()
@@ -307,7 +287,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         match port.parse::<i32>() {
             Ok(p) => {
                 state.send_message_info(&format!("Listening on {p}"));
-                recv(p, state.texture_channel.0.clone());
+                net::recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
             }
@@ -324,12 +304,15 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
+        info!("This Display has DPI {:?}", gfx.dpi());
+        let offset = if gfx.dpi() > 1.0 { 0.0 } else { -1.4 };
+
         fonts.font_data.insert(
             "inter".to_owned(),
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -339,7 +322,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -395,7 +378,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     state
 }
 
-fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
+fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
     if state.key_grab {
         return;
     }
@@ -549,6 +532,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
             if key_pressed(app, state, DeleteFile) {
+                // TODO: needs confirmation
                 delete_file(state);
             }
             if key_pressed(app, state, ClearImage) {
@@ -752,13 +736,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
             ),
             state.image_geometry.scale,
         );
-    }
-
-    // make sure that in edit mode, RGBA is set.
-    // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
-    // let's disable it here.
-    if state.persistent_settings.edit_enabled {
-        state.persistent_settings.current_channel = ColorChannel::Rgba;
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
@@ -1023,13 +1000,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // }
     let mut bbox_tl: egui::Pos2 = Default::default();
     let mut bbox_br: egui::Pos2 = Default::default();
-    let mut browser_open = false;
+    let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
-            ctx.memory_mut(|w| w.open_popup(Id::new(id)));
+            ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
 
+        // set info panel color dynamically
+        info_panel_color = ctx.style().visuals.panel_fill;
+
+        // open a file browser if requested
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
@@ -1087,13 +1068,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        browser_open = ctx.memory(|w| w.is_popup_open(Id::new("SAVE")))
-            || ctx.memory(|w| w.is_popup_open(Id::new("OPEN")))
-            || ctx.memory(|w| w.is_popup_open(Id::new("LUT")));
-
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
+            && state.current_image.is_some()
         {
             (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
@@ -1204,7 +1182,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.info_enabled && !browser_open {
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+                .color(Color::from_rgb(
+                    info_panel_color.r() as f32 / 255.,
+                    info_panel_color.g() as f32 / 255.,
+                    info_panel_color.b() as f32 / 255.,
+                ));
+
             texture.draw_zoomed(
                 &mut zoom_image,
                 bbox_tl.x,
@@ -1259,37 +1247,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         c[2] as f32 / 255.,
     ));
     gfx.render(&draw);
-    gfx.render(&egui_output);
     gfx.render(&zoom_image);
-}
-
-// Show file browser to select image to load
-#[cfg(feature = "file_open")]
-fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.volatile_settings.last_open_directory.clone();
-    let load_sender = state.load_channel.0.clone();
-    state.redraw = true;
-    std::thread::spawn(move || {
-        let uppercase_lowercase_ext = [
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_lowercase())
-                .collect::<Vec<_>>(),
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_uppercase())
-                .collect::<Vec<_>>(),
-        ]
-        .concat();
-        let file_dialog_result = rfd::FileDialog::new()
-            .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
-            .add_filter("All File Types", &["*"])
-            .set_directory(start_directory)
-            .pick_file();
-        if let Some(file_path) = file_dialog_result {
-            let _ = load_sender.send(file_path);
-        }
-    });
+    gfx.render(&egui_output);
 }
 
 // Make sure offset is restricted to window size so we don't offset to infinity
