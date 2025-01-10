@@ -3,11 +3,7 @@ pub const THUMB_CAPTION_HEIGHT: u32 = 24;
 pub const MAX_THREADS: usize = 4;
 
 use std::{
-    fs::create_dir_all,
-    hash::{DefaultHasher, Hash, Hasher},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-    time::Duration,
+    fs::{create_dir_all, File}, hash::{DefaultHasher, Hash, Hasher}, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, Mutex}, time::Duration
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -68,7 +64,8 @@ impl Thumbnails {
 pub fn path_to_id<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut hasher = DefaultHasher::new();
     path.as_ref().hash(&mut hasher);
-    PathBuf::from(hasher.finish().to_string()).with_extension("png")
+    let size = File::open(path).and_then(|f|f.metadata().map(|m|m.len())).unwrap_or_default();
+    PathBuf::from(format!("{}_{size}",hasher.finish().to_string())).with_extension("png")
 }
 
 fn get_disk_cache_path() -> Result<PathBuf> {
