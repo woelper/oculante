@@ -3,7 +3,7 @@ pub const THUMB_CAPTION_HEIGHT: u32 = 24;
 pub const MAX_THREADS: usize = 4;
 
 use std::{
-    fs::{create_dir_all, File}, hash::{DefaultHasher, Hash, Hasher}, os::unix::fs::MetadataExt, path::{Path, PathBuf}, sync::{Arc, Mutex}, time::Duration
+    fs::{create_dir_all, File}, hash::{DefaultHasher, Hash, Hasher}, path::{Path, PathBuf}, sync::{Arc, Mutex}, time::Duration
 };
 
 use anyhow::{anyhow, bail, Context, Result};
