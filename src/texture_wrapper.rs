@@ -338,7 +338,12 @@ impl TexWrap {
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
             }
-            _ => {}
+            _ => {//All non supported formats will be converted, make sure we set the right type then. Everything deeper than 1 byte per pixel will be rgba32f then.
+                let depth = image.color().bytes_per_pixel() / image.color().channel_count();
+                if depth > 1 {
+                   format = notan::prelude::TextureFormat::Rgba32Float;
+                } 
+            }
         }
         return (format, pipeline);
     }
