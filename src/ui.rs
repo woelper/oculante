@@ -1232,7 +1232,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                                    configuration_item_ui("Borderless moder", "Don't draw OS window decorations. A restart is required to take effect.", |ui| {
+                                    configuration_item_ui("Borderless mode", "Don't draw OS window decorations. A restart is required to take effect.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.borderless, "");
                                     }, ui);
 
