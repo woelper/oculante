@@ -48,6 +48,28 @@ pub struct EditState {
     pub export_extension: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct LegacyEditState {
+    pub painting: bool,
+    pub non_destructive_painting: bool,
+    pub paint_strokes: Vec<PaintStroke>,
+    pub paint_fade: bool,
+    pub pixel_op_stack: Vec<ImageOperation>,
+    pub image_op_stack: Vec<ImageOperation>,
+    pub export_extension: String,
+}
+
+impl LegacyEditState {
+    pub fn upgrade(&self) -> EditState {
+        let mut ne = EditState::default();
+        ne.image_op_stack = self.image_op_stack.iter()
+            .map(|op| ImgOpItem::new(op.clone())).collect();
+        ne.pixel_op_stack = self.pixel_op_stack.iter()
+            .map(|op| ImgOpItem::new(op.clone())).collect();
+        ne
+    }
+}
+
 impl Default for EditState {
     fn default() -> Self {
         Self {
@@ -108,6 +130,7 @@ pub enum ScaleFilter {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+
 pub struct ImgOpItem {
     pub active: bool,
     pub operation: ImageOperation,
