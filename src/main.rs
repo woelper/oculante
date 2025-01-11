@@ -376,6 +376,18 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(2, "noto_ar".to_owned());
 
+
+        fonts.font_data.insert(
+            "noto_sc".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSansSC-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "noto_sc".to_owned());
+
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
         ctx.set_fonts(fonts);
