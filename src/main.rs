@@ -318,8 +318,6 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             }),
         );
 
-
-
         fonts.font_data.insert(
             "inter_bold".to_owned(),
             FontData::from_static(BOLD_FONT).tweak(FontTweak {
@@ -343,7 +341,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 baseline_offset_factor: 0.0,
             }),
         );
-   
+
         fonts
             .families
             .get_mut(&FontFamily::Proportional)
@@ -356,23 +354,27 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
-            // let mut decomp: Vec<u8> = Vec::new();
-            // let mut c = Cursor::new(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf.xz"));
-            // lzma_rs::xz_decompress(&mut c, &mut decomp).unwrap();
+        fonts.font_data.insert(
+            "noto_jp".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
+        );
 
-            // fonts.font_data.insert(
-            //     "noto_jp".to_owned(),
-            //     FontData::from_owned(decomp),
-            // );
-                   fonts.font_data.insert(
-                "noto_jp".to_owned(),
-                FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
-            );
-            fonts
+        fonts
             .families
             .get_mut(&FontFamily::Proportional)
             .unwrap()
             .insert(2, "noto_jp".to_owned());
+
+        fonts.font_data.insert(
+            "noto_ar".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoNaskhArabic-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "noto_ar".to_owned());
 
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
