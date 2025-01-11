@@ -42,7 +42,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     debug!("Completed argument parsing.");
     let maybe_img_location = matches
         .get_one::<String>("INPUT")
-        .map(|arg| PathBuf::from(arg));
+        .map(PathBuf::from);
 
     if !matches.is_present("chainload") && maybe_img_location.is_none() {
         info!("Chainload not specified, and no input file present. Invoking mac hack.");
@@ -86,11 +86,11 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         match file_arg.lock().unwrap().as_ref() {
             Some(f) => {
                 info!("Chainloading {:?} with {}", oculante_exe, f);
-                let _ = Command::new(oculante_exe).args(&[&f, "-c"]).spawn();
+                let _ = Command::new(oculante_exe).args([&f, "-c"]).spawn();
             }
             None => {
                 info!("Chainloading {:?} with -c arg", oculante_exe);
-                let _ = Command::new(oculante_exe).args(&["-c"]).spawn();
+                let _ = Command::new(oculante_exe).args(["-c"]).spawn();
             }
         }
     }

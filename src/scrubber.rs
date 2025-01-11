@@ -138,7 +138,7 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
 
 /// Find first valid image from the directory
 /// Assumes the given path is a directory and not a file
-pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
+pub fn find_first_image_in_directory(folder_path: &Path) -> Result<PathBuf> {
     if !folder_path.is_dir() {
         bail!("This is not a folder");
     };

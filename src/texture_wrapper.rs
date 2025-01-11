@@ -132,7 +132,7 @@ impl TexWrap {
             )
             .build();
 
-        let _ = match texture_result {
+        match texture_result {
             Ok(texture) => return Some(texture),
             Err(error) => panic!("Problem generating texture: {error:?}"),
         };
@@ -156,7 +156,7 @@ impl TexWrap {
             error!("Pixel buffer is smaller than expected!");
             return None;
         }
-        return Some(byte_count);
+        Some(byte_count)
     }
 
     fn image_bytes_slice(img: &DynamicImage) -> Option<&[u8]> {
@@ -219,7 +219,7 @@ impl TexWrap {
             (size.0 as usize, size.1 as usize),
             pixel_byte,
         );
-        return buff;
+        buff
     }
 
     fn image_tile_u16(image: &DynamicImage, offset: (u32, u32), size: (u32, u32)) -> Vec<u16> {
@@ -236,7 +236,7 @@ impl TexWrap {
             (size.0 as usize, size.1 as usize),
             pixel_byte,
         );
-        return buff;
+        buff
     }
 
     fn image_tile_f32(image: &DynamicImage, offset: (u32, u32), size: (u32, u32)) -> Vec<f32> {
@@ -253,7 +253,7 @@ impl TexWrap {
             (size.0 as usize, size.1 as usize),
             pixel_byte,
         );
-        return buff;
+        buff
     }
 
     fn get_dyn_image_part(
@@ -284,7 +284,7 @@ impl TexWrap {
                         image.color()
                     );
                     let img_rgba = image.to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(img_rgba));
+                    Some(DynamicImage::ImageRgba32F(img_rgba))
                 }
             }
         } else {
@@ -295,7 +295,7 @@ impl TexWrap {
                     debug!("tiling {:?} to l8", image.color());
                     let gi: image::GrayImage =
                         image::GrayImage::from_raw(size.0, size.1, bytes).unwrap();
-                    return Some(DynamicImage::ImageLuma8(gi));
+                    Some(DynamicImage::ImageLuma8(gi))
                 }
 
                 DynamicImage::ImageLumaA8(_) => {
@@ -305,7 +305,7 @@ impl TexWrap {
                         image::GrayAlphaImage::from_raw(size.0, size.1, bytes).unwrap(),
                     )
                     .to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(gi));
+                    Some(DynamicImage::ImageRgba8(gi))
                 }
 
                 DynamicImage::ImageRgba8(_) => {
@@ -322,7 +322,7 @@ impl TexWrap {
                         image::RgbImage::from_raw(size.0, size.1, bytes).unwrap(),
                     )
                     .to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(gi));
+                    Some(DynamicImage::ImageRgba8(gi))
                 }
 
                 //16 Bit types
@@ -334,7 +334,7 @@ impl TexWrap {
                         size.0, size.1, raw_data,
                     )
                     .unwrap();
-                    return Some(DynamicImage::ImageLuma16(gi));
+                    Some(DynamicImage::ImageLuma16(gi))
                 }
 
                 DynamicImage::ImageLumaA16(_) => {
@@ -357,7 +357,7 @@ impl TexWrap {
                     )
                     .unwrap();
                     let converted_image = DynamicImage::ImageRgb16(gi).to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                    Some(DynamicImage::ImageRgba32F(converted_image))
                 }
 
                 DynamicImage::ImageRgba16(_) => {
@@ -369,7 +369,7 @@ impl TexWrap {
                     )
                     .unwrap();
                     let converted_image = DynamicImage::ImageRgba16(gi).to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                    Some(DynamicImage::ImageRgba32F(converted_image))
                 }
 
                 //32 Bit types
@@ -380,14 +380,14 @@ impl TexWrap {
                         image::Rgb32FImage::from_raw(size.0, size.1, raw_data).unwrap(),
                     )
                     .to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(gi));
+                    Some(DynamicImage::ImageRgba32F(gi))
                 }
 
                 DynamicImage::ImageRgba32F(_) => {
                     let raw_data = Self::image_tile_f32(image, offset, size);
                     debug!("tiling {:?} to rgba32f", image.color());
                     let gi = image::Rgba32FImage::from_raw(size.0, size.1, raw_data).unwrap();
-                    return Some(DynamicImage::ImageRgba32F(gi));
+                    Some(DynamicImage::ImageRgba32F(gi))
                 }
 
                 other_image_type => {
@@ -395,7 +395,7 @@ impl TexWrap {
                     let sub_img =
                         imageops::crop_imm(other_image_type, offset.0, offset.1, size.0, size.1);
                     let my_img = sub_img.to_image();
-                    return Some(DynamicImage::ImageRgba8(my_img));
+                    Some(DynamicImage::ImageRgba8(my_img))
                 }
             }
         }
@@ -431,7 +431,7 @@ impl TexWrap {
                 }
             }
         }
-        return (format, pipeline);
+        (format, pipeline)
     }
 
     fn gen_from_dynamic_image(
@@ -825,14 +825,14 @@ impl TexWrap {
     }
 
     pub fn size(&self) -> (f32, f32) {
-        return self.size_vec;
+        self.size_vec
     }
 
     pub fn width(&self) -> f32 {
-        return self.size_vec.0;
+        self.size_vec.0
     }
 
     pub fn height(&self) -> f32 {
-        return self.size_vec.1;
+        self.size_vec.1
     }
 }

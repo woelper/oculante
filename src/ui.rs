@@ -244,7 +244,7 @@ impl EguiExt for Ui {
 
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        let spacing = if icon.len() == 0 { "" } else { "       " };
+        let spacing = if icon.is_empty() { "" } else { "       " };
         self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
         let r = self.menu_button(format!("{spacing}{description}"), add_contents);
@@ -271,7 +271,7 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-        let spacing = if icon.len() == 0 { "" } else { "      " };
+        let spacing = if icon.is_empty() { "" } else { "      " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
@@ -301,7 +301,7 @@ impl EguiExt for Ui {
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
 
-        let spacing = if icon.len() == 0 { "" } else { "  " };
+        let spacing = if icon.is_empty() { "" } else { "  " };
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
@@ -552,7 +552,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 egui::Grid::new("info")
                     .num_columns(2)
                     .show(ui, |ui| {
-                    ui.label_i(&format!("{ARROWS_OUT} Size",));
+                    ui.label_i(format!("{ARROWS_OUT} Size",));
                     ui.label_right(
                         RichText::new(format!(
                             "{}x{}",
@@ -564,7 +564,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(&format!("{} File", IMAGE));
+                        ui.label_i(format!("{} File", IMAGE));
                         let path_label = egui::Label::new(
                             RichText::new(file_name)
                         ).truncate(true);
@@ -575,19 +575,19 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                         ui.end_row();
                     }
 
-                    ui.label_i(&format!("{PALETTE} RGBA"));
+                    ui.label_i(format!("{PALETTE} RGBA"));
                     ui.label_right(
                         RichText::new(disp_col(state.sampled_color))
                     );
                     ui.end_row();
 
-                    ui.label_i(&format!("{PALETTE} RGBA"));
+                    ui.label_i(format!("{PALETTE} RGBA"));
                     ui.label_right(
                         RichText::new(disp_col_norm(state.sampled_color, 255.))
                     );
                     ui.end_row();
 
-                    ui.label_i(&format!("{PALETTE} HEX"));
+                    ui.label_i(format!("{PALETTE} HEX"));
                     let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
                     ui.label_right(
                         RichText::new(hex)
@@ -757,7 +757,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 
         });
     });
-    return (bbox_tl, bbox_br);
+    (bbox_tl, bbox_br)
 }
 
 fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
@@ -1592,7 +1592,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                                 ui.vertical_centered_justified(|ui|{
                                     for op in &mut ops {
-                                        if ui.button( &format!("{op}")).clicked() {
+                                        if ui.button( format!("{op}")).clicked() {
                                             if op.operation.is_per_pixel() {
                                                 state.edit_state.pixel_op_stack.push(op.clone());
                                             } else {
@@ -1824,7 +1824,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button(format!("Apply all edits"))
+                    .button("Apply all edits")
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                 {
@@ -1841,13 +1841,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
-                        .button(format!("Restore original"))
+                        .button("Restore original")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
                         state.is_loaded = false;
                         state.player.cache.clear();
-                        state.player.load(&path, state.message_channel.0.clone());
+                        state.player.load(path, state.message_channel.0.clone());
                     }
                 }
 
@@ -1920,7 +1920,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
-                    if ui.button(format!("Save as...")).clicked() {
+                    if ui.button("Save as...").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
                     }
 
@@ -2238,11 +2238,8 @@ pub fn stroke_ui(
         }
     });
 
-    if combined_response.hovered() {
-        stroke.highlight = true;
-    } else {
-        stroke.highlight = false;
-    }
+    stroke.highlight = combined_response.hovered();
+
     if combined_response.changed() {
         stroke.highlight = false;
     }
@@ -2321,7 +2318,7 @@ fn modifier_stack_ui(
                     }
                     ui.add_space(caret_size / 2.);
                     ui.add_enabled_ui(operation.active, |ui| {
-                        ui.label(&format!("{operation}"));
+                        ui.label(format!("{operation}"));
                     });
                 });
 
@@ -2505,7 +2502,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             if reload {
                 state.is_loaded = false;
                 state.player.cache.clear();
-                state.player.load(&p, state.message_channel.0.clone());
+                state.player.load(p, state.message_channel.0.clone());
             }
         });
     }
@@ -2552,7 +2549,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .shortcuts
         .iter_mut()
         .collect::<Vec<_>>();
-    ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     egui::Grid::new("info").num_columns(4).show(ui, |ui| {
         for (event, keys) in ordered_shortcuts {
@@ -2949,7 +2946,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     .clicked()
                     || copy_pressed
                 {
-                    clipboard_copy(&img);
+                    clipboard_copy(img);
                     ui.close_menu();
                 }
             }
@@ -3311,11 +3308,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     let accent_color = style.visuals.selection.bg_fill.to_array();
 
-    let accent_color_luma = (accent_color[0] as f32 * 0.299
-        + accent_color[1] as f32 * 0.587
-        + accent_color[2] as f32 * 0.114)
-        .max(0.)
-        .min(255.) as u8;
+    let accent_color_luma = (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color[2] as f32 * 0.114).clamp(0., 255.) as u8;
     let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
     // Set text on highlighted elements
     style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
@@ -3431,15 +3424,15 @@ fn show_modal<R>(
 
 /// Save an image to a path using encoding options and generate a thumbnail
 fn save_with_encoding(image: &DynamicImage, path: &Path, image_info: &Option<ExtendedImageInfo>, encoders: &Vec<FileEncoder>) -> anyhow::Result<()>{
-    let encoding_options = FileEncoder::matching_variant(path, &encoders);
-    encoding_options.save(&image, path)?;
+    let encoding_options = FileEncoder::matching_variant(path, encoders);
+    encoding_options.save(image, path)?;
     debug!("Saved to {}", path.display());
     // Re-apply exif
     if let Some(info) = &image_info {
         debug!("Extended image info present");
         // before doing anything, make sure we have raw exif data
         if info.raw_exif.is_some() {
-            fix_exif(&path, info.raw_exif.clone())?;
+            fix_exif(path, info.raw_exif.clone())?;
         } else {
             debug!("No raw exif");
         }
