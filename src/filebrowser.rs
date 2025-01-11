@@ -649,8 +649,6 @@ impl PathExt for Path {
     }
 }
 
-
-
 // the native file dialog
 
 #[cfg(feature = "file_open")]
@@ -659,7 +657,6 @@ use crate::appstate::OculanteState;
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 pub fn browse_for_image_path(state: &mut OculanteState) {
-
     let start_directory = state.volatile_settings.last_open_directory.clone();
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
@@ -669,7 +666,7 @@ pub fn browse_for_image_path(state: &mut OculanteState) {
                 .into_iter()
                 .map(|e| e.to_ascii_lowercase())
                 .collect::<Vec<_>>(),
-                crate::utils::SUPPORTED_EXTENSIONS
+            crate::utils::SUPPORTED_EXTENSIONS
                 .into_iter()
                 .map(|e| e.to_ascii_uppercase())
                 .collect::<Vec<_>>(),

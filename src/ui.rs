@@ -1,21 +1,27 @@
 #[cfg(not(feature = "file_open"))]
 use crate::filebrowser;
 use crate::{
-    appstate::{ImageGeometry, OculanteState}, file_encoder::FileEncoder, image_editing::{
+    appstate::{ImageGeometry, OculanteState},
+    file_encoder::FileEncoder,
+    image_editing::{
         process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem,
         MeasureShape, ScaleFilter,
-    }, paint::PaintStroke, settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings}, shortcuts::{key_pressed, keypresses_as_string, lookup}, thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE}, utils::{
+    },
+    paint::PaintStroke,
+    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
+    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
+    utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
-    }
+    },
 };
 
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 
 use crate::utils::*;
-
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
@@ -854,13 +860,14 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                         #[cfg(feature = "file_open")]
                         if ui.button(format!("Save ASE")).clicked() {
-                            let start_directory = state.volatile_settings.last_open_directory.clone();
+                            let start_directory =
+                                state.volatile_settings.last_open_directory.clone();
                             std::thread::spawn(move || {
                                 let file_dialog_result = rfd::FileDialog::new()
                                     .set_directory(start_directory)
                                     .save_file();
-                                    if let Some(p) = file_dialog_result {
-                                        let swatches = sampled_colors
+                                if let Some(p) = file_dialog_result {
+                                    let swatches = sampled_colors
                                         .iter()
                                         .map(|c| ase_swatch::types::ObjectColor {
                                             name: "".into(),
@@ -884,7 +891,7 @@ fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                             });
                             ui.ctx().request_repaint();
                         }
-                        
+
                         #[cfg(not(feature = "file_open"))]
                         if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
                             filebrowser::browse_modal(
@@ -1627,25 +1634,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         &mut pixels_changed,
                         ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
-                    ui.horizontal(|ui|{
-                        if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
-                            if let Some(img) = &state.current_image {
-                                state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture.set_image(img, gfx, &state.persistent_settings);
-                            }
-                        }
-                        if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
-                            pixels_changed = true;
-                          
-                        }
-                    });
-
-                    if ui.button("Reset all edits").clicked() {
-                        state.edit_state = Default::default();
-                        pixels_changed = true
-                    }
-
-
                 });
 
 
@@ -1822,6 +1810,19 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             }
 
+            ui.horizontal(|ui|{
+                if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.image_geometry.dimensions = img.dimensions();
+                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                    }
+                }
+                if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
+                    pixels_changed = true;
+
+                }
+            });
+
             ui.vertical_centered_justified(|ui| {
                 if ui
                     .button("Apply all edits")
@@ -1836,12 +1837,18 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         image_changed = true;
                     }
                 }
+
+                if ui.button("Remove all edits").clicked() {
+                    state.edit_state = Default::default();
+                    pixels_changed = true
+                }
             });
+
 
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
-                        .button("Restore original")
+                        .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
@@ -1943,7 +1950,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-              
+
 
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
@@ -2619,7 +2626,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             state.persistent_settings.current_channel = ColorChannel::Rgba;
             changed_channels = true;
         }
-        
+
         // Force rgba while edit mode is open.
         // TODO: display of channels should be done through a shader
         if state.persistent_settings.edit_enabled {
@@ -2648,7 +2655,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::BLACK;
                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
                 }
-
 
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
@@ -2681,8 +2687,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     });
             });
         }
-        
-     
 
         // TODO: remove redundancy
         if changed_channels {
@@ -2803,8 +2807,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 app.window().set_always_on_top(state.always_on_top);
             }
         }
-
-     
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
             let modal = show_modal(
@@ -3308,7 +3310,10 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     let accent_color = style.visuals.selection.bg_fill.to_array();
 
-    let accent_color_luma = (accent_color[0] as f32 * 0.299 + accent_color[1] as f32 * 0.587 + accent_color[2] as f32 * 0.114).clamp(0., 255.) as u8;
+    let accent_color_luma = (accent_color[0] as f32 * 0.299
+        + accent_color[1] as f32 * 0.587
+        + accent_color[2] as f32 * 0.114)
+        .clamp(0., 255.) as u8;
     let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
     // Set text on highlighted elements
     style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
@@ -3423,7 +3428,12 @@ fn show_modal<R>(
 }
 
 /// Save an image to a path using encoding options and generate a thumbnail
-fn save_with_encoding(image: &DynamicImage, path: &Path, image_info: &Option<ExtendedImageInfo>, encoders: &Vec<FileEncoder>) -> anyhow::Result<()>{
+fn save_with_encoding(
+    image: &DynamicImage,
+    path: &Path,
+    image_info: &Option<ExtendedImageInfo>,
+    encoders: &Vec<FileEncoder>,
+) -> anyhow::Result<()> {
     let encoding_options = FileEncoder::matching_variant(path, encoders);
     encoding_options.save(image, path)?;
     debug!("Saved to {}", path.display());
@@ -3438,5 +3448,5 @@ fn save_with_encoding(image: &DynamicImage, path: &Path, image_info: &Option<Ext
         }
     }
     thumbnails::generate(path)?;
-   Ok(())
+    Ok(())
 }
