@@ -376,7 +376,6 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(2, "noto_ar".to_owned());
 
-
         fonts.font_data.insert(
             "noto_sc".to_owned(),
             FontData::from_static(include_bytes!("../res/fonts/NotoSansSC-Regular.ttf")),
@@ -889,7 +888,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if !state.persistent_settings.keep_edits {
                     state.edit_state = Default::default();
-                    state.persistent_settings.edit_enabled = false;
                     state.edit_state = Default::default();
                 }
 
@@ -897,10 +895,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 if let Some(p) = &state.current_path {
                     if p.with_extension("oculante").is_file() {
                         if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-
                             match serde_json::from_reader::<_, EditState>(f) {
                                 Ok(edit_state) => {
-                                    state.send_message_info("Edits have been loaded for this image.");
+                                    state.send_message_info(
+                                        "Edits have been loaded for this image.",
+                                    );
                                     state.edit_state = edit_state;
                                     state.persistent_settings.edit_enabled = true;
                                     state.reset_image = true;
@@ -909,16 +908,26 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     // state.send_message_info("Edits have been loaded for this image.");
                                     warn!("{e}");
 
-                                    if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-                                        if let Ok(legacy_edit_state) = serde_json::from_reader::<_, LegacyEditState>(f) {
+                                    if let Ok(f) = std::fs::File::open(p.with_extension("oculante"))
+                                    {
+                                        if let Ok(legacy_edit_state) =
+                                            serde_json::from_reader::<_, LegacyEditState>(f)
+                                        {
                                             warn!("Legacy edits found");
-                                            state.send_message_info("Edits have been loaded for this image.");
+                                            state.send_message_info(
+                                                "Edits have been loaded for this image.",
+                                            );
                                             state.edit_state = legacy_edit_state.upgrade();
                                             state.persistent_settings.edit_enabled = true;
                                             state.reset_image = true;
                                             // Migrate config
-                                            if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
-                                                _ = serde_json::to_writer_pretty(&f, &state.edit_state);
+                                            if let Ok(f) =
+                                                std::fs::File::create(p.with_extension("oculante"))
+                                            {
+                                                _ = serde_json::to_writer_pretty(
+                                                    &f,
+                                                    &state.edit_state,
+                                                );
                                             }
                                         }
                                     } else {
@@ -926,7 +935,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                                     }
                                 }
                             }
-                         
                         }
                     } else if let Some(parent) = p.parent() {
                         debug!("Looking for {}", parent.join(".oculante").display());
@@ -1123,6 +1131,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.edit_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
+            && state.current_image.is_some()
         {
             edit_ui(app, ctx, state, gfx);
         }

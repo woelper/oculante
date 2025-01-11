@@ -62,10 +62,16 @@ pub struct LegacyEditState {
 impl LegacyEditState {
     pub fn upgrade(&self) -> EditState {
         let mut ne = EditState::default();
-        ne.image_op_stack = self.image_op_stack.iter()
-            .map(|op| ImgOpItem::new(op.clone())).collect();
-        ne.pixel_op_stack = self.pixel_op_stack.iter()
-            .map(|op| ImgOpItem::new(op.clone())).collect();
+        ne.image_op_stack = self
+            .image_op_stack
+            .iter()
+            .map(|op| ImgOpItem::new(op.clone()))
+            .collect();
+        ne.pixel_op_stack = self
+            .pixel_op_stack
+            .iter()
+            .map(|op| ImgOpItem::new(op.clone()))
+            .collect();
         ne
     }
 }
