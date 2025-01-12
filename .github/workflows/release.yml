@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-14, ubuntu-latest, macos-12]
+        os: [ubuntu-20.04, windows-2019, macos-14, macos-12, ubuntu-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v4
@@ -61,11 +61,11 @@ jobs:
         zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Cross-compile arm64
-      run: |
-        cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/glsl-to-spirv
-        zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
-      if: matrix.os == 'ubuntu-latest'
+    # - name: Cross-compile arm64
+    #   run: |
+    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/glsl-to-spirv
+    #     zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
+    #   if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
@@ -188,17 +188,17 @@ jobs:
         asset_name: oculante_linux_armv7_minimal.zip
         asset_content_type: application/zip
 
-    - name: Upload ARM64 Release
-      if: matrix.os == 'ubuntu-latest'
-      id: upload-release-arm64
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.release_job.outputs.upload_url }}
-        asset_path: oculante_aarch64_minimal.zip
-        asset_name: oculante_linux_aarch64_minimal.zip
-        asset_content_type: application/zip
+    # - name: Upload ARM64 Release
+    #   if: matrix.os == 'ubuntu-latest'
+    #   id: upload-release-arm64
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ needs.release_job.outputs.upload_url }}
+    #     asset_path: oculante_aarch64_minimal.zip
+    #     asset_name: oculante_linux_aarch64_minimal.zip
+    #     asset_content_type: application/zip
 
     - name: Upload Linux 20.04 Release zip
       if: matrix.os == 'ubuntu-20.04'
