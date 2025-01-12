@@ -449,7 +449,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             let r = ui.available_rect_before_wrap();
 
             let spacing = ui.style().spacing.item_spacing.x;
-            let w = r.width() - spacing * 3.;
+            let w = r.width() - spacing * 3. + 2.;
 
             let thumbs_per_row = (w / (THUMB_SIZE[0] as f32 + spacing))
                 .floor()
@@ -464,7 +464,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .show(ui, |ui| {
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
-                        .auto_shrink([true, false])
+                        .auto_shrink([false, false])
                         .show_rows(
                             ui,
                             (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
