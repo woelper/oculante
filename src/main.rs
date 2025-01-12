@@ -2,6 +2,8 @@
 
 use clap::Arg;
 use clap::Command;
+use image::GenericImageView;
+use image_editing::LegacyEditState;
 use log::debug;
 use log::error;
 use log::info;
@@ -20,49 +22,27 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
-use oculante::BOLD_FONT;
-use oculante::FONT;
-use shortcuts::key_pressed;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
-pub mod cache;
-pub mod file_encoder;
-pub mod icons;
-pub mod scrubber;
-pub mod settings;
-pub mod shortcuts;
-#[cfg(feature = "turbo")]
-use crate::image_editing::lossless_tx;
-use crate::scrubber::find_first_image_in_directory;
-use crate::shortcuts::InputEvent::*;
-mod utils;
-use utils::*;
-mod appstate;
-mod image_loader;
-use appstate::*;
-#[cfg(not(feature = "file_open"))]
-mod filebrowser;
-mod texture_wrapper;
 
-pub mod ktx2_loader;
-// mod events;
-#[cfg(target_os = "macos")]
-mod mac;
-mod net;
-use net::*;
-#[cfg(test)]
-mod tests;
-mod ui;
-#[cfg(feature = "update")]
-mod update;
+#[cfg(feature = "file_open")]
+use filebrowser::browse_for_image_path;
+use oculante::appstate::*;
+use oculante::utils::*;
+use oculante::*;
+use shortcuts::key_pressed;
+use ui::PANEL_WIDTH;
 use ui::*;
+use BOLD_FONT;
+use FONT;
 
-use crate::image_editing::EditState;
-
-mod image_editing;
-pub mod paint;
+#[cfg(feature = "turbo")]
+use image_editing::lossless_tx;
+use image_editing::EditState;
+use scrubber::find_first_image_in_directory;
+use shortcuts::InputEvent::*;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -120,7 +100,7 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         // MacOS needs an incredible dance performed just to open a file
-        let _ = mac::launch();
+        let _ = oculante::mac::launch();
     }
 
     // Unfortunately we need to load the volatile settings here, too - the window settings need
@@ -166,7 +146,7 @@ fn main() -> Result<(), String> {
         .add_config(window_config)
         .add_config(EguiConfig)
         .add_config(DrawConfig)
-        .event(event)
+        .event(process_events)
         .update(update)
         .draw(drawe)
         .build()
@@ -296,7 +276,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                             .texture_channel
                             .0
                             .clone()
-                            .send(utils::Frame::new_reset(i.to_rgba8()));
+                            .send(utils::Frame::new_reset(i));
                     }
                     Err(e) => error!("ERR loading from stdin: {e} - for now, oculante only supports data that can be decoded by the image crate."),
                 }
@@ -308,7 +288,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         match port.parse::<i32>() {
             Ok(p) => {
                 state.send_message_info(&format!("Listening on {p}"));
-                recv(p, state.texture_channel.0.clone());
+                net::recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
             }
@@ -325,12 +305,15 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
+        info!("This Display has DPI {:?}", gfx.dpi());
+        let offset = if gfx.dpi() > 1.0 { 0.0 } else { -1.4 };
+
         fonts.font_data.insert(
             "inter".to_owned(),
             FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -340,7 +323,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
-                y_offset: -1.4,
+                y_offset: offset,
                 baseline_offset_factor: 0.0,
             }),
         );
@@ -371,6 +354,39 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
+        fonts.font_data.insert(
+            "noto_jp".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "noto_jp".to_owned());
+
+        fonts.font_data.insert(
+            "noto_ar".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoNaskhArabic-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "noto_ar".to_owned());
+
+        fonts.font_data.insert(
+            "noto_sc".to_owned(),
+            FontData::from_static(include_bytes!("../res/fonts/NotoSansSC-Regular.ttf")),
+        );
+
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "noto_sc".to_owned());
+
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
         ctx.set_fonts(fonts);
@@ -396,7 +412,10 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     state
 }
 
-fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
+fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
+    if state.key_grab {
+        return;
+    }
     match evt {
         Event::KeyUp { .. } => {
             // Fullscreen needs to be on key up on mac (bug)
@@ -547,6 +566,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
             if key_pressed(app, state, DeleteFile) {
+                // TODO: needs confirmation
                 delete_file(state);
             }
             if key_pressed(app, state, ClearImage) {
@@ -752,13 +772,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
-    // make sure that in edit mode, RGBA is set.
-    // This is a bit lazy. but instead of writing lots of stuff for an ubscure feature,
-    // let's disable it here.
-    if state.persistent_settings.edit_enabled {
-        state.persistent_settings.current_channel = ColorChannel::Rgba;
-    }
-
     // redraw if extended info is missing so we make sure it's promply displayed
     if state.persistent_settings.info_enabled && state.image_info.is_none() {
         app.window().request_frame();
@@ -803,7 +816,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
-
+    let mut zoom_image = gfx.create_draw();
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
@@ -847,14 +860,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             .volatile_settings
                             .recent_images
                             .insert(0, path.clone());
-                        state.volatile_settings.recent_images.truncate(10);
+                        state.volatile_settings.recent_images.truncate(12);
                     }
                 }
             }
             _ => {}
         }
-
- 
 
         match &frame {
             Frame::Still(ref img) | Frame::ImageCollectionMember(ref img) => {
@@ -877,7 +888,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 if !state.persistent_settings.keep_edits {
                     state.edit_state = Default::default();
-                    state.persistent_settings.edit_enabled = false;
                     state.edit_state = Default::default();
                 }
 
@@ -885,11 +895,45 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 if let Some(p) = &state.current_path {
                     if p.with_extension("oculante").is_file() {
                         if let Ok(f) = std::fs::File::open(p.with_extension("oculante")) {
-                            if let Ok(edit_state) = serde_json::from_reader::<_, EditState>(f) {
-                                state.send_message_info("Edits have been loaded for this image.");
-                                state.edit_state = edit_state;
-                                state.persistent_settings.edit_enabled = true;
-                                state.reset_image = true;
+                            match serde_json::from_reader::<_, EditState>(f) {
+                                Ok(edit_state) => {
+                                    state.send_message_info(
+                                        "Edits have been loaded for this image.",
+                                    );
+                                    state.edit_state = edit_state;
+                                    state.persistent_settings.edit_enabled = true;
+                                    state.reset_image = true;
+                                }
+                                Err(e) => {
+                                    // state.send_message_info("Edits have been loaded for this image.");
+                                    warn!("{e}");
+
+                                    if let Ok(f) = std::fs::File::open(p.with_extension("oculante"))
+                                    {
+                                        if let Ok(legacy_edit_state) =
+                                            serde_json::from_reader::<_, LegacyEditState>(f)
+                                        {
+                                            warn!("Legacy edits found");
+                                            state.send_message_info(
+                                                "Edits have been loaded for this image.",
+                                            );
+                                            state.edit_state = legacy_edit_state.upgrade();
+                                            state.persistent_settings.edit_enabled = true;
+                                            state.reset_image = true;
+                                            // Migrate config
+                                            if let Ok(f) =
+                                                std::fs::File::create(p.with_extension("oculante"))
+                                            {
+                                                _ = serde_json::to_writer_pretty(
+                                                    &f,
+                                                    &state.edit_state,
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        state.send_message_err("Edits could not be loaded.");
+                                    }
+                                }
                             }
                         }
                     } else if let Some(parent) = p.parent() {
@@ -947,39 +991,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                if let Some(tex) = &mut state.current_texture.get() {
-                    if tex.width() as u32 == img.width() && tex.height() as u32 == img.height() {
-                        debug!("Re-using texture as it is the same size.");
-                        img.update_texture_with_texwrap(gfx, tex);
-                    } else {
-                        debug!("Updating texture with new size.");
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
-                    }
-                } else {
-                    debug!("No current texture. Creating and setting texture");
-                    state.current_texture.set(
-                        img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                        gfx,
-                    );
-                }
+                state
+                    .current_texture
+                    .set_image(&img, gfx, &state.persistent_settings);
 
                 match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
-                    ColorChannel::Rgb => state.current_texture.set(
-                        unpremult(&img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    ColorChannel::Rgb => state.current_texture.set_image(
+                        &unpremult(&img),
                         gfx,
+                        &state.persistent_settings,
                     ),
                     // Do nuttin'
                     ColorChannel::Rgba => (),
                     // Display the channel
                     _ => {
-                        state.current_texture.set(
-                            solo_channel(&img, state.persistent_settings.current_channel as usize)
-                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state.current_texture.set_image(
+                            &solo_channel(&img, state.persistent_settings.current_channel as usize),
                             gfx,
+                            &state.persistent_settings,
                         );
                     }
                 }
@@ -987,21 +1017,20 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             Frame::UpdateTexture => {
                 // Only update the texture.
-                
+
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set(
-                        state.edit_state.result_pixel_op.to_texture_with_texwrap(gfx, &state.persistent_settings),
+                    state.current_texture.set_image(
+                        &state.edit_state.result_pixel_op,
                         gfx,
-                    );
-
+                        &state.persistent_settings,
+                    )
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state
+                            .current_texture
+                            .set_image(&img, gfx, &state.persistent_settings);
                     }
                 }
             }
@@ -1036,13 +1065,19 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
-
+    let mut bbox_tl: egui::Pos2 = Default::default();
+    let mut bbox_br: egui::Pos2 = Default::default();
+    let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
-            ctx.memory_mut(|w| w.open_popup(Id::new(id)));
+            ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
-    
+
+        // set info panel color dynamically
+        info_panel_color = ctx.style().visuals.panel_fill;
+
+        // open a file browser if requested
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
@@ -1096,6 +1131,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.edit_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
+            && state.current_image.is_some()
         {
             edit_ui(app, ctx, state, gfx);
         }
@@ -1103,8 +1139,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.info_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
+            && state.current_image.is_some()
         {
-            info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1163,12 +1200,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if state.persistent_settings.show_checker_background {
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
-                    // .size(texture.width() as f32, texture.height() as f32)
-                    .size(texture.width() as f32 * state.image_geometry.scale * state.tiling as f32, texture.height() as f32 * state.image_geometry.scale* state.tiling as f32)
+                    .size(
+                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                    )
                     .blend_mode(BlendMode::ADD)
-                    .translate(aligned_offset_x, aligned_offset_y)
-                    // .scale(state.image_geometry.scale, state.image_geometry.scale)
-                    ;
+                    .translate(aligned_offset_x, aligned_offset_y);
             }
         }
         if state.tiling < 2 {
@@ -1213,18 +1250,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .translate(aligned_offset_x, aligned_offset_y);
         }
 
-        if state.persistent_settings.show_minimap {
-            // let offset_x = app.window().size().0 as f32 - state.dimensions.0 as f32;
-            let offset_x = 0.0;
+        if state.persistent_settings.info_enabled
+            && !state.settings_enabled
+            && !state.persistent_settings.zen_mode
+        {
+            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+                .color(Color::from_rgb(
+                    info_panel_color.r() as f32 / 255.,
+                    info_panel_color.g() as f32 / 255.,
+                    info_panel_color.b() as f32 / 255.,
+                ));
 
-            let scale = 200. / app.window().size().0 as f32;
-            let show_minimap = state.image_geometry.dimensions.0 as f32
-                * state.image_geometry.scale
-                > app.window().size().0 as f32;
-
-            if show_minimap {
-                texture.draw_textures(&mut draw, offset_x, 100., scale);
-            }
+            texture.draw_zoomed(
+                &mut zoom_image,
+                bbox_tl.x,
+                bbox_tl.y,
+                bbox_br.x - bbox_tl.x,
+                (state.cursor_relative.x, state.cursor_relative.y),
+                8.0,
+            );
         }
 
         // Draw a brush preview when paint mode is on
@@ -1271,36 +1315,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         c[2] as f32 / 255.,
     ));
     gfx.render(&draw);
+    gfx.render(&zoom_image);
     gfx.render(&egui_output);
-}
-
-// Show file browser to select image to load
-#[cfg(feature = "file_open")]
-fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.volatile_settings.last_open_directory.clone();
-    let load_sender = state.load_channel.0.clone();
-    state.redraw = true;
-    std::thread::spawn(move || {
-        let uppercase_lowercase_ext = [
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_lowercase())
-                .collect::<Vec<_>>(),
-            utils::SUPPORTED_EXTENSIONS
-                .into_iter()
-                .map(|e| e.to_ascii_uppercase())
-                .collect::<Vec<_>>(),
-        ]
-        .concat();
-        let file_dialog_result = rfd::FileDialog::new()
-            .add_filter("All Supported Image Types", &uppercase_lowercase_ext)
-            .add_filter("All File Types", &["*"])
-            .set_directory(start_directory)
-            .pick_file();
-        if let Some(file_path) = file_dialog_result {
-            let _ = load_sender.send(file_path);
-        }
-    });
 }
 
 // Make sure offset is restricted to window size so we don't offset to infinity

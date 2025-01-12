@@ -25,7 +25,7 @@ dirs = "5.0"
 env_logger = "0.11"
 evalexpr = "11.3"
 exr = "1.72"
-fast_image_resize = "5.0"
+fast_image_resize = { version = "5.0", features = ["rayon"] }
 gif = "0.13.1"
 gif-dispose = "5.0.1"
 image = { version = "0.25.4", features = ["hdr"] }
@@ -39,6 +39,7 @@ notan = { version = "0.12", default-features = false, features = [
     "draw",
     "drop_files",
     "egui",
+    "clipboard"
 ] }
 egui_plot = "0.27"
 palette = "0.7"
@@ -93,6 +94,8 @@ libblur = "0.13.5"
 egui-modal = "0.3.6"
 zip = "2.2.0"
 ase-swatch = "0.1.0"
+quantette = { version = "0.3.0", features = ["threads"] }
+sysinfo = "0.33.1"
 
 [features]
 default = [
@@ -111,6 +114,7 @@ turbo = ["turbojpeg"]
 update = ["self_update"]
 j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
+hdr = []
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -135,12 +139,12 @@ chrono = "0.4.38"
 criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
 [profile.release]
-# codegen-units = 1
+codegen-units = 1
 # incremental = false
-# lto = true
+lto = true
 strip = true
 # opt-level = 3
-panic = "abort"
+# panic = "abort"
 
 [profile.dev]
 debug = false

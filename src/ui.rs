@@ -1,22 +1,27 @@
+#[cfg(not(feature = "file_open"))]
+use crate::filebrowser;
 use crate::{
-    appstate::{ImageGeometry, Message, OculanteState},
-    clear_image, clipboard_to_image, delete_file,
+    appstate::{ImageGeometry, OculanteState},
     file_encoder::FileEncoder,
-    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
+    image_editing::{
+        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem,
+        MeasureShape, ScaleFilter,
+    },
     paint::PaintStroke,
-    set_zoom,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
+    thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
 };
-#[cfg(not(feature = "file_open"))]
-use crate::{filebrowser, SUPPORTED_EXTENSIONS};
 
-use std::io::Write;
+#[cfg(feature = "file_open")]
+use crate::filebrowser::browse_for_image_path;
+
+use crate::utils::*;
 
 const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
@@ -24,17 +29,18 @@ pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 
 use crate::icons::*;
-use ase_swatch::types::{Color, ObjectColor};
 use egui_plot::{Line, Plot, PlotPoints};
 use epaint::TextShape;
-use image::{DynamicImage, RgbaImage};
+use image::{ColorType, DynamicImage, GenericImageView, RgbaImage};
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
+use nalgebra::Vector2;
 use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
+use quantette::{ColorSpace, PalettePipeline};
 use std::{
     collections::BTreeSet,
     ops::RangeInclusive,
@@ -42,7 +48,8 @@ use std::{
     time::{Duration, Instant},
 };
 use strum::IntoEnumIterator;
-const PANEL_WIDTH: f32 = 240.0;
+use text::{LayoutJob, TextWrapping};
+pub const PANEL_WIDTH: f32 = 240.0;
 const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 #[cfg(feature = "turbo")]
@@ -52,10 +59,15 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    fn label_unselectable(&mut self, _text: impl Into<WidgetText>) -> Response {
+        unimplemented!()
+    }
+
     fn label_right(&mut self, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
+    #[allow(unused)]
     fn label_i_selected(&mut self, _selected: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
@@ -161,7 +173,6 @@ impl EguiExt for Ui {
         });
 
         if self.is_rect_visible(rect) {
-            // let visuals = self.style().interact_selectable(&response, *checked); // too colorful
             let visuals = self.style().interact(&response);
             let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
             self.painter().add(epaint::RectShape::new(
@@ -170,13 +181,12 @@ impl EguiExt for Ui {
                 if *checked {
                     color.gamma_multiply(0.3)
                 } else {
-                    visuals.bg_fill
+                    visuals.weak_bg_fill
                 },
                 visuals.bg_stroke,
             ));
             if *checked {
                 // Check mark:
-
                 let mut stroke = visuals.fg_stroke;
                 stroke.color = color;
                 self.painter().add(Shape::line(
@@ -214,8 +224,8 @@ impl EguiExt for Ui {
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             // self.horizontal(|ui| {
-            ui.add_sized(
-                egui::Vec2::new(8., ui.available_height()),
+            ui.add(
+                // egui::Vec2::new(8., ui.available_height()),
                 egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
             );
             ui.label(
@@ -223,6 +233,11 @@ impl EguiExt for Ui {
             );
         })
         .response
+    }
+
+    /// Unselectable label
+    fn label_unselectable(&mut self, text: impl Into<WidgetText>) -> Response {
+        self.add(egui::Label::new(text).selectable(false))
     }
 
     fn styled_menu_button(
@@ -235,7 +250,7 @@ impl EguiExt for Ui {
 
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        let spacing = if icon.len() == 0 { "" } else { "       " };
+        let spacing = if icon.is_empty() { "" } else { "       " };
         self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
         let r = self.menu_button(format!("{spacing}{description}"), add_contents);
@@ -262,11 +277,11 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
 
-        let spacing = if icon.len() == 0 { "" } else { "      " };
+        let spacing = if icon.is_empty() { "" } else { "      " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
-                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
+                .min_size(vec2(140., BUTTON_HEIGHT_LARGE)),
         );
 
         let mut icon_pos = r.rect.left_center();
@@ -291,9 +306,8 @@ impl EguiExt for Ui {
         let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
         let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
-        // self.style_mut().visuals.widgets.inactive.rounding = Rounding::same(6.);
 
-        let spacing = if icon.len() == 0 { "" } else { "  " };
+        let spacing = if icon.is_empty() { "" } else { "  " };
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
@@ -310,27 +324,12 @@ impl EguiExt for Ui {
             FontId::proportional(icon_size),
             self.style().visuals.selection.bg_fill,
         );
-
         r
-
-        // self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-        //     // self.horizontal(|ui| {
-        //     ui.add_sized(
-        //         egui::Vec2::new(8., ui.available_height()),
-        //         egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-        //     );
-        //     ui.label(
-        //         RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
-        //     );
-        // })
-        // .response
     }
 
     /// Draw a justified icon from a string starting with an emoji
     fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
         self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-            // self.horizontal(|ui| {
-
             ui.label(text);
         })
         .response
@@ -345,7 +344,6 @@ impl EguiExt for Ui {
         self.style_mut().visuals.indent_has_left_vline = false;
 
         CollapsingHeader::new(heading)
-            // .show_background(true)
             .icon(caret_icon)
             .show_unindented(self, add_contents)
     }
@@ -472,8 +470,6 @@ impl EguiExt for Ui {
 #[allow(unused)]
 pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(texture) = &state.current_texture.get() {
-        //let tex_id = gfx.egui_register_texture(&texture.texture_array[0]); //TODO: Adapt if needed
-
         let image_rect = Rect::from_center_size(
             Pos2::new(
                 state.image_geometry.offset.x
@@ -510,35 +506,51 @@ pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     // .rect;
 }
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
+    let mut color_type = ColorType::Rgba8;
+    let mut bbox_tl: Pos2 = Default::default();
+    let mut bbox_br: Pos2 = Default::default();
+    let mut uv_center: (f64, f64) = Default::default();
+    let mut uv_size: (f64, f64) = Default::default();
+
     if let Some(img) = &state.current_image {
-        let mut img = img;
+        color_type = img.color();
 
         // prefer edit result if present
-        if state.edit_state.result_pixel_op.width() > 0 {
-            img = &state.edit_state.result_pixel_op;
-        }
+        let img = if state.edit_state.result_pixel_op.width() > 0 {
+            &state.edit_state.result_pixel_op
+        } else {
+            img
+        };
 
-        if let Some(p) = img.get_pixel_checked(
-            state.cursor_relative.x as u32,
-            state.cursor_relative.y as u32,
-        ) {
-            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+        // don't do this every frame for performance reasons
+        if ctx.frame_nr() % 5 == 0 {
+            if let Some(p) = get_pixel_checked(
+                img,
+                state.cursor_relative.x as u32,
+                state.cursor_relative.y as u32,
+            ) {
+                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+            }
         }
     }
 
-    egui::SidePanel::left("side_panel")
+    egui::SidePanel::left("info")
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
+    .frame(egui::Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
     .show(ctx, |ui| {
-
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
+
+            // Force-expand to prevent spacing issue with scroll bar
+            ui.allocate_space(egui::Vec2::new(PANEL_WIDTH - PANEL_WIDGET_OFFSET, 0.));
+
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
-                let uv_center = (
+                uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
@@ -546,7 +558,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                 egui::Grid::new("info")
                     .num_columns(2)
                     .show(ui, |ui| {
-                    ui.label_i(&format!("{ARROWS_OUT} Size",));
+                    ui.label_i(format!("{ARROWS_OUT} Size",));
                     ui.label_right(
                         RichText::new(format!(
                             "{}x{}",
@@ -558,7 +570,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(&format!("{} File", IMAGE));
+                        ui.label_i(format!("{} File", IMAGE));
                         let path_label = egui::Label::new(
                             RichText::new(file_name)
                         ).truncate(true);
@@ -569,15 +581,28 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                         ui.end_row();
                     }
 
-                    ui.label_i(&format!("{PALETTE} RGBA"));
+                    ui.label_i(format!("{PALETTE} RGBA"));
                     ui.label_right(
                         RichText::new(disp_col(state.sampled_color))
                     );
                     ui.end_row();
 
-                    ui.label_i(&format!("{PALETTE} RGBA"));
+                    ui.label_i(format!("{PALETTE} RGBA"));
                     ui.label_right(
                         RichText::new(disp_col_norm(state.sampled_color, 255.))
+                    );
+                    ui.end_row();
+
+                    ui.label_i(format!("{PALETTE} HEX"));
+                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                    ui.label_right(
+                        RichText::new(hex)
+                    );
+                    ui.end_row();
+
+                    ui.label_i(&format!("{PALETTE} Color"));
+                    ui.label_right(
+                        format!("{:?}", color_type)
                     );
                     ui.end_row();
 
@@ -599,54 +624,20 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
 
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                let uv_size = (scale, scale * ratio);
-                let bbox_tl: Pos2;
-                let bbox_br: Pos2;
-                if texture.texture_count == 1 {
-                    let texture_resonse = texture.get_texture_at_xy(0,0);
-                    ui.add_space(10.);
-                    let preview_rect = ui
-                        .add(
-                            egui::Image::new(texture_resonse.texture.texture_egui)
-                            .maintain_aspect_ratio(false)
-                            .fit_to_exact_size(egui::Vec2::splat(desired_width as f32))
-                            .rounding(ROUNDING)
-                            .uv(egui::Rect::from_x_y_ranges(
-                                (uv_center.0 - uv_size.0) as f32..=(uv_center.0 + uv_size.0) as f32,
-                                (uv_center.1 - uv_size.1) as f32..=(uv_center.1 + uv_size.1) as f32,
-                            )),
-                        )
-                        .rect;
-                    bbox_tl = preview_rect.left_top();
-                    bbox_br = preview_rect.right_bottom();
-                }
-                else {
-                    (bbox_tl, bbox_br) = render_info_image_tiled(ui, uv_center,uv_size, desired_width, texture);
-                }
+                uv_size = (scale, scale * ratio);
+                ui.add_space(10.);
 
-                let bg_color = Color32::BLACK.linear_multiply(0.5);
-                let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
+                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+
+                let offset = (ui.available_width() - preview_rect.width())/2.;
+                preview_rect = preview_rect.translate(vec2(offset, 0.));
+                //Rendering a placeholder rectangle
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
+                bbox_tl = preview_rect.left_top();
+                bbox_br = preview_rect.right_bottom();
+
+                // let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
-
-
-                let stroke_color = Color32::from_white_alpha(240);
-
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.center_bottom(), preview_rect.center_top()],
-                    Stroke::new(4., bg_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.left_center(), preview_rect.right_center()],
-                    Stroke::new(4., bg_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.center_bottom(), preview_rect.center_top()],
-                    Stroke::new(1., stroke_color),
-                );
-                ui.painter_at(preview_rect).line_segment(
-                    [preview_rect.left_center(), preview_rect.right_center()],
-                    Stroke::new(1., stroke_color),
-                );
             }
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
@@ -660,9 +651,22 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                             if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
-                                crate::browse_for_image_path(state);
+                                browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
                                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+
+                                state.is_loaded = false;
+                                // tag to add new image
+                                ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
+                            }
+
+                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
+                                if state.is_loaded && state.reset_image == false {
+                                    if let Some(path) = &state.current_path {
+                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
+                                    }
+                                }
                             }
                             let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
                             compare_list.sort_by(|a,b| a.0.cmp(&b.0));
@@ -719,7 +723,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_bleed(img);
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                     ui.ctx().request_repaint();
                                 }
                                 if ui
@@ -730,13 +734,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                                     .clicked()
                                 {
                                     state.edit_state.result_pixel_op = highlight_semitrans(img);
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                     ui.ctx().request_repaint();
                                 }
                                 if ui.button("Reset image").clicked() {
                                     state.edit_state.result_pixel_op = Default::default();
 
-                                    state.send_frame(crate::Frame::UpdateTexture);
+                                    state.send_frame(crate::utils::Frame::UpdateTexture);
                                 }
                             }
                         });
@@ -744,7 +748,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                 });
 
                 palette_ui(ui, state);
-                
+
+                if state.persistent_settings.experimental_features {
+                    measure_ui(ui, state);
+                }
+
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
                     ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
@@ -752,409 +760,649 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
                 });
             }
             advanced_ui(ui, state);
+
+        });
+    });
+    (bbox_tl, bbox_br)
+}
+
+fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
+    ui.styled_collapsing("Palette", |ui| {
+        ui.vertical_centered_justified(|ui| {
+            dark_panel(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.));
+                if let Some(sampled_colors) = ui
+                    .ctx()
+                    .memory(|r| r.data.get_temp::<Vec<[u8; 4]>>("picker".into()))
+                {
+                    if !sampled_colors.is_empty() {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = Vec2::splat(6.);
+                            for color in &sampled_colors {
+                                let (rect, resp) =
+                                    ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
+
+                                let egui_color = Color32::from_rgba_premultiplied(
+                                    (color[0]) as u8,
+                                    (color[1]) as u8,
+                                    (color[2]) as u8,
+                                    (color[3]) as u8,
+                                );
+
+                                let sampled_color = [
+                                    state.sampled_color[0] as u8,
+                                    state.sampled_color[1] as u8,
+                                    state.sampled_color[2] as u8,
+                                    state.sampled_color[3] as u8,
+                                ];
+
+                                ui.painter().rect_filled(rect, 1., egui_color);
+                                if color == &sampled_color {
+                                    ui.painter().rect_stroke(
+                                        rect,
+                                        1.,
+                                        Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                    );
+                                }
+                                if resp.hovered() {
+                                    if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                                        ui.ctx().memory_mut(|w| {
+                                            let cols =
+                                                w.data.get_temp_mut_or_default::<Vec<[u8; 4]>>(
+                                                    "picker".into(),
+                                                );
+                                            if let Some(i) = cols.iter().position(|c| c == color) {
+                                                cols.remove(i);
+                                            }
+                                        });
+                                    }
+                                    if ui.ctx().input(|r| r.pointer.primary_clicked()) {
+                                        ui.ctx()
+                                            .output_mut(|w| w.copied_text = egui_color.to_hex());
+                                        state.send_message_info(&format!(
+                                            "Copied color: {}",
+                                            egui_color.to_hex()
+                                        ));
+                                    }
+                                }
+                                resp.on_hover_ui(|ui| {
+                                    ui.label(format!("HEX: {}", egui_color.to_hex()));
+                                    ui.label(format!(
+                                        "RGBA: {}",
+                                        disp_col([
+                                            color[0] as f32,
+                                            color[1] as f32,
+                                            color[2] as f32,
+                                            color[3] as f32,
+                                        ])
+                                    ));
+                                    ui.label("Left click to copy Hex, right click to remove.");
+                                });
+                            }
+                        });
+                        if ui.button("Clear").clicked() {
+                            ui.ctx().memory_mut(|w| {
+                                w.data.remove_temp::<Vec<[u8; 4]>>("picker".into())
+                            });
+                        }
+                        if ui.button("Sort").clicked() {
+                            ui.ctx().memory_mut(|w| {
+                                let cols = w
+                                    .data
+                                    .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                cols.sort();
+                            });
+                        }
+                        #[cfg(not(feature = "file_open"))]
+                        if ui.button("Save ASE").clicked() {
+                            ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                        }
+
+                        #[cfg(feature = "file_open")]
+                        if ui.button(format!("Save ASE")).clicked() {
+                            let start_directory =
+                                state.volatile_settings.last_open_directory.clone();
+                            std::thread::spawn(move || {
+                                let file_dialog_result = rfd::FileDialog::new()
+                                    .set_directory(start_directory)
+                                    .save_file();
+                                if let Some(p) = file_dialog_result {
+                                    let swatches = sampled_colors
+                                        .iter()
+                                        .map(|c| ase_swatch::types::ObjectColor {
+                                            name: "".into(),
+                                            object_type: ase_swatch::types::ObjectColorType::Global,
+                                            data: ase_swatch::types::Color {
+                                                mode: ase_swatch::types::ColorMode::Rgb,
+                                                values: [
+                                                    c[0] as f32 / 255.,
+                                                    c[1] as f32 / 255.,
+                                                    c[2] as f32 / 255.,
+                                                ]
+                                                .to_vec(),
+                                            },
+                                        })
+                                        .collect::<Vec<_>>();
+                                    let s = ase_swatch::create_ase(&vec![], &swatches);
+                                    if let Ok(mut f) = std::fs::File::create(p) {
+                                        _ = std::io::Write::write_all(&mut f, &s);
+                                    }
+                                }
+                            });
+                            ui.ctx().request_repaint();
+                        }
+
+                        #[cfg(not(feature = "file_open"))]
+                        if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                            filebrowser::browse_modal(
+                                true,
+                                &["ase"],
+                                &mut state.volatile_settings,
+                                |p| {
+                                    let swatches = sampled_colors
+                                        .iter()
+                                        .map(|c| ase_swatch::types::ObjectColor {
+                                            name: "".into(),
+                                            object_type: ase_swatch::types::ObjectColorType::Global,
+                                            data: ase_swatch::types::Color {
+                                                mode: ase_swatch::types::ColorMode::Rgb,
+                                                values: [
+                                                    c[0] as f32 / 255.,
+                                                    c[1] as f32 / 255.,
+                                                    c[2] as f32 / 255.,
+                                                ]
+                                                .to_vec(),
+                                            },
+                                        })
+                                        .collect::<Vec<_>>();
+
+                                    let s = ase_swatch::create_ase(&vec![], &swatches);
+                                    if let Ok(mut f) = std::fs::File::create(p) {
+                                        _ = std::io::Write::write_all(&mut f, &s);
+                                    }
+                                },
+                                ui.ctx(),
+                            );
+                        }
+                    }
+                } else {
+                    ui.label("Right click to sample color");
+                }
+                if let Some(img) = &state.current_image {
+                    if ui.button("From image").clicked() {
+                        ui.ctx()
+                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+
+                        if let Ok(mut pipeline) =
+                            PalettePipeline::try_from(&img.clone().into_rgb8())
+                        {
+                            let palette = pipeline
+                                .palette_size(32)
+                                .colorspace(ColorSpace::Oklab)
+                                .quantize_method(quantette::KmeansOptions::new())
+                                .palette_par();
+
+                            for col in palette {
+                                ui.ctx().memory_mut(|w| {
+                                    let cols = w
+                                        .data
+                                        .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                    cols.push([col.red, col.green, col.blue, 255]);
+                                });
+                            }
+                        }
+                    }
+                }
+                // if let Some(img) = state.current_image.clone() {
+                //     if ui.button("To image").clicked() {
+                //         let img = img.into_rgb8();
+                //         let mut pipeline = ImagePipeline::try_from(&img).unwrap();
+
+                //         let pipeline = pipeline
+                //         .palette_size(12)
+                //         .colorspace(ColorSpace::Oklab)
+                //         .quantize_method(QuantizeMethod::kmeans())
+                //         .dither_error_diffusion(0.8)
+                //         ;
+
+                //         let image = pipeline.quantized_rgbimage_par();
+
+                //         state.edit_state.result_pixel_op = DynamicImage::ImageRgb8(image);
+                //         state.send_frame(crate::Frame::UpdateTexture);
+                //         ui.ctx().request_repaint();
+                //     }
+                // }
+                if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
+                    if !state.pointer_over_ui {
+                        ui.ctx().memory_mut(|w| {
+                            let cols = w
+                                .data
+                                .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+
+                            let sampled_color = [
+                                state.sampled_color[0] as u8,
+                                state.sampled_color[1] as u8,
+                                state.sampled_color[2] as u8,
+                                state.sampled_color[3] as u8,
+                            ];
+
+                            if !cols.contains(&sampled_color) {
+                                cols.push(sampled_color);
+                            } else {
+                                state.send_message_info("Color already in palette");
+                            }
+                        });
+                    }
+                }
+            });
         });
     });
 }
 
-fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
-        ui.styled_collapsing("Palette", |ui| {
-            ui.vertical_centered_justified(|ui| {
-                dark_panel(ui, |ui| {
-                    ui.allocate_space(vec2(ui.available_width(), 0.));
-                        if let Some(sampled_colors) = ui
-                            .ctx()
-                            .memory(|r| r.data.get_temp::<Vec<[f32; 4]>>("picker".into()))
-                        {
-                            ui.horizontal_wrapped(|ui| {
-                                ui.spacing_mut().item_spacing = Vec2::splat(6.);
-                                for color in &sampled_colors {
-                                    let (rect, resp) =
-                                        ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
-                                    ui.painter().rect_filled(
-                                        rect,
-                                        1.,
-                                        Color32::from_rgb(
-                                            (color[0]) as u8,
-                                            (color[1]) as u8,
-                                            (color[2]) as u8,
-                                        ),
-                                    );
-                                    resp.on_hover_ui(|ui| {
-                                        ui.label(format!("RGBA: {}", disp_col(*color)));
-                                    });
-                                }
-                            });
-                            if ui.button("Clear").clicked() {
-                                ui.ctx().memory_mut(|w| {
-                                    w.data.remove_temp::<Vec<[f32; 4]>>("picker".into())
-                                });
-                            }
-                            if ui.button("Save ASE").clicked() {
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
-                            }
-                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
-                                filebrowser::browse_modal(
-                                    true,
-                                    &["ase"],
-                                    &mut state.volatile_settings,
-                                    |p| {
-                                        let swatches = sampled_colors
-                                            .iter()
-                                            .map(|c| ObjectColor {
-                                                name: "".into(),
-                                                object_type:
-                                                    ase_swatch::types::ObjectColorType::Global,
-                                                data: Color {
-                                                    mode: ase_swatch::types::ColorMode::Rgb,
-                                                    values: [c[0]/255., c[1]/255., c[2]/255.].to_vec(),
-                                                },
-                                            })
-                                            .collect::<Vec<_>>();
+fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
+    ui.styled_collapsing("Measure", |ui| {
+        ui.vertical_centered_justified(|ui| {
+            dark_panel(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.));
+                // draw a line using egui with the mouse
 
-                                        let s = ase_swatch::create_ase(&vec![], &swatches);
-                                        if let Ok(mut f) = std::fs::File::create(p) {
-                                            _ = f.write_all(&s);
+                let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+
+                let cursor_relative = pos_from_coord(
+                    state.image_geometry.offset,
+                    Vector2::new(cursor_abs.x, cursor_abs.y),
+                    Vector2::new(
+                        state.image_geometry.dimensions.0 as f32,
+                        state.image_geometry.dimensions.1 as f32,
+                    ),
+                    state.image_geometry.scale,
+                );
+
+                let x = state
+                    .edit_state
+                    .image_op_stack
+                    .iter()
+                    .filter(|op| matches!(op.operation, ImageOperation::Measure { .. }))
+                    .collect::<Vec<_>>();
+                if x.len() != 1 {
+                    state
+                        .edit_state
+                        .image_op_stack
+                        .push(ImgOpItem::new(ImageOperation::Measure {
+                            shapes: vec![MeasureShape::new_rect(vec![(0, 0), (0, 0)])],
+                        }));
+                }
+
+                if ui.ctx().input(|r| r.pointer.secondary_pressed()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        if !op.active {
+                            continue;
+                        }
+                        match &mut op.operation {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[0].0 = cursor_relative.x as u32;
+                                            points[0].1 = cursor_relative.y as u32;
                                         }
-                                    },
-                                    ui.ctx(),
-                                );
+                                        _ => {}
+                                    }
+                                }
                             }
-                        } else {
-                            ui.label("Right click to sample color");
+                            _ => {}
                         }
-                        if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
-                            ui.ctx().memory_mut(|w| {
-                                let cols = w
-                                    .data
-                                    .get_temp_mut_or_default::<Vec<[f32; 4]>>("picker".into());
-                                cols.push(state.sampled_color);
-                            });
+                    }
+                }
+
+                if ui.ctx().input(|r| r.pointer.secondary_down()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        if !op.active {
+                            continue;
                         }
-                });
+                        match &mut op.operation {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[1].0 = cursor_relative.x as u32;
+                                            points[1].1 = cursor_relative.y as u32;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                if ui.ctx().input(|r| r.pointer.secondary_released()) {
+                    for op in &mut state.edit_state.image_op_stack {
+                        if !op.active {
+                            continue;
+                        }
+                        match &mut op.operation {
+                            ImageOperation::Measure { shapes } => {
+                                for shape in shapes {
+                                    match shape {
+                                        MeasureShape::Rect { points, .. } => {
+                                            points[1].0 = cursor_relative.x as u32;
+                                            points[1].1 = cursor_relative.y as u32;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             });
         });
-}
 
-fn render_info_image_tiled(
-    ui: &mut Ui,
-    uv_center: (f64, f64),
-    uv_size: (f64, f64),
-    desired_width: f64,
-    texture: &crate::texture_wrapper::TexWrap,
-) -> (Pos2, Pos2) {
-    let xy_size = (
-        (texture.width() as f64 * uv_size.0) as i32,
-        (texture.height() as f64 * uv_size.1) as i32,
-    );
-
-    let xy_center = (
-        (texture.width() as f64 * uv_center.0) as i32,
-        (texture.height() as f64 * uv_center.1) as i32,
-    ); //(16384,1024);//
-    let sc1 = (
-        2.0 * xy_size.0 as f64 / desired_width,
-        2.0 * xy_size.1 as f64 / desired_width,
-    );
-
-    //coordinates of the image-view
-    let mut bbox_tl = egui::pos2(f32::MAX, f32::MAX);
-    let mut bbox_br = egui::pos2(f32::MIN, f32::MIN);
-
-    //Ui position to start at
-    let base_ui_curs = nalgebra::Vector2::new(ui.cursor().min.x as f64, ui.cursor().min.y as f64);
-    let mut curr_ui_curs = base_ui_curs;
-    //our start position
-
-    //Loop control variables, start end end coordinates of interest
-    let x_coordinate_end = (xy_center.0 + xy_size.0) as i32;
-    let mut y_coordinate = xy_center.1 - xy_size.1;
-    let y_coordinate_end = (xy_center.1 + xy_size.1) as i32;
-
-    while y_coordinate <= y_coordinate_end {
-        let mut y_coordinate_increment = 0; //increment for y coordinate after x loop
-        let mut x_coordinate = xy_center.0 - xy_size.0;
-        curr_ui_curs.x = base_ui_curs.x;
-        let mut last_display_size_y: f64 = 0.0;
-        while x_coordinate <= x_coordinate_end {
-            //get texture tile
-            let curr_tex_response =
-                texture.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
-
-            //increment coordinates by usable width/height
-            y_coordinate_increment = curr_tex_response.offset_height;
-            x_coordinate += curr_tex_response.offset_width;
-
-            //Handling last texture in a row or col
-            let mut curr_tex_end = nalgebra::Vector2::new(
-                i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
-                i32::min(curr_tex_response.y_tex_bottom_global, y_coordinate_end),
+        for op in &mut state.edit_state.image_op_stack {
+            op.operation.ui(
+                ui,
+                &state.image_geometry,
+                &mut state.mouse_grab,
+                &mut state.volatile_settings,
             );
-
-            //Handling positive coordinate overflow
-            if curr_tex_response.x_tex_right_global as f32 >= texture.width() - 1.0f32 {
-                x_coordinate = x_coordinate_end + 1;
-                curr_tex_end.x += (x_coordinate_end - curr_tex_response.x_tex_right_global).max(0);
-            }
-
-            if curr_tex_response.y_tex_bottom_global as f32 >= texture.height() - 1.0f32 {
-                y_coordinate_increment = y_coordinate_end - y_coordinate + 1;
-                curr_tex_end.y += (y_coordinate_end - curr_tex_response.y_tex_bottom_global).max(0);
-            }
-
-            //Usable tile size, depending on offsets
-            let tile_size = nalgebra::Vector2::new(
-                curr_tex_end.x
-                    - curr_tex_response.x_offset_texture
-                    - curr_tex_response.x_tex_left_global
-                    + 1,
-                curr_tex_end.y
-                    - curr_tex_response.y_offset_texture
-                    - curr_tex_response.y_tex_top_global
-                    + 1,
-            );
-
-            //Display size - tile size scaled
-            let display_size =
-                nalgebra::Vector2::new(tile_size.x as f64 / sc1.0, tile_size.y as f64 / sc1.1);
-
-            //Texture display range
-            let uv_start = nalgebra::Vector2::new(
-                curr_tex_response.x_offset_texture as f64 / curr_tex_response.texture_width as f64,
-                curr_tex_response.y_offset_texture as f64 / curr_tex_response.texture_height as f64,
-            );
-
-            let uv_end = nalgebra::Vector2::new(
-                (curr_tex_end.x - curr_tex_response.x_tex_left_global + 1) as f64
-                    / curr_tex_response.texture_width as f64,
-                (curr_tex_end.y - curr_tex_response.y_tex_top_global + 1) as f64
-                    / curr_tex_response.texture_height as f64,
-            );
-
-            //let tex_id2 = gfx.egui_register_texture(curr_tex_response.texture);
-            let draw_tl_32 = Pos2::new(curr_ui_curs.x as f32, curr_ui_curs.y as f32);
-            let draw_br_32 = Pos2::new(
-                (curr_ui_curs.x + display_size.x) as f32,
-                (curr_ui_curs.y + display_size.y) as f32,
-            );
-            let r_ret = egui::Rect::from_min_max(draw_tl_32, draw_br_32);
-
-            egui::Image::new(curr_tex_response.texture.texture_egui)
-                .maintain_aspect_ratio(false)
-                .fit_to_exact_size(egui::Vec2::new(
-                    display_size.x as f32,
-                    display_size.y as f32,
-                ))
-                .uv(egui::Rect::from_x_y_ranges(
-                    uv_start.x as f32..=uv_end.x as f32,
-                    uv_start.y as f32..=uv_end.y as f32,
-                ))
-                .paint_at(ui, r_ret);
-
-            //Update display cursor
-            curr_ui_curs.x += display_size.x;
-            last_display_size_y = display_size.y;
-
-            //Update coordinates for preview rectangle
-            bbox_tl.x = bbox_tl.x.min(r_ret.left());
-            bbox_tl.y = bbox_tl.y.min(r_ret.top());
-            bbox_br.x = bbox_br.x.max(r_ret.right());
-            bbox_br.y = bbox_br.y.max(r_ret.bottom());
         }
-        //Update y coordinates
-        y_coordinate += y_coordinate_increment;
-        curr_ui_curs.y += last_display_size_y;
-    }
-    (bbox_tl, bbox_br)
+    });
 }
 
 pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+    #[derive(Debug, PartialEq)]
+    enum SettingsState {
+        General,
+        Visual,
+        Input,
+        Debug,
+        None,
+    }
+
+    fn configuration_item_ui<R>(
+        title: &str,
+        description: &str,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+        ui: &mut Ui,
+    ) {
+        ui.horizontal(|ui| {
+            ui.add(egui::Label::new(RichText::new(title)).selectable(false));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.scope(add_contents);
+            });
+        });
+        ui.add(
+            egui::Label::new(
+                RichText::new(description)
+                    .small()
+                    .color(ui.style().visuals.weak_text_color()),
+            )
+            .selectable(false),
+        );
+        ui.add_space(14.);
+    }
+
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
-            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
             .collapsible(false)
             .open(&mut settings_enabled)
-            .resizable([false, true])
+            .resizable(true)
             .default_width(600.)
             .show(ctx, |ui| {
 
-                #[cfg(debug_assertions)]
-                if ui.button("send test msg").clicked() {
-                    state.send_message_info("Test");
-                }
+                let mut scroll_to = SettingsState::None;
 
-                egui::ComboBox::from_label("Color theme")
-                .selected_text(format!("{:?}", state.persistent_settings.theme))
-                .show_ui(ui, |ui| {
-                    let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
-                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
-                        r.mark_changed();
-                    }
-                    if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
-                        r.mark_changed();
-                    }
-
-                    if r.changed() {
-                        apply_theme(state, ctx);
-                    }
-                }
-                );
-
-
-                egui::Grid::new("settings").num_columns(2).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        if ui
-                            .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
-                            .changed()
-                        {
-                          apply_theme(state, ctx);
+                ui.horizontal(|ui|{
+                    ui.vertical(|ui| {
+                        if ui.styled_button(format!("{OPTIONS} General")).clicked() {
+                            scroll_to = SettingsState::General;
                         }
-                        ui.label("Accent color");
+                        if ui.styled_button(format!("{DISPLAY} Visual")).clicked() {
+                            scroll_to = SettingsState::Visual;
+                        }
+                        if ui.styled_button(format!("{MOUSE} Input")).clicked() {
+                            scroll_to = SettingsState::Input;
+                        }
+                        if ui.styled_button(format!("{DEBUG} Debug")).clicked() {
+                            scroll_to = SettingsState::Debug;
+                        }
                     });
 
-                    ui.horizontal(|ui| {
-                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
-                        ui.label("Background color");
+                    dark_panel(ui, |ui| {
+                        // ui.add_space(ui.available_width());
+                        egui::ScrollArea::vertical().auto_shrink([false,false]).min_scrolled_height(400.).min_scrolled_width(400.).show(ui, |ui| {
+
+                            ui.vertical(|ui| {
+
+                                let general = ui.heading("General");
+                                if SettingsState::General == scroll_to {
+                                    general.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+
+                                    configuration_item_ui("Vsync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.vsync, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Show index slider", "Enables an index slider to quickly scrub through lots of images.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "")
+                                        ;
+                                    }, ui);
+
+                                    configuration_item_ui("Wrap images at folder boundaries", "Repeats the current directory when you move past the first or last file in the current directory.", |ui| {
+                                        if ui
+                                        .styled_checkbox(&mut state.persistent_settings.wrap_folder, "")
+                                        .changed()
+                                        {
+                                            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
+                                        if ui
+                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
+                                        .changed()
+                                        {
+                                            state.player.cache.cache_size = state.persistent_settings.max_cache;
+                                            state.player.cache.clear();
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Keep image edits", "When a new image is loaded, keep current edits on the previously edited image.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.keep_edits, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Redraw every frame", "Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "").changed(){
+                                            app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Use mipmaps", "When zooming out, less memory will be used. Faster performance, but blurry.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "").changed(){
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Fit image on window resize", "When you resize the main window, do you want to fit the image with it?", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Zoom multiplier", "Multiplier of zoom when you use the mouse wheel or the trackpad.", |ui| {
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
+                                    }, ui);
+
+                                    #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
+                                    configuration_item_ui("Borderless mode", "Don't draw OS window decorations. A restart is required to take effect.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.borderless, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Minimum window size", "Set the minimum size of the main window.", |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                        });
+
+                                    }, ui);
+
+                                    #[cfg(feature = "update")]
+                                    configuration_item_ui("Check for updates", "Check and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
+                                        if ui.button("Check").clicked() {
+                                            state.send_message_info("Checking for updates...");
+                                            crate::update::update(Some(state.message_channel.0.clone()));
+                                            state.settings_enabled = false;
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Visit GitHub Repository", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
+                                        if ui.link("Check it out!").on_hover_text("https://github.com/woelper/oculante").clicked() {
+                                            _ = webbrowser::open("https://github.com/woelper/oculante");
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Reset all settings", "Reset Oculante to default", |ui| {
+                                        if ui.button("Reset").clicked() {
+                                            state.persistent_settings = Default::default();
+                                            apply_theme(state, ctx);
+                                        }
+                                    }, ui);
+
+
+                                });
+
+                                let visual = ui.heading("Visual");
+                                if SettingsState::Visual == scroll_to {
+                                    visual.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    configuration_item_ui("Color theme", "Customize look and feel", |ui| {
+                                        egui::ComboBox::from_id_source("Color theme")
+                                        .selected_text(format!("{:?}", state.persistent_settings.theme))
+                                        .show_ui(ui, |ui| {
+                                            let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
+                                            if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Light, "Light").changed() {
+                                                r.mark_changed();
+                                            }
+                                            if ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::System, "Same as system").clicked() {
+                                                r.mark_changed();
+                                            }
+
+                                            if r.changed() {
+                                                apply_theme(state, ctx);
+                                            }
+                                        });
+                                    }, ui);
+
+                                   configuration_item_ui("Accent color", "Customize the primary color used in the UI", |ui| {
+                                        if ui
+                                        .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
+                                        .changed()
+                                        {
+                                            apply_theme(state, ctx);
+                                        }
+                                    }, ui);
+
+                                    // This does not work, it just scales the texture in Notan.
+                                    // https://docs.rs/egui/latest/egui/struct.Context.html#method.set_zoom_factor
+                                    // configuration_item_ui("Zoom", "UI global zoom factor", |ui| {
+                                    //     let mut z = ui.ctx().zoom_factor();
+                                    //     if ui.add(egui::DragValue::new(&mut z).clamp_range(0.1..=4.0).speed(0.01)).changed() {
+                                    //         ui.ctx().set_zoom_factor(z);
+                                    //     }
+                                    // }, ui);
+
+                                    configuration_item_ui("Background color", "The color used as a background for images", |ui| {
+                                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
+                                    }, ui);
+
+                                    configuration_item_ui("Transparency Grid", "Replaces image transparency with a checker background.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_checker_background, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Draw frame around image", "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.", |ui| {
+                                        ui
+                                        .styled_checkbox(&mut state.persistent_settings.show_frame, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Interpolate when zooming in", "When zooming in, do you prefer to see individual pixels or an interpolation?", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "").changed(){
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Interpolate when zooming out", "When zooming out, do you prefer crisper or smoother pixels?", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "").changed() {
+                                            state.send_frame(crate::utils::Frame::UpdateTexture);
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Zen mode", "Hides all UI and fits images to the frame.", |ui| {
+                                        if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "").changed(){
+                                            set_title(app, state);
+                                        }
+                                    }, ui);
+
+
+                                    // TODO: add more options here
+                                    ui.horizontal(|ui| {
+                                        ui.label("Window title");
+                                        if ui
+                                        .text_edit_singleline(&mut state.persistent_settings.title_format)
+                                        .on_hover_text(
+                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
+                                        )
+                                        .changed()
+                                        {
+                                            set_title(app, state);
+                                        }
+                                    });
+
+                                });
+
+
+                                let input = ui.heading("Input");
+                                if SettingsState::Input == scroll_to {
+                                    input.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    keybinding_ui(app, state, ui);
+                                });
+
+                                let debug = ui.heading("Debug");
+                                if SettingsState::Debug == scroll_to {
+                                    debug.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    #[cfg(debug_assertions)]
+                                    configuration_item_ui("Send test message", "Send some messages", |ui| {
+                                        if ui.button("Info").clicked() {
+                                            state.send_message_info("Test");
+                                        }
+                                        if ui.button("Warn").clicked() {
+                                            state.send_message_warn("Test");
+                                        }
+                                        if ui.button("Err").clicked() {
+                                            state.send_message_err("Test");
+                                        }
+                                    }, ui);
+
+                                    configuration_item_ui("Enable experimental features", "Turn on features that are not yet finished", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "");
+                                    }, ui);
+                                });
+                            });
+                        });
                     });
-
-                    ui.end_row();
-
-                    ui
-                    .styled_checkbox(&mut state.persistent_settings.vsync, "VSync")
-                    .on_hover_text(
-                        "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.",
-                    );
-                ui
-                .styled_checkbox(&mut state.persistent_settings.show_scrub_bar, "Show index slider")
-                .on_hover_text(
-                    "Enables an index slider to quickly scrub through lots of images.",
-                );
-                    ui.end_row();
-
-                    if ui
-                    .styled_checkbox(&mut state.persistent_settings.wrap_folder, "Wrap images at folder boundaries")
-                    .on_hover_text(
-                        "Repeats the current directory when you move past the first or last file in the current directory.",
-                    )
-                    .changed()
-                {
-                    state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                }
-                ui.horizontal(|ui| {
-                    ui.label("Number of images to cache");
-                    if ui
-                    .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
-
-                    .on_hover_text(
-                        "Keeps this many images in memory for faster opening.",
-                    )
-                    .changed()
-                {
-                    state.player.cache.cache_size = state.persistent_settings.max_cache;
-                    state.player.cache.clear();
-                }
                 });
 
-                ui.end_row();
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.keep_view, "Do not reset image view")
-                    .on_hover_text(
-                        "When a new image is loaded, keep the current zoom and offset.",
-                    );
-
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.keep_edits, "Keep image edits")
-                    .on_hover_text(
-                        "When a new image is loaded, keep current edits on the previously edited image.",
-                    );
-                ui.end_row();
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.show_checker_background, "Transparency Grid")
-                    .on_hover_text(
-                        "Replaces transparency with a checker background.",
-                    );
-
-                ui
-                    .styled_checkbox(&mut state.persistent_settings.show_frame, "Draw frame around image")
-                    .on_hover_text(
-                        "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.",
-                    );
-                    ui.end_row();
-                if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "Zen mode").on_hover_text("Hides all UI and fits images to the frame.").changed(){
-                    set_title(app, state);
-                }
-                if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "Redraw every frame").on_hover_text("Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.").changed(){
-                    app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
-                }
-
-                // ui.label(format!("lazy {}", app.window().lazy_loop()));
-                ui.end_row();
-                if ui.styled_checkbox(&mut state.persistent_settings.linear_mag_filter, "Interpolate when zooming in").on_hover_text("When zooming in, do you prefer to see individual pixels or an interpolation?").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-                if ui.styled_checkbox(&mut state.persistent_settings.linear_min_filter, "Interpolate when zooming out").on_hover_text("When zooming out, do you prefer crisper or smoother pixels?").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-                ui.end_row();
-
-                if ui.styled_checkbox(&mut state.persistent_settings.use_mipmaps, "Use mipmaps").on_hover_text("When zooming out, less memory will be used. Faster performance, but blurry.").changed(){
-                    state.send_frame(crate::Frame::UpdateTexture);
-                }
-
-                ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "Fit image on window resize").on_hover_text("When you resize the main window, do you want to fit the image with it?");
-                ui.end_row();
-
-                ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).prefix("Zoom multiplier: ").speed(0.01)).on_hover_text("Multiplier of zoom when you use the mouse wheel or the trackpad.");
-                #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                ui.styled_checkbox(&mut state.persistent_settings.borderless, "Borderless mode").on_hover_text("Don't draw OS window decorations. A restart is required to take effect.");
-                ui.end_row();
-
-                ui.label("Minimum window size");
-                ui.horizontal(|ui| {
-                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                    ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
-                });
-                ui.end_row();
 
 
-            });
-
-                // TODO: add more options here
-                ui.horizontal(|ui| {
-                    ui.label("Window title");
-                    if ui
-                    .text_edit_singleline(&mut state.persistent_settings.title_format)
-                    .on_hover_text(
-                        "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
-                    )
-                    .changed()
-                    {
-                        set_title(app, state);
-                    }
-                });
-
-                if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug, or leave a star if you like it!").clicked() {
-                    _ = webbrowser::open("https://github.com/woelper/oculante");
-                }
-
-
-                ui.vertical_centered_justified(|ui| {
-
-                    #[cfg(feature = "update")]
-                    if ui.button("Check for updates").on_hover_text("Check and install the latest update if available. A restart is required to use a newly installed version.").clicked() {
-                        state.send_message_info("Checking for updates...");
-                        crate::update::update(Some(state.message_channel.0.clone()));
-                        state.settings_enabled = false;
-                    }
-
-                    if ui.button("Reset all settings").clicked() {
-                        state.persistent_settings = Default::default();
-                        apply_theme(state, ctx);
-                    }
-                });
-
-                ui.styled_collapsing("Keybindings",|ui| {
-                    keybinding_ui(app, state, ui);
-                });
 
             });
     state.settings_enabled = settings_enabled;
@@ -1245,174 +1493,156 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 /// Everything related to image editing
 #[allow(unused_variables)]
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+    // A flag to indicate that the image needs to be rebuilt
+    let mut image_changed = false;
+    let mut pixels_changed = false;
+
+    if let Some(img) = &state.current_image {
+        // Ensure that edit result image is always filled
+        if state.edit_state.result_pixel_op.width() == 0 {
+            debug!("Edit state pixel comp buffer is default, cloning from image");
+            // FIXME This needs to go, and we need to implement operators for DynamicImage
+            state.edit_state.result_pixel_op = img.clone();
+            pixels_changed = true;
+        }
+        if state.edit_state.result_image_op.width() == 0 {
+            debug!("Edit state image comp buffer is default, cloning from image");
+            // FIXME This needs to go, and we need to implement operators for DynamicImage
+            state.edit_state.result_image_op = img.clone();
+            image_changed = true;
+        }
+    }
+
+    // TODO: Move these to image_editing
+    let mut ops = [
+        // General Image Adjustments
+        ImgOpItem::new(ImageOperation::Brightness(0)),
+        ImgOpItem::new(ImageOperation::Contrast(0)),
+        ImgOpItem::new(ImageOperation::Exposure(0)),
+        ImgOpItem::new(ImageOperation::Desaturate(0)),
+        ImgOpItem::new(ImageOperation::Invert),
+        // Colour and Hue
+        ImgOpItem::new(ImageOperation::ChannelSwap((Channel::Red, Channel::Red))),
+        ImgOpItem::new(ImageOperation::Equalize((0, 255))),
+        ImgOpItem::new(ImageOperation::HSV((0, 100, 100))),
+        ImgOpItem::new(ImageOperation::Add([0, 0, 0])),
+        ImgOpItem::new(ImageOperation::Mult([255, 255, 255])),
+        ImgOpItem::new(ImageOperation::Fill([255, 255, 255, 255])),
+        // Colour Mapping and Conversion
+        ImgOpItem::new(ImageOperation::LUT("Lomography Redscale 100".into())),
+        ImgOpItem::new(ImageOperation::GradientMap(vec![
+            GradientStop::new(0, [155, 33, 180]),
+            GradientStop::new(128, [255, 83, 0]),
+            GradientStop::new(255, [224, 255, 0]),
+        ])),
+        ImgOpItem::new(ImageOperation::Posterize(8)),
+        ImgOpItem::new(ImageOperation::Filter3x3([
+            0, -100, 0, -100, 500, -100, 0, -100, 0,
+        ])),
+        ImgOpItem::new(ImageOperation::ColorConverter(
+            crate::image_editing::ColorTypeExt::Rgba8,
+        )),
+        // Mathematical
+        ImgOpItem::new(ImageOperation::MMult),
+        ImgOpItem::new(ImageOperation::MDiv),
+        ImgOpItem::new(ImageOperation::Expression("r = 1.0".into())),
+        ImgOpItem::new(ImageOperation::ScaleImageMinMax),
+        // Effects
+        ImgOpItem::new(ImageOperation::Blur(0)),
+        ImgOpItem::new(ImageOperation::Noise {
+            amt: 50,
+            mono: false,
+        }),
+        ImgOpItem::new(ImageOperation::ChromaticAberration(15)),
+        // Geometry and Transformations
+        ImgOpItem::new(ImageOperation::Flip(false)),
+        ImgOpItem::new(ImageOperation::Rotate(90)),
+        ImgOpItem::new(ImageOperation::Resize {
+            dimensions: state.image_geometry.dimensions,
+            aspect: true,
+            filter: ScaleFilter::Hamming,
+        }),
+        ImgOpItem::new(ImageOperation::Crop([0, 0, 0, 0])),
+        ImgOpItem::new(ImageOperation::CropPerspective {
+            points: [
+                (0, 0),
+                (state.image_geometry.dimensions.0, 0),
+                (0, state.image_geometry.dimensions.1),
+                (
+                    state.image_geometry.dimensions.0,
+                    state.image_geometry.dimensions.1,
+                ),
+            ],
+            original_size: state.image_geometry.dimensions,
+        }),
+    ];
+
     egui::SidePanel::right("editing")
         .min_width(100.)
+        // safeguard to not expand too much
+        .max_width(500.)
         .show_separator_line(false)
         .show(ctx, |ui| {
 
-            // A flag to indicate that the image needs to be rebuilt
-            let mut image_changed = false;
-            let mut pixels_changed = false;
 
-            if let Some(img) = &state.current_image {
-                // Ensure that edit result image is always filled
-                if state.edit_state.result_pixel_op.width() == 0 {
-                    debug!("Edit state pixel comp buffer is default, cloning from image");
-                    state.edit_state.result_pixel_op = img.clone();
-                    pixels_changed = true;
-                }
-                if state.edit_state.result_image_op.width() == 0 {
-                    debug!("Edit state image comp buffer is default, cloning from image");
-                    state.edit_state.result_image_op = img.clone();
-                    image_changed = true;
-                }
+            let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
+
+            ui.scope(|ui| {
+                ui.style_mut().visuals.collapsing_header_frame = true;
+                ui.style_mut().visuals.indent_has_left_vline = false;
+                CollapsingHeader::new("Filters")
+                    .icon(caret_icon)
+                    .open(open)
+                    .show_unindented(ui, |ui| {
+                        dark_panel(ui, |ui| {
+                            egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+
+                                ui.vertical_centered_justified(|ui|{
+                                    for op in &mut ops {
+                                        if ui.button( format!("{op}")).clicked() {
+                                            if op.operation.is_per_pixel() {
+                                                state.edit_state.pixel_op_stack.push(op.clone());
+                                            } else {
+                                                state.edit_state.image_op_stack.push(op.clone());
+                                            }
+                                            image_changed = true;
+                                            ui.ctx().data_mut(|w|w.insert_temp("filter_open".into(), false));
+                                        }
+                                    }
+                                });
+                            });
+                        });
+                    });
+            });
+
+            if open.is_some() {
+                ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
             }
 
-            egui::Grid::new("editing")
-                .num_columns(2)
-                .striped(true)
-                .show(ui, |ui| {
-                    let mut ops = [
 
-                        // General Image Adjustments
-                        ImageOperation::Brightness(0),
-                        ImageOperation::Contrast(0),
-                        ImageOperation::Exposure(20),
-                        ImageOperation::Desaturate(0),
-                        ImageOperation::Invert,
+            egui::ScrollArea::vertical().show(ui, |ui| {
 
-                        // Colour and Hue
-                        ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
-                        ImageOperation::Equalize((0, 255)),
-                        ImageOperation::HSV((0, 100, 100)),
-                        ImageOperation::Add([0, 0, 0]),
-                        ImageOperation::Mult([255, 255, 255]),
-                        ImageOperation::Fill([255, 255, 255, 255]),
-
-                        // Colour Mapping and Conversion
-                        ImageOperation::LUT("Lomography Redscale 100".into()),
-                        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
-                        ImageOperation::Posterize(8),
-                        ImageOperation::Filter3x3([0,-100, 0, -100, 500, -100, 0, -100, 0]),
-
-                        // Mathematical
-                        ImageOperation::MMult,
-                        ImageOperation::MDiv,
-                        ImageOperation::Expression("r = 1.0".into()),
-                        ImageOperation::ScaleImageMinMax,
-
-                        // Effects
-                        ImageOperation::Blur(0),
-                        ImageOperation::Noise {
-                            amt: 50,
-                            mono: false,
-                        },
-                        ImageOperation::ChromaticAberration(15),
-
-                        // Geometry and Transformations
-                        ImageOperation::Flip(false),
-                        ImageOperation::Rotate(90),
-                        ImageOperation::Resize {
-                            dimensions: state.image_geometry.dimensions,
-                            aspect: true,
-                            filter: ScaleFilter::Hamming,
-                        },
-                        ImageOperation::Crop([0, 0, 0, 0]),
-                        ImageOperation::CropPerspective{points: [
-                            (0,0),
-                            (state.image_geometry.dimensions.0, 0),
-                            (0, state.image_geometry.dimensions.1),
-                            (state.image_geometry.dimensions.0, state.image_geometry.dimensions.1),
-                            ]
-                        , original_size : state.image_geometry.dimensions
-                        },
-                    ];
-
-                    ui.label_i("➕ Filter");
-                    let available_w_single_spacing =
-                        ui.available_width();
-                        //  - ui.style().spacing.item_spacing.x;
-
-                    egui::ComboBox::from_id_source("Imageops")
-                        .selected_text("Select a filter to add...")
-                        .width(available_w_single_spacing)
-                        .show_ui(ui, |ui| {
-                            for op in &mut ops {
-                                if ui.label_i_selected(false, &format!("{op}")).clicked() {
-                                    if op.is_per_pixel() {
-                                        state.edit_state.pixel_op_stack.push(op.clone());
-                                        pixels_changed = true;
-                                    } else {
-                                        state.edit_state.image_op_stack.push(op.clone());
-                                        image_changed = true;
-                                    }
-                                }
-                            }
-                        });
-                    ui.end_row();
-
+                ui.vertical_centered_justified(|ui| {
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
+                    // draw a line between different operator types
                     if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
                         ui.separator();
-                        ui.separator();
-                        ui.end_row();
                     }
-
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
                         ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
-
-                    ui.label_i(&format!("Reset"));
-                    ui.centered_and_justified(|ui| {
-                        if ui.button("Reset all edits").clicked() {
-                            state.edit_state = Default::default();
-                            pixels_changed = true
-                        }
-                    });
-                    ui.end_row();
-
-                    ui.label_i(&format!("Compare"));
-                    let available_w_single_spacing =
-                        ui.available_width() - ui.style().spacing.item_spacing.x;
-                    ui.horizontal(|ui| {
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Original"),
-                            )
-                            .clicked()
-                        {
-                            if let Some(img) = &state.current_image {
-                                state.image_geometry.dimensions = img.dimensions();
-                                state.current_texture.set(img.to_texture_with_texwrap(gfx, &state.persistent_settings), gfx);
-                            }
-                        }
-                        if ui
-                            .add_sized(
-                                egui::vec2(available_w_single_spacing / 2., ui.available_height()),
-                                egui::Button::new("Modified"),
-                            )
-                            .clicked()
-                        {
-                            pixels_changed = true;
-                        }
-                    });
-                    ui.end_row();
                 });
+
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
 
                     if ctx.input(|i|i.pointer.secondary_down()) {
                         if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = state.edit_state.result_pixel_op.get_pixel_checked(
-                                state.cursor_relative.x as u32,
-                                state.cursor_relative.y as u32,
-                            ) {
-                                debug!("{:?}", p);
+                            if let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -1550,7 +1780,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                ui.end_row();
 
                 // If we have no lines, create an empty one
                 if state.edit_state.paint_strokes.is_empty() {
@@ -1580,11 +1809,23 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
             }
-            ui.end_row();
+
+            ui.horizontal(|ui|{
+                if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
+                    if let Some(img) = &state.current_image {
+                        state.image_geometry.dimensions = img.dimensions();
+                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                    }
+                }
+                if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
+                    pixels_changed = true;
+
+                }
+            });
 
             ui.vertical_centered_justified(|ui| {
                 if ui
-                    .button(format!("Apply all edits"))
+                    .button("Apply all edits")
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                 {
@@ -1596,109 +1837,24 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         image_changed = true;
                     }
                 }
+
+                if ui.button("Remove all edits").clicked() {
+                    state.edit_state = Default::default();
+                    pixels_changed = true
+                }
             });
 
-            // Do the processing
-
-            // If expensive operations happened (modifying image geometry), process them here
-            if image_changed {
-                if let Some(img) = &mut state.current_image {
-                    let stamp = Instant::now();
-                    // start with a fresh copy of the unmodified image
-                    state.edit_state.result_image_op = img.clone();
-                    for operation in &mut state.edit_state.image_op_stack {
-                        if let Err(e) = operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}")
-                        }
-                    }
-                    debug!(
-                        "Image changed. Finished evaluating in {}s",
-                        stamp.elapsed().as_secs_f32()
-                    );
-
-                    // tag strokes as uncommitted as they need to be rendered again
-                    for stroke in &mut state.edit_state.paint_strokes {
-                        stroke.committed = false;
-                    }
-                }
-                pixels_changed = true;
-            }
-
-            if pixels_changed {
-                // init result as a clean copy of image operation result
-                let stamp = Instant::now();
-
-                // start from the result of the image operations
-                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
-
-                // only process pixel stack if it is empty so we don't run through pixels without need
-                if !state.edit_state.pixel_op_stack.is_empty() {
-                    let ops = &state.edit_state.pixel_op_stack;
-                    process_pixels(&mut state.edit_state.result_pixel_op, ops);
-
-                }
-
-                    debug!(
-                    "Finished Pixel op stack in {} s",
-                    stamp.elapsed().as_secs_f32()
-                );
-
-                // draw paint lines
-                for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed {
-                        stroke.render(
-                            &mut state.edit_state.result_pixel_op,
-                            &state.edit_state.brushes,
-                        );
-                    }
-                }
-
-                state.send_frame(crate::Frame::UpdateTexture);
-                debug!(
-                    "Done updating tex after pixel; ops in {} s",
-                    stamp.elapsed().as_secs_f32()
-                );
-            }
-
-            // render uncommitted strokes if destructive to speed up painting
-            if state.edit_state.painting {
-                // render previous strokes
-                if state
-                    .edit_state
-                    .paint_strokes
-                    .iter()
-                    .filter(|l| !l.points.is_empty())
-                    .count()
-                    > 1
-                    && !state.edit_state.non_destructive_painting
-                {
-                    let stroke_count = state.edit_state.paint_strokes.len();
-
-                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
-                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-                            stroke.render(
-                                &mut state.edit_state.result_image_op,
-                                &state.edit_state.brushes,
-                            );
-                            stroke.committed = true;
-                            debug!("Committed stroke {}", i);
-                        }
-                    }
-                }
-            }
-
-            state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
 
             ui.vertical_centered_justified(|ui| {
                 if let Some(path) = &state.current_path {
                     if ui
-                        .button(format!("Restore original"))
+                        .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
                         state.is_loaded = false;
                         state.player.cache.clear();
-                        state.player.load(&path, state.message_channel.0.clone());
+                        state.player.load(path, state.message_channel.0.clone());
                     }
                 }
 
@@ -1739,7 +1895,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
-                                                _ = msg_sender.send(Message::Saved(file_path.clone()));
+                                                _ = msg_sender.send(crate::appstate::Message::Saved(file_path.clone()));
                                                 debug!("Saved to {}", file_path.display());
                                                 // Re-apply exif
                                                 if let Some(info) = &image_info {
@@ -1758,7 +1914,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                 }
                                             }
                                             Err(e) => {
-                                                _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                                _ = err_sender.send(crate::appstate::Message::err(&format!("Error: Could not save: {e}")));
                                             }
                                         }
                                         // state.toast_cooldown = 0.0;
@@ -1771,7 +1927,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
-                    if ui.button(format!("Save as...")).clicked() {
+                    if ui.button("Save as...").clicked() {
                         ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
                     }
 
@@ -1779,90 +1935,34 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
                         let msg_sender = state.message_channel.0.clone();
-
-                        // let keys = state.encoding_options.keys().map(|k|k.as_str()).collect::<Vec<&str>>();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
-
+                        let encoders = state.volatile_settings.encoding_options.clone();
                         filebrowser::browse_modal(
                             true,
                             key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-
-
-                                let dynimage = DynamicImage::ImageRgba8(state.edit_state.result_pixel_op.clone());
-                                let encoding_options = FileEncoder::matching_variant(p, &encoding_options);
-                                    match encoding_options.save(&dynimage, p) {
-
-
-                                    // match state.edit_state.result_pixel_op.save(&p) {
-                                        Ok(_) => {
-                                            _ = msg_sender.send(Message::Saved(p.clone()));
-                                            debug!("Saved to {}", p.display());
-                                            // Re-apply exif
-                                            if let Some(info) = &state.image_info {
-                                                debug!("Extended image info present");
-
-                                                // before doing anything, make sure we have raw exif data
-                                                if info.raw_exif.is_some() {
-                                                    if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
-                                                        error!("{e}");
-                                                    } else {
-                                                        info!("Saved EXIF.");
-                                                        _ = msg_sender.send(Message::Info("Exif metadata was saved to file".into()));
-                                                    }
-                                                } else {
-                                                    debug!("No raw exif");
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            _ = msg_sender.send(Message::err(&format!("Error: Could not save: {e}")));
-                                        }
-                                }
+                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &encoders);
                             },
                             ctx,
                         );
                     }
                 }
 
+
+
                 if let Some(p) = &state.current_path {
-                    let text = if p
-                        // .with_extension(&state.edit_state.export_extension)
-                        .exists()
-                    {
-                        format!("Overwrite")
-                    } else {
-                        format!("Save")
-                    };
+                    let text = if p.exists() { "Overwrite" } else { "Save"};
+                    let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
+                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                    }, "overwrite");
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite.").clicked() {
-                        match state
-                        .edit_state
-                        .result_pixel_op
-                        .save(p) {
-                            Ok(_) => {
-                                debug!("Saved to {}", p.display());
-                                state.send_message_info(&format!("Saved to {}", p.display()));
-                                // Re-apply exif
-                                if let Some(info) = &state.image_info {
-                                    debug!("Extended image info present");
-                                    // before doing anything, make sure we have raw exif data
-                                    if info.raw_exif.is_some() {
-                                        if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
-                                            error!("{e}");
-                                        } else {
-                                            info!("Saved EXIF.")
-                                        }
-                                    } else {
-                                        debug!("No raw exif");
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                state.send_message_err(&format!("Could not save: {e}"));
-                            }
+                        if p.exists() {
+                            modal.open();
+                        } else {
+                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                         }
                     }
 
@@ -1876,12 +1976,145 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                             }
+                        }
+                    }
+                }
+            });
+        });
 
+        if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+            let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
+            if !op_present {
+                state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
+                image_changed = true;
+                pixels_changed = true;
+                state.send_message_info("Color conversion operator added.");
+            }
+        }
+
+        if let Some(img) = &state.current_image {
+            if img.color() != ColorType::Rgba8 {
+                ui.add_space(10.);
+                ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
+            }
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+            ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
+            ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
+
+        }
+
+
+            // Do the processing
+
+            // If expensive operations happened (modifying image geometry), process them here
+            let message: Option<String> = None;
+            if image_changed {
+                if let Some(img) = &mut state.current_image {
+                    let stamp = Instant::now();
+                    // start with a fresh copy of the unmodified image
+                    // FIXME This needs to go, and we need to implement operators for DynamicImage
+                    state.edit_state.result_image_op = img.clone();
+                    for operation in &state.edit_state.image_op_stack {
+                        if !operation.active {
+                            continue;
+                        }
+                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
+                            error!("{e}");
+                            state.send_message_warn(&format!("{e}"));
+                        }
+                    }
+                    debug!(
+                        "Image changed. Finished evaluating in {}s",
+                        stamp.elapsed().as_secs_f32()
+                    );
+
+                    // tag strokes as uncommitted as they need to be rendered again
+                    for stroke in &mut state.edit_state.paint_strokes {
+                        stroke.committed = false;
+                    }
+                }
+                pixels_changed = true;
+            }
+
+            if pixels_changed {
+                // init result as a clean copy of image operation result
+                let stamp = Instant::now();
+
+                // start from the result of the image operations
+                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
+
+                // only process pixel stack if it is empty so we don't run through pixels without need
+                if !state.edit_state.pixel_op_stack.is_empty() {
+                    let ops = &state.edit_state.pixel_op_stack.iter().filter(|op|op.active).map(|op| op.operation.clone()).collect();
+                    if let Err(e) = process_pixels(&mut state.edit_state.result_pixel_op, ops) {
+                        state.send_message_warn(&format!("{e}"));
+                    }
+                }
+
+                    debug!(
+                    "Finished Pixel op stack in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
+
+                // draw paint lines
+                for stroke in &state.edit_state.paint_strokes {
+                    if !stroke.committed {
+                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                            stroke.render(
+                                compatible_buffer,
+                                &state.edit_state.brushes,
+                            );
                         }
 
                     }
                 }
-            });
+
+                state.send_frame(crate::utils::Frame::UpdateTexture);
+                debug!(
+                    "Done updating tex after pixel; ops in {} s",
+                    stamp.elapsed().as_secs_f32()
+                );
+            }
+
+            // render uncommitted strokes if destructive to speed up painting
+            if state.edit_state.painting {
+                // render previous strokes
+                if state
+                    .edit_state
+                    .paint_strokes
+                    .iter()
+                    .filter(|l| !l.points.is_empty())
+                    .count()
+                    > 1
+                    && !state.edit_state.non_destructive_painting
+                {
+                    let stroke_count = state.edit_state.paint_strokes.len();
+
+                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
+                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
+
+                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                                stroke.render(
+                                    compatible_buffer,
+                                    &state.edit_state.brushes,
+                                );
+                            }
+
+
+                            stroke.committed = true;
+                            debug!("Committed stroke {}", i);
+                        }
+                    }
+                }
+            }
+
+            state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
+
+
 
             if pixels_changed && state.persistent_settings.info_enabled {
                 state.image_info = None;
@@ -1925,18 +2158,12 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             egui::Button::new(
                 RichText::new(text)
                     .size(ICON_SIZE)
-                    // .heading()
                     .color(ui.style().visuals.selection.bg_fill),
             )
             .frame(false),
         )
     } else {
-        ui.add(
-            egui::Button::new(
-                RichText::new(text).size(ICON_SIZE), // .heading()
-            )
-            .frame(false),
-        )
+        ui.add(egui::Button::new(RichText::new(text).size(ICON_SIZE)).frame(false))
     }
 }
 
@@ -2018,11 +2245,8 @@ pub fn stroke_ui(
         }
     });
 
-    if combined_response.hovered() {
-        stroke.highlight = true;
-    } else {
-        stroke.highlight = false;
-    }
+    stroke.highlight = combined_response.hovered();
+
     if combined_response.changed() {
         stroke.highlight = false;
     }
@@ -2030,7 +2254,7 @@ pub fn stroke_ui(
 }
 
 fn modifier_stack_ui(
-    stack: &mut Vec<ImageOperation>,
+    stack: &mut Vec<ImgOpItem>,
     image_changed: &mut bool,
     ui: &mut Ui,
     geo: &ImageGeometry,
@@ -2043,70 +2267,91 @@ fn modifier_stack_ui(
     let stack_len = stack.len();
 
     for (i, operation) in stack.iter_mut().enumerate() {
-        ui.label_i(&format!("{operation}"));
+        let frame_color = if ui.style().visuals.dark_mode {
+            Color32::from_hex("#212121").unwrap()
+        } else {
+            Color32::from_hex("#F2F2F2").unwrap()
+        };
+        egui::Frame::none()
+            .fill(frame_color)
+            .rounding(ui.style().visuals.widgets.active.rounding)
+            .inner_margin(Margin::same(6.))
+            .show(ui, |ui| {
+                ui.allocate_space(vec2(ui.available_width(), 0.0));
+                ui.horizontal(|ui| {
+                    let up = i != 0;
+                    let down = i != stack_len - 1;
+                    let caret_size = 10.;
 
-        // let op draw itself and check for response
+                    ui.add_enabled_ui(up, |ui| {
+                        let ur = ui.add(
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                        );
+                        if ur.on_hover_text("Move up").clicked() {
+                            swap = Some(((i as i32 - 1).max(0) as usize, i));
+                            *image_changed = true;
+                        }
+                    });
 
-        ui.push_id(i, |ui| {
-            // draw the image operator
-            ui.style_mut().spacing.slider_width = ui.available_width() * 0.6;
-            if operation.ui(ui, geo, mouse_grab, settings).changed() {
-                *image_changed = true;
-            }
+                    ui.add_enabled_ui(down, |ui| {
+                        let dr = ui.add(
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                        );
+                        if dr.on_hover_text("Move down").clicked() {
+                            swap = Some((i, i + 1));
+                            *image_changed = true;
+                        }
+                    });
 
-            ui.add_space(ui.style().spacing.icon_spacing);
-
-            ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                ui.style_mut().spacing.icon_spacing = 0.;
-                ui.style_mut().spacing.button_padding = Vec2::ZERO;
-                ui.style_mut().spacing.interact_size = Vec2::ZERO;
-                ui.style_mut().spacing.indent = 0.0;
-                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
-                if egui::Button::new("")
-                    .small()
-                    .frame(false)
-                    .ui(ui)
-                    .on_hover_text("Remove operator")
-                    .clicked()
-                {
-                    delete = Some(i);
-                    *image_changed = true;
-                }
-
-                let up = i != 0;
-                let down = i != stack_len - 1;
-
-                ui.add_enabled_ui(up, |ui| {
-                    if egui::Button::new("")
-                        .small()
+                    let icon = if operation.active { EYE } else { EYEOFF };
+                    if egui::Button::new(RichText::new(icon).size(caret_size))
                         .frame(false)
                         .ui(ui)
-                        .on_hover_text("Move up")
+                        .on_hover_text("Bypass")
                         .clicked()
                     {
-                        swap = Some(((i as i32 - 1).max(0) as usize, i));
+                        operation.active = !operation.active;
                         *image_changed = true;
                     }
+
+                    if egui::Button::new(RichText::new("").size(caret_size * 1.5))
+                        .frame(false)
+                        .ui(ui)
+                        .on_hover_text("Remove operator")
+                        .clicked()
+                    {
+                        delete = Some(i);
+                        *image_changed = true;
+                    }
+                    ui.add_space(caret_size / 2.);
+                    ui.add_enabled_ui(operation.active, |ui| {
+                        ui.label(format!("{operation}"));
+                    });
                 });
 
-                ui.add_enabled_ui(down, |ui| {
-                    if egui::Button::new("")
-                        .small()
-                        .frame(false)
-                        .ui(ui)
-                        .on_hover_text("Move down")
-                        .clicked()
-                    {
-                        swap = Some((i, i + 1));
-                        *image_changed = true;
-                    }
+                ui.push_id(i, |ui| {
+                    // draw the image operator
+                    ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
+
+                    ui.add_enabled_ui(operation.active, |ui| {
+                        if operation
+                            .operation
+                            .ui(ui, geo, mouse_grab, settings)
+                            .changed()
+                        {
+                            *image_changed = true;
+                        }
+                    });
+
+                    ui.style_mut().spacing.icon_spacing = 0.;
+                    ui.style_mut().spacing.button_padding = Vec2::ZERO;
+                    ui.style_mut().spacing.interact_size = Vec2::ZERO;
+                    ui.style_mut().spacing.indent = 0.0;
+                    ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+
+                    // ui.add_space(80.);
                 });
             });
-
-            ui.end_row();
-        });
-
-        ui.end_row();
     }
 
     if let Some(delete) = delete {
@@ -2199,7 +2444,9 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     .edit_state
                     .image_op_stack
                     .iter()
-                    .filter(|op| matches!(op, ImageOperation::Crop(_)))
+                    .filter(|op|op.active)
+                    .filter(|op| matches!(op.operation, ImageOperation::Crop(_)))
+                    .map(|op|&op.operation)
                     .collect::<Vec<_>>();
 
                 let crop = crop_ops
@@ -2213,7 +2460,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                     state
                         .edit_state
                         .image_op_stack
-                        .push(ImageOperation::Crop([0, 0, 0, 0]))
+                        .push(ImgOpItem::new(ImageOperation::Crop([0, 0, 0, 0])))
                 }
 
                 ui.add_enabled_ui(crop != ImageOperation::Crop([0, 0, 0, 0]), |ui| {
@@ -2262,7 +2509,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             if reload {
                 state.is_loaded = false;
                 state.player.cache.clear();
-                state.player.load(&p, state.message_channel.0.clone());
+                state.player.load(p, state.message_channel.0.clone());
             }
         });
     }
@@ -2288,9 +2535,11 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
     let no_keys_pressed = app.keyboard.down.is_empty();
 
     ui.horizontal(|ui| {
-        ui.label("While this is open, regular shortcuts will not work.");
+        ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
-            ui.label(egui::RichText::new("Please press & hold a key").color(Color32::RED));
+            ui.label_unselectable(
+                egui::RichText::new("Please press & hold a key").color(Color32::RED),
+            );
         }
     });
 
@@ -2301,42 +2550,37 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .map(|k| format!("{:?}", k.0))
         .collect::<BTreeSet<String>>();
 
-    egui::ScrollArea::vertical()
-        .auto_shrink([false, true])
-        .show(ui, |ui| {
-            let s = state.persistent_settings.shortcuts.clone();
-            let mut ordered_shortcuts = state
-                .persistent_settings
-                .shortcuts
-                .iter_mut()
-                .collect::<Vec<_>>();
-            ordered_shortcuts
-                .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    let s = state.persistent_settings.shortcuts.clone();
+    let mut ordered_shortcuts = state
+        .persistent_settings
+        .shortcuts
+        .iter_mut()
+        .collect::<Vec<_>>();
+    ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-            egui::Grid::new("info").num_columns(2).show(ui, |ui| {
-                for (event, keys) in ordered_shortcuts {
-                    ui.label(format!("{event:?}"));
-
-                    ui.label(lookup(&s, event));
-                    if !no_keys_pressed {
-                        if ui
-                            .button(format!("Assign {}", keypresses_as_string(&k)))
-                            .clicked()
-                        {
-                            *keys = app
-                                .keyboard
-                                .down
-                                .iter()
-                                .map(|(k, _)| format!("{k:?}"))
-                                .collect();
-                        }
-                    } else {
-                        ui.add_enabled(false, egui::Button::new("Press key(s)..."));
-                    }
-                    ui.end_row();
+    egui::Grid::new("info").num_columns(4).show(ui, |ui| {
+        for (event, keys) in ordered_shortcuts {
+            ui.label_unselectable(format!("{event:?}"));
+            ui.label_unselectable(lookup(&s, event));
+            ui.add_space(200.);
+            if !no_keys_pressed {
+                if ui
+                    .button(format!("Assign {}", keypresses_as_string(&k)))
+                    .clicked()
+                {
+                    *keys = app
+                        .keyboard
+                        .down
+                        .iter()
+                        .map(|(k, _)| format!("{k:?}"))
+                        .collect();
                 }
-            });
-        });
+            } else {
+                ui.add_enabled(false, egui::Button::new("Press key(s)..."));
+            }
+            ui.end_row();
+        }
+    });
 }
 
 // fn keystrokes(ui: &mut Ui) {
@@ -2383,15 +2627,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             changed_channels = true;
         }
 
+        // Force rgba while edit mode is open.
+        // TODO: display of channels should be done through a shader
+        if state.persistent_settings.edit_enabled {
+            if state.persistent_settings.current_channel != ColorChannel::Rgba {
+                state.persistent_settings.current_channel = ColorChannel::Rgba;
+                changed_channels = true;
+            }
+        }
+
         if window_x > ui.cursor().left() + 110. {
             ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(10., 0.);
-                // ui.spacing_mut().interact_size.y = ui.available_height() * 0.7;
                 ui.spacing_mut().interact_size.y = BUTTON_HEIGHT_SMALL;
                 ui.spacing_mut().combo_width = 1.;
                 ui.spacing_mut().icon_width = 0.;
 
-                // style.visuals.widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
                 let color = if ui.style().visuals.dark_mode {
                     Color32::WHITE
                 } else {
@@ -2399,23 +2650,27 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 };
                 ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., color);
 
+                if !ui.style().visuals.dark_mode {
+                    ui.style_mut().visuals.override_text_color = Some(Color32::WHITE);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::BLACK;
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
+                }
+
                 egui::ComboBox::from_id_source("channels")
                     .icon(blank_icon)
-                    .selected_text(
-                        RichText::new(
-                            state
-                                .persistent_settings
-                                .current_channel
-                                .to_string()
-                                .to_uppercase(),
-                        ), // .size(combobox_text_size),
-                    )
+                    .selected_text(RichText::new(
+                        state
+                            .persistent_settings
+                            .current_channel
+                            .to_string()
+                            .to_uppercase(),
+                    ))
                     .show_ui(ui, |ui| {
                         for channel in ColorChannel::iter() {
                             let r = ui.selectable_value(
                                 &mut state.persistent_settings.current_channel,
                                 channel,
-                                RichText::new(channel.to_string().to_uppercase()), // .size(combobox_text_size),
+                                RichText::new(channel.to_string().to_uppercase()),
                             );
 
                             if tooltip(
@@ -2435,29 +2690,59 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // TODO: remove redundancy
         if changed_channels {
+            // TODO: Make this dependent of DynamicImage's type
             if let Some(img) = &state.current_image {
                 match &state.persistent_settings.current_channel {
                     ColorChannel::Rgb => {
-                        state.current_texture.set(
-                            unpremult(img).to_texture_with_texwrap(gfx, &state.persistent_settings),
+                        state.current_texture.set_image(
+                            &unpremult(img),
                             gfx,
+                            &state.persistent_settings,
                         );
                     }
                     ColorChannel::Rgba => {
-                        state.current_texture.set(
-                            img.to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        state
+                            .current_texture
+                            .set_image(img, gfx, &state.persistent_settings);
                     }
                     _ => {
-                        state.current_texture.set(
-                            solo_channel(img, state.persistent_settings.current_channel as usize)
-                                .to_texture_with_texwrap(gfx, &state.persistent_settings),
-                            gfx,
-                        );
+                        let solo_im =
+                            solo_channel(img, state.persistent_settings.current_channel as usize);
+                        state
+                            .current_texture
+                            .set_image(&solo_im, gfx, &state.persistent_settings);
                     }
                 }
             }
+        }
+
+        let label_rect = ui.ctx().available_rect().shrink(50.);
+
+        // TODO Center toast to image viewing area (Shift to the left / Right if the info or edit panel gets opened)
+        if state.persistent_settings.current_channel != ColorChannel::Rgba {
+            let mut job = LayoutJob::simple(
+                format!(
+                    "Viewing {} channel. Press '{}' to revert.",
+                    state.persistent_settings.current_channel,
+                    ColorChannel::Rgba.hotkey(&state.persistent_settings.shortcuts)
+                ),
+                FontId::proportional(13.),
+                ui.style().visuals.text_color(),
+                1000.,
+            );
+            job.halign = Align::Center;
+            let galley = ui.painter().layout_job(job);
+            let tr = galley
+                .rect
+                .translate(label_rect.center_bottom().to_vec2())
+                .expand(8.);
+            ui.painter().rect_filled(
+                tr,
+                ui.get_rounding(BUTTON_HEIGHT_SMALL),
+                ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
+            );
+            ui.painter()
+                .galley(label_rect.center_bottom(), galley, Color32::RED);
         }
 
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
@@ -2524,51 +2809,23 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
-            let modal = egui_modal::Modal::new(ui.ctx(), "delete");
-            modal.show(|ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical_centered_justified(|ui| {
-                        ui.add_space(10.);
-
-                        ui.label(
-                            RichText::new(WARNING_CIRCLE)
-                                .size(100.)
-                                .color(ui.style().visuals.warn_fg_color),
-                        );
-                        ui.add_space(20.);
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(format!(
-                                "Are you sure you want to move {} to the trash?",
-                                state
-                                    .current_path
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .file_name()
-                                    .map(|s| s.to_string_lossy())
-                                    .unwrap_or_default()
-                            ));
-                        });
-                        ui.add_space(20.);
-                        ui.scope(|ui| {
-                            let warn_color = Color32::from_rgb(255, 77, 77);
-                            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
-                            ui.style_mut().visuals.widgets.inactive.fg_stroke =
-                                Stroke::new(1., Color32::WHITE);
-                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
-                                warn_color.linear_multiply(0.8);
-
-                            if ui.styled_button("Yes").clicked() {
-                                delete_file(state);
-                                modal.close();
-                            }
-                        });
-
-                        if ui.styled_button("Cancel").clicked() {
-                            modal.close();
-                        }
-                    });
-                });
-            });
+            let modal = show_modal(
+                ui.ctx(),
+                format!(
+                    "Are you sure you want to move {} to the trash?",
+                    state
+                        .current_path
+                        .clone()
+                        .unwrap_or_default()
+                        .file_name()
+                        .map(|s| s.to_string_lossy())
+                        .unwrap_or_default()
+                ),
+                |_| {
+                    delete_file(state);
+                },
+                "delete",
+            );
 
             if tooltip(
                 unframed_button(TRASH, ui),
@@ -2647,7 +2904,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
         {
             #[cfg(feature = "file_open")]
-            crate::browse_for_image_path(state);
+            browse_for_image_path(state);
             #[cfg(not(feature = "file_open"))]
             ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
         }
@@ -2670,6 +2927,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 state.reset_image = true;
                 ui.close_menu();
             }
+
             if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
                 set_zoom(
                     1.0,
@@ -2731,43 +2989,60 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.right_bottom().x + 200., r.left_top().y),
-                    Pos2::new(
-                        r.left_bottom().x - ui.available_width(),
-                        r.left_top().y + 300.,
-                    ),
+                    Pos2::new(r.right_bottom().x + 100., r.left_top().y),
+                    Pos2::new(r.left_bottom().x, r.left_top().y + 0.),
                 );
+
+                let panel_bg_color = match ui.style().visuals.dark_mode {
+                    true => Color32::from_gray(31),
+                    false => Color32::from_gray(247),
+                };
 
                 ui.allocate_ui_at_rect(recent_rect, |ui| {
                     for r in &state.volatile_settings.recent_images.clone() {
+                        let ext = r
+                            .extension()
+                            .map(|e| e.to_string_lossy().to_string())
+                            .unwrap_or_default()
+                            .to_uppercase();
+
                         ui.horizontal(|ui| {
-                            render_file_icon(&r, ui);
-                            // ui.add(egui::Image::from_uri(format!("file://{}", r.display())).max_width(120.));
-                            ui.vertical_centered_justified(|ui| {
-                                if let Some(filename) = r.file_name() {
-                                    if ui.button(filename.to_string_lossy()).clicked() {
-                                        load_image_from_path(r, state);
-                                        ui.close_menu();
-                                    }
-                                }
-                            });
+                            egui::Frame::none()
+                                .fill(panel_bg_color)
+                                .rounding(ui.style().visuals.widgets.active.rounding)
+                                .inner_margin(Margin::same(6.))
+                                .show(ui, |ui| {
+                                    let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
+
+                                    ui.painter().rect(
+                                        icon_rect,
+                                        ui.get_rounding(BUTTON_HEIGHT_SMALL),
+                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
+                                        Stroke::NONE,
+                                    );
+
+                                    ui.painter().text(
+                                        icon_rect.center(),
+                                        Align2::CENTER_CENTER,
+                                        ext,
+                                        FontId::proportional(10.),
+                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.8),
+                                    );
+
+                                    ui.vertical_centered_justified(|ui| {
+                                        if let Some(filename) = r.file_stem() {
+                                            let res = ui.button(filename.to_string_lossy());
+                                            if res.clicked() {
+                                                load_image_from_path(r, state);
+                                                ui.close_menu();
+                                            }
+                                        }
+                                    });
+                                });
                         });
                     }
                 });
             });
-
-            // TODO: expose favourites with a tool button
-            // ui.menu_button("Favourites", |ui| {
-            //     for r in &state.persistent_settings.favourite_images.clone() {
-            //         if let Some(filename) = r.file_name() {
-            //             if ui.button(filename.to_string_lossy()).clicked() {
-            //ui.close_menu();
-
-            //             }
-            //         }
-            //     }
-
-            // });
         });
 
         // });
@@ -2818,22 +3093,122 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
         }
     }
 }
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui) -> Response {
-    let size = 30.;
-    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
-    ui.painter()
-        .rect_filled(rect, Rounding::same(size / 4.), Color32::GRAY);
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        icon_path
-            .extension()
-            .map(|e| e.to_string_lossy().to_string().to_uppercase())
-            .unwrap_or_default(),
-        FontId::proportional(10.),
-        Color32::BLACK,
+pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
+    let scroll = false;
+
+    let mut zoom = ui
+        .data_mut(|w| w.get_temp::<f32>("ZM".into()))
+        .unwrap_or(1.);
+    let delta = ui.input(|r| r.zoom_delta()).clamp(0.999, 1.001);
+    zoom *= delta;
+    zoom = zoom.clamp(0.5, 1.3);
+    ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
+    let size = Vec2::new(
+        THUMB_SIZE[0] as f32,
+        (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
+    ) * zoom;
+    let response = ui.allocate_response(size, Sense::click());
+    let rounding = Rounding::same(4.);
+
+    let mut image_rect = response.rect;
+    image_rect.max = image_rect.max.round();
+    image_rect.min = image_rect.min.round();
+    image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
+
+    if icon_path.is_dir() {
+        ui.painter().text(
+            response.rect.center(),
+            Align2::CENTER_CENTER,
+            FOLDERFILL,
+            FontId::proportional(85.),
+            ui.style().visuals.text_color(),
+        );
+    } else {
+        match thumbnails.get(icon_path) {
+            Ok(tp) => {
+                let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
+                image.paint_at(ui, image_rect);
+            }
+            Err(_) => {
+                // warn!("{e}");
+                ui.painter()
+                    .rect_filled(image_rect, rounding, Color32::from_gray(80).to_opaque());
+                ui.painter().text(
+                    image_rect.center(),
+                    Align2::CENTER_CENTER,
+                    icon_path
+                        .extension()
+                        .map(|e| e.to_string_lossy().to_string().to_uppercase())
+                        .unwrap_or_default(),
+                    FontId::proportional(25.),
+                    Color32::WHITE,
+                );
+            }
+        }
+    }
+
+    let text = icon_path
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut job = LayoutJob::simple(
+        text.clone(),
+        FontId::proportional(13.),
+        ui.style().visuals.text_color(),
+        // THUMB_SIZE[0] as f32 - margin * 2.,
+        THUMB_SIZE[0] as f32 * 10.,
     );
-    // ui.add(egui::Label::new(""))
+    job.halign = Align::Center;
+
+    if response.hovered() {
+        // the generic hover effect, a rect over everything
+        ui.painter()
+            .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
+
+        let mut text_pos = image_rect.expand(6.).center_bottom();
+        if scroll {
+            fn sawtooth_wave(x: f32, period: f32, amp: f32) -> f32 {
+                ((x / period) - (x / period).floor()) * amp
+            }
+            let galley = ui.painter().layout_job(job);
+            if galley.rect.width() > response.rect.width() {
+                // align text left
+                text_pos.x += galley.rect.width() / 2. - response.rect.width() / 2. + 10.;
+                // repaint for smooth animation
+                ui.ctx().request_repaint();
+                text_pos.x = text_pos.x
+                    - sawtooth_wave(ui.ctx().frame_nr() as f32 * 0.003, 1., galley.rect.width());
+                ui.painter_at(response.rect)
+                    .galley(text_pos, galley, Color32::RED);
+            }
+        } else {
+            let mut job = LayoutJob::simple(
+                text,
+                FontId::proportional(13.),
+                ui.style().visuals.text_color(),
+                THUMB_SIZE[0] as f32,
+            );
+            job.halign = Align::Center;
+            let galley = ui.painter().layout_job(job);
+            let painter = ui
+                .ctx()
+                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
+                .with_clip_rect(ui.clip_rect());
+
+            let c = ui.style().visuals.extreme_bg_color;
+            let mut right_bottom = image_rect.right_bottom();
+            right_bottom.y += galley.rect.height() + 14.;
+            let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom);
+            painter.rect_filled(r, rounding, c);
+            painter.galley(text_pos, galley, Color32::RED);
+        }
+    } else {
+        job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
+        let galley = ui.painter().layout_job(job);
+        ui.painter()
+            .galley(image_rect.expand(6.).center_bottom(), galley, Color32::RED);
+    }
     response
 }
 
@@ -2847,7 +3222,7 @@ pub fn blank_icon(
 }
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
-    let mut button_color = Color32::from_gray(38);
+    let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
     let mut panel_color = Color32::from_gray(25);
 
     match state.persistent_settings.theme {
@@ -2858,8 +3233,15 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
     // Switching theme resets accent color, set it again
     let mut style: egui::Style = (*ctx.style()).clone();
+    style.spacing.scroll = egui::style::ScrollStyle::solid();
 
     if style.visuals.dark_mode {
+        // Text color for label
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
+        // Text color for buttons
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
         if state.persistent_settings.background_color == [200, 200, 200] {
             state.persistent_settings.background_color =
@@ -2870,6 +3252,12 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         }
     } else {
         style.visuals.extreme_bg_color = Color32::from_hex("#D9D9D9").unwrap_or_default();
+        // Text color for label
+        style.visuals.widgets.noninteractive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
+        // Text color for buttons
+        style.visuals.widgets.inactive.fg_stroke.color =
+            Color32::from_hex("#333333").unwrap_or_default();
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
@@ -2882,9 +3270,8 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
             state.persistent_settings.accent_color = [0, 170, 255];
         }
         style.visuals.widgets.inactive.bg_fill = Color32::WHITE;
+        style.visuals.widgets.hovered.bg_fill = Color32::WHITE.gamma_multiply(0.8);
     }
-
-    style.spacing.scroll = egui::style::ScrollStyle::solid();
     style.interaction.tooltip_delay = 0.0;
     style.spacing.icon_width = 20.;
     style.spacing.window_margin = 5.0.into();
@@ -2926,8 +3313,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let accent_color_luma = (accent_color[0] as f32 * 0.299
         + accent_color[1] as f32 * 0.587
         + accent_color[2] as f32 * 0.114)
-        .max(0.)
-        .min(255.) as u8;
+        .clamp(0., 255.) as u8;
     let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
     // Set text on highlighted elements
     style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
@@ -2953,12 +3339,12 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
-                ..=r.size().x + ui.style().spacing.icon_spacing - 4.0 + x_offset,
+                ..=r.size().x + ui.style().spacing.icon_spacing - 3.0 + x_offset,
             openness,
         ),
         egui::lerp(
             -ui.style().spacing.icon_spacing + y_offset
-                ..=-ui.style().spacing.icon_spacing + y_offset,
+                ..=-ui.style().spacing.icon_spacing + y_offset + 1.,
             openness,
         ),
     ));
@@ -2966,13 +3352,8 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     ui.painter().add(text);
 }
 
-fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
     let panel_bg_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(13),
-        false => Color32::from_gray(217),
-    };
-
-    let button_color = match ui.style().visuals.dark_mode {
         true => Color32::from_gray(25),
         false => Color32::from_gray(230),
     };
@@ -2982,12 +3363,90 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         .rounding(ui.style().visuals.widgets.active.rounding)
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
-            ui.style_mut().visuals.widgets.inactive.weak_bg_fill = button_color;
-
             ui.scope(add_contents);
-            // let mut prepared = ui.begin(ui);
-            // let ret = add_contents(&mut prepared.content_ui);
-            // let response = prepared.end(ui);
-            // InnerResponse::new(ret, response)
         });
+}
+
+fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+    let panel_bg_color = match ui.style().visuals.dark_mode {
+        true => Color32::from_gray(13),
+        false => Color32::from_gray(217),
+    };
+
+    egui::Frame::none()
+        .fill(panel_bg_color)
+        .rounding(ui.style().visuals.widgets.active.rounding)
+        .inner_margin(Margin::same(6.))
+        .show(ui, |ui| {
+            ui.scope(add_contents);
+        });
+}
+
+fn show_modal<R>(
+    ctx: &Context,
+    warning_text: impl Into<WidgetText>,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+    id_source: impl std::fmt::Display,
+) -> egui_modal::Modal {
+    let modal = egui_modal::Modal::new(ctx, id_source);
+    modal.show(|ui| {
+        ui.horizontal(|ui| {
+            ui.vertical_centered_justified(|ui| {
+                ui.add_space(10.);
+
+                ui.label(
+                    RichText::new(WARNING_CIRCLE)
+                        .size(100.)
+                        .color(ui.style().visuals.warn_fg_color),
+                );
+                ui.add_space(20.);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(warning_text);
+                });
+                ui.add_space(20.);
+                ui.scope(|ui| {
+                    let warn_color = Color32::from_rgb(255, 77, 77);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                    ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                        Stroke::new(1., Color32::WHITE);
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                        warn_color.linear_multiply(0.8);
+
+                    if ui.styled_button("Yes").clicked() {
+                        ui.scope(add_contents);
+                        modal.close();
+                    }
+                });
+
+                if ui.styled_button("Cancel").clicked() {
+                    modal.close();
+                }
+            });
+        });
+    });
+    modal
+}
+
+/// Save an image to a path using encoding options and generate a thumbnail
+fn save_with_encoding(
+    image: &DynamicImage,
+    path: &Path,
+    image_info: &Option<ExtendedImageInfo>,
+    encoders: &Vec<FileEncoder>,
+) -> anyhow::Result<()> {
+    let encoding_options = FileEncoder::matching_variant(path, encoders);
+    encoding_options.save(image, path)?;
+    debug!("Saved to {}", path.display());
+    // Re-apply exif
+    if let Some(info) = &image_info {
+        debug!("Extended image info present");
+        // before doing anything, make sure we have raw exif data
+        if info.raw_exif.is_some() {
+            fix_exif(path, info.raw_exif.clone())?;
+        } else {
+            debug!("No raw exif");
+        }
+    }
+    thumbnails::generate(path)?;
+    Ok(())
 }

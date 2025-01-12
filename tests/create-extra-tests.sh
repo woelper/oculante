@@ -195,3 +195,45 @@ exiftool -overwrite_original -Orientation='Rotate 90 CW' exiftool-right_moss.web
 cp rust.png png_rust.jpg
 cp orange.heic heic_orange.png
 cp pngtest_16bit.png png_pngtest_16bit.webp
+
+### Large image directories
+
+read -p 'Warning! This will hardlink 38,000 copies of an image for testing, please type "i am 100 percent sure i want to hardlink 38k images" in all capitals to continue: ' INPUT
+
+if [ "$INPUT" = "I AM 100 PERCENT SURE I WANT TO HARDLINK 38K IMAGES" ]; then
+  echo "Continuing"
+
+  mkdir ../tests/38k_images_test_dirs
+  mkdir ../tests/38k_images_test_dirs/1k_images
+  mkdir ../tests/38k_images_test_dirs/2k_images
+  mkdir ../tests/38k_images_test_dirs/5k_images
+  mkdir ../tests/38k_images_test_dirs/10k_images
+  mkdir ../tests/38k_images_test_dirs/20k_images
+
+  for i in {1..1000}
+    do 
+    ln ../tests/jxl-art1.jxl ../tests/38k_images_test_dirs/1k_images/jxl-art1_$i.jxl
+  done
+
+  for i in {1..2000}
+    do 
+    ln ../tests/jxl-art1.jxl ../tests/38k_images_test_dirs/2k_images/jxl-art1_$i.jxl
+  done
+
+  for i in {1..5000}
+    do 
+    ln ../tests/jxl-art1.jxl ../tests/38k_images_test_dirs/5k_images/jxl-art1_$i.jxl
+  done
+
+  for i in {1..10000}
+    do 
+    ln ../tests/jxl-art1.jxl ../tests/38k_images_test_dirs/10k_images/jxl-art1_$i.jxl
+  done
+
+  for i in {1..20000}
+    do 
+    ln ../tests/jxl-art1.jxl ../tests/38k_images_test_dirs/20k_images/jxl-art1_$i.jxl
+  done;
+else
+  echo "Cancelling";
+fi

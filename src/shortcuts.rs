@@ -168,14 +168,13 @@ impl ShortcutExt for Shortcuts {
 pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent) -> bool {
     // let mut alternates: HashMap<String, String>;
     // alternates.insert("+", v)
-
-    if !app.keyboard.down.is_empty() {
-        trace!("Keyboard down: {:?}", app.keyboard.down);
-    }
-
     // don't do anything if keyboard is grabbed (typing in textbox etc)
     if state.key_grab {
         return false;
+    }
+
+    if !app.keyboard.down.is_empty() {
+        trace!("Keyboard down: {:?}", app.keyboard.down);
     }
 
     // if nothing is down, just return
@@ -253,7 +252,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                         if format!("{:?}", dn) == key {
                             debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
                             debug!("Matched {:?} / {:?}", command, key);
-                            debug!("d {}", app.system_timer.delta_f32());
                             return true;
                         }
                     }

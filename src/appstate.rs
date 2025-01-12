@@ -3,11 +3,12 @@ use crate::{
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
     texture_wrapper::TextureWrapperManager,
+    thumbnails::Thumbnails,
     utils::{ExtendedImageInfo, Frame, Player},
 };
 
 use egui_notify::Toasts;
-use image::RgbaImage;
+use image::DynamicImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
@@ -70,7 +71,7 @@ pub struct OculanteState {
     //pub current_texture: Option<TexWrap>,
     pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
-    pub current_image: Option<RgbaImage>,
+    pub current_image: Option<DynamicImage>,
     pub settings_enabled: bool,
     pub image_info: Option<ExtendedImageInfo>,
     pub tiling: usize,
@@ -93,6 +94,7 @@ pub struct OculanteState {
     pub first_start: bool,
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
+    pub thumbnails: Thumbnails,
 }
 
 impl<'b> OculanteState {
@@ -109,10 +111,7 @@ impl<'b> OculanteState {
     }
 
     pub fn send_frame(&self, frame: Frame) {
-        let _ = self
-        .texture_channel
-        .0
-        .send(frame);
+        let _ = self.texture_channel.0.send(frame);
     }
 }
 
@@ -161,6 +160,7 @@ impl<'b> Default for OculanteState {
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
+            thumbnails: Default::default(),
         }
     }
 }

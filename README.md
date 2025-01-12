@@ -246,13 +246,23 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 
 - `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
 
-- `notan/glsl-to-spirv` (default) uses the spirv shader compiler
+- `notan/glsl-to-spirv` (on by default) uses the spirv shader compiler
 
 - `notan/shaderc` uses shaderc as a shader compiler. Longer build time.
 
-- `update` (default) enable app updating.
+- `update` (on by default) enable app updating.
 
-</details>
+- `heif` HEIF format support.
+
+- `avif_native` (on by default) Rust AVIF decoder.
+
+- `dav1d` Tried and tested AVIF decoder, takes priority over `avif_native` if both are enabled.
+
+- `jxlcms` (on by default) Required for complete JXL support.
+
+- `j2k` (on by default) Support for jpeg2000.
+
+</details> 
 
 <details>
 <summary>Default Shortcuts</summary>
