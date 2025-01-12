@@ -2,7 +2,7 @@
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
 edition = "2021"
-exclude = ["res/*.gif", "tests/*", "res/screenshots/*", "res/previews/*"]
+exclude = [".github/*", "res/fonts/NotoSansSC-Regular.ttf", "res/icons/*", "res/*.svg", "res/premult.png", "res/screen*.png","res/*.avif", "res/*.gif", "tests/*", "res/screenshots/*", "res/previews/*"]
 keywords = ["graphics", "image", "viewer"]
 license = "MIT"
 name = "oculante"
@@ -115,6 +115,7 @@ update = ["self_update"]
 j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
+lang_support = []
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
