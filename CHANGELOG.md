@@ -1,3 +1,36 @@
+\# 0.9.2
+
+### :beetle: Bug Fixes
+
+* Prevent application from saving current channel to settings file. The current image channel now is reset between restarts as this was confusing to users. (98ebe9e0)
+* prevent dng from being loaded as tiff (96417bbf)
+* Send frame wen editing alpha tools to prevent crash (f4eb4690)
+* Fallback to native image library if TurboJPEG fails on certain images, such as taken by Samsung phones (3a8b34cc)
+* Add all supported heif extensions. Fixes #457 (2e316a95)
+
+### :sparkles: Features
+
+* Simplified Chinese support (dfb6b67d)
+* Arabic language support (0851570c)
+* Support Japanese, Arabic, Chinese (a5b0dc77)
+* Enable bypassing image filters (60beaf6c)
+* generate palette from image (932e9ae2)
+* Copy palette color to clipboard, highlight palette color if contained (Closes #572, #571) (4279a7d7)
+* Basic swatch / palette UI (f1052395)
+* enable thumbnails in image browser (d39b79d5)
+* search files in current directory in file browser (1a1775c1)
+* Expose image save options (372aeefb)
+* Allow storing bookmarls in the file dialog (bf5b7e1e)
+* Criterion benchmarks (c8218834)
+* Read Krita files (711b666a)
+* Rotate images according to their EXIF rotation data (dbeb9a96)
+* Heif format is bundled in release for Apple Silicon macs (extra heif build available for intel macs) (dbd71465)
+* Heif support in OSX release builds (0e1a3d78)
+
+### :green_apple: Chore
+
+* Filters are in scrollable list (01264bbf)
+
 # 0.9.1 (2024-09-21)
 
 ### :beetle: Bug Fixes
