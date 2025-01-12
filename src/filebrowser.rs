@@ -464,7 +464,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .show(ui, |ui| {
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
-                        .auto_shrink([false, false])
+                        .auto_shrink([true, false])
                         .show_rows(
                             ui,
                             (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
