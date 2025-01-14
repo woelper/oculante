@@ -96,6 +96,8 @@ zip = "2.2.0"
 ase-swatch = "0.1.0"
 quantette = { version = "0.3.0", features = ["threads"] }
 sysinfo = "0.33.1"
+dicom-pixeldata = { version = "0.8.0", features = ["image"] }
+dicom-object = "0.8.0"
 
 [features]
 default = [

@@ -87,6 +87,15 @@ pub fn open_image(
                 return Ok(receiver);
             }
         }
+        "dcm" | "ima" => {
+            use dicom_object::open_file;
+            use dicom_pixeldata::PixelDecoder;
+            let obj = open_file(img_location)?;
+            let image = obj.decode_pixel_data()?;
+            let dynamic_image = image.to_dynamic_image(0)?;
+            // FIXME: Fix loading l16, then send dynamicimage
+            _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(dynamic_image.to_rgb8())));
+        }
         "ktx2" => {
             // let file = File::open(img_location)?;
             let data = std::fs::read(img_location)?;
