@@ -40,6 +40,62 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release date="2025-01-12" version="0.9.2">
+      <url type="details">https://github.com/woelper/oculante/releases/tag/0.9.2</url>
+      <description>
+        <p>Bug Fixes</p>
+        <ul>
+          <li>Prevent application from saving current channel to settings file. The current image channel now is reset between restarts as this was confusing to users. (98ebe9e)</li>
+          <li>prevent dng from being loaded as tiff (96417bb)</li>
+          <li>Send frame wen editing alpha tools to prevent crash (f4eb469)</li>
+          <li>Fallback to native image library if TurboJPEG fails on certain images, such as taken by Samsung phones (3a8b34c)</li>
+          <li>Add all supported heif extensions. Fixes #457 (2e316a9)</li>
+        </ul>
+        <p>Features</p>
+        <ul>
+          <li>Simplified Chinese support (dfb6b67)</li>
+          <li>Arabic language support (0851570)</li>
+          <li>Support Japanese, Arabic, Chinese (a5b0dc7)</li>
+          <li>Enable bypassing image filters (60beaf6)</li>
+          <li>generate palette from image (932e9ae)</li>
+          <li>Copy palette color to clipboard, highlight palette color if contained (Closes #572, #571) (4279a7d)</li>
+          <li>Basic swatch / palette UI (f105239)</li>
+          <li>enable thumbnails in image browser (d39b79d)</li>
+          <li>search files in current directory in file browser (1a1775c)</li>
+          <li>Expose image save options (372aeef)</li>
+          <li>Allow storing bookmarls in the file dialog (bf5b7e1)</li>
+          <li>Criterion benchmarks (c821883)</li>
+          <li>Read Krita files (711b666)</li>
+          <li>Rotate images according to their EXIF rotation data (dbeb9a9)</li>
+          <li>Heif format is bundled in release for Apple Silicon macs (extra heif build available for intel macs) (dbd7146)</li>
+          <li>Heif support in OSX release builds (0e1a3d7)</li>
+        </ul>
+        <p>Chore</p>
+        <ul>
+          <li>Filters are in scrollable list (01264bb)</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.8.23" date="2024-07-29">
+      <url type="details">https://github.com/woelper/oculante/releases/tag/0.8.23</url>
+      <description>
+        <p>Bug Fixes</p>
+        <ul>
+          <li>Display image path for loading errors</li>
+          <li>Prevent panic for scrubber index being out of range and allow opening images without path prefic correctly</li>
+          <li>Update index when image in same folder is loaded</li>
+          <li>Switching theme removes accent color</li>
+          <li>Preserve scubber index</li>
+          <li>Prevent image removal going out of bounds</li>
+          <li>Clearing and deleting an image removes it from the virtual scrubber and advances to the next according to the scrubber direction</li>
+          <li>Fix issue where SVG files were detected as XML</li>
+          <li>Compare menu works without image loaded</li>
+          <li>ClearImage can be assigned to a shortcut</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+  <releases>
     <release date="2024-09-23" version="0.9.1">
       <url type="details">https://github.com/woelper/oculante/releases/tag/0.9.1</url>
       <description>
