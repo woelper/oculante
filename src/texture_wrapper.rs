@@ -329,7 +329,7 @@ impl TexWrap {
                 DynamicImage::ImageLuma16(_) => {
                     // Creating luma 16 sub image
                     let raw_data = Self::image_tile_u16(image, offset, size);
-                    debug!("tiling {:?} to l16", image.color());
+                    debug!("tiling {:?} to rgba32f", image.color());
                     let gi = image::ImageBuffer::<image::Luma<u16>, Vec<u16>>::from_raw(
                         size.0, size.1, raw_data,
                     )
