@@ -123,16 +123,16 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Fit image on window resize", "When you resize the main window, do you want to fit the image with it?", |ui| {
+                                    configuration_item_ui("Fit image on window resize", "Fits the image to the window while resizing.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.fit_image_on_window_resize, "");
                                     }, ui);
 
-                                    configuration_item_ui("Zoom multiplier", "Multiplier of zoom when you use the mouse wheel or the trackpad.", |ui| {
+                                    configuration_item_ui("Zoom multiplier", "Multiplier of how fast the image will change size when using your mouse wheel or trackpad.", |ui| {
                                         ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
                                     }, ui);
 
                                     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-                                    configuration_item_ui("Borderless mode", "Don't draw OS window decorations. A restart is required to take effect.", |ui| {
+                                    configuration_item_ui("Borderless mode", "Prevents drawing OS window decorations. A restart is required to take effect.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.borderless, "");
                                     }, ui);
 
@@ -145,7 +145,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     #[cfg(feature = "update")]
-                                    configuration_item_ui("Check for updates", "Check and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
+                                    configuration_item_ui("Check for updates", "Check for updates and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
                                         if ui.button("Check").clicked() {
                                             state.send_message_info("Checking for updates...");
                                             crate::update::update(Some(state.message_channel.0.clone()));
@@ -159,7 +159,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Reset all settings", "Reset Oculante to default", |ui| {
+                                    configuration_item_ui("Reset all settings", "Reset Oculante to default settings.", |ui| {
                                         if ui.button("Reset").clicked() {
                                             state.persistent_settings = Default::default();
                                             apply_theme(state, ctx);
@@ -174,7 +174,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     visual.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-                                    configuration_item_ui("Color theme", "Customize look and feel", |ui| {
+                                    configuration_item_ui("Color theme", "Customize the look and feel.", |ui| {
                                         egui::ComboBox::from_id_source("Color theme")
                                         .selected_text(format!("{:?}", state.persistent_settings.theme))
                                         .show_ui(ui, |ui| {
@@ -192,7 +192,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         });
                                     }, ui);
 
-                                   configuration_item_ui("Accent color", "Customize the primary color used in the UI", |ui| {
+                                   configuration_item_ui("Accent color", "Customize the primary color used in the UI.", |ui| {
                                         if ui
                                         .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
                                         .changed()
@@ -210,7 +210,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     //     }
                                     // }, ui);
 
-                                    configuration_item_ui("Background color", "The color used as a background for images", |ui| {
+                                    configuration_item_ui("Background color", "The color used as a background for images.", |ui| {
                                         ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
                                     }, ui);
 
@@ -218,7 +218,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         ui.styled_checkbox(&mut state.persistent_settings.show_checker_background, "");
                                     }, ui);
 
-                                    configuration_item_ui("Draw frame around image", "Draw a small frame around the image. It is centered on the outmost pixel. This can be helpful on images with lots of transparency.", |ui| {
+                                    configuration_item_ui("Draw frame around image", "Draws a frame around images which can help see its edges when there are many transparent areas. It is centered on the outmost pixel.", |ui| {
                                         ui
                                         .styled_checkbox(&mut state.persistent_settings.show_frame, "");
                                     }, ui);
@@ -248,7 +248,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         if ui
                                         .text_edit_singleline(&mut state.persistent_settings.title_format)
                                         .on_hover_text(
-                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}",
+                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}.",
                                         )
                                         .changed()
                                         {
@@ -273,7 +273,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
                                     #[cfg(debug_assertions)]
-                                    configuration_item_ui("Send test message", "Send some messages", |ui| {
+                                    configuration_item_ui("Send test message", "Send some messages.", |ui| {
                                         if ui.button("Info").clicked() {
                                             state.send_message_info("Test");
                                         }
@@ -285,7 +285,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Enable experimental features", "Turn on features that are not yet finished", |ui| {
+                                    configuration_item_ui("Enable experimental features", "Turn on features that are not yet finished.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "");
                                     }, ui);
                                 });

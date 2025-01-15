@@ -187,7 +187,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 egui::Grid::new("paint").show(ui, |ui| {
                     ui.label("📜 Keep history");
                     ui.styled_checkbox(&mut state.edit_state.non_destructive_painting, "")
-                        .on_hover_text("Keeps all paint history and edit it. Slower.");
+                        .on_hover_text("Keeps all paint history and allows edits to it. Slower.");
                     ui.end_row();
 
                     if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
@@ -473,7 +473,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     }, "overwrite");
 
-                    if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite.").clicked() {
+                    if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
                         if p.exists() {
                             modal.open();
                         } else {
@@ -486,7 +486,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
-                    if ui.button(format!("Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button(format!("Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
                         if let Some(parent) = p.parent() {
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
@@ -660,7 +660,7 @@ fn stroke_ui(
 
     let r = ui
         .styled_checkbox(&mut stroke.flip_random, "")
-        .on_hover_text("Flip brush in X any Y randomly to make stroke less uniform");
+        .on_hover_text("Flip brush X and Y randomly to make stroke less uniform");
     if r.changed() {
         combined_response.changed = true;
     }
