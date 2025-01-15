@@ -140,7 +140,7 @@ impl TexWrap {
 
     fn image_color_supported(img: &DynamicImage) -> bool {
         img.color() == image::ColorType::L8
-            || img.color() == image::ColorType::L16
+            //|| img.color() == image::ColorType::L16 TODO: Re-Enable when 16 Bit is implemented in notan
             || img.color() == image::ColorType::Rgba8
             || img.color() == image::ColorType::Rgba32F
     }
@@ -334,7 +334,8 @@ impl TexWrap {
                         size.0, size.1, raw_data,
                     )
                     .unwrap();
-                    Some(DynamicImage::ImageLuma16(gi))
+                    let converted_image = DynamicImage::ImageLuma16(gi).to_rgba32f(); //TODO: Remove when 16 Bit is implemented in notan
+                    Some(DynamicImage::ImageRgba32F(converted_image))
                 }
 
                 DynamicImage::ImageLumaA16(_) => {
@@ -416,10 +417,11 @@ impl TexWrap {
                 format = notan::prelude::TextureFormat::R8;
                 pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
             }
-            image::ColorType::L16 => {
+            //TODO: Re-Enable when 16 Bit is implemented in notan
+            /*image::ColorType::L16 => {
                 format = notan::prelude::TextureFormat::R16Uint;
                 pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
-            }
+            }*/
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
             }
