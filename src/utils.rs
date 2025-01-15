@@ -66,6 +66,8 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "avif",
     "jxl",
     "ppm",
+    "dcm",
+    "ima",
     "qoi",
     "ktx2",
     "kra",
