@@ -41,9 +41,12 @@ pub fn open_image(
         .to_str()
         .unwrap_or_default()
         .to_lowercase()
+        // add aliased extensions here if the same formats have multiple extensions
         .replace("tiff", "tif")
-        .replace("jpeg", "jpg");
+        .replace("jpeg", "jpg")
+        .replace("heic", "heif");
 
+    // These are detected incorrectly, for example svg is xml etc
     let unchecked_extensions = ["svg", "kra", "tga", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
