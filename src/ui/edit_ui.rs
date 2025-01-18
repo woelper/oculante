@@ -43,6 +43,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         ImgOpItem::new(ImageOperation::Add([0, 0, 0])),
         ImgOpItem::new(ImageOperation::Mult([255, 255, 255])),
         ImgOpItem::new(ImageOperation::Fill([255, 255, 255, 255])),
+        ImgOpItem::new(ImageOperation::Slice(128, 20, false)),
         // Colour Mapping and Conversion
         ImgOpItem::new(ImageOperation::LUT("Lomography Redscale 100".into())),
         ImgOpItem::new(ImageOperation::GradientMap(vec![
@@ -369,7 +370,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     {
                         state.is_loaded = false;
                         state.player.cache.clear();
-                        state.player.load(path, state.message_channel.0.clone());
+                        state.player.load(path);
                     }
                 }
 
@@ -458,7 +459,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &encoders);
+                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &encoders);
                             },
                             ctx,
                         );
@@ -470,14 +471,14 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
                     let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
-                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     }, "overwrite");
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
                         if p.exists() {
                             modal.open();
                         } else {
-                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_info, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                         }
                     }
 
@@ -629,14 +630,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
 
-            if pixels_changed && state.persistent_settings.info_enabled {
-                state.image_info = None;
-                send_extended_info(
-                    &Some(state.edit_state.result_pixel_op.clone()),
-                    &state.current_path,
-                    &state.extended_info_channel,
-                );
-            }
+         
         });
 }
 
@@ -982,7 +976,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             if reload {
                 state.is_loaded = false;
                 state.player.cache.clear();
-                state.player.load(p, state.message_channel.0.clone());
+                state.player.load(p);
             }
         });
     }

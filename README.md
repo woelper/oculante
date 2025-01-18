@@ -154,6 +154,7 @@ Uninstalling Oculante is a quick process, just delete the executable and delete 
 - webp (via `libwebp-sys` - `image` had _very_ limited format support)
 - farbfeld
 - DDS (DXT1-5, via `dds-rs`)
+- DICOM (via dicom-rs) - Some metadata supported, too.
 - psd (via `psd`)
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped

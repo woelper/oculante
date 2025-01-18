@@ -161,6 +161,8 @@ impl fmt::Display for ImgOpItem {
 pub enum ImageOperation {
     ColorConverter(ColorTypeExt),
     Brightness(i32),
+    /// discard pixels around a threshold: position and range, bool for mode.
+    Slice(u8, u8, bool),
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
@@ -241,6 +243,7 @@ impl fmt::Display for ImageOperation {
         match *self {
             Self::ColorConverter(_) => write!(f, "Color Type"),
             Self::Brightness(_) => write!(f, "Brightness"),
+            Self::Slice(..) => write!(f, "Slice"),
             Self::Noise { .. } => write!(f, "Noise"),
             Self::Desaturate(_) => write!(f, "Desaturate"),
             Self::Posterize(_) => write!(f, "Posterize"),
@@ -317,6 +320,21 @@ impl ImageOperation {
                 x
             }
             Self::Brightness(val) => ui.styled_slider(val, -255..=255),
+            Self::Slice(position, range, hard) => {
+                let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
+                ui.label("Position");
+                if ui.styled_slider(position, 0..=255).changed() {
+                    x.mark_changed();
+                }
+                ui.label("Range");
+                if ui.styled_slider(range, 0..=255).changed() {
+                    x.mark_changed();
+                }
+                if ui.styled_checkbox(hard, "Smooth").changed() {
+                    x.mark_changed();
+                }
+                x
+            }
             Self::Exposure(val) => ui.styled_slider(val, -100..=100),
             Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
             Self::Filter3x3(val) => {
@@ -1465,9 +1483,6 @@ impl ImageOperation {
             }
             Self::Exposure(amt) => {
                 let amt = (*amt as f32 / 100.) * 4.;
-
-                // *p = *p * Vector4::new(2., 2., 2., 2.).;
-
                 p[0] = p[0] * (2_f32).powf(amt);
                 p[1] = p[1] * (2_f32).powf(amt);
                 p[2] = p[2] * (2_f32).powf(amt);
@@ -1481,7 +1496,23 @@ impl ImageOperation {
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
                 p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
             }
-
+            Self::Slice(position, range, smooth) => {
+                let normalized_pos = (*position as f32) / 255.;
+                let normalized_range = (*range as f32) / 255.;
+                for i in 0..=2 {
+                    if *smooth {
+                        let distance = 1.0 - (normalized_pos - p[i]).abs();
+                        p[i] *= distance + normalized_range;
+                    } else {
+                        if p[i] > normalized_pos + normalized_range {
+                            p[i] = 0.;
+                        }
+                        if p[i] < (normalized_pos - normalized_range) {
+                            p[i] = 0.;
+                        }
+                    }
+                }
+            }
             Self::GradientMap(col) => {
                 let brightness = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
                 // let res = interpolate_spline(col, brightness);

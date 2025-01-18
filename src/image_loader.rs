@@ -44,6 +44,8 @@ pub fn open_image(
         // add aliased extensions here if the same formats have multiple extensions
         .replace("tiff", "tif")
         .replace("jpeg", "jpg")
+        .replace("jpeg", "jpg")
+        .replace("ima", "dcm")
         .replace("heic", "heif");
 
     // These are detected incorrectly, for example svg is xml etc
@@ -89,6 +91,13 @@ pub fn open_image(
                 _ = sender.send(Frame::new_still(d));
                 return Ok(receiver);
             }
+        }
+        "dcm" | "ima" => {
+            use dicom_pixeldata::PixelDecoder;
+            let obj = dicom_object::open_file(img_location)?;
+            let image = obj.decode_pixel_data()?;
+            let dynamic_image = image.to_dynamic_image(0)?;
+            _ = sender.send(Frame::new_still(dynamic_image));
         }
         "ktx2" => {
             // let file = File::open(img_location)?;

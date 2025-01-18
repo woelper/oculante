@@ -661,7 +661,7 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
     {
         let p = state.scrubber.set(state.scrubber.index);
         state.current_path = Some(p.clone());
-        state.player.load(&p, state.message_channel.0.clone());
+        state.player.load(&p);
     }
 }
 

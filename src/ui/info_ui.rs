@@ -190,11 +190,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                         if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                                             state
                                                 .player
-                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), geo.clone())), state.message_channel.0.clone());
+                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), geo.clone())));
                                             ui.ctx().request_repaint();
                                             ui.ctx().request_repaint_after(Duration::from_millis(500));
                                             state.current_path = Some(path);
-                                            state.image_info = None;
                                         }
                                     });
                                 });
@@ -269,6 +268,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
+
             advanced_ui(ui, state);
 
         });
@@ -277,7 +277,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 }
 
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
-    if let Some(info) = &state.image_info {
+    if let Some(info) = &state.image_metadata {
         egui::Grid::new("extended").num_columns(2).show(ui, |ui| {
             ui.label("Number of colors");
             ui.label_right(format!("{}", info.num_colors));
@@ -298,6 +298,29 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             ui.styled_collapsing("EXIF", |ui| {
                 dark_panel(ui, |ui| {
                     for (key, val) in &info.exif {
+                        ui.scope(|ui| {
+                            ui.style_mut().override_font_id =
+                                Some(FontId::new(14., FontFamily::Name("bold".into())));
+                            ui.colored_label(
+                                if ui.style().visuals.dark_mode {
+                                    Color32::from_gray(200)
+                                } else {
+                                    Color32::from_gray(20)
+                                },
+                                key,
+                            );
+                        });
+                        ui.label(val);
+                        ui.separator();
+                    }
+                });
+            });
+        }
+
+        if let Some(dicom) = &info.dicom {
+            ui.styled_collapsing("DICOM", |ui| {
+                dark_panel(ui, |ui| {
+                    for (key, val) in &dicom.dicom_data {
                         ui.scope(|ui| {
                             ui.style_mut().override_font_id =
                                 Some(FontId::new(14., FontFamily::Name("bold".into())));
