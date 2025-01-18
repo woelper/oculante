@@ -1,3 +1,4 @@
+use crate::icons::INFO;
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
@@ -44,6 +45,8 @@ pub fn open_image(
         // add aliased extensions here if the same formats have multiple extensions
         .replace("tiff", "tif")
         .replace("jpeg", "jpg")
+        .replace("jpeg", "jpg")
+        .replace("ima", "dcm")
         .replace("heic", "heif");
 
     // These are detected incorrectly, for example svg is xml etc
@@ -91,11 +94,37 @@ pub fn open_image(
             }
         }
         "dcm" | "ima" => {
-            use dicom_object::open_file;
             use dicom_pixeldata::PixelDecoder;
-            let obj = open_file(img_location)?;
+            let obj = dicom_object::open_file(img_location)?;
+            
+
+            // WIP: Find out interesting items to display
+            for name in &[
+                "StudyDate",
+                "ModalitiesInStudy",
+                "Modality",
+                "SourceType",
+                "ImageType",
+                "Manufacturer",
+                "InstitutionName",
+                "PrivateDataElement",
+                "PrivateDataElementName",
+                "OperatorsName",
+                "ManufacturerModelName",
+                "PatientName",
+                "PatientBirthDate",
+                "PatientAge",
+                "PixelSpacing",
+            ] {
+                if let Ok(e) = obj.element_by_name(name) {
+                    if let Ok(s) = e.to_str() {
+                        info!("{name}: {s}");
+                    }
+                }
+            }
+
             let image = obj.decode_pixel_data()?;
-            let dynamic_image = image.to_dynamic_image(0)?;            
+            let dynamic_image = image.to_dynamic_image(0)?;
             _ = sender.send(Frame::new_still(dynamic_image));
         }
         "ktx2" => {
