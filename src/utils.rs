@@ -1,7 +1,7 @@
 use arboard::Clipboard;
 
 use img_parts::{Bytes, DynImage, ImageEXIF};
-use log::{debug, error};
+use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
 use notan::prelude::{App, Graphics};
@@ -93,7 +93,13 @@ fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
+pub struct DicomData {
+    pub physical_size: (f32, f32),
+    pub dicom_data: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
@@ -102,31 +108,9 @@ pub struct ExtendedImageInfo {
     pub green_histogram: Vec<(i32, u64)>,
     pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
+    pub dicom: Option<DicomData>,
     pub raw_exif: Option<Bytes>,
     pub name: String,
-}
-
-pub fn delete_file(state: &mut OculanteState) {
-    if let Some(p) = &state.current_path {
-        #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-        {
-            _ = trash::delete(p);
-        }
-        #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
-        {
-            _ = std::fs::remove_file(p)
-        }
-
-        state.send_message_info(&format!(
-            "Deleted {}",
-            p.file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_default()
-        ));
-        // remove from cache so we don't suceed to load it agaim
-        state.player.cache.data.remove(p);
-    }
-    clear_image(state);
 }
 
 impl ExtendedImageInfo {
@@ -159,6 +143,48 @@ impl ExtendedImageInfo {
                 f.display_value().with_unit(&exif).to_string(),
             );
         }
+        Ok(())
+    }
+
+    pub fn with_dicom(&mut self, image_path: &Path) -> Result<()> {
+        self.name = image_path.to_string_lossy().to_string();
+        if image_path.extension() != Some(OsStr::new("dcm"))
+            || image_path.extension() != Some(OsStr::new("ima"))
+        {
+            let obj = dicom_object::open_file(image_path)?;
+            let mut dicom_data = HashMap::new();
+
+            // WIP: Find out interesting items to display
+            for name in &[
+                "StudyDate",
+                "ModalitiesInStudy",
+                "Modality",
+                "SourceType",
+                "ImageType",
+                "Manufacturer",
+                "InstitutionName",
+                "PrivateDataElement",
+                "PrivateDataElementName",
+                "OperatorsName",
+                "ManufacturerModelName",
+                "PatientName",
+                "PatientBirthDate",
+                "PatientAge",
+                "PixelSpacing",
+            ] {
+                if let Ok(e) = obj.element_by_name(name) {
+                    if let Ok(s) = e.to_str() {
+                        info!("{name}: {s}");
+                        dicom_data.insert(name.to_string(), s.to_string());
+                    }
+                }
+            }
+            self.dicom = Some(DicomData {
+                physical_size: (0.0, 0.0),
+                dicom_data,
+            })
+        }
+
         Ok(())
     }
 
@@ -226,6 +252,7 @@ impl ExtendedImageInfo {
             raw_exif: Default::default(),
             name: Default::default(),
             exif: Default::default(),
+            dicom: Default::default(),
         }
     }
 }
@@ -234,7 +261,6 @@ impl ExtendedImageInfo {
 pub struct Player {
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
-    pub metadata_sender: Sender<ExtendedImageInfo>,
     pub message_sender: Sender<Message>,
     pub cache: Cache,
     watcher: HashMap<PathBuf, SystemTime>,
@@ -242,13 +268,16 @@ pub struct Player {
 
 impl Player {
     /// Create a new Player
-    pub fn new(image_sender: Sender<Frame>, cache_size: usize, metadata_sender: Sender<ExtendedImageInfo>, message_sender: Sender<Message>) -> Player {
+    pub fn new(
+        image_sender: Sender<Frame>,
+        cache_size: usize,
+        message_sender: Sender<Message>,
+    ) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
             image_sender,
             stop_sender,
             message_sender,
-            metadata_sender,
             cache: Cache {
                 data: Default::default(),
                 cache_size,
@@ -275,11 +304,8 @@ impl Player {
         }
     }
 
-    pub fn load_advanced(
-        &mut self,
-        img_location: &Path,
-        forced_frame_source: Option<Frame>,
-    ) {
+    /// The main loading function of the player
+    pub fn load_advanced(&mut self, img_location: &Path, forced_frame_source: Option<Frame>) {
         debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -304,7 +330,6 @@ impl Player {
             img_location,
             self.image_sender.clone(),
             self.message_sender.clone(),
-            self.metadata_sender.clone(),
             stop_receiver,
             forced_frame_source,
         );
@@ -329,7 +354,6 @@ pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
-    metadata_sender: Sender<ExtendedImageInfo>,
     stop_receiver: Receiver<()>,
     forced_frame_source: Option<Frame>,
 ) {
@@ -340,7 +364,7 @@ pub fn send_image_threaded(
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
 
-        match open_image(&loc, Some(message_sender.clone()), Some(metadata_sender.clone())) {
+        match open_image(&loc, Some(message_sender.clone())) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
@@ -532,6 +556,29 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+pub fn delete_file(state: &mut OculanteState) {
+    if let Some(p) = &state.current_path {
+        #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
+        {
+            _ = trash::delete(p);
+        }
+        #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
+        {
+            _ = std::fs::remove_file(p)
+        }
+
+        state.send_message_info(&format!(
+            "Deleted {}",
+            p.file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default()
+        ));
+        // remove from cache so we don't suceed to load it agaim
+        state.player.cache.data.remove(p);
+    }
+    clear_image(state);
+}
+
 /// Display RGBA values nicely
 pub fn disp_col(col: [f32; 4]) -> String {
     format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
@@ -671,7 +718,9 @@ pub fn send_extended_info(
             let mut e_info = ExtendedImageInfo::from_image(&copied_img);
             if let Some(p) = current_path {
                 _ = e_info.with_exif(&p);
+                _ = e_info.with_dicom(&p);
             }
+            debug!("Sending extended info");
             _ = sender.send(e_info);
         });
     }
@@ -791,9 +840,7 @@ pub fn last_image(state: &mut OculanteState) {
         if &next_img != img_location {
             state.is_loaded = false;
             *img_location = next_img;
-            state
-                .player
-                .load(img_location);
+            state.player.load(img_location);
         }
     }
 }
@@ -805,9 +852,7 @@ pub fn first_image(state: &mut OculanteState) {
         if &next_img != img_location {
             state.is_loaded = false;
             *img_location = next_img;
-            state
-                .player
-                .load(img_location);
+            state.player.load(img_location);
         }
     }
 }
@@ -820,16 +865,14 @@ pub fn clear_image(state: &mut OculanteState) {
         state.current_image = None;
         state.current_texture.clear();
         state.current_path = None;
-        state.image_info = None;
+        state.image_metadata = None;
         return;
     }
     // prevent reload if at last or first
     if Some(&next_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(next_img.clone());
-        state
-            .player
-            .load(&next_img);
+        state.player.load(&next_img);
     }
 }
 
@@ -839,9 +882,7 @@ pub fn next_image(state: &mut OculanteState) {
     if Some(&next_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(next_img.clone());
-        state
-            .player
-            .load(&next_img);
+        state.player.load(&next_img);
     }
 }
 
@@ -851,9 +892,7 @@ pub fn prev_image(state: &mut OculanteState) {
     if Some(&prev_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(prev_img.clone());
-        state
-            .player
-            .load(&prev_img);
+        state.player.load(&prev_img);
     }
 }
 
@@ -911,7 +950,8 @@ pub fn compare_next(state: &mut OculanteState) {
             state.current_image = None;
             state.player.load_advanced(
                 path,
-                Some(Frame::CompareResult(Default::default(), geo.clone())));
+                Some(Frame::CompareResult(Default::default(), geo.clone())),
+            );
             state.current_path = Some(path.clone());
         }
     }

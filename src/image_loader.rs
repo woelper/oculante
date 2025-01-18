@@ -1,5 +1,5 @@
 use crate::ktx2_loader::CompressedImageFormats;
-use crate::utils::{fit, ExtendedImageInfo, Frame};
+use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
 use psd::Psd;
@@ -29,7 +29,6 @@ use zune_png::zune_core::result::DecodingResult;
 pub fn open_image(
     img_location: &Path,
     message_sender: Option<Sender<Message>>,
-    metadata_sender: Option<Sender<ExtendedImageInfo>>,
 ) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
@@ -96,33 +95,6 @@ pub fn open_image(
         "dcm" | "ima" => {
             use dicom_pixeldata::PixelDecoder;
             let obj = dicom_object::open_file(img_location)?;
-            
-
-            // WIP: Find out interesting items to display
-            for name in &[
-                "StudyDate",
-                "ModalitiesInStudy",
-                "Modality",
-                "SourceType",
-                "ImageType",
-                "Manufacturer",
-                "InstitutionName",
-                "PrivateDataElement",
-                "PrivateDataElementName",
-                "OperatorsName",
-                "ManufacturerModelName",
-                "PatientName",
-                "PatientBirthDate",
-                "PatientAge",
-                "PixelSpacing",
-            ] {
-                if let Ok(e) = obj.element_by_name(name) {
-                    if let Ok(s) = e.to_str() {
-                        info!("{name}: {s}");
-                    }
-                }
-            }
-
             let image = obj.decode_pixel_data()?;
             let dynamic_image = image.to_dynamic_image(0)?;
             _ = sender.send(Frame::new_still(dynamic_image));

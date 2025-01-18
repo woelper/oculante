@@ -173,11 +173,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
             {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
-                send_extended_info(
-                    &state.current_image,
-                    &state.current_path,
-                    &state.extended_info_channel,
-                );
             }
             if window_x > ui.cursor().left() + 80. {
                 if tooltip(

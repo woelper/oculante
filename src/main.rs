@@ -197,9 +197,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     state.player = Player::new(
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache,
-        state.extended_info_channel.0.clone(),
-        state.message_channel.0.clone()
-        
+        state.message_channel.0.clone(),
     );
 
     debug!("matches {:?}", matches);
@@ -224,16 +222,12 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             if let Ok(first_img_location) = find_first_image_in_directory(location) {
                 state.is_loaded = false;
                 state.current_path = Some(first_img_location.clone());
-                state
-                    .player
-                    .load(&first_img_location);
+                state.player.load(&first_img_location);
             }
         } else {
             state.is_loaded = false;
             state.current_path = Some(location.clone().clone());
-            state
-                .player
-                .load(&location);
+            state.player.load(&location);
         };
     }
 
@@ -257,7 +251,6 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             state.player.load_advanced(
                 &location,
                 Some(Frame::ImageCollectionMember(Default::default())),
-                
             );
         };
         state.scrubber.entries = paths_to_open.clone();
@@ -560,11 +553,6 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, InfoMode) {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
-                send_extended_info(
-                    &state.current_image,
-                    &state.current_path,
-                    &state.extended_info_channel,
-                );
             }
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
@@ -727,9 +715,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
         let t = app.timer.elapsed_f32() % 0.8;
         if t <= 0.05 {
             trace!("chk mod {}", t);
-            state
-                .player
-                .check_modified(p);
+            state.player.check_modified(p);
         }
     }
 
@@ -777,14 +763,14 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
 
     // redraw if extended info is missing so we make sure it's promply displayed
-    if state.persistent_settings.info_enabled && state.image_info.is_none() {
+    if state.persistent_settings.info_enabled && state.image_metadata.is_none() {
         app.window().request_frame();
     }
 
     // check extended info has been sent
     if let Ok(info) = state.extended_info_channel.1.try_recv() {
         debug!("Received extended image info for {}", info.name);
-        state.image_info = Some(info);
+        state.image_metadata = Some(info);
         app.window().request_frame();
     }
 
@@ -959,7 +945,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     }
                 }
                 state.redraw = false;
-                state.image_info = None;
+                // state.image_info = None;
             }
             Frame::EditResult(_) => {
                 state.redraw = false;
@@ -1046,14 +1032,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // In those cases, we want the image to stay as it is.
         // TODO: PERF: This copies the image buffer. This should also maybe not run for animation frames
         // although it looks cool.
-        if state.persistent_settings.info_enabled {
-            debug!("Sending extended info");
-            send_extended_info(
-                &state.current_image,
-                &state.current_path,
-                &state.extended_info_channel,
-            );
-        }
+        state.image_metadata = None;
+        send_extended_info(
+            &state.current_image,
+            &state.current_path,
+            &state.extended_info_channel,
+        );
     }
 
     if state.redraw {
