@@ -1,6 +1,5 @@
-use crate::icons::INFO;
 use crate::ktx2_loader::CompressedImageFormats;
-use crate::utils::{fit, Frame};
+use crate::utils::{fit, ExtendedImageInfo, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
 use psd::Psd;
@@ -30,6 +29,7 @@ use zune_png::zune_core::result::DecodingResult;
 pub fn open_image(
     img_location: &Path,
     message_sender: Option<Sender<Message>>,
+    metadata_sender: Option<Sender<ExtendedImageInfo>>,
 ) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();

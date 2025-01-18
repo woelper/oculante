@@ -118,6 +118,8 @@ impl<'b> OculanteState {
 impl<'b> Default for OculanteState {
     fn default() -> OculanteState {
         let tx_channel = mpsc::channel();
+        let msg_channel = mpsc::channel();
+        let meta_channel = mpsc::channel();
         OculanteState {
             image_geometry: ImageGeometry {
                 scale: 1.0,
@@ -131,11 +133,11 @@ impl<'b> Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone(), 20),
+            player: Player::new(tx_channel.0.clone(), 20, meta_channel.0.clone(), msg_channel.0.clone()),
             texture_channel: tx_channel,
-            message_channel: mpsc::channel(),
+            message_channel: msg_channel,
             load_channel: mpsc::channel(),
-            extended_info_channel: mpsc::channel(),
+            extended_info_channel: meta_channel,
             extended_info_loading: Default::default(),
             mouse_delta: Default::default(),
             current_texture: Default::default(),

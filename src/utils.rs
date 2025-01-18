@@ -234,17 +234,21 @@ impl ExtendedImageInfo {
 pub struct Player {
     pub image_sender: Sender<Frame>,
     pub stop_sender: Sender<()>,
+    pub metadata_sender: Sender<ExtendedImageInfo>,
+    pub message_sender: Sender<Message>,
     pub cache: Cache,
     watcher: HashMap<PathBuf, SystemTime>,
 }
 
 impl Player {
     /// Create a new Player
-    pub fn new(image_sender: Sender<Frame>, cache_size: usize) -> Player {
+    pub fn new(image_sender: Sender<Frame>, cache_size: usize, metadata_sender: Sender<ExtendedImageInfo>, message_sender: Sender<Message>) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
             image_sender,
             stop_sender,
+            message_sender,
+            metadata_sender,
             cache: Cache {
                 data: Default::default(),
                 cache_size,
@@ -253,7 +257,7 @@ impl Player {
         }
     }
 
-    pub fn check_modified(&mut self, path: &Path, message_sender: Sender<Message>) {
+    pub fn check_modified(&mut self, path: &Path) {
         if let Some(watched_mod) = self.watcher.get(path) {
             if let Ok(meta) = std::fs::metadata(path) {
                 if let Ok(modified) = meta.modified() {
@@ -264,7 +268,7 @@ impl Player {
                         );
 
                         self.cache.data.remove(path);
-                        self.load(path, message_sender);
+                        self.load(path);
                     }
                 }
             }
@@ -275,7 +279,6 @@ impl Player {
         &mut self,
         img_location: &Path,
         forced_frame_source: Option<Frame>,
-        message_sender: Sender<Message>,
     ) {
         debug!("Stopping player on load");
         self.stop();
@@ -300,7 +303,8 @@ impl Player {
         send_image_threaded(
             img_location,
             self.image_sender.clone(),
-            message_sender,
+            self.message_sender.clone(),
+            self.metadata_sender.clone(),
             stop_receiver,
             forced_frame_source,
         );
@@ -312,8 +316,8 @@ impl Player {
         }
     }
 
-    pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
-        self.load_advanced(img_location, None, message_sender);
+    pub fn load(&mut self, img_location: &Path) {
+        self.load_advanced(img_location, None);
     }
 
     pub fn stop(&self) {
@@ -325,6 +329,7 @@ pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
+    metadata_sender: Sender<ExtendedImageInfo>,
     stop_receiver: Receiver<()>,
     forced_frame_source: Option<Frame>,
 ) {
@@ -335,7 +340,7 @@ pub fn send_image_threaded(
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
 
-        match open_image(&loc, Some(message_sender.clone())) {
+        match open_image(&loc, Some(message_sender.clone()), Some(metadata_sender.clone())) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
@@ -774,7 +779,7 @@ pub fn clipboard_copy(img: &DynamicImage) {
 
 pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
     state.is_loaded = false;
-    state.player.load(p, state.message_channel.0.clone());
+    state.player.load(p);
     state.current_path = Some(p.to_owned());
 }
 
@@ -788,7 +793,7 @@ pub fn last_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(img_location, state.message_channel.0.clone());
+                .load(img_location);
         }
     }
 }
@@ -802,7 +807,7 @@ pub fn first_image(state: &mut OculanteState) {
             *img_location = next_img;
             state
                 .player
-                .load(img_location, state.message_channel.0.clone());
+                .load(img_location);
         }
     }
 }
@@ -824,7 +829,7 @@ pub fn clear_image(state: &mut OculanteState) {
         state.current_path = Some(next_img.clone());
         state
             .player
-            .load(&next_img, state.message_channel.0.clone());
+            .load(&next_img);
     }
 }
 
@@ -836,7 +841,7 @@ pub fn next_image(state: &mut OculanteState) {
         state.current_path = Some(next_img.clone());
         state
             .player
-            .load(&next_img, state.message_channel.0.clone());
+            .load(&next_img);
     }
 }
 
@@ -848,7 +853,7 @@ pub fn prev_image(state: &mut OculanteState) {
         state.current_path = Some(prev_img.clone());
         state
             .player
-            .load(&prev_img, state.message_channel.0.clone());
+            .load(&prev_img);
     }
 }
 
@@ -906,9 +911,7 @@ pub fn compare_next(state: &mut OculanteState) {
             state.current_image = None;
             state.player.load_advanced(
                 path,
-                Some(Frame::CompareResult(Default::default(), geo.clone())),
-                state.message_channel.0.clone(),
-            );
+                Some(Frame::CompareResult(Default::default(), geo.clone())));
             state.current_path = Some(path.clone());
         }
     }

@@ -94,7 +94,7 @@ pub fn generate<P: AsRef<Path>>(source_path: P) -> Result<()> {
         source_path.as_ref().display(),
         dest_path.display()
     );
-    let f = open_image(source_path.as_ref(), None)?;
+    let f = open_image(source_path.as_ref(), None, None)?;
     let i = f.recv()?.get_image().context("Can't get buffer")?;
 
     debug!("\tOpened {}", source_path.as_ref().display());
