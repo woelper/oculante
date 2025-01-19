@@ -209,18 +209,16 @@ impl EguiExt for Ui {
         response
     }
 
-    /// Draw a justified icon from a string starting with an emoji
+    /// Draw a justified icon from a string containing an emoji
     fn label_i(&mut self, text: impl Into<WidgetText>) -> Response {
         let text: WidgetText = text.into();
         let text = text.text();
 
-        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let (icon, description) = parse_icon_plus_text(text);
+        let icon = icon.unwrap_or_default();
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-            // self.horizontal(|ui| {
             ui.add(
-                // egui::Vec2::new(8., ui.available_height()),
                 egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
             );
             ui.label(
@@ -243,8 +241,9 @@ impl EguiExt for Ui {
         let text: WidgetText = title.into();
         let text = text.text();
 
-        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let (icon, description) = parse_icon_plus_text(text);
+        let icon = icon.unwrap_or_default();
+
         let spacing = if icon.is_empty() { "" } else { "       " };
         self.spacing_mut().button_padding = Vec2::new(0., 10.);
 
@@ -269,8 +268,8 @@ impl EguiExt for Ui {
         let text: WidgetText = text.into();
         let text = text.text();
 
-        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let (icon, description) = parse_icon_plus_text(text);
+        let icon = icon.unwrap_or_default();
 
         let spacing = if icon.is_empty() { "" } else { "      " };
         let r = self.add(
@@ -298,10 +297,11 @@ impl EguiExt for Ui {
         let text = text.text();
 
         let icon_size = 12.;
-        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.spacing_mut().button_padding = Vec2::new(8., 0.);
 
+        let (icon, description) = parse_icon_plus_text(text);
+        let icon = icon.unwrap_or_default();
+
+        self.spacing_mut().button_padding = Vec2::new(8., 0.);
         let spacing = if icon.is_empty() { "" } else { "  " };
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
@@ -322,7 +322,7 @@ impl EguiExt for Ui {
         r
     }
 
-    /// Draw a justified icon from a string starting with an emoji
+    /// Draw a right justified label
     fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
         self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
             ui.label(text);
@@ -348,8 +348,10 @@ impl EguiExt for Ui {
         let text: WidgetText = text.into();
         let text = text.text();
 
-        let icon = text.chars().filter(|c| !c.is_ascii()).collect::<String>();
-        let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
+        let (icon, description) = parse_icon_plus_text(text);
+        let icon = icon.unwrap_or_default();
+
+        // let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
         self.horizontal(|ui| {
             let mut r = ui.add_sized(
                 egui::Vec2::new(30., ui.available_height()),
@@ -459,6 +461,32 @@ impl EguiExt for Ui {
         })
         .inner
     }
+}
+
+
+fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
+    use unicode_segmentation::UnicodeSegmentation;
+
+    let trimmed = line.trim();
+
+    // 1) Check if the first token is exactly 1 grapheme
+    if let Some((candidate, remainder)) = trimmed.split_once(' ') {
+        if candidate.graphemes(true).count() == 1 {
+            // icon at the front
+            return (Some(candidate.to_owned()), remainder.to_owned());
+        }
+    }
+
+    // 2) Otherwise, check from the right for a trailing icon
+    if let Some((remainder, candidate)) = trimmed.rsplit_once(' ') {
+        if candidate.graphemes(true).count() == 1 {
+            // icon at the end
+            return (Some(candidate.to_owned()), remainder.to_owned());
+        }
+    }
+
+    // 3) No icon found
+    (None, trimmed.to_owned())
 }
 
 /// Proof-of-concept funtion to draw texture completely with egui
