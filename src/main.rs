@@ -313,19 +313,19 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             }),
         );
 
-        fonts.font_data.insert(
-            "inter_bold".to_owned(),
-            FontData::from_static(BOLD_FONT).tweak(FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: offset,
-                baseline_offset_factor: 0.0,
-            }),
-        );
-        fonts.families.insert(
-            FontFamily::Name("bold".to_owned().into()),
-            vec!["inter_bold".into()],
-        );
+        // fonts.font_data.insert(
+        //     "inter_bold".to_owned(),
+        //     FontData::from_static(BOLD_FONT).tweak(FontTweak {
+        //         scale: 1.0,
+        //         y_offset_factor: 0.0,
+        //         y_offset: offset,
+        //         baseline_offset_factor: 0.0,
+        //     }),
+        // );
+        // fonts.families.insert(
+        //     FontFamily::Name("bold".to_owned().into()),
+        //     vec!["inter_bold".into()],
+        // );
 
         fonts.font_data.insert(
             "icons".to_owned(),
@@ -349,27 +349,30 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
-        fonts.font_data.insert(
-            "noto_jp".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
-        );
+        // fonts.font_data.insert(
+        //     "noto_jp".to_owned(),
+        //     FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
+        // );
 
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(2, "noto_jp".to_owned());
+        // fonts
+        //     .families
+        //     .get_mut(&FontFamily::Proportional)
+        //     .unwrap()
+        //     .insert(2, "noto_jp".to_owned());
 
-        fonts.font_data.insert(
-            "noto_ar".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoNaskhArabic-Regular.ttf")),
-        );
+        // fonts.font_data.insert(
+        //     "noto_ar".to_owned(),
+        //     FontData::from_static(include_bytes!("../res/fonts/NotoNaskhArabic-Regular.ttf")),
+        // );
 
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(2, "noto_ar".to_owned());
+        // fonts
+        //     .families
+        //     .get_mut(&FontFamily::Proportional)
+        //     .unwrap()
+        //     .insert(2, "noto_ar".to_owned());
+
+
+        load_system_fonts(ctx);
 
         #[cfg(feature = "lang_support")]
         {
