@@ -98,6 +98,7 @@ quantette = { version = "0.3.0", features = ["threads"] }
 sysinfo = "0.33.1"
 dicom-pixeldata = { version = "0.8.0", features = ["image"] }
 dicom-object = "0.8.0"
+unicode-segmentation = "1.12.0"
 
 [features]
 default = [
