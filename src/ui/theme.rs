@@ -159,6 +159,7 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions{
         "Amiri",
         "Lateef",
         "Al Tarikh",
+        "Segoe UI",
     ]);
 
     for (region, font_names) in fontdb {
