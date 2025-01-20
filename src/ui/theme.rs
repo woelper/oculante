@@ -1,5 +1,11 @@
 use super::*;
 use crate::appstate::OculanteState;
+use std::{collections::HashMap, fs::read};
+use egui::{Context, FontData, FontDefinitions};
+use epaint::FontFamily;
+use font_kit::{
+    family_name::FamilyName, handle::Handle, properties::Properties, source::SystemSource
+};
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
@@ -100,137 +106,73 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     ctx.set_style(style);
 }
 
-// use std::fs::read;
-
-// use egui::{Context, FontData, FontDefinitions};
-
-// use font_kit::{
-//     family_name::FamilyName, handle::Handle, properties::Properties, source::SystemSource,
-// };
-
-// pub fn load_system_font(ctx: &Context) {
-//     let mut fonts = FontDefinitions::default();
-
-//     font_kit::source::Source::
-
-//     let handle = SystemSource::new()
-//         .select_best_match(&[FamilyName::], &Properties::new())
-//         .unwrap();
-
-//     let buf: Vec<u8> = match handle {
-//         Handle::Memory { bytes, .. } => bytes.to_vec(),
-//         Handle::Path { path, .. } => read(path).unwrap(),
-//     };
-
-//     const FONT_SYSTEM_SANS_SERIF: &'static str = "System Sans Serif";
-
-//     fonts
-//         .font_data
-//         .insert(FONT_SYSTEM_SANS_SERIF.to_owned(), FontData::from_owned(buf));
-
-//     if let Some(vec) = fonts.families.get_mut(&FontFamily::Proportional) {
-//         vec.push(FONT_SYSTEM_SANS_SERIF.to_owned());
-//     }
-
-//     if let Some(vec) = fonts.families.get_mut(&FontFamily::Monospace) {
-//         vec.push(FONT_SYSTEM_SANS_SERIF.to_owned());
-//     }
-
-//     ctx.set_fonts(fonts);
-// }
-
-
-use std::fs::read;
-
-use egui::{Context, FontData, FontDefinitions};
-use epaint::FontFamily;
-use font_kit::{
-    family_name::{FamilyName},
-    handle::Handle,
-    properties::Properties,
-    source::SystemSource,
-};
 
 /// Attempt to load a system font by any of the given `family_names`, returning the first match.
 fn load_font_family(family_names: &[&str]) -> Option<Vec<u8>> {
     let system_source = SystemSource::new();
 
     for &name in family_names {
-        // FamilyName::Title will match an explicit font-family name like "Noto Sans Arabic"
-        let family = FamilyName::Title(name.to_string());
-        if let Ok(font_handle) = system_source.select_best_match(&[family], &Properties::new()) {
-            match font_handle {
-                Handle::Memory { bytes, .. } => {
-                    return Some(bytes.to_vec());
-                }
-                Handle::Path { path, .. } => {
-                    if let Ok(data) = read(path) {
-                        return Some(data);
+        let font_handle = system_source
+            .select_best_match(&[FamilyName::Title(name.to_string())], &Properties::new());
+        match font_handle {
+            Ok(h) => {
+                match &h {
+                    Handle::Memory { bytes, .. } => {
+                        debug!("Loaded {name} from memory.");
+                        return Some(bytes.to_vec());
+                    }
+                    Handle::Path { path, .. } => {
+                        info!("Loaded {name} from path: {:?}", path);
+                        if let Ok(data) = read(path) {
+                            return Some(data);
+                        }
                     }
                 }
             }
+            Err(e) => error!("Could not load {}: {:?}", name, e),
         }
     }
 
     None
 }
 
-pub fn load_system_fonts(ctx: &Context) {
-    info!("Attempting to load sys fonts");
-    // Start from the default fonts
-    let mut fonts = FontDefinitions::default();
+pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions{
+    debug!("Attempting to load sys fonts");
+    let mut fontdb = HashMap::new();
 
- 
-    if let Some(cjk_data) = load_font_family(&[
-        "Noto Sans CJK SC",   // Good coverage for Simplified Chinese
+    fontdb.insert("chinese_simplified", vec![
+        "Heiti SC",
+        "Songti SC",
+        "Noto Sans CJK SC", // Good coverage for Simplified Chinese
         "Noto Sans SC",
-        "Noto Sans CJK JP",   // Japanese
+        "Noto Sans CJK JP", 
         "Noto Sans JP",
-        "WenQuanYi Zen Hei",  // Another common Linux CJK font
-        "SimSun",             // Common on Windows for Simplified Chinese
-        "MS Gothic",          // Another Windows fallback for Japanese
-        "Songti SC"
-    ]) {
+        "WenQuanYi Zen Hei",
+        "SimSun",
+        "MS Gothic",
+        "Noto Sans SC",
+        "PingFang SC",
+    ]);
 
-        info!("Inserting font !");
-        // Insert it into font_data under a name we control:
-        fonts.font_data.insert(
-            "my_cjk_font".to_owned(),
-            FontData::from_owned(cjk_data),
-        );
-
-        // Push to fallback for both proportional and monospace
-        if let Some(list) = fonts.families.get_mut(&FontFamily::Proportional) {
-            list.push("my_cjk_font".to_owned());
-        }
-    }
-
-    //
-    // 2) Load a font that supports Arabic
-    //
-    // Try from a set of known Arabic-capable fonts
-    //
-    if let Some(arabic_data) = load_font_family(&[
+    fontdb.insert("arabic", vec![
         "Noto Sans Arabic",
         "Amiri",
         "Lateef",
-        "Scheherazade",
-        // Add more if needed
-    ]) {
-        fonts.font_data.insert(
-            "my_arabic_font".to_owned(),
-            FontData::from_owned(arabic_data),
-        );
+        "Al Tarikh",
+    ]);
 
-        if let Some(list) = fonts.families.get_mut(&FontFamily::Proportional) {
-            list.push("my_arabic_font".to_owned());
+    for (region, font_names) in fontdb {
+        if let Some(font_data) = load_font_family(&font_names) {
+            info!("Inserting font {region}");
+            fonts
+            .font_data
+            .insert(region.to_owned(), FontData::from_owned(font_data));
+
+            fonts.families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .push(region.to_owned());
         }
     }
-
-    //
-    // 3) (Optional) Load additional fonts for more languages/scripts as needed.
-    //
-
-    // Finally, tell egui to use our new font definitions:
-    ctx.set_fonts(fonts);
+    fonts
 }
