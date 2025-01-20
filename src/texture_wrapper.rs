@@ -6,8 +6,8 @@ use log::debug;
 use log::error;
 use log::warn;
 use notan::draw::*;
-use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter, Buffer};
 use notan::math::{Mat4, Vec4};
+use notan::prelude::{BlendMode, Buffer, Graphics, ShaderSource, Texture, TextureFilter};
 use rand::distributions::uniform;
 pub struct TexWrap {
     texture_array: Vec<Texture>,
@@ -22,17 +22,15 @@ pub struct TexWrap {
     pub format: notan::prelude::TextureFormat,
     pub image_format: image::ColorType,
     uniform_swizzle_mask: Buffer,
-    uniform_add_vec: Buffer
+    uniform_add_vec: Buffer,
 }
 
 #[derive(Default)]
 pub struct TextureWrapperManager {
     current_texture: Option<TexWrap>,
-    
 }
 
 impl TextureWrapperManager {
-
     pub fn set_image(
         &mut self,
         img: &DynamicImage,
@@ -56,54 +54,76 @@ impl TextureWrapperManager {
             self.clear();
             debug!("Updating or creating texture with new size.");
         }
-        
-        let (mask, vec) = Self::get_mat_vec(settings.current_channel);
+
+        let (mask, vec) = Self::get_mat_vec(settings.current_channel, img.color());
         self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img, mask, vec);
     }
 
-
-    pub fn update_color_selection(&mut self,
-        gfx: &mut Graphics,
-        settings: &PersistentSettings){
+    pub fn update_color_selection(&mut self, gfx: &mut Graphics, settings: &PersistentSettings) {
         if let Some(tex) = &mut self.current_texture {
-            let (mask, vec) = Self::get_mat_vec(settings.current_channel);
+            let (mask, vec) = Self::get_mat_vec(settings.current_channel, tex.image_format);
             tex.update_uniform_buffer(gfx, mask, vec);
         }
     }
 
+    fn get_mat_vec(chan: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
+        //Currently we have two types of textures: rgba and gray ones.
+        //All other types will be converted to rgba, so we only need to take care of those types here
+        if image_color == image::ColorType::L8 || image_color == image::ColorType::L16 {
+            Self::get_mat_vec_gray(chan)
+        } else {
+            Self::get_mat_vec_rgba(chan)
+        }
+    }
 
-    fn get_mat_vec(chan: ColorChannel)-> (Mat4, Vec4){
+    fn get_mat_vec_gray(chan: ColorChannel) -> (Mat4, Vec4) {
         let mut mat = Mat4::ZERO;
         let mut vec = Vec4::ZERO;
-        //mat = Mat4::from_rotation_x(0.0); //Diag
-        match chan{
-            ColorChannel::Red => {
-                mat.x_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);                
+        match chan {
+            ColorChannel::Alpha => {
+                vec = Vec4::ONE; // Just plain white
+            }
+            _ => {
+                //Every channel is the same, so we don't care
+                mat.x_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
                 vec.w = 1.0; //Alpha constant 1.0
             }
-            ColorChannel::Green=> {
+        }
+        (mat, vec)
+    }
+
+    fn get_mat_vec_rgba(chan: ColorChannel) -> (Mat4, Vec4) {
+        let mut mat = Mat4::ZERO;
+        let mut vec = Vec4::ZERO;
+        
+        match chan {
+            ColorChannel::Red => {
+                mat.x_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Green => {
                 mat.y_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
                 vec.w = 1.0; //Alpha constant 1.0
             }
 
-            ColorChannel::Blue=> {
+            ColorChannel::Blue => {
                 mat.z_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
                 vec.w = 1.0; //Alpha constant 1.0
             }
-            ColorChannel::Alpha=> {
+            ColorChannel::Alpha => {
                 mat.w_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
                 vec.w = 1.0; //Alpha constant 1.0
             }
-            ColorChannel::Rgb=> {
+            ColorChannel::Rgb => {
                 mat = Mat4::from_rotation_x(0.0); //Diag
                 mat.w_axis = Vec4::new(0.0, 0.0, 0.0, 0.0); // Kill alpha
                 vec.w = 1.0; //Alpha constant 1.0
             }
-            ColorChannel::Rgba=> {
+            ColorChannel::Rgba => {
                 mat = Mat4::from_rotation_x(0.0); //Diag
             }
         }
-        
+
         (mat, vec)
     }
 
@@ -129,26 +149,7 @@ pub struct TextureResponse<'a> {
 }
 
 //language=glsl
-const FRAGMENT_GRAYSCALEO: ShaderSource = notan::fragment_shader! {
-    r#"
-    #version 450
-    precision mediump float;
-
-    layout(location = 0) in vec2 v_uvs;
-    layout(location = 1) in vec4 v_color;
-
-    layout(binding = 0) uniform sampler2D u_texture;
-
-    layout(location = 0) out vec4 color;
-
-    void main() {
-        vec4 tex_col = texture(u_texture, v_uvs);
-        color = vec4(tex_col.r, tex_col.r,tex_col.r, 1.0) * v_color;
-    }
-    "#
-};
-
-const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
+const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     r#"
     #version 450
     precision mediump float;
@@ -180,32 +181,40 @@ impl TexWrap {
         gfx: &mut Graphics,
         settings: &PersistentSettings,
         image: &DynamicImage,
-        swizzle_mask:Mat4,
-        add_vec:Vec4
+        swizzle_mask: Mat4,
+        add_vec: Vec4,
     ) -> Option<TexWrap> {
-        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_standard,swizzle_mask, add_vec)
+        Self::gen_from_dynamic_image(
+            gfx,
+            settings,
+            image,
+            Self::gen_texture_standard,
+            swizzle_mask,
+            add_vec,
+        )
     }
 
-    fn gen_uniform_buffer_swizzle_mask(gfx: &mut Graphics,swizzle_mask:Mat4, add_vec: Vec4)->(Buffer, Buffer){       
+    fn gen_uniform_buffer_swizzle_mask(
+        gfx: &mut Graphics,
+        swizzle_mask: Mat4,
+        add_vec: Vec4,
+    ) -> (Buffer, Buffer) {
         let uniform_swizzle_mask = gfx
-        .create_uniform_buffer(1, "TextureInfo")
-        .with_data(&swizzle_mask)
-        .build()
-        .unwrap();
+            .create_uniform_buffer(1, "TextureInfo")
+            .with_data(&swizzle_mask)
+            .build()
+            .unwrap();
 
         let uniform_add_vector = gfx
-        .create_uniform_buffer(2, "TextureInfo2")
-        .with_data(&add_vec)
-        .build()
-        .unwrap();
+            .create_uniform_buffer(2, "TextureInfo2")
+            .with_data(&add_vec)
+            .build()
+            .unwrap();
 
         (uniform_swizzle_mask, uniform_add_vector)
     }
 
-    fn update_uniform_buffer(&self,
-                             gfx: &mut Graphics,
-                             mat:Mat4,
-                             add_vec:Vec4){
+    fn update_uniform_buffer(&self, gfx: &mut Graphics, mat: Mat4, add_vec: Vec4) {
         gfx.set_buffer_data(&self.uniform_swizzle_mask, &mat);
         gfx.set_buffer_data(&self.uniform_add_vec, &add_vec);
     }
@@ -517,7 +526,8 @@ impl TexWrap {
         Option<notan::prelude::Pipeline>,
     ) {
         let mut format: notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
-        let mut pipeline: Option<notan::prelude::Pipeline> = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+        let pipeline: Option<notan::prelude::Pipeline> =
+            Some(create_image_pipeline(gfx, Some(&FRAGMENT_IMAGE_RENDER)).unwrap());
         debug!("{:?}", image.color());
         match image.color() {
             image::ColorType::L8 => {
@@ -556,8 +566,8 @@ impl TexWrap {
             &PersistentSettings,
             bool,
         ) -> Option<Texture>,
-        swizzle_mask:Mat4,
-        add_vec: Vec4
+        swizzle_mask: Mat4,
+        add_vec: Vec4,
     ) -> Option<TexWrap> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
 
@@ -661,7 +671,8 @@ impl TexWrap {
 
         if fine {
             let texture_count = texture_vec.len();
-            let (uniforms, uniforms2) = Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec);
+            let (uniforms, uniforms2) =
+                Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec);
             Some(TexWrap {
                 texture_boundary: texture_boundary.unwrap(),
                 size_vec: im_size,
@@ -675,7 +686,7 @@ impl TexWrap {
                 format,
                 image_format: image.color(),
                 uniform_swizzle_mask: uniforms,
-                uniform_add_vec: uniforms2
+                uniform_add_vec: uniforms2,
             })
         } else {
             None
@@ -928,7 +939,10 @@ impl TexWrap {
 
     fn add_draw_shader(&self, draw: &mut Draw) {
         if let Some(pip) = &self.pipeline {
-            draw.image_pipeline().pipeline(pip).uniform_buffer(&self.uniform_swizzle_mask).uniform_buffer(&self.uniform_add_vec);
+            draw.image_pipeline()
+                .pipeline(pip)
+                .uniform_buffer(&self.uniform_swizzle_mask)
+                .uniform_buffer(&self.uniform_add_vec);
         }
     }
 
