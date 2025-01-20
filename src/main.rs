@@ -294,8 +294,8 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
+        
         let mut fonts = FontDefinitions::default();
-
         egui_extras::install_image_loaders(ctx);
 
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
@@ -349,40 +349,9 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
-        fonts.font_data.insert(
-            "noto_jp".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoSansJP-Regular.ttf")),
-        );
+       
+        let fonts = load_system_fonts(fonts);
 
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(2, "noto_jp".to_owned());
-
-        fonts.font_data.insert(
-            "noto_ar".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/NotoNaskhArabic-Regular.ttf")),
-        );
-
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(2, "noto_ar".to_owned());
-
-        #[cfg(feature = "lang_support")]
-        {
-            fonts.font_data.insert(
-                "noto_sc".to_owned(),
-                FontData::from_static(include_bytes!("../res/fonts/NotoSansSC-Regular.ttf")),
-            );
-            fonts
-                .families
-                .get_mut(&FontFamily::Proportional)
-                .unwrap()
-                .insert(2, "noto_sc".to_owned());
-        }
 
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
