@@ -537,8 +537,8 @@ impl TexWrap {
             //TODO: Re-Enable when 16 Bit is implemented in notan
             /*image::ColorType::L16 => {
                 format = notan::prelude::TextureFormat::R16Uint;
-                pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
-            }*/
+                //pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+            }*/            
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
             }
