@@ -954,7 +954,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     .current_texture
                     .set_image(&img, gfx, &state.persistent_settings);
 
-                match &state.persistent_settings.current_channel {
+                /*match &state.persistent_settings.current_channel {
                     // Unpremultiply the image
                     ColorChannel::Rgb => state.current_texture.set_image(
                         &unpremult(&img),
@@ -971,7 +971,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             &state.persistent_settings,
                         );
                     }
-                }
+                }*/
                 state.current_image = Some(img);
             }
             Frame::UpdateTexture => {
