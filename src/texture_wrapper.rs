@@ -159,18 +159,18 @@ const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     layout(binding = 0) uniform sampler2D u_texture;
 
     layout(binding = 1) uniform SwizzleMask {
-        mat4 u_size;
+        mat4 swizzle_mat;
     };
 
     layout(binding = 2) uniform OffsetVector {
-        vec4 u_add;
+        vec4 offset;
     };
     
     layout(location = 0) out vec4 color;
 
     void main() {
         vec4 tex_col = texture(u_texture, v_uvs);
-        color = ((u_size*tex_col)+u_add) * v_color;
+        color = ((swizzle_mat*tex_col)+offset) * v_color;
     }
     "#
 };
