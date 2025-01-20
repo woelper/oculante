@@ -2688,8 +2688,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             });
         }
         
-        if changed_channels {
-            // TODO: Make this dependent of DynamicImage's type
+        if changed_channels {            
             if state.current_image.is_some() {
                 state.current_texture.update_color_selection(gfx, &state.persistent_settings);
             }
