@@ -140,7 +140,7 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions{
     debug!("Attempting to load sys fonts");
     let mut fontdb = HashMap::new();
 
-    fontdb.insert("simplifed_chinese", vec![
+    fontdb.insert("simplified_chinese", vec![
         "Heiti SC",
         "Songti SC",
         "Noto Sans CJK SC", // Good coverage for Simplified Chinese
