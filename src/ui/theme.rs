@@ -140,7 +140,7 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions{
     debug!("Attempting to load sys fonts");
     let mut fontdb = HashMap::new();
 
-    fontdb.insert("chinese_simplified", vec![
+    fontdb.insert("asian_fonts", vec![
         "Heiti SC",
         "Songti SC",
         "Noto Sans CJK SC", // Good coverage for Simplified Chinese
@@ -152,9 +152,14 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions{
         "MS Gothic",
         "Noto Sans SC",
         "PingFang SC",
+        "Source Han Sans CN",
+        "Source Han Sans HK",
+        "Source Han Sans JP",
+        "Source Han Sans KR",
+        "Source Han Sans TW",
     ]);
 
-    fontdb.insert("arabic", vec![
+    fontdb.insert("arabic_fonts", vec![
         "Noto Sans Arabic",
         "Amiri",
         "Lateef",
