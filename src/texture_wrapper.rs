@@ -106,7 +106,6 @@ impl TextureWrapperManager {
                 swizzle_mat.y_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
             }
-
             ColorChannel::Blue => {
                 swizzle_mat.z_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
@@ -124,7 +123,6 @@ impl TextureWrapperManager {
                 swizzle_mat = Mat4::from_rotation_x(0.0); //Diag
             }
         }
-
         (swizzle_mat, offset_vec)
     }
 
@@ -248,9 +246,9 @@ impl TexWrap {
             .build();
 
         match texture_result {
-            Ok(texture) => return Some(texture),
+            Ok(texture) => Some(texture),
             Err(error) => panic!("Problem generating texture: {error:?}"),
-        };
+        }
     }
 
     fn image_color_supported(img: &DynamicImage) -> bool {
@@ -303,7 +301,7 @@ impl TexWrap {
         size_w_h: (usize, usize),
         bytes_per_pixel: usize,
     ) {
-        let mut dst_idx_start = 0 as usize;
+        let mut dst_idx_start = 0_usize;
         let mut src_idx_start = (offset_x_y.0 + offset_x_y.1 * src_image_width) * bytes_per_pixel;
 
         let row_increment_src = src_image_width * bytes_per_pixel;
@@ -381,7 +379,7 @@ impl TexWrap {
         if offset.0 == 0 && offset.1 == 0 && size.0 == image.width() && size.1 == image.height() {
             //Whole image, no tiling involved
             if color_supported {
-                return None;
+                None
             } else {
                 let depth = image.color().bytes_per_pixel() / image.color().channel_count();
                 if depth == 1 {
@@ -391,7 +389,7 @@ impl TexWrap {
                     );
                     //Convert to rgba8 if current image is not supported
                     let img_rgba = image.to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(img_rgba));
+                    Some(DynamicImage::ImageRgba8(img_rgba))
                 } else {
                     //Convert to rgba32 if current image is not supported
                     debug!(
@@ -428,7 +426,7 @@ impl TexWrap {
                     debug!("tiling {:?} to rgba8", image.color());
                     let gi: image::RgbaImage =
                         image::RgbaImage::from_raw(size.0, size.1, bytes).unwrap();
-                    return Some(DynamicImage::ImageRgba8(gi));
+                    Some(DynamicImage::ImageRgba8(gi))
                 }
                 DynamicImage::ImageRgb8(_) => {
                     let bytes = Self::image_tile_u8(image, offset, size);
@@ -461,7 +459,7 @@ impl TexWrap {
                     )
                     .unwrap();
                     let converted_image = DynamicImage::ImageLumaA16(gi).to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                    Some(DynamicImage::ImageRgba32F(converted_image))
                 }
 
                 DynamicImage::ImageRgb16(_) => {
@@ -630,19 +628,17 @@ impl TexWrap {
                             allow_mipmap,
                         );
                     }
-                } else {
-                    if let Some(bt_slice) = Self::image_bytes_slice(&image) {
-                        //Use input image directly
-                        tex = texture_generator_function(
-                            gfx,
-                            bt_slice,
-                            tex_width,
-                            tex_height,
-                            format,
-                            settings,
-                            allow_mipmap,
-                        );
-                    }
+                } else if let Some(bt_slice) = Self::image_bytes_slice(image) {
+                    //Use input image directly
+                    tex = texture_generator_function(
+                        gfx,
+                        bt_slice,
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
                 }
 
                 if let Some(t) = tex {
@@ -675,8 +671,8 @@ impl TexWrap {
             Some(TexWrap {
                 texture_boundary: texture_boundary.unwrap(),
                 size_vec: im_size,
-                col_count: col_count,
-                row_count: row_count,
+                col_count,
+                row_count,
                 texture_array: texture_vec,
                 col_translation: col_increment,
                 row_translation: row_increment,
@@ -732,7 +728,7 @@ impl TexWrap {
 
         let width_tex = (width / scale) as i32;
 
-        let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
+        let xy_tex_size = ((width_tex), (width_tex));
         let xy_tex_center = ((center.0) as i32, (center.1) as i32);
 
         //Ui position to start at
@@ -740,9 +736,9 @@ impl TexWrap {
         let mut curr_ui_curs = base_ui_curs;
 
         //Loop control variables, start end end coordinates of interest
-        let x_coordinate_end = (xy_tex_center.0 + xy_tex_size.0) as i32;
+        let x_coordinate_end = xy_tex_center.0 + xy_tex_size.0;
         let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
-        let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
+        let y_coordinate_end = xy_tex_center.1 + xy_tex_size.1;
         //print!("Start x: {}, y: {}\n",xy_tex_center.0 - xy_tex_size.0,y_coordinate);
 
         while y_coordinate <= y_coordinate_end {
@@ -753,7 +749,7 @@ impl TexWrap {
             while x_coordinate <= x_coordinate_end {
                 //get texture tile
                 let curr_tex_response =
-                    self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+                    self.get_texture_at_xy(x_coordinate, y_coordinate);
 
                 //Render boundary without our shader
                 if !shader_active && !curr_tex_response.is_boundary {
@@ -786,7 +782,7 @@ impl TexWrap {
                     ((tile_size.y) as f64 / (2 * width_tex + 1) as f64) * width as f64,
                 );
 
-                draw.image(&curr_tex_response.texture)
+                draw.image(curr_tex_response.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
                     .crop(
@@ -863,7 +859,7 @@ impl TexWrap {
                         return;
                     }
                 } else {
-                    let byte_slice = Self::image_bytes_slice(&image);
+                    let byte_slice = Self::image_bytes_slice(image);
                     if let Some(bt_slice) = byte_slice {
                         if let Err(e) = gfx
                             .update_texture(&mut self.texture_array[tex_index])
@@ -888,10 +884,10 @@ impl TexWrap {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
-        let width: i32;
-        let height: i32;
-        width = if xa < 0 { xa.abs() } else { tex_width_int };
-        height = if ya < 0 { ya.abs() } else { tex_height_int };
+        
+        
+        let width: i32 = if xa < 0 { xa.abs() } else { tex_width_int };
+        let height: i32 = if ya < 0 { ya.abs() } else { tex_height_int };
 
         TextureResponse {
             texture: &self.texture_boundary,
@@ -935,8 +931,8 @@ impl TexWrap {
 
         TextureResponse {
             texture: my_tex_pair,
-            x_offset_texture: x_offset_texture,
-            y_offset_texture: y_offset_texture,
+            x_offset_texture,
+            y_offset_texture,
             x_tex_right_global: tex_right,
             y_tex_bottom_global: tex_bottom,
             is_boundary: false,

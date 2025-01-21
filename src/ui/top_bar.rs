@@ -105,10 +105,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             });
         }
         
-        if changed_channels {            
-            if state.current_image.is_some() {
-                state.current_texture.update_color_selection(gfx, &state.persistent_settings);
-            }
+        if changed_channels && state.current_image.is_some() {
+            state.current_texture.update_color_selection(gfx, &state.persistent_settings);
         }
 
         let label_rect = ui.ctx().available_rect().shrink(50.);
