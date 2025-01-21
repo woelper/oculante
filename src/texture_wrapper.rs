@@ -137,16 +137,14 @@ impl TextureWrapperManager {
     }
 }
 
-pub struct TextureResponse<'a> {
+struct TextureResponse<'a> {
     pub texture: &'a Texture,
 
     pub x_offset_texture: i32,
     pub y_offset_texture: i32,
-
-    pub x_tex_left_global: i32,
-    pub y_tex_top_global: i32,
     pub x_tex_right_global: i32,
     pub y_tex_bottom_global: i32,
+    pub is_boundary: bool,
 }
 
 //language=glsl
@@ -730,7 +728,7 @@ impl TexWrap {
         center: (f32, f32),
         scale: f32,
     ) {
-        self.add_draw_shader(draw);
+        let mut shader_active = false;
 
         let width_tex = (width / scale) as i32;
 
@@ -756,6 +754,15 @@ impl TexWrap {
                 //get texture tile
                 let curr_tex_response =
                     self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+
+                //Render boundary without our shader
+                if !shader_active && !curr_tex_response.is_boundary {
+                    self.add_draw_shader(draw);
+                    shader_active = true;
+                } else if shader_active && curr_tex_response.is_boundary {
+                    self.remove_draw_shader(draw);
+                    shader_active = false;
+                }
 
                 //print!("x: {} y: {} ", x_coordinate, y_coordinate);
                 //print!("top: {} left: {} ", curr_tex_response.y_tex_top_global, curr_tex_response.x_tex_left_global);
@@ -877,7 +884,7 @@ impl TexWrap {
         }
     }
 
-    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
@@ -890,14 +897,13 @@ impl TexWrap {
             texture: &self.texture_boundary,
             x_offset_texture: 0,
             y_offset_texture: 0,
-            x_tex_left_global: xa,
-            y_tex_top_global: ya,
             x_tex_right_global: xa + width - 1,
             y_tex_bottom_global: ya + height - 1,
+            is_boundary: true,
         }
     }
 
-    pub fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
         let width_int = self.width() as i32;
         let height_int = self.height() as i32;
 
@@ -931,10 +937,9 @@ impl TexWrap {
             texture: my_tex_pair,
             x_offset_texture: x_offset_texture,
             y_offset_texture: y_offset_texture,
-            x_tex_left_global: tex_left,
-            y_tex_top_global: tex_top,
             x_tex_right_global: tex_right,
             y_tex_bottom_global: tex_bottom,
+            is_boundary: false,
         }
     }
 
