@@ -55,7 +55,8 @@ impl TextureWrapperManager {
         }
 
         let (swizzle_mat, offset_vec) = Self::get_mat_vec(settings.current_channel, img.color());
-        self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img, swizzle_mat, offset_vec);
+        self.current_texture =
+            TexWrap::from_dynamic_image(gfx, settings, img, swizzle_mat, offset_vec);
     }
 
     pub fn update_color_selection(&mut self, gfx: &mut Graphics, settings: &PersistentSettings) {
@@ -94,23 +95,24 @@ impl TextureWrapperManager {
     fn get_mat_vec_rgba(channel_selection: ColorChannel) -> (Mat4, Vec4) {
         let mut swizzle_mat = Mat4::ZERO;
         let mut offset_vec = Vec4::ZERO;
-        
+
+        let one_row_vec = Vec4::new(1.0, 1.0, 1.0, 0.0);
         match channel_selection {
             ColorChannel::Red => {
-                swizzle_mat.x_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                swizzle_mat.x_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
             }
             ColorChannel::Green => {
-                swizzle_mat.y_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                swizzle_mat.y_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
             }
 
             ColorChannel::Blue => {
-                swizzle_mat.z_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                swizzle_mat.z_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
             }
             ColorChannel::Alpha => {
-                swizzle_mat.w_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                swizzle_mat.w_axis = one_row_vec;
                 offset_vec.w = 1.0; //Alpha constant 1.0
             }
             ColorChannel::Rgb => {
@@ -537,7 +539,7 @@ impl TexWrap {
             /*image::ColorType::L16 => {
                 format = notan::prelude::TextureFormat::R16Uint;
                 //pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
-            }*/            
+            }*/
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
             }
