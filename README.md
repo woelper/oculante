@@ -266,6 +266,13 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 </details> 
 
 <details>
+<summary>Extended Language Support</summary>
+
+Oculante can support some additional languages such as Arabic, Chinese, Japanese, and Korean. This support depends on if your system has a supported font family installed. One supported font family is [Noto Sans](https://fonts.google.com/noto/specimen/Noto+Sans).
+
+</details> 
+
+<details>
 <summary>Default Shortcuts</summary>
 
 ### Shortcuts:
