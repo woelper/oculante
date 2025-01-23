@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    branches: [ "*" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  MACOS_DEPLOYMENT_TARGET: 10.15
+
+jobs:
+  build_job:
+    name: Build release
+    needs: release_job
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14]
+        rust: [stable]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install latest rust
+      run: rustup update
+
+    - name: Install cargo bundle
+      run: cargo install cargo-bundle
+
+    - name: Build Mac Silicon Bundle
+      run: ./build_mac.sh
+
+    - name: Notarize product
+      uses: love-action/xcode-notarizer@v1
+      with:
+        product-path: ./target/release/bundle/osx/oculante.app
+        key-content: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        key-id: ${{ secrets.APPLE_KEY_ID }}
+        issuer-id: ${{ secrets.APPLE_ISSUER_ID }}
+        staple: false
+
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: app
+        path: |
+          target/release/bundle/osx/oculante.app
+          
