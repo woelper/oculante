@@ -107,8 +107,9 @@ pub fn open_image(
                 data.as_bytes(),
                 CompressedImageFormats::all(),
                 true,
-            )?;
-            let d = ktx.try_into_dynamic()?;
+            )
+            .map_err(|e| anyhow!("{:?}", e))?;
+            let d = ktx.try_into_dynamic().map_err(|e| anyhow!("{:?}", e))?;
             _ = sender.send(Frame::new_still(d));
             return Ok(receiver);
         }

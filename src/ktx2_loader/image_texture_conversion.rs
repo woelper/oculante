@@ -5,7 +5,6 @@ use crate::ktx2_loader::Image;
 use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
 use log::debug;
-use thiserror::Error;
 use wgpu::TextureFormat;
 
 impl Image {
@@ -88,13 +87,11 @@ impl Image {
 
 /// Errors that occur while converting an [`Image`] into a [`DynamicImage`]
 #[non_exhaustive]
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum IntoDynamicImageError {
     /// Conversion into dynamic image not supported for source format.
-    #[error("KTX2: Unsupported format: {0:?}. Please open a github issue and attach your image.")]
     UnsupportedFormat(TextureFormat),
 
     /// Encountered an unknown error during conversion.
-    #[error("KTX2: Failed interpret buffer: {0:?}.")]
     UnknownConversionError(TextureFormat),
 }
