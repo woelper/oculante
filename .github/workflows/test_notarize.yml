@@ -30,7 +30,7 @@ jobs:
       run: ./build_mac.sh
 
     - name: Notarize product
-      uses: love-action/xcode-notarizer@v1
+      uses: love-actions/xcode-notarizer@v1
       with:
         product-path: ./target/release/bundle/osx/oculante.app
         key-content: ${{ secrets.APPLE_API_KEY_CONTENT }}
