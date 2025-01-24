@@ -33,11 +33,11 @@ jobs:
       uses: love-actions/xcode-notarizer@v1
       with:
         product-path: ./target/release/bundle/osx/oculante.app
-        key-content: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        key-id: ${{ secrets.APPLE_KEY_ID }}
-        issuer-id: ${{ secrets.APPLE_ISSUER_ID }}
+        apple-id: ${{ secrets.APPLE_ID }}
+        app-password: ${{ secrets.APPLE_PASSWORD }}
+        team-id: ${{ secrets.APPLE_TEAM_ID }}
         staple: false
-
+        
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4
       with:
