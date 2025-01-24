@@ -191,22 +191,30 @@ impl TexWrap {
         )
     }
 
+    fn check_union_buffer_creation(buffer_result:Result<Buffer,String>)->Buffer{
+        match buffer_result {
+            Ok(buffer) => buffer,
+            Err(error) => panic!("Problem generating union buffer: {error:?}"),
+        }
+    }
+
     fn gen_uniform_buffer_swizzle_mask(
         gfx: &mut Graphics,
         swizzle_mask: Mat4,
         offset_vec: Vec4,
     ) -> (Buffer, Buffer) {
-        let uniform_swizzle_mask = gfx
+        let uniform_swizzle_mask = 
+            Self::check_union_buffer_creation(
+            gfx
             .create_uniform_buffer(1, "SwizzleMask")
             .with_data(&swizzle_mask)
-            .build()
-            .unwrap();
+            .build());
 
-        let uniform_offset_vector = gfx
+        let uniform_offset_vector = 
+        Self::check_union_buffer_creation(gfx
             .create_uniform_buffer(2, "OffsetVector")
             .with_data(&offset_vec)
-            .build()
-            .unwrap();
+            .build());
 
         (uniform_swizzle_mask, uniform_offset_vector)
     }
@@ -214,6 +222,19 @@ impl TexWrap {
     fn update_uniform_buffer(&self, gfx: &mut Graphics, swizzle_mat: Mat4, offset_vec: Vec4) {
         gfx.set_buffer_data(&self.uniform_swizzle_mask, &swizzle_mat);
         gfx.set_buffer_data(&self.uniform_offset_vec, &offset_vec);
+    }
+
+    fn gen_texture_background(gfx: &mut Graphics) -> Texture {
+        let boundary_pixels_bytes: [u8; 4] = [0, 0, 0, 255];
+        let texture_result: Result<Texture, String> = gfx
+            .create_texture()
+            .from_bytes(&boundary_pixels_bytes, 1, 1)
+            .with_format(notan::app::TextureFormat::Rgba32)
+            .build();
+        match texture_result {
+            Ok(texture) => texture,
+            Err(error) => panic!("Problem generating texture: {error:?}"),
+        }
     }
 
     fn gen_texture_standard(
@@ -524,7 +545,7 @@ impl TexWrap {
     ) {
         let mut format: notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
         let pipeline: Option<notan::prelude::Pipeline> =
-            Some(create_image_pipeline(gfx, Some(&FRAGMENT_IMAGE_RENDER)).unwrap());
+            create_image_pipeline(gfx, Some(&FRAGMENT_IMAGE_RENDER)).ok();
         debug!("{:?}", image.color());
         match image.color() {
             image::ColorType::L8 => {
@@ -657,19 +678,14 @@ impl TexWrap {
             }
         }
 
-        let boundary_pixels_bytes: [u8; 4] = [0, 0, 0, 255];
-        let texture_boundary: Result<Texture, String> = gfx
-            .create_texture()
-            .from_bytes(&boundary_pixels_bytes, 1, 1)
-            .with_format(notan::app::TextureFormat::Rgba32)
-            .build();
+        let texture_boundary = Self::gen_texture_background(gfx);
 
         if fine {
             let texture_count = texture_vec.len();
             let (uniforms, uniforms2) =
                 Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec);
             Some(TexWrap {
-                texture_boundary: texture_boundary.unwrap(),
+                texture_boundary,
                 size_vec: im_size,
                 col_count,
                 row_count,
@@ -748,8 +764,7 @@ impl TexWrap {
             let mut last_display_size_y = f64::MAX;
             while x_coordinate <= x_coordinate_end {
                 //get texture tile
-                let curr_tex_response =
-                    self.get_texture_at_xy(x_coordinate, y_coordinate);
+                let curr_tex_response = self.get_texture_at_xy(x_coordinate, y_coordinate);
 
                 //Render boundary without our shader
                 if !shader_active && !curr_tex_response.is_boundary {
@@ -884,8 +899,6 @@ impl TexWrap {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
-        
-        
         let width: i32 = if xa < 0 { xa.abs() } else { tex_width_int };
         let height: i32 = if ya < 0 { ya.abs() } else { tex_height_int };
 
