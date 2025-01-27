@@ -964,7 +964,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         &state.edit_state.result_pixel_op,
                         gfx,
                         &state.persistent_settings,
-                    )
+                    );
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
