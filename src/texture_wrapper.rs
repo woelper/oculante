@@ -44,7 +44,6 @@ impl TextureWrapperManager {
             {
                 debug!("Re-using texture as it is the same size and type.");
                 tex.update_textures(gfx, img);
-                return;
             }
         }
 
@@ -55,8 +54,14 @@ impl TextureWrapperManager {
         }
 
         let (swizzle_mat, offset_vec) = Self::get_mat_vec(settings.current_channel, img.color());
-        self.current_texture =
-            TexWrap::from_dynamic_image(gfx, settings, img, swizzle_mat, offset_vec);
+
+        match TexWrap::from_dynamic_image(gfx, settings, img, swizzle_mat, offset_vec) {
+            Ok(texture_wrap) => self.current_texture = Some(texture_wrap),
+            Err(error) => {
+                self.current_texture = None;
+                error!("{error}"); //TODO pass this to caller
+            }
+        }
     }
 
     pub fn update_color_selection(&mut self, gfx: &mut Graphics, settings: &PersistentSettings) {
@@ -180,7 +185,7 @@ impl TexWrap {
         image: &DynamicImage,
         swizzle_mask: Mat4,
         offset_vec: Vec4,
-    ) -> Option<TexWrap> {
+    ) -> Result<TexWrap, String> {
         Self::gen_from_dynamic_image(
             gfx,
             settings,
@@ -191,32 +196,42 @@ impl TexWrap {
         )
     }
 
-    fn check_union_buffer_creation(buffer_result:Result<Buffer,String>)->Buffer{
-        match buffer_result {
-            Ok(buffer) => buffer,
-            Err(error) => panic!("Problem generating union buffer: {error:?}"),
-        }
-    }
-
     fn gen_uniform_buffer_swizzle_mask(
         gfx: &mut Graphics,
         swizzle_mask: Mat4,
         offset_vec: Vec4,
-    ) -> (Buffer, Buffer) {
-        let uniform_swizzle_mask = 
-            Self::check_union_buffer_creation(
-            gfx
+    ) -> Result<(Buffer, Buffer), String> {
+        let uniform_swizzle_mask = gfx
             .create_uniform_buffer(1, "SwizzleMask")
             .with_data(&swizzle_mask)
-            .build());
+            .build();
 
-        let uniform_offset_vector = 
-        Self::check_union_buffer_creation(gfx
+        match uniform_swizzle_mask {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(format!(
+                    "Problem generating union buffer for swizzle matrix: {error:?}"
+                ))
+            }
+        }
+
+        let uniform_offset_vector = gfx
             .create_uniform_buffer(2, "OffsetVector")
             .with_data(&offset_vec)
-            .build());
+            .build();
+        match uniform_offset_vector {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(format!(
+                    "Problem generating union buffer for offset vector: {error:?}"
+                ))
+            }
+        }
 
-        (uniform_swizzle_mask, uniform_offset_vector)
+        Ok((
+            uniform_swizzle_mask.unwrap(),
+            uniform_offset_vector.unwrap(),
+        ))
     }
 
     fn update_uniform_buffer(&self, gfx: &mut Graphics, swizzle_mat: Mat4, offset_vec: Vec4) {
@@ -586,7 +601,7 @@ impl TexWrap {
         ) -> Option<Texture>,
         swizzle_mask: Mat4,
         add_vec: Vec4,
-    ) -> Option<TexWrap> {
+    ) -> Result<TexWrap, String> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
 
         let image = src_image;
@@ -598,7 +613,7 @@ impl TexWrap {
 
         if im_w < 1 || im_h < 1 {
             error!("Image width smaller than 1!"); //TODO: fix t
-            return None;
+            return Err(String::from("Image width smaller than 1!"));
         }
 
         let im_pixel_count = (im_w * im_h) as usize;
@@ -682,9 +697,15 @@ impl TexWrap {
 
         if fine {
             let texture_count = texture_vec.len();
-            let (uniforms, uniforms2) =
-                Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec);
-            Some(TexWrap {
+
+            let uniforms: Buffer;
+            let uniforms2: Buffer;
+            match Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec) {
+                Ok(uniforms_tuple) => (uniforms, uniforms2) = uniforms_tuple,
+                Err(error) => return Err(error),
+            }
+
+            Ok(TexWrap {
                 texture_boundary,
                 size_vec: im_size,
                 col_count,
@@ -700,7 +721,7 @@ impl TexWrap {
                 uniform_offset_vec: uniforms2,
             })
         } else {
-            None
+            Err(String::from("Texture generation failed!"))
         }
     }
 
