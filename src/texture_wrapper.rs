@@ -43,7 +43,14 @@ impl TextureWrapperManager {
                 && img.color() == tex.image_format
             {
                 debug!("Re-using texture as it is the same size and type.");
-                return tex.update_textures(gfx, img);
+                match tex.update_textures(gfx, img) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        self.clear();
+                        error!("{error}");
+                        return Err(error);
+                    }
+                }
             }
         }
 
@@ -61,8 +68,8 @@ impl TextureWrapperManager {
                 Ok(())
             }
             Err(error) => {
-                self.current_texture = None;
-                error!("{error}"); //TODO pass this to caller
+                self.clear();
+                error!("{error}");
                 Err(error)
             }
         }
