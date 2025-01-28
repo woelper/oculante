@@ -1,11 +1,13 @@
 use crate::settings::PersistentSettings;
+use crate::utils::ColorChannel;
 use image::imageops;
 use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::warn;
 use notan::draw::*;
-use notan::prelude::{BlendMode, Graphics, ShaderSource, Texture, TextureFilter};
+use notan::math::{Mat4, Vec4};
+use notan::prelude::{BlendMode, Buffer, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<Texture>,
     texture_boundary: Texture,
@@ -18,6 +20,8 @@ pub struct TexWrap {
     pipeline: Option<notan::prelude::Pipeline>,
     pub format: notan::prelude::TextureFormat,
     pub image_format: image::ColorType,
+    uniform_swizzle_mask: Buffer,
+    uniform_offset_vec: Buffer,
 }
 
 #[derive(Default)]
@@ -31,7 +35,7 @@ impl TextureWrapperManager {
         img: &DynamicImage,
         gfx: &mut Graphics,
         settings: &PersistentSettings,
-    ) {
+    ) -> Result<(), String> {
         //First: try to update an existing texture
         if let Some(tex) = &mut self.current_texture {
             if tex.width() as u32 == img.width()
@@ -39,8 +43,14 @@ impl TextureWrapperManager {
                 && img.color() == tex.image_format
             {
                 debug!("Re-using texture as it is the same size and type.");
-                tex.update_textures(gfx, img);
-                return;
+                match tex.update_textures(gfx, img) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        self.clear();
+                        error!("{error}");
+                        return Err(error);
+                    }
+                }
             }
         }
 
@@ -50,7 +60,86 @@ impl TextureWrapperManager {
             debug!("Updating or creating texture with new size.");
         }
 
-        self.current_texture = TexWrap::from_dynamic_image(gfx, settings, img);
+        let (swizzle_mat, offset_vec) = Self::get_mat_vec(settings.current_channel, img.color());
+
+        match TexWrap::from_dynamic_image(gfx, settings, img, swizzle_mat, offset_vec) {
+            Ok(texture_wrap) => {
+                self.current_texture = Some(texture_wrap);
+                Ok(())
+            }
+            Err(error) => {
+                self.clear();
+                error!("{error}");
+                Err(error)
+            }
+        }
+    }
+
+    pub fn update_color_selection(&mut self, gfx: &mut Graphics, settings: &PersistentSettings) {
+        if let Some(tex) = &mut self.current_texture {
+            let (mask, vec) = Self::get_mat_vec(settings.current_channel, tex.image_format);
+            tex.update_uniform_buffer(gfx, mask, vec);
+        }
+    }
+
+    fn get_mat_vec(channel_selection: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
+        //Currently we have two types of textures: rgba and gray ones.
+        //All other types will be converted to rgba, so we only need to take care of those types here
+        if image_color == image::ColorType::L8 || image_color == image::ColorType::L16 {
+            Self::get_mat_vec_gray(channel_selection)
+        } else {
+            Self::get_mat_vec_rgba(channel_selection)
+        }
+    }
+
+    fn get_mat_vec_gray(channel_selection: ColorChannel) -> (Mat4, Vec4) {
+        let mut swizzle_mat = Mat4::ZERO;
+        let mut offset_vec = Vec4::ZERO;
+        match channel_selection {
+            ColorChannel::Alpha => {
+                offset_vec = Vec4::ONE; // Just plain white
+            }
+            _ => {
+                //Every channel is the same, so we don't care
+                swizzle_mat.x_axis = Vec4::new(1.0, 1.0, 1.0, 0.0);
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+        }
+        (swizzle_mat, offset_vec)
+    }
+
+    fn get_mat_vec_rgba(channel_selection: ColorChannel) -> (Mat4, Vec4) {
+        let mut swizzle_mat = Mat4::ZERO;
+        let mut offset_vec = Vec4::ZERO;
+
+        let one_row_vec = Vec4::new(1.0, 1.0, 1.0, 0.0);
+        match channel_selection {
+            ColorChannel::Red => {
+                swizzle_mat.x_axis = one_row_vec;
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Green => {
+                swizzle_mat.y_axis = one_row_vec;
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Blue => {
+                swizzle_mat.z_axis = one_row_vec;
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Alpha => {
+                swizzle_mat.w_axis = one_row_vec;
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Rgb => {
+                swizzle_mat = Mat4::from_rotation_x(0.0); //Diag
+                swizzle_mat.w_axis = Vec4::new(0.0, 0.0, 0.0, 0.0); // Kill alpha
+                offset_vec.w = 1.0; //Alpha constant 1.0
+            }
+            ColorChannel::Rgba => {
+                swizzle_mat = Mat4::from_rotation_x(0.0); //Diag
+            }
+        }
+        (swizzle_mat, offset_vec)
     }
 
     pub fn get(&mut self) -> &mut Option<TexWrap> {
@@ -62,20 +151,18 @@ impl TextureWrapperManager {
     }
 }
 
-pub struct TextureResponse<'a> {
+struct TextureResponse<'a> {
     pub texture: &'a Texture,
 
     pub x_offset_texture: i32,
     pub y_offset_texture: i32,
-
-    pub x_tex_left_global: i32,
-    pub y_tex_top_global: i32,
     pub x_tex_right_global: i32,
     pub y_tex_bottom_global: i32,
+    pub is_boundary: bool,
 }
 
 //language=glsl
-const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
+const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     r#"
     #version 450
     precision mediump float;
@@ -85,11 +172,19 @@ const FRAGMENT_GRAYSCALE: ShaderSource = notan::fragment_shader! {
 
     layout(binding = 0) uniform sampler2D u_texture;
 
+    layout(binding = 1) uniform SwizzleMask {
+        mat4 swizzle_mat;
+    };
+
+    layout(binding = 2) uniform OffsetVector {
+        vec4 offset;
+    };
+    
     layout(location = 0) out vec4 color;
 
     void main() {
         vec4 tex_col = texture(u_texture, v_uvs);
-        color = vec4(tex_col.r, tex_col.r,tex_col.r, 1.0) * v_color;
+        color = ((swizzle_mat*tex_col)+offset) * v_color;
     }
     "#
 };
@@ -99,8 +194,40 @@ impl TexWrap {
         gfx: &mut Graphics,
         settings: &PersistentSettings,
         image: &DynamicImage,
-    ) -> Option<TexWrap> {
-        Self::gen_from_dynamic_image(gfx, settings, image, Self::gen_texture_standard)
+        swizzle_mask: Mat4,
+        offset_vec: Vec4,
+    ) -> Result<TexWrap, String> {
+        Self::gen_from_dynamic_image(
+            gfx,
+            settings,
+            image,
+            Self::gen_texture_standard,
+            swizzle_mask,
+            offset_vec,
+        )
+    }
+
+    fn gen_uniform_buffer_swizzle_mask(
+        gfx: &mut Graphics,
+        swizzle_mask: Mat4,
+        offset_vec: Vec4,
+    ) -> Result<(Buffer, Buffer), String> {
+        let uniform_swizzle_mask = gfx
+            .create_uniform_buffer(1, "SwizzleMask")
+            .with_data(&swizzle_mask)
+            .build()?;
+
+        let uniform_offset_vector = gfx
+            .create_uniform_buffer(2, "OffsetVector")
+            .with_data(&offset_vec)
+            .build()?;
+
+        Ok((uniform_swizzle_mask, uniform_offset_vector))
+    }
+
+    fn update_uniform_buffer(&self, gfx: &mut Graphics, swizzle_mat: Mat4, offset_vec: Vec4) {
+        gfx.set_buffer_data(&self.uniform_swizzle_mask, &swizzle_mat);
+        gfx.set_buffer_data(&self.uniform_offset_vec, &offset_vec);
     }
 
     fn gen_texture_standard(
@@ -111,9 +238,8 @@ impl TexWrap {
         format: notan::prelude::TextureFormat,
         settings: &PersistentSettings,
         size_ok: bool,
-    ) -> Option<Texture> {
-        let texture_result = gfx
-            .create_texture()
+    ) -> Result<Texture, String> {
+        gfx.create_texture()
             .from_bytes(bytes, width, height)
             .with_mipmaps(settings.use_mipmaps && size_ok)
             .with_format(format)
@@ -130,12 +256,7 @@ impl TexWrap {
                     TextureFilter::Nearest
                 },
             )
-            .build();
-
-        match texture_result {
-            Ok(texture) => return Some(texture),
-            Err(error) => panic!("Problem generating texture: {error:?}"),
-        };
+            .build()
     }
 
     fn image_color_supported(img: &DynamicImage) -> bool {
@@ -188,7 +309,7 @@ impl TexWrap {
         size_w_h: (usize, usize),
         bytes_per_pixel: usize,
     ) {
-        let mut dst_idx_start = 0 as usize;
+        let mut dst_idx_start = 0_usize;
         let mut src_idx_start = (offset_x_y.0 + offset_x_y.1 * src_image_width) * bytes_per_pixel;
 
         let row_increment_src = src_image_width * bytes_per_pixel;
@@ -266,7 +387,7 @@ impl TexWrap {
         if offset.0 == 0 && offset.1 == 0 && size.0 == image.width() && size.1 == image.height() {
             //Whole image, no tiling involved
             if color_supported {
-                return None;
+                None
             } else {
                 let depth = image.color().bytes_per_pixel() / image.color().channel_count();
                 if depth == 1 {
@@ -276,7 +397,7 @@ impl TexWrap {
                     );
                     //Convert to rgba8 if current image is not supported
                     let img_rgba = image.to_rgba8();
-                    return Some(DynamicImage::ImageRgba8(img_rgba));
+                    Some(DynamicImage::ImageRgba8(img_rgba))
                 } else {
                     //Convert to rgba32 if current image is not supported
                     debug!(
@@ -313,7 +434,7 @@ impl TexWrap {
                     debug!("tiling {:?} to rgba8", image.color());
                     let gi: image::RgbaImage =
                         image::RgbaImage::from_raw(size.0, size.1, bytes).unwrap();
-                    return Some(DynamicImage::ImageRgba8(gi));
+                    Some(DynamicImage::ImageRgba8(gi))
                 }
                 DynamicImage::ImageRgb8(_) => {
                     let bytes = Self::image_tile_u8(image, offset, size);
@@ -346,7 +467,7 @@ impl TexWrap {
                     )
                     .unwrap();
                     let converted_image = DynamicImage::ImageLumaA16(gi).to_rgba32f();
-                    return Some(DynamicImage::ImageRgba32F(converted_image));
+                    Some(DynamicImage::ImageRgba32F(converted_image))
                 }
 
                 DynamicImage::ImageRgb16(_) => {
@@ -410,17 +531,18 @@ impl TexWrap {
         Option<notan::prelude::Pipeline>,
     ) {
         let mut format: notan::prelude::TextureFormat = notan::app::TextureFormat::Rgba32;
-        let mut pipeline: Option<notan::prelude::Pipeline> = None;
+        let pipeline: Option<notan::prelude::Pipeline> =
+            create_image_pipeline(gfx, Some(&FRAGMENT_IMAGE_RENDER)).ok();
         debug!("{:?}", image.color());
         match image.color() {
             image::ColorType::L8 => {
                 format = notan::prelude::TextureFormat::R8;
-                pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+                //pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
             }
             //TODO: Re-Enable when 16 Bit is implemented in notan
             /*image::ColorType::L16 => {
                 format = notan::prelude::TextureFormat::R16Uint;
-                pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
+                //pipeline = Some(create_image_pipeline(gfx, Some(&FRAGMENT_GRAYSCALE)).unwrap());
             }*/
             image::ColorType::Rgba32F => {
                 format = notan::prelude::TextureFormat::Rgba32Float;
@@ -448,8 +570,10 @@ impl TexWrap {
             notan::prelude::TextureFormat,
             &PersistentSettings,
             bool,
-        ) -> Option<Texture>,
-    ) -> Option<TexWrap> {
+        ) -> Result<Texture, String>,
+        swizzle_mask: Mat4,
+        add_vec: Vec4,
+    ) -> Result<TexWrap, String> {
         const MAX_PIXEL_COUNT: usize = 8192 * 8192;
 
         let image = src_image;
@@ -461,7 +585,7 @@ impl TexWrap {
 
         if im_w < 1 || im_h < 1 {
             error!("Image width smaller than 1!"); //TODO: fix t
-            return None;
+            return Err(String::from("Image width smaller than 1!"));
         }
 
         let im_pixel_count = (im_w * im_h) as usize;
@@ -482,7 +606,6 @@ impl TexWrap {
         let mut texture_vec: Vec<Texture> = Vec::new();
         let row_increment = std::cmp::min(max_texture_size, im_h);
         let col_increment = std::cmp::min(max_texture_size, im_w);
-        let mut fine = true;
 
         for row_index in 0..row_count {
             let tex_start_y = row_index * row_increment;
@@ -491,7 +614,8 @@ impl TexWrap {
                 let tex_start_x = col_index * col_increment;
                 let tex_width = std::cmp::min(col_increment, im_w - tex_start_x);
 
-                let mut tex: Option<Texture> = None;
+                let mut tex: Result<Texture, String> =
+                    Err(String::from("Texture generation failed!"));
 
                 let sub_img_opt = Self::get_dyn_image_part(
                     image,
@@ -512,62 +636,55 @@ impl TexWrap {
                             allow_mipmap,
                         );
                     }
-                } else {
-                    if let Some(bt_slice) = Self::image_bytes_slice(&image) {
-                        //Use input image directly
-                        tex = texture_generator_function(
-                            gfx,
-                            bt_slice,
-                            tex_width,
-                            tex_height,
-                            format,
-                            settings,
-                            allow_mipmap,
-                        );
+                } else if let Some(bt_slice) = Self::image_bytes_slice(image) {
+                    //Use input image directly
+                    tex = texture_generator_function(
+                        gfx,
+                        bt_slice,
+                        tex_width,
+                        tex_height,
+                        format,
+                        settings,
+                        allow_mipmap,
+                    );
+                }
+
+                match tex {
+                    Ok(t) => texture_vec.push(t),
+                    Err(error) => {
+                        texture_vec.clear();
+                        return Err(error);
                     }
                 }
-
-                if let Some(t) = tex {
-                    texture_vec.push(t);
-                } else {
-                    //On error
-                    texture_vec.clear();
-                    fine = false;
-                    break;
-                }
-            }
-            if !fine {
-                //early exit if we failed
-                error!("Texture generation failed!");
-                break;
             }
         }
 
-        let boundary_pixels_bytes: [u8; 4] = [0, 0, 0, 255];
-        let texture_boundary: Result<Texture, String> = gfx
+        let texture_boundary = gfx
             .create_texture()
-            .from_bytes(&boundary_pixels_bytes, 1, 1)
+            .from_bytes(&[0, 0, 0, 255], 1, 1)
             .with_format(notan::app::TextureFormat::Rgba32)
-            .build();
+            .build()?;
 
-        if fine {
-            let texture_count = texture_vec.len();
-            Some(TexWrap {
-                texture_boundary: texture_boundary.unwrap(),
-                size_vec: im_size,
-                col_count: col_count,
-                row_count: row_count,
-                texture_array: texture_vec,
-                col_translation: col_increment,
-                row_translation: row_increment,
-                texture_count,
-                pipeline,
-                format,
-                image_format: image.color(),
-            })
-        } else {
-            None
-        }
+        let texture_count = texture_vec.len();
+
+        let (uniforms, uniforms2) =
+            Self::gen_uniform_buffer_swizzle_mask(gfx, swizzle_mask, add_vec)?;
+
+        Ok(TexWrap {
+            texture_boundary,
+            size_vec: im_size,
+            col_count,
+            row_count,
+            texture_array: texture_vec,
+            col_translation: col_increment,
+            row_translation: row_increment,
+            texture_count,
+            pipeline,
+            format,
+            image_format: image.color(),
+            uniform_swizzle_mask: uniforms,
+            uniform_offset_vec: uniforms2,
+        })
     }
 
     pub fn draw_textures(
@@ -606,11 +723,11 @@ impl TexWrap {
         center: (f32, f32),
         scale: f32,
     ) {
-        self.add_draw_shader(draw);
+        let mut shader_active = false;
 
         let width_tex = (width / scale) as i32;
 
-        let xy_tex_size = ((width_tex) as i32, (width_tex) as i32);
+        let xy_tex_size = ((width_tex), (width_tex));
         let xy_tex_center = ((center.0) as i32, (center.1) as i32);
 
         //Ui position to start at
@@ -618,9 +735,9 @@ impl TexWrap {
         let mut curr_ui_curs = base_ui_curs;
 
         //Loop control variables, start end end coordinates of interest
-        let x_coordinate_end = (xy_tex_center.0 + xy_tex_size.0) as i32;
+        let x_coordinate_end = xy_tex_center.0 + xy_tex_size.0;
         let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
-        let y_coordinate_end = (xy_tex_center.1 + xy_tex_size.1) as i32;
+        let y_coordinate_end = xy_tex_center.1 + xy_tex_size.1;
         //print!("Start x: {}, y: {}\n",xy_tex_center.0 - xy_tex_size.0,y_coordinate);
 
         while y_coordinate <= y_coordinate_end {
@@ -630,8 +747,16 @@ impl TexWrap {
             let mut last_display_size_y = f64::MAX;
             while x_coordinate <= x_coordinate_end {
                 //get texture tile
-                let curr_tex_response =
-                    self.get_texture_at_xy(x_coordinate as i32, y_coordinate as i32);
+                let curr_tex_response = self.get_texture_at_xy(x_coordinate, y_coordinate);
+
+                //Render boundary without our shader
+                if !shader_active && !curr_tex_response.is_boundary {
+                    self.add_draw_shader(draw);
+                    shader_active = true;
+                } else if shader_active && curr_tex_response.is_boundary {
+                    self.remove_draw_shader(draw);
+                    shader_active = false;
+                }
 
                 //print!("x: {} y: {} ", x_coordinate, y_coordinate);
                 //print!("top: {} left: {} ", curr_tex_response.y_tex_top_global, curr_tex_response.x_tex_left_global);
@@ -655,7 +780,7 @@ impl TexWrap {
                     ((tile_size.y) as f64 / (2 * width_tex + 1) as f64) * width as f64,
                 );
 
-                draw.image(&curr_tex_response.texture)
+                draw.image(curr_tex_response.texture)
                     .blend_mode(BlendMode::NORMAL)
                     .size(display_size.x as f32, display_size.y as f32)
                     .crop(
@@ -701,7 +826,11 @@ impl TexWrap {
         .stroke_color(notan::app::Color { r: (0.0), g: (0.0), b: (0.0), a: (1.0) })*/;
     }
 
-    pub fn update_textures(&mut self, gfx: &mut Graphics, image: &DynamicImage) {
+    pub fn update_textures(
+        &mut self,
+        gfx: &mut Graphics,
+        image: &DynamicImage,
+    ) -> Result<(), String> {
         let mut tex_index = 0;
         for row_index in 0..self.row_count {
             let tex_start_y = row_index * self.row_translation;
@@ -725,14 +854,13 @@ impl TexWrap {
                             .update()
                         {
                             error!("{e}");
-                            return;
+                            return Err(e);
                         }
                     } else {
-                        //Error!
-                        return;
+                        return Err(String::from("Could not get slice from image"));
                     }
                 } else {
-                    let byte_slice = Self::image_bytes_slice(&image);
+                    let byte_slice = Self::image_bytes_slice(image);
                     if let Some(bt_slice) = byte_slice {
                         if let Err(e) = gfx
                             .update_texture(&mut self.texture_array[tex_index])
@@ -740,40 +868,37 @@ impl TexWrap {
                             .update()
                         {
                             error!("{e}");
-                            return;
+                            return Err(e);
                         }
                     } else {
-                        //Error!
-                        return;
+                        return Err(String::from("Could not get slice from image"));
                     }
                 }
 
                 tex_index += 1;
             }
         }
+        Ok(())
     }
 
-    pub fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
-        let width: i32;
-        let height: i32;
-        width = if xa < 0 { xa.abs() } else { tex_width_int };
-        height = if ya < 0 { ya.abs() } else { tex_height_int };
+        let width: i32 = if xa < 0 { xa.abs() } else { tex_width_int };
+        let height: i32 = if ya < 0 { ya.abs() } else { tex_height_int };
 
         TextureResponse {
             texture: &self.texture_boundary,
             x_offset_texture: 0,
             y_offset_texture: 0,
-            x_tex_left_global: xa,
-            y_tex_top_global: ya,
             x_tex_right_global: xa + width - 1,
             y_tex_bottom_global: ya + height - 1,
+            is_boundary: true,
         }
     }
 
-    pub fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
         let width_int = self.width() as i32;
         let height_int = self.height() as i32;
 
@@ -805,18 +930,20 @@ impl TexWrap {
 
         TextureResponse {
             texture: my_tex_pair,
-            x_offset_texture: x_offset_texture,
-            y_offset_texture: y_offset_texture,
-            x_tex_left_global: tex_left,
-            y_tex_top_global: tex_top,
+            x_offset_texture,
+            y_offset_texture,
             x_tex_right_global: tex_right,
             y_tex_bottom_global: tex_bottom,
+            is_boundary: false,
         }
     }
 
     fn add_draw_shader(&self, draw: &mut Draw) {
         if let Some(pip) = &self.pipeline {
-            draw.image_pipeline().pipeline(pip);
+            draw.image_pipeline()
+                .pipeline(pip)
+                .uniform_buffer(&self.uniform_swizzle_mask)
+                .uniform_buffer(&self.uniform_offset_vec);
         }
     }
 

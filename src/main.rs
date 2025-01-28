@@ -953,25 +953,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 state
                     .current_texture
                     .set_image(&img, gfx, &state.persistent_settings);
-
-                match &state.persistent_settings.current_channel {
-                    // Unpremultiply the image
-                    ColorChannel::Rgb => state.current_texture.set_image(
-                        &unpremult(&img),
-                        gfx,
-                        &state.persistent_settings,
-                    ),
-                    // Do nuttin'
-                    ColorChannel::Rgba => (),
-                    // Display the channel
-                    _ => {
-                        state.current_texture.set_image(
-                            &solo_channel(&img, state.persistent_settings.current_channel as usize),
-                            gfx,
-                            &state.persistent_settings,
-                        );
-                    }
-                }
                 state.current_image = Some(img);
             }
             Frame::UpdateTexture => {
@@ -983,7 +964,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         &state.edit_state.result_pixel_op,
                         gfx,
                         &state.persistent_settings,
-                    )
+                    );
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
