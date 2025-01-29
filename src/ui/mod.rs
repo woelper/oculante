@@ -273,7 +273,7 @@ impl EguiExt for Ui {
         let (icon, description) = parse_icon_plus_text(text);
         let icon = icon.unwrap_or_default();
 
-        let spacing = if icon.is_empty() { "" } else { "      " };
+        let spacing = if icon.is_empty() { "" } else { "       " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
