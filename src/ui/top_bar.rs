@@ -311,12 +311,12 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
 
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
-            if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
+            if ui.styled_button(format!("{MOVE}  Reset view")).clicked() {
                 state.reset_image = true;
                 ui.close_menu();
             }
 
-            if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
+            if ui.styled_button(format!("{FRAME}  View 1:1")).clicked() {
                 set_zoom(
                     1.0,
                     Some(nalgebra::Vector2::new(
@@ -331,7 +331,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             let copy_pressed = key_pressed(app, state, Copy);
             if let Some(img) = &state.current_image {
                 if ui
-                    .styled_button(format!("{COPY} Copy"))
+                    .styled_button(format!("{COPY}  Copy"))
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
                     || copy_pressed
@@ -342,7 +342,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             if ui
-                .styled_button(format!("{CLIPBOARD} Paste"))
+                .styled_button(format!("{CLIPBOARD}  Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
                 || key_pressed(app, state, Paste)
@@ -364,16 +364,16 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
-            if ui.styled_button(format!("{GEAR} Preferences")).clicked() {
+            if ui.styled_button(format!("{GEAR}  Preferences")).clicked() {
                 state.settings_enabled = !state.settings_enabled;
                 ui.close_menu();
             }
 
-            if ui.styled_button(format!("{EXIT} Quit")).clicked() {
+            if ui.styled_button(format!("{EXIT}  Quit")).clicked() {
                 app.backend.exit();
             }
 
-            ui.styled_menu_button(format!("{CLOCK} Recent"), |ui| {
+            ui.styled_menu_button(format!("{CLOCK}  Recent"), |ui| {
                 let r = ui.max_rect();
 
                 let recent_rect = Rect::from_two_pos(
