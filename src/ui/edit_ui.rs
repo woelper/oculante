@@ -630,7 +630,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
 
-         
+
         });
 }
 

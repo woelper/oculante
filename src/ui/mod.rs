@@ -220,9 +220,9 @@ impl EguiExt for Ui {
         let icon = icon.unwrap_or_default();
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-            ui.add(
-                egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-            );
+            ui.add(egui::Label::new(
+                RichText::new(icon).color(ui.style().visuals.selection.bg_fill),
+            ));
             ui.label(
                 RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
             );
@@ -464,7 +464,6 @@ impl EguiExt for Ui {
         .inner
     }
 }
-
 
 fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
     use unicode_segmentation::UnicodeSegmentation;
@@ -740,6 +739,37 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 
+pub fn paint_texture_load_result(
+    ui: &Ui,
+    tlr: &load::TextureLoadResult,
+    rect: Rect,
+    show_loading_spinner: Option<bool>,
+    options: &ImageOptions,
+) {
+    match tlr {
+        Ok(load::TexturePoll::Ready { texture }) => {
+            paint_texture_at(ui.painter(), rect, options, texture);
+        }
+        Ok(load::TexturePoll::Pending { .. }) => {
+            let show_loading_spinner =
+                show_loading_spinner.unwrap_or(ui.visuals().image_loading_spinners);
+            if show_loading_spinner {
+                Spinner::new().paint_at(ui, rect);
+            }
+        }
+        Err(_) => {
+            let font_id = TextStyle::Body.resolve(ui.style());
+            ui.painter().text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                "⚠",
+                font_id,
+                ui.visuals().error_fg_color,
+            );
+        }
+    }
+}
+
 pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
     let scroll = false;
 
@@ -773,8 +803,24 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     } else {
         match thumbnails.get(icon_path) {
             Ok(tp) => {
-                let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
-                image.paint_at(ui, image_rect);
+                let image = egui::Image::new(format!("file://{}", tp.display()))
+                    .rounding(rounding)
+                    .show_loading_spinner(true);
+
+                let load_result = image.load_for_size(ui.ctx(), image_rect.size());
+
+                paint_texture_load_result(
+                    ui,
+                    &load_result,
+                    image_rect,
+                    None,
+                    &ImageOptions::default(),
+                );
+                if load_result.is_err() {
+                    // If an image could not be loaded, reload. This is usually because the image
+                    // is being written while loading.
+                    ui.ctx().forget_image(&format!("file://{}", tp.display()));
+                }
             }
             Err(_) => {
                 // warn!("{e}");
@@ -810,6 +856,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
 
     if response.hovered() {
         // the generic hover effect, a rect over everything
+        // ui.ctx().forget_image(uri);
         ui.painter()
             .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
 
@@ -867,8 +914,6 @@ pub fn blank_icon(
     _above_or_below: egui::AboveOrBelow,
 ) {
 }
-
-
 
 fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let galley = ui.ctx().fonts(|fonts| {
