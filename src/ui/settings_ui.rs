@@ -78,7 +78,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
 
-                                    configuration_item_ui("Vsync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
+                                    configuration_item_ui("VSync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.vsync, "");
                                     }, ui);
 
