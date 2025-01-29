@@ -104,33 +104,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     });
             });
         }
-
-        // TODO: remove redundancy
-        if changed_channels {
-            // TODO: Make this dependent of DynamicImage's type
-            if let Some(img) = &state.current_image {
-                match &state.persistent_settings.current_channel {
-                    ColorChannel::Rgb => {
-                        state.current_texture.set_image(
-                            &unpremult(img),
-                            gfx,
-                            &state.persistent_settings,
-                        );
-                    }
-                    ColorChannel::Rgba => {
-                        state
-                            .current_texture
-                            .set_image(img, gfx, &state.persistent_settings);
-                    }
-                    _ => {
-                        let solo_im =
-                            solo_channel(img, state.persistent_settings.current_channel as usize);
-                        state
-                            .current_texture
-                            .set_image(&solo_im, gfx, &state.persistent_settings);
-                    }
-                }
-            }
+        
+        if changed_channels && state.current_image.is_some() {
+            state.current_texture.update_color_selection(gfx, &state.persistent_settings);
         }
 
         let label_rect = ui.ctx().available_rect().shrink(50.);
