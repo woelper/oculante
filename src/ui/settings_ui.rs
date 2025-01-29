@@ -296,7 +296,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         if ui.button("Delete thumbnails").clicked() {
                                             _ = get_disk_cache_path().map(|p|remove_dir_all(p));
                                         }
-                                        if ui.button("Open thumb dir").clicked() {
+                                        if ui.button("Open thumbnails directory").clicked() {
                                             _ = get_disk_cache_path().map(|p|open::that(p));
                                         }
 
