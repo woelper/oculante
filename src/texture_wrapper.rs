@@ -42,9 +42,8 @@ impl TextureWrapperManager {
                 && tex.height() as u32 == img.height()
                 && img.color() == tex.image_format
             {
-                debug!("Re-using texture as it is the same size and type.");
                 match tex.update_textures(gfx, img) {
-                    Ok(_) => {}
+                    Ok(_) => return Ok(()),
                     Err(error) => {
                         self.clear();
                         error!("{error}");

@@ -294,7 +294,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
-        
+
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
@@ -349,9 +349,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
-       
         let fonts = load_system_fonts(fonts);
-
 
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
@@ -950,9 +948,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                state
-                    .current_texture
-                    .set_image(&img, gfx, &state.persistent_settings);
+                if let Err(error) =
+                    state
+                        .current_texture
+                        .set_image(&img, gfx, &state.persistent_settings)
+                {
+                    state.send_message_warn(&format!("Error while displaying image: {error}"));
+                }
                 state.current_image = Some(img);
             }
             Frame::UpdateTexture => {
@@ -960,17 +962,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set_image(
+                    if let Err(error) = state.current_texture.set_image(
                         &state.edit_state.result_pixel_op,
                         gfx,
                         &state.persistent_settings,
-                    );
+                    ) {
+                        state.send_message_warn(&format!("Error while displaying image: {error}"));
+                    }
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state
-                            .current_texture
-                            .set_image(&img, gfx, &state.persistent_settings);
+                        if let Err(error) =
+                            state
+                                .current_texture
+                                .set_image(&img, gfx, &state.persistent_settings)
+                        {
+                            state.send_message_warn(&format!(
+                                "Error while displaying image: {error}"
+                            ));
+                        }
                     }
                 }
             }
