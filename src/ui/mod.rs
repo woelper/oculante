@@ -771,21 +771,15 @@ pub fn paint_texture_load_result(
 }
 
 pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
-    let scroll = false;
 
-    let mut zoom = ui
-        .data_mut(|w| w.get_temp::<f32>("ZM".into()))
-        .unwrap_or(1.);
-    let delta = ui.input(|r| r.zoom_delta()).clamp(0.999, 1.001);
-    zoom *= delta;
-    zoom = zoom.clamp(0.5, 1.3);
-    ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
+    let zoom = 1.;
+
     let size = Vec2::new(
         THUMB_SIZE[0] as f32,
         (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
     ) * zoom;
     let response = ui.allocate_response(size, Sense::click());
-    let rounding = Rounding::same(0.);
+    let rounding = Rounding::same(6.);
 
     let mut image_rect = response.rect;
     image_rect.max = image_rect.max.round();
@@ -814,7 +808,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
                     &load_result,
                     image_rect,
                     None,
-                    &ImageOptions::default(),
+                    &image.image_options(),
                 );
                 if load_result.is_err() {
                     // If an image could not be loaded, reload. This is usually because the image
@@ -849,7 +843,6 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         text.clone(),
         FontId::proportional(13.),
         ui.style().visuals.text_color(),
-        // THUMB_SIZE[0] as f32 - margin * 2.,
         THUMB_SIZE[0] as f32 * 10.,
     );
     job.halign = Align::Center;
@@ -857,7 +850,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     if response.hovered() {
         // the generic hover effect, a rect over everything
         ui.painter()
-            .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
+            .rect_filled(image_rect, rounding, Color32::from_white_alpha(8));
 
         let text_pos = image_rect.expand(6.).center_bottom();
 
