@@ -785,7 +785,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
     ) * zoom;
     let response = ui.allocate_response(size, Sense::click());
-    let rounding = Rounding::same(4.);
+    let rounding = Rounding::same(0.);
 
     let mut image_rect = response.rect;
     image_rect.max = image_rect.max.round();
@@ -856,47 +856,30 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
 
     if response.hovered() {
         // the generic hover effect, a rect over everything
-        // ui.ctx().forget_image(uri);
         ui.painter()
             .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
 
-        let mut text_pos = image_rect.expand(6.).center_bottom();
-        if scroll {
-            fn sawtooth_wave(x: f32, period: f32, amp: f32) -> f32 {
-                ((x / period) - (x / period).floor()) * amp
-            }
-            let galley = ui.painter().layout_job(job);
-            if galley.rect.width() > response.rect.width() {
-                // align text left
-                text_pos.x += galley.rect.width() / 2. - response.rect.width() / 2. + 10.;
-                // repaint for smooth animation
-                ui.ctx().request_repaint();
-                text_pos.x = text_pos.x
-                    - sawtooth_wave(ui.ctx().frame_nr() as f32 * 0.003, 1., galley.rect.width());
-                ui.painter_at(response.rect)
-                    .galley(text_pos, galley, Color32::RED);
-            }
-        } else {
-            let mut job = LayoutJob::simple(
-                text,
-                FontId::proportional(13.),
-                ui.style().visuals.text_color(),
-                THUMB_SIZE[0] as f32,
-            );
-            job.halign = Align::Center;
-            let galley = ui.painter().layout_job(job);
-            let painter = ui
-                .ctx()
-                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
-                .with_clip_rect(ui.clip_rect());
+        let text_pos = image_rect.expand(6.).center_bottom();
 
-            let c = ui.style().visuals.extreme_bg_color;
-            let mut right_bottom = image_rect.right_bottom();
-            right_bottom.y += galley.rect.height() + 14.;
-            let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom);
-            painter.rect_filled(r, rounding, c);
-            painter.galley(text_pos, galley, Color32::RED);
-        }
+        let mut job = LayoutJob::simple(
+            text,
+            FontId::proportional(13.),
+            ui.style().visuals.text_color(),
+            THUMB_SIZE[0] as f32,
+        );
+        job.halign = Align::Center;
+        let galley = ui.painter().layout_job(job);
+        let painter = ui
+            .ctx()
+            .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
+            .with_clip_rect(ui.clip_rect());
+
+        let c = ui.style().visuals.extreme_bg_color;
+        let mut right_bottom = image_rect.right_bottom();
+        right_bottom.y += galley.rect.height() + 14.;
+        let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom).expand(1.);
+        painter.rect_filled(r, rounding, c);
+        painter.galley(text_pos, galley, Color32::RED);
     } else {
         job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
         let galley = ui.painter().layout_job(job);
