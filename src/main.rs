@@ -948,9 +948,13 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                state
-                    .current_texture
-                    .set_image(&img, gfx, &state.persistent_settings);
+                if let Err(error) =
+                    state
+                        .current_texture
+                        .set_image(&img, gfx, &state.persistent_settings)
+                {
+                    state.send_message_warn(&format!("Error while displaying image: {error}"));
+                }
                 state.current_image = Some(img);
             }
             Frame::UpdateTexture => {
@@ -958,17 +962,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set_image(
+                    if let Err(error) = state.current_texture.set_image(
                         &state.edit_state.result_pixel_op,
                         gfx,
                         &state.persistent_settings,
-                    );
+                    ) {
+                        state.send_message_warn(&format!("Error while displaying image: {error}"));
+                    }
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state
-                            .current_texture
-                            .set_image(&img, gfx, &state.persistent_settings);
+                        if let Err(error) =
+                            state
+                                .current_texture
+                                .set_image(&img, gfx, &state.persistent_settings)
+                        {
+                            state.send_message_warn(&format!(
+                                "Error while displaying image: {error}"
+                            ));
+                        }
                     }
                 }
             }
