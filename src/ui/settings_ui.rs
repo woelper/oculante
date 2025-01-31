@@ -1,5 +1,8 @@
+use std::fs::remove_dir_all;
+
 use super::*;
 use crate::appstate::OculanteState;
+use crate::thumbnails::get_disk_cache_path;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
@@ -75,7 +78,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
 
-                                    configuration_item_ui("Vsync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
+                                    configuration_item_ui("VSync", "VSync eliminates tearing and saves CPU usage. Toggling VSync off will make some operations such as panning and zooming snappier. A restart is required to take effect.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.vsync, "");
                                     }, ui);
 
@@ -287,6 +290,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Enable experimental features", "Turn on features that are not yet finished.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.experimental_features, "");
+                                    }, ui);
+
+                                    configuration_item_ui("Thumbnails", "Functionality to test thumbnail generation.", |ui| {
+                                        if ui.button("Delete thumbnails").clicked() {
+                                            _ = get_disk_cache_path().map(|p|remove_dir_all(p));
+                                        }
+                                        if ui.button("Open thumbnails directory").clicked() {
+                                            std::thread::spawn(||{
+                                                _ = get_disk_cache_path().map(|p|open::that(p));
+                                            });
+                                        }
+
                                     }, ui);
                                 });
                             });

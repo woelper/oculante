@@ -3,6 +3,7 @@ pub const THUMB_CAPTION_HEIGHT: u32 = 24;
 pub const MAX_THREADS: usize = 4;
 
 use std::{
+    collections::HashSet,
     fs::{create_dir_all, File},
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
@@ -19,7 +20,7 @@ use crate::image_loader::open_image;
 #[derive(Debug, Default, Clone)]
 pub struct Thumbnails {
     /// The known thumbnail ids. This is used to avoid re-generating known thumbnails
-    ids: Vec<PathBuf>,
+    ids: HashSet<PathBuf>,
     /// Number of thumbnails being created at a given time
     pool: Arc<Mutex<usize>>,
 }
@@ -58,7 +59,7 @@ impl Thumbnails {
                 let num = *pool.lock().unwrap();
                 *pool.lock().unwrap() = num.saturating_sub(1);
             });
-            self.ids.push(cached_path);
+            self.ids.insert(cached_path);
             bail!("Thumbnail not yet present.");
         }
         Ok(cached_path)
@@ -74,7 +75,7 @@ pub fn path_to_id<P: AsRef<Path>>(path: P) -> PathBuf {
     PathBuf::from(format!("{}_{size}", hasher.finish())).with_extension("png")
 }
 
-fn get_disk_cache_path() -> Result<PathBuf> {
+pub fn get_disk_cache_path() -> Result<PathBuf> {
     Ok(dirs::data_local_dir()
         .ok_or(anyhow!("Can't get local dir"))?
         .join("oculante")
@@ -104,41 +105,40 @@ pub fn generate<P: AsRef<Path>>(source_path: P) -> Result<()> {
 }
 
 pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Result<()> {
-    let (mut width, mut height) = image.dimensions();
-    let x = 0;
-    let mut y = 0;
+    debug!("TMB=> Original image size: {:?}", image.dimensions());
 
-    if width < height {
-        height = (width as f32 * 1. / 1.3333) as u32;
-        y = (image.dimensions().0 as f32 - height as f32 / 2.) as u32;
-    }
+    let target_width = 120;
+    let target_height = 90;
+    let desired_aspect = target_width as f32 / target_height as f32;
 
-    if width > height {
-        width = (height as f32 * 1.3333) as u32;
-    }
+    let (orig_width, orig_height) = image.dimensions();
+    let orig_aspect = orig_width as f32 / orig_height as f32;
 
-    if width == height {
-        height = (width as f32 * 1. / 1.3333) as u32;
-    }
+    let (crop_width, crop_height) = if orig_aspect > desired_aspect {
+        // Image is too wide. Crop horizontally.
+        let crop_w = (desired_aspect * orig_height as f32).round() as u32;
+        (crop_w, orig_height)
+    } else {
+        // Image is too tall or just right width. Crop vertically.
+        let crop_h = (orig_width as f32 / desired_aspect).round() as u32;
+        (orig_width, crop_h)
+    };
 
-    let mut d = DynamicImage::ImageRgba8(image.crop_imm(x, y, width, height).to_rgba8());
-    debug!("\tDim: {:?}", d.dimensions());
+    let x_offset = (orig_width - crop_width) / 2;
+    let y_offset = (orig_height - crop_height) / 2;
 
-    // let op = ImageOperation::Resize {
-    //     dimensions: (THUMB_SIZE[0], THUMB_SIZE[1]),
-    //     aspect: false,
-    //     filter: crate::image_editing::ScaleFilter::Bilinear,
-    // };
-    // op.process_image(&mut d)?;
+    let cropped_img =
+        imageops::crop_imm(image, x_offset, y_offset, crop_width, crop_height).to_image();
 
-    d = d.resize(
-        THUMB_SIZE[0],
-        THUMB_SIZE[1],
-        imageops::FilterType::CatmullRom,
-    );
-    debug!("\tDim: {:?}", d.dimensions());
+    let mut d = DynamicImage::ImageRgba8(cropped_img);
+    let op = crate::image_editing::ImageOperation::Resize {
+        dimensions: (target_width, target_height),
+        aspect: false,
+        filter: crate::image_editing::ScaleFilter::Bilinear,
+    };
+    op.process_image(&mut d)?;
     d.save(&dest_path)?;
-    debug!("\tSaved to {}.", dest_path.as_ref().display());
+
     Ok(())
 }
 
@@ -147,6 +147,8 @@ fn test_thumbs() {
     std::env::set_var("RUST_LOG", "debug");
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
-    thumbs.get("tests/rust.png").unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(3000));
+    _ = thumbs.get("tests/rust.png");
+    _ = thumbs.get("tests/ultrahigh.png");
+    _ = thumbs.get("tests/mohsen-karimi.webp");
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 }
