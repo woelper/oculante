@@ -294,7 +294,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     // Set up egui style / theme
     plugins.egui(|ctx| {
         // FIXME: Wait for https://github.com/Nazariglez/notan/issues/315 to close, then remove
-        
+
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
@@ -349,9 +349,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             .unwrap()
             .insert(0, "inter".to_owned());
 
-       
         let fonts = load_system_fonts(fonts);
-
 
         debug!("Theme {:?}", state.persistent_settings.theme);
         apply_theme(&mut state, ctx);
@@ -792,38 +790,38 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         debug!("Got frame: {}", frame.to_string());
 
-        match &frame {
-            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {
-                // Something new came in, update scrubber (index slider) and path
-                if let Some(path) = &state.current_path {
-                    if state.scrubber.has_folder_changed(&path) {
-                        debug!("Folder has changed, creating new scrubber");
-                        state.scrubber = scrubber::Scrubber::new(path);
-                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                    } else {
-                        let index = state
-                            .scrubber
-                            .entries
-                            .iter()
-                            .position(|p| p == path)
-                            .unwrap_or_default();
-                        if index < state.scrubber.entries.len() {
-                            state.scrubber.index = index;
-                        }
-                    }
-                }
-
-                if let Some(path) = &state.current_path {
-                    if !state.volatile_settings.recent_images.contains(path) {
-                        state
-                            .volatile_settings
-                            .recent_images
-                            .insert(0, path.clone());
-                        state.volatile_settings.recent_images.truncate(12);
+        if matches!(
+            &frame,
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
+        ) {
+            // Something new came in, update scrubber (index slider) and path
+            if let Some(path) = &state.current_path {
+                if state.scrubber.has_folder_changed(&path) {
+                    debug!("Folder has changed, creating new scrubber");
+                    state.scrubber = scrubber::Scrubber::new(path);
+                    state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                } else {
+                    let index = state
+                        .scrubber
+                        .entries
+                        .iter()
+                        .position(|p| p == path)
+                        .unwrap_or_default();
+                    if index < state.scrubber.entries.len() {
+                        state.scrubber.index = index;
                     }
                 }
             }
-            _ => {}
+
+            if let Some(path) = &state.current_path {
+                if !state.volatile_settings.recent_images.contains(path) {
+                    state
+                        .volatile_settings
+                        .recent_images
+                        .insert(0, path.clone());
+                    state.volatile_settings.recent_images.truncate(12);
+                }
+            }
         }
 
         match &frame {
@@ -939,6 +937,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             Frame::UpdateTexture => {}
         }
 
+        if !matches!(frame, Frame::Animation(_, _)) {
+            state.image_metadata = None;
+        }
+
         // Deal with everything that sends an image
         match frame {
             Frame::AnimationStart(img)
@@ -950,27 +952,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 debug!("Received image buffer: {:?}", img.dimensions(),);
                 state.image_geometry.dimensions = img.dimensions();
 
-                state
-                    .current_texture
-                    .set_image(&img, gfx, &state.persistent_settings);
-
-                match &state.persistent_settings.current_channel {
-                    // Unpremultiply the image
-                    ColorChannel::Rgb => state.current_texture.set_image(
-                        &unpremult(&img),
-                        gfx,
-                        &state.persistent_settings,
-                    ),
-                    // Do nuttin'
-                    ColorChannel::Rgba => (),
-                    // Display the channel
-                    _ => {
-                        state.current_texture.set_image(
-                            &solo_channel(&img, state.persistent_settings.current_channel as usize),
-                            gfx,
-                            &state.persistent_settings,
-                        );
-                    }
+                if let Err(error) =
+                    state
+                        .current_texture
+                        .set_image(&img, gfx, &state.persistent_settings)
+                {
+                    state.send_message_warn(&format!("Error while displaying image: {error}"));
                 }
                 state.current_image = Some(img);
             }
@@ -979,17 +966,25 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                 // Prefer the edit result, if present
                 if state.edit_state.result_pixel_op != Default::default() {
-                    state.current_texture.set_image(
+                    if let Err(error) = state.current_texture.set_image(
                         &state.edit_state.result_pixel_op,
                         gfx,
                         &state.persistent_settings,
-                    )
+                    ) {
+                        state.send_message_warn(&format!("Error while displaying image: {error}"));
+                    }
                 } else {
                     // update from image
                     if let Some(img) = &state.current_image {
-                        state
-                            .current_texture
-                            .set_image(&img, gfx, &state.persistent_settings);
+                        if let Err(error) =
+                            state
+                                .current_texture
+                                .set_image(&img, gfx, &state.persistent_settings)
+                        {
+                            state.send_message_warn(&format!(
+                                "Error while displaying image: {error}"
+                            ));
+                        }
                     }
                 }
             }
@@ -1001,7 +996,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // In those cases, we want the image to stay as it is.
         // TODO: PERF: This copies the image buffer. This should also maybe not run for animation frames
         // although it looks cool.
-        state.image_metadata = None;
         send_extended_info(
             &state.current_image,
             &state.current_path,
@@ -1102,7 +1096,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
-        // ("using pointer {}", ctx.is_using_pointer());
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer

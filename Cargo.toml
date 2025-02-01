@@ -100,6 +100,7 @@ dicom-pixeldata = { version = "0.8.0", features = ["image"] }
 dicom-object = "0.8.0"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14.2"
+open = "5.3.2"
 
 [features]
 default = [

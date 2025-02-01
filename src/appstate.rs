@@ -65,7 +65,6 @@ pub struct OculanteState {
     /// Channel to load images from
     pub load_channel: (Sender<PathBuf>, Receiver<PathBuf>),
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
-    pub extended_info_loading: bool,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
     //pub current_texture: Option<TexWrap>,
@@ -133,16 +132,11 @@ impl<'b> Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(
-                tx_channel.0.clone(),
-                20,
-                msg_channel.0.clone(),
-            ),
+            player: Player::new(tx_channel.0.clone(), 20, msg_channel.0.clone()),
             texture_channel: tx_channel,
             message_channel: msg_channel,
             load_channel: mpsc::channel(),
             extended_info_channel: meta_channel,
-            extended_info_loading: Default::default(),
             mouse_delta: Default::default(),
             current_texture: Default::default(),
             current_image: Default::default(),

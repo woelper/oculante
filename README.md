@@ -120,7 +120,7 @@ Windows:
 Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
 
 Mac:
-`brew install nasm`
+`brew install nasm cmake`
 
 ## Updates
 
