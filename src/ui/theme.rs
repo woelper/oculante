@@ -5,6 +5,7 @@ use epaint::FontFamily;
 use font_kit::{
     family_name::FamilyName, handle::Handle, properties::Properties, source::SystemSource,
 };
+use log::warn;
 use std::{collections::HashMap, fs::read};
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
@@ -109,14 +110,13 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 /// Attempt to load a system font by any of the given `family_names`, returning the first match.
 fn load_font_family(family_names: &[&str]) -> Option<Vec<u8>> {
     let system_source = SystemSource::new();
-
     for &name in family_names {
         let font_handle = system_source
             .select_best_match(&[FamilyName::Title(name.to_string())], &Properties::new());
         match font_handle {
             Ok(h) => match &h {
                 Handle::Memory { bytes, .. } => {
-                    debug!("Loaded {name} from memory.");
+                    info!("Loaded {name} from memory.");
                     return Some(bytes.to_vec());
                 }
                 Handle::Path { path, .. } => {
@@ -126,10 +126,9 @@ fn load_font_family(family_names: &[&str]) -> Option<Vec<u8>> {
                     }
                 }
             },
-            Err(e) => error!("Could not load {}: {:?}", name, e),
+            Err(e) => debug!("Could not load {}: {:?}", name, e),
         }
     }
-
     None
 }
 
@@ -191,6 +190,8 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
                 .get_mut(&FontFamily::Proportional)
                 .unwrap()
                 .push(region.to_owned());
+        } else {
+            warn!("Could not load a font for region {region}. If you experience incorrect file names, try installing one of these fonts: [{}]", font_names.join(", "))
         }
     }
     fonts
