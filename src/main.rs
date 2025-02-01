@@ -790,38 +790,38 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         debug!("Got frame: {}", frame.to_string());
 
-        match &frame {
-            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_) => {
-                // Something new came in, update scrubber (index slider) and path
-                if let Some(path) = &state.current_path {
-                    if state.scrubber.has_folder_changed(&path) {
-                        debug!("Folder has changed, creating new scrubber");
-                        state.scrubber = scrubber::Scrubber::new(path);
-                        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-                    } else {
-                        let index = state
-                            .scrubber
-                            .entries
-                            .iter()
-                            .position(|p| p == path)
-                            .unwrap_or_default();
-                        if index < state.scrubber.entries.len() {
-                            state.scrubber.index = index;
-                        }
-                    }
-                }
-
-                if let Some(path) = &state.current_path {
-                    if !state.volatile_settings.recent_images.contains(path) {
-                        state
-                            .volatile_settings
-                            .recent_images
-                            .insert(0, path.clone());
-                        state.volatile_settings.recent_images.truncate(12);
+        if matches!(
+            &frame,
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
+        ) {
+            // Something new came in, update scrubber (index slider) and path
+            if let Some(path) = &state.current_path {
+                if state.scrubber.has_folder_changed(&path) {
+                    debug!("Folder has changed, creating new scrubber");
+                    state.scrubber = scrubber::Scrubber::new(path);
+                    state.scrubber.wrap = state.persistent_settings.wrap_folder;
+                } else {
+                    let index = state
+                        .scrubber
+                        .entries
+                        .iter()
+                        .position(|p| p == path)
+                        .unwrap_or_default();
+                    if index < state.scrubber.entries.len() {
+                        state.scrubber.index = index;
                     }
                 }
             }
-            _ => {}
+
+            if let Some(path) = &state.current_path {
+                if !state.volatile_settings.recent_images.contains(path) {
+                    state
+                        .volatile_settings
+                        .recent_images
+                        .insert(0, path.clone());
+                    state.volatile_settings.recent_images.truncate(12);
+                }
+            }
         }
 
         match &frame {
@@ -937,6 +937,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             Frame::UpdateTexture => {}
         }
 
+        if !matches!(frame, Frame::Animation(_, _)) {
+            state.image_metadata = None;
+        }
+
         // Deal with everything that sends an image
         match frame {
             Frame::AnimationStart(img)
@@ -992,7 +996,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // In those cases, we want the image to stay as it is.
         // TODO: PERF: This copies the image buffer. This should also maybe not run for animation frames
         // although it looks cool.
-        state.image_metadata = None;
         send_extended_info(
             &state.current_image,
             &state.current_path,
@@ -1093,7 +1096,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
-        // ("using pointer {}", ctx.is_using_pointer());
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
