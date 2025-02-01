@@ -742,7 +742,6 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 
-
 pub fn blank_icon(
     _ui: &egui::Ui,
     _rect: egui::Rect,

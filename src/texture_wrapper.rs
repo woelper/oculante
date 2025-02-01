@@ -5,6 +5,7 @@ use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::warn;
+use notan::app::Color;
 use notan::draw::*;
 use notan::math::{Mat4, Vec4};
 use notan::prelude::{BlendMode, Buffer, Graphics, ShaderSource, Texture, TextureFilter};
@@ -737,7 +738,6 @@ impl TexWrap {
         let x_coordinate_end = xy_tex_center.0 + xy_tex_size.0;
         let mut y_coordinate = xy_tex_center.1 - xy_tex_size.1;
         let y_coordinate_end = xy_tex_center.1 + xy_tex_size.1;
-        //print!("Start x: {}, y: {}\n",xy_tex_center.0 - xy_tex_size.0,y_coordinate);
 
         while y_coordinate <= y_coordinate_end {
             let mut y_coordinate_new = i32::MAX; //increment for y coordinate after x loop
@@ -757,9 +757,6 @@ impl TexWrap {
                     shader_active = false;
                 }
 
-                //print!("x: {} y: {} ", x_coordinate, y_coordinate);
-                //print!("top: {} left: {} ", curr_tex_response.y_tex_top_global, curr_tex_response.x_tex_left_global);
-                //print!("bottom: {} right: {} \n", curr_tex_response.y_tex_bottom_global, curr_tex_response.x_tex_right_global);
 
                 //Handling last texture in a row or col
                 let curr_tex_end = nalgebra::Vector2::new(
@@ -797,32 +794,32 @@ impl TexWrap {
                 curr_ui_curs.x += display_size.x;
                 last_display_size_y = last_display_size_y.min(display_size.y);
             }
-            //Update y coordinates
-            //print!("new y: {}, old y: {} \n", y_coordinate_new, y_coordinate);
+            // Update y coordinates
             y_coordinate = y_coordinate_new;
             curr_ui_curs.y += last_display_size_y;
         }
-        //print!("\n");
         self.remove_draw_shader(draw);
 
-        //Draw crosshair
-        //let stroke_width = 0.5;
+        // Draw crosshair
         let half_width = scale/4.0/*-stroke_width*/;
 
         draw.rect(
             (translation_x + width / 2.0 - half_width, translation_y),
             (2.0 * half_width, width),
-        )
-        /*.fill()
-        .stroke(stroke_width)
-        .stroke_color(notan::app::Color { r: (0.0), g: (0.0), b: (0.0), a: (1.0) }) */;
+        ).alpha(0.5);
+
         draw.rect(
             (translation_x, translation_y + width / 2.0 - half_width),
             (width, 2.0 * half_width),
+        ).alpha(0.5);
+        
+        draw.rect(
+            (translation_x + width / 2.0 - half_width, translation_y + width / 2.0 - half_width),
+            (2.0 * half_width, 2.0* half_width),
         )
-        /* .fill()
-        .stroke(stroke_width)
-        .stroke_color(notan::app::Color { r: (0.0), g: (0.0), b: (0.0), a: (1.0) })*/;
+        .fill_color(Color::from_rgb(0.1, 0.1, 0.1))
+        .alpha(0.2);
+
     }
 
     pub fn update_textures(
