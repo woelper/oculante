@@ -330,7 +330,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
                     if let Some(img) = &state.current_image {
                         state.image_geometry.dimensions = img.dimensions();
-                        state.current_texture.set_image(img, gfx, &state.persistent_settings);
+                        if let Err(error) = state.current_texture.set_image(img, gfx, &state.persistent_settings){
+                            state.send_message_warn(&format!("Error while displaying image: {error}"));
+                        }
                     }
                 }
                 if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
@@ -630,7 +632,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
             state.image_geometry.dimensions = state.edit_state.result_pixel_op.dimensions();
 
-         
+
         });
 }
 

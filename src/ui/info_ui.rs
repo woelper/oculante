@@ -141,12 +141,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
 
                 let offset = (ui.available_width() - preview_rect.width())/2.;
                 preview_rect = preview_rect.translate(vec2(offset, 0.));
-                //Rendering a placeholder rectangle
+                // Rendering a placeholder rectangle
                 ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
-
-                // let preview_rect = egui::Rect::from_min_max(bbox_tl, bbox_br);
                 ui.advance_cursor_after_rect(preview_rect);
             }
             ui.add_space(10.);

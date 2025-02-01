@@ -111,6 +111,7 @@ dicom-pixeldata = { version = "0.8", features = ["image"] }
 dicom-object = "0.8"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14.2"
+open = "5.3.2"
 
 [features]
 default = [
@@ -156,16 +157,15 @@ criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
 [profile.release]
 codegen-units = 1
-# incremental = false
 lto = true
 strip = true
-# opt-level = 3
 # panic = "abort"
 
 [profile.dev]
 debug = false
-incremental = true
-opt-level = 3
+opt-level = 2
+lto = false
+codegen-units = 64
 
 
 [[bench]]

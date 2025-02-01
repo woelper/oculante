@@ -17,6 +17,8 @@ mod edit_ui;
 pub use edit_ui::edit_ui;
 mod theme;
 pub use theme::*;
+mod thumbnail_rendering;
+pub use thumbnail_rendering::*;
 
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
@@ -220,9 +222,9 @@ impl EguiExt for Ui {
         let icon = icon.unwrap_or_default();
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
-            ui.add(
-                egui::Label::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill)),
-            );
+            ui.add(egui::Label::new(
+                RichText::new(icon).color(ui.style().visuals.selection.bg_fill),
+            ));
             ui.label(
                 RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
             );
@@ -273,7 +275,7 @@ impl EguiExt for Ui {
         let (icon, description) = parse_icon_plus_text(text);
         let icon = icon.unwrap_or_default();
 
-        let spacing = if icon.is_empty() { "" } else { "      " };
+        let spacing = if icon.is_empty() { "" } else { "       " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
                 .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
@@ -464,7 +466,6 @@ impl EguiExt for Ui {
         .inner
     }
 }
-
 
 fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
     use unicode_segmentation::UnicodeSegmentation;
@@ -695,6 +696,7 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
     }
 }
 
+/// An area that can be dragged by a user to move the window
 pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
@@ -740,125 +742,6 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     }
 }
 
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
-    let scroll = false;
-
-    let mut zoom = ui
-        .data_mut(|w| w.get_temp::<f32>("ZM".into()))
-        .unwrap_or(1.);
-    let delta = ui.input(|r| r.zoom_delta()).clamp(0.999, 1.001);
-    zoom *= delta;
-    zoom = zoom.clamp(0.5, 1.3);
-    ui.data_mut(|w| w.insert_temp("ZM".into(), zoom));
-    let size = Vec2::new(
-        THUMB_SIZE[0] as f32,
-        (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
-    ) * zoom;
-    let response = ui.allocate_response(size, Sense::click());
-    let rounding = Rounding::same(4.);
-
-    let mut image_rect = response.rect;
-    image_rect.max = image_rect.max.round();
-    image_rect.min = image_rect.min.round();
-    image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
-
-    if icon_path.is_dir() {
-        ui.painter().text(
-            response.rect.center(),
-            Align2::CENTER_CENTER,
-            FOLDERFILL,
-            FontId::proportional(85.),
-            ui.style().visuals.text_color(),
-        );
-    } else {
-        match thumbnails.get(icon_path) {
-            Ok(tp) => {
-                let image = egui::Image::new(format!("file://{}", tp.display())).rounding(rounding);
-                image.paint_at(ui, image_rect);
-            }
-            Err(_) => {
-                // warn!("{e}");
-                ui.painter()
-                    .rect_filled(image_rect, rounding, Color32::from_gray(80).to_opaque());
-                ui.painter().text(
-                    image_rect.center(),
-                    Align2::CENTER_CENTER,
-                    icon_path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_string().to_uppercase())
-                        .unwrap_or_default(),
-                    FontId::proportional(25.),
-                    Color32::WHITE,
-                );
-            }
-        }
-    }
-
-    let text = icon_path
-        .file_name()
-        .map(|f| f.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-    let mut job = LayoutJob::simple(
-        text.clone(),
-        FontId::proportional(13.),
-        ui.style().visuals.text_color(),
-        // THUMB_SIZE[0] as f32 - margin * 2.,
-        THUMB_SIZE[0] as f32 * 10.,
-    );
-    job.halign = Align::Center;
-
-    if response.hovered() {
-        // the generic hover effect, a rect over everything
-        ui.painter()
-            .rect_filled(response.rect, rounding, Color32::from_white_alpha(5));
-
-        let mut text_pos = image_rect.expand(6.).center_bottom();
-        if scroll {
-            fn sawtooth_wave(x: f32, period: f32, amp: f32) -> f32 {
-                ((x / period) - (x / period).floor()) * amp
-            }
-            let galley = ui.painter().layout_job(job);
-            if galley.rect.width() > response.rect.width() {
-                // align text left
-                text_pos.x += galley.rect.width() / 2. - response.rect.width() / 2. + 10.;
-                // repaint for smooth animation
-                ui.ctx().request_repaint();
-                text_pos.x = text_pos.x
-                    - sawtooth_wave(ui.ctx().frame_nr() as f32 * 0.003, 1., galley.rect.width());
-                ui.painter_at(response.rect)
-                    .galley(text_pos, galley, Color32::RED);
-            }
-        } else {
-            let mut job = LayoutJob::simple(
-                text,
-                FontId::proportional(13.),
-                ui.style().visuals.text_color(),
-                THUMB_SIZE[0] as f32,
-            );
-            job.halign = Align::Center;
-            let galley = ui.painter().layout_job(job);
-            let painter = ui
-                .ctx()
-                .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
-                .with_clip_rect(ui.clip_rect());
-
-            let c = ui.style().visuals.extreme_bg_color;
-            let mut right_bottom = image_rect.right_bottom();
-            right_bottom.y += galley.rect.height() + 14.;
-            let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom);
-            painter.rect_filled(r, rounding, c);
-            painter.galley(text_pos, galley, Color32::RED);
-        }
-    } else {
-        job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
-        let galley = ui.painter().layout_job(job);
-        ui.painter()
-            .galley(image_rect.expand(6.).center_bottom(), galley, Color32::RED);
-    }
-    response
-}
-
 pub fn blank_icon(
     _ui: &egui::Ui,
     _rect: egui::Rect,
@@ -867,8 +750,6 @@ pub fn blank_icon(
     _above_or_below: egui::AboveOrBelow,
 ) {
 }
-
-
 
 fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let galley = ui.ctx().fonts(|fonts| {
