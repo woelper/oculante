@@ -28,24 +28,6 @@ identifier = "com.github.woelper.oculante"
 name = "oculante"
 
 [dependencies]
-anyhow = "1.0"
-arboard = { version = "3.4", features = ["wayland-data-control"] }
-avif-decode = { version = "1.0", optional = true }
-clap = "3.2"
-dds-rs = "0.7"
-dirs = "6.0"
-env_logger = "0.11"
-evalexpr = "12"
-exr = "1.73"
-fast_image_resize = { version = "5.1", features = ["rayon"] }
-gif = "0.13.1"
-gif-dispose = "5.0.1"
-image = { version = "0.25.5", features = ["hdr"] }
-kamadak-exif = "0.6"
-lexical-sort = "0.3"
-libavif-image = { version = "0.14", optional = true }
-log = "0.4"
-nalgebra = "0.33"
 notan = { version = "0.12", default-features = false, features = [
     "backend",
     "draw",
@@ -53,17 +35,60 @@ notan = { version = "0.12", default-features = false, features = [
     "egui",
     "clipboard",
 ] }
+# === EGUI
+#  These need to match the egui version used in notan and can't be
+# updated unless notan updates egui.
 egui_plot = "0.27"
-palette = "0.7"
+egui_extras = { version = "0.27.2", features = ["image", "file"] }
+egui-modal = "0.3.6"
+egui-notify = "0.14"
+
+# === IMAGE FORMATS
+avif-decode = { version = "1.0", optional = true }
+turbojpeg = { version = "1.2", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
-rand = "0.8"
-rand_chacha = "0.3"
-rayon = "1.10"
-# the next 3 belong together
+tiff = "0.9"
+jxl-oxide = "0.8"
+zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
+# These 3 need to be updated together
 resvg = "0.42.0"
 tiny-skia = "0.11.4"
 usvg = "0.42.0"
+libheif-rs = { version = "1.0", default-features = false, optional = true }
+ktx2 = "0.3.0"
+basis-universal = "0.3"
+dds-rs = "0.7"
+exr = "1.73"
+gif = "0.13.1"
+image = { version = "0.25.5", features = ["hdr"] }
+jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
+    "threads",
+    "file-io",
+    "openjpeg-sys",
+] }
+icns = "0.3.1"
+webp-animation = { version = "0.9.0", features = ["static"] }
+# dicom needs to be the same version
+dicom-pixeldata = { version = "0.8", features = ["image"] }
+dicom-object = "0.8"
+libavif-image = { version = "0.14", optional = true }
+gif-dispose = "5.0.1"
+
+# === FILTER CRATES
+palette = "0.7"
+lutgen = { version = "0.11", features = ["lutgen-palettes"] }
+quantette = { version = "0.3.0", features = ["threads"] }
+ase-swatch = "0.1.0"
+libblur = "0.14"
+imageproc = { version = "0.25", features = ["rayon"] }
+evalexpr = "12"
+fast_image_resize = { version = "5.1", features = ["rayon"] }
+
+# APP FUNCTIONALITY CRATES
+rand = "0.8"
+rand_chacha = "0.3"
+rayon = "1.10"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
 self_update = { version = "0.41", default-features = false, features = [
@@ -73,45 +98,30 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
-turbojpeg = { version = "1.2", optional = true }
 webbrowser = "1.0"
-tiff = "0.9"
-jxl-oxide = "0.8"
-zune-png = "0.5.0-rc1"
-img-parts = "0.3"
+img-parts = "0.3" # for exif saving
 dark-light = "1.0"
 trash = "5.2"
-lutgen = { version = "0.11", features = ["lutgen-palettes"] }
-libheif-rs = { version = "1.0", default-features = false, optional = true }
-egui-notify = "0.14"
-ktx2 = "0.3.0"
 bitflags = "2.4.1"
 flate2 = "1.0.28"
 wgpu = "22" # for ktx
 ruzstd = "0.7" # for ktx
-basis-universal = "0.3"
 mouse_position = "0.1.4"
-webp-animation = { version = "0.9.0", features = ["static"] }
-imageproc = { version = "0.25", features = ["rayon"] }
-icns = "0.3.1"
-jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
-    "threads",
-    "file-io",
-    "openjpeg-sys",
-] }
 file-format = "0.26"
-egui_extras = { version = "0.27.2", features = ["image", "file"] }
-libblur = "0.14"
-egui-modal = "0.3.6"
 zip = "2.2.0"
-ase-swatch = "0.1.0"
-quantette = { version = "0.3.0", features = ["threads"] }
 sysinfo = "0.33.1"
-dicom-pixeldata = { version = "0.8", features = ["image"] }
-dicom-object = "0.8"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14.2"
 open = "5.3.2"
+kamadak-exif = "0.6"
+lexical-sort = "0.3"
+log = "0.4"
+nalgebra = "0.33"
+anyhow = "1.0"
+arboard = { version = "3.4", features = ["wayland-data-control"] }
+clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
+dirs = "6.0"
+env_logger = "0.11"
 
 [features]
 default = [
@@ -133,10 +143,8 @@ jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
 lang_support = []
 
-
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
-
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
