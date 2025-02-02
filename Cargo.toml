@@ -35,7 +35,7 @@ clap = "3.2"
 dds-rs = "0.7"
 dirs = "6.0"
 env_logger = "0.11"
-evalexpr = "11.3"
+evalexpr = "12"
 exr = "1.73"
 fast_image_resize = { version = "5.1", features = ["rayon"] }
 gif = "0.13.1"
