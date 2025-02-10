@@ -52,9 +52,9 @@ tiff = "0.9"
 jxl-oxide = "0.8"
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
-resvg = "0.42.0"
-tiny-skia = "0.11.4"
-usvg = "0.42.0"
+resvg = "0.44"
+tiny-skia = "0.11"
+usvg = "0.44"
 libheif-rs = { version = "1.0", default-features = false, optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
