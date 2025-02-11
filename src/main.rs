@@ -1025,6 +1025,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
 
+        if !state.pointer_over_ui && !state.mouse_grab {
+            if ctx.input(|r| {
+                r.pointer
+                    .button_double_clicked(egui::PointerButton::Primary)
+            }) {
+                toggle_fullscreen(app, state);
+            }
+        }
+
         // set info panel color dynamically
         info_panel_color = ctx.style().visuals.panel_fill;
 
