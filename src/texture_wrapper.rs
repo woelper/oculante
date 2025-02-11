@@ -162,6 +162,7 @@ struct TextureResponse<'a> {
 }
 
 //language=glsl
+#[allow(unexpected_cfgs)]
 const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     r#"
     #version 450
@@ -179,7 +180,7 @@ const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     layout(binding = 2) uniform OffsetVector {
         vec4 offset;
     };
-    
+
     layout(location = 0) out vec4 color;
 
     void main() {
@@ -757,7 +758,6 @@ impl TexWrap {
                     shader_active = false;
                 }
 
-
                 //Handling last texture in a row or col
                 let curr_tex_end = nalgebra::Vector2::new(
                     i32::min(curr_tex_response.x_tex_right_global, x_coordinate_end),
@@ -806,20 +806,24 @@ impl TexWrap {
         draw.rect(
             (translation_x + width / 2.0 - half_width, translation_y),
             (2.0 * half_width, width),
-        ).alpha(0.5);
+        )
+        .alpha(0.5);
 
         draw.rect(
             (translation_x, translation_y + width / 2.0 - half_width),
             (width, 2.0 * half_width),
-        ).alpha(0.5);
-        
+        )
+        .alpha(0.5);
+
         draw.rect(
-            (translation_x + width / 2.0 - half_width, translation_y + width / 2.0 - half_width),
-            (2.0 * half_width, 2.0* half_width),
+            (
+                translation_x + width / 2.0 - half_width,
+                translation_y + width / 2.0 - half_width,
+            ),
+            (2.0 * half_width, 2.0 * half_width),
         )
         .fill_color(Color::from_rgb(0.1, 0.1, 0.1))
         .alpha(0.2);
-
     }
 
     pub fn update_textures(
