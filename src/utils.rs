@@ -26,6 +26,7 @@ use strum_macros::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
+use crate::histogram;
 use crate::image_loader::{open_image, rotate_dynimage};
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
@@ -188,10 +189,12 @@ impl ExtendedImageInfo {
         Ok(())
     }
 
-    pub fn from_image(img: &RgbaImage) -> Self {
+    pub fn from_image(image: &DynamicImage) -> Self {
         let mut hist_r: [u64; 256] = [0; 256];
         let mut hist_g: [u64; 256] = [0; 256];
         let mut hist_b: [u64; 256] = [0; 256];
+        let img = image.as_rgba8().unwrap();
+        let stat = histogram::calculate_statistics(image);
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
@@ -711,7 +714,7 @@ pub fn send_extended_info(
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
 ) {
     if let Some(img) = current_image {
-        let copied_img = img.to_rgba8();
+        let copied_img = img.clone();
         let sender = channel.0.clone();
         let current_path = current_path.clone();
         thread::spawn(move || {
