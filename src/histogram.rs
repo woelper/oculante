@@ -7,6 +7,7 @@ pub struct ImageStatistics<A: Clone + Debug> {
     pub hist_bins: Vec<Vec<A>>,
     pub hist_value: Vec<f32>,
     pub distinct_colors: u64,
+    pub transparent_pixels: u64
 }
 
 trait ArgumentReducer<A, V> {
@@ -69,7 +70,7 @@ impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
 }
 
 fn calculate_statistics_impl<
-    A: Clone + Debug + Copy,
+    A: Clone + Debug + Copy + Into<f32>,
     V: Default,
     const CN: usize,
     const USEFUL_CN: usize,
@@ -82,7 +83,7 @@ fn calculate_statistics_impl<
     distinct_colors_reducer: impl ArgumentReducer<A, u8>,
 ) -> ImageStatistics<u64>
 where
-    V: AsPrimitive<usize> + AsPrimitive<u32>,
+    V: AsPrimitive<usize> + AsPrimitive<u32> + AsPrimitive<f32>,
 {
     assert!(USEFUL_CN >= 1 && USEFUL_CN <= 3);
     assert!(CN >= 1 && CN <= 4);
@@ -106,7 +107,30 @@ where
         vec![0u64; 0]
     };
 
-    for row in image.chunks_exact(stride) {
+    let mut transparent_pixels: u64 = 0;
+
+    for chunk in image.chunks_exact(CN){
+        let mut trans:bool = true;
+        let c0: usize = reducer.reduce(chunk[0]).as_();
+            bin0[c0] += 1;
+            trans &= c0==0;
+            if USEFUL_CN > 1 {
+                let c1: usize = reducer.reduce(chunk[1]).as_();
+                bin1[c1] += 1;
+                trans &= c1==0;
+            }
+            if USEFUL_CN > 2 {
+                let c2: usize = reducer.reduce(chunk[2]).as_();
+                bin2[c2] += 1;
+                trans &= c2==0;
+            }
+            if CN==4{
+                let alpha: f32 = chunk[3].into();
+                transparent_pixels += (alpha<=f32::EPSILON && trans) as u64;
+            }
+    }
+
+    /*for row in image.chunks_exact(stride) {
         let fixed_row = &row[0..width * CN];
         /*
            For high bit-depth, 8-bit it is essentially pass through, but for `f32`
@@ -123,6 +147,7 @@ where
             if USEFUL_CN > 2 {
                 dst[2] = reducer.reduce(src[2]);
             }
+            
         }
 
         // Calculate hist
@@ -137,8 +162,12 @@ where
                 let c2: usize = chunk[2].as_();
                 bin2[c2] += 1;
             }
+            /*if CN==4{
+                let alpha: f32 = chunk[3].as_();
+                transparent_pixels += (alpha<=f32::EPSILON) as u64;
+            }*/
         }
-    }
+    }*/
 
     working_row.resize(0, V::default());
 
@@ -218,6 +247,7 @@ where
         hist_bins,
         hist_value: v2,
         distinct_colors,
+        transparent_pixels
     }
 }
 

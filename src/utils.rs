@@ -196,15 +196,15 @@ impl ExtendedImageInfo {
         //let mut hist_b: [u64; 256] = [0; 256];
         let img = image.to_rgba8();
         let stat = histogram::calculate_statistics(image);
-        println!("Hist {:?}", stat);
+        //println!("Hist {:?}", stat);
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
 
         //Colors counting
-        const FIXED_RGB_SIZE: usize = 24;
-        const SUB_INDEX_SIZE: usize = 5;
-        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
+        //const FIXED_RGB_SIZE: usize = 24;
+        //const SUB_INDEX_SIZE: usize = 5;
+        //const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
         //let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
 
         for p in img.pixels() {
@@ -246,6 +246,8 @@ impl ExtendedImageInfo {
             if(stat_count>=3)        {
         blue_histogram = stat.hist_bins[2].iter().zip(&stat.hist_value).map(|(bin_count, bin_value)| (*bin_value as i32, *bin_count)).collect();
             }
+
+        assert!(stat.transparent_pixels as usize == num_transparent_pixels);
 
         Self {
             num_pixels,
