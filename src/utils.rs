@@ -202,10 +202,10 @@ impl ExtendedImageInfo {
         let mut num_transparent_pixels = 0;
 
         //Colors counting
-        //const FIXED_RGB_SIZE: usize = 24;
-        //const SUB_INDEX_SIZE: usize = 5;
-        //const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
-        //let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
+        const FIXED_RGB_SIZE: usize = 24;
+        const SUB_INDEX_SIZE: usize = 5;
+        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
+        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
 
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
@@ -218,16 +218,16 @@ impl ExtendedImageInfo {
 
             //Store every existing color combination in a bit
             //Therefore we use a 24 bit index, splitted into a main and a sub index.
-            //let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
-            //let pos_main = pos >> SUB_INDEX_SIZE;
-            //let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
-            //color_map[pos_main as usize] |= 1 << pos_sub;
+            let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
+            let pos_main = pos >> SUB_INDEX_SIZE;
+            let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
+            color_map[pos_main as usize] |= 1 << pos_sub;
         }
 
-        /*let mut full_colors = 0u32;
+        let mut full_colors = 0u32;
         for &intensity in color_map.iter() {
             full_colors += intensity.count_ones();
-        }*/
+        }
 
         let stat_count = stat.hist_bins.iter().count();
         let mut red_histogram: Vec<(i32, u64)> = Vec::new();
@@ -247,6 +247,7 @@ impl ExtendedImageInfo {
         blue_histogram = stat.hist_bins[2].iter().zip(&stat.hist_value).map(|(bin_count, bin_value)| (*bin_value as i32, *bin_count)).collect();
             }
 
+        assert!(stat.distinct_colors as usize == full_colors as usize);
         assert!(stat.transparent_pixels as usize == num_transparent_pixels);
 
         Self {

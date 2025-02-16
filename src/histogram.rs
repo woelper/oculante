@@ -74,18 +74,21 @@ trait AlphaTest{
     }
 
 impl AlphaTest for u8 {
+    #[inline(always)]
     fn is_transparent_alpha(self)-> bool{
         self == 0
     }
 }
 
 impl AlphaTest for u16 {
+    #[inline(always)]
     fn is_transparent_alpha(self)-> bool{
         self == 0
     }
 }
 
 impl AlphaTest for f32 {
+    #[inline(always)]
     fn is_transparent_alpha(self)-> bool{
         let mut value = self;
 
