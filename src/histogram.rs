@@ -1,5 +1,5 @@
 use image::{DynamicImage, ImageReader};
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, Signed};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
@@ -69,8 +69,42 @@ impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
     }
 }
 
+trait AlphaTest{ 
+    fn is_transparent_alpha(self)-> bool;
+    }
+
+impl AlphaTest for u8 {
+    fn is_transparent_alpha(self)-> bool{
+        self == 0
+    }
+}
+
+impl AlphaTest for u16 {
+    fn is_transparent_alpha(self)-> bool{
+        self == 0
+    }
+}
+
+impl AlphaTest for f32 {
+    fn is_transparent_alpha(self)-> bool{
+        let mut value = self;
+
+        if self.is_nan() {
+            value= f32::MAX // Or any local positive extremum, as 1, 255, 65535 etc
+        } else if self.is_infinite() && self.is_positive() {
+            value= f32::MAX // Or any local positive extremum, as 1, 255, 65535 etc
+        } else if self.is_infinite() && self.is_negative() {
+            value= f32::MIN  // Or any local negative extremum, 0 if u8, u16 type required
+        } else if self.is_subnormal() {
+            value= 0. // Non-transparent value, since 1/65535 is subnormal, but for 16 bit-depth it is not transparent :)
+        } 
+
+        value <= f32::EPSILON
+    }
+}
+
 fn calculate_statistics_impl<
-    A: Clone + Debug + Copy + Into<f32>,
+    A: Clone + Debug + Copy + AlphaTest,
     V: Default,
     const CN: usize,
     const USEFUL_CN: usize,
@@ -83,7 +117,7 @@ fn calculate_statistics_impl<
     distinct_colors_reducer: impl ArgumentReducer<A, u8>,
 ) -> ImageStatistics<u64>
 where
-    V: AsPrimitive<usize> + AsPrimitive<u32> + AsPrimitive<f32>,
+    V: AsPrimitive<usize> + AsPrimitive<u32>,
 {
     assert!(USEFUL_CN >= 1 && USEFUL_CN <= 3);
     assert!(CN >= 1 && CN <= 4);
@@ -110,24 +144,23 @@ where
     let mut transparent_pixels: u64 = 0;
     let has_alpha = (CN-USEFUL_CN) == 1;
 
-    for chunk in image.chunks_exact(CN){
-        let mut trans:bool = true;
+    for chunk in image.chunks_exact(CN){      
         let c0: usize = reducer.reduce(chunk[0]).as_();
             bin0[c0] += 1;
-            trans &= c0==0;
+            let mut trans = chunk[0].is_transparent_alpha();
             if USEFUL_CN > 1 {
                 let c1: usize = reducer.reduce(chunk[1]).as_();
                 bin1[c1] += 1;
-                trans &= c1==0;
+                trans &= chunk[1].is_transparent_alpha();
             }
             if USEFUL_CN > 2 {
                 let c2: usize = reducer.reduce(chunk[2]).as_();
                 bin2[c2] += 1;
-                trans &= c2==0;
+                trans &= chunk[2].is_transparent_alpha();
             }
-            if has_alpha{
-                let alpha: f32 = chunk[USEFUL_CN].into();
-                transparent_pixels += (alpha<=f32::EPSILON && trans) as u64;
+            if has_alpha{                
+                trans &= chunk[USEFUL_CN].is_transparent_alpha();
+                transparent_pixels += (trans) as u64;
             }
     }
 
