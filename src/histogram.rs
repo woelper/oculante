@@ -108,6 +108,7 @@ where
     };
 
     let mut transparent_pixels: u64 = 0;
+    let has_alpha = (CN-USEFUL_CN) == 1;
 
     for chunk in image.chunks_exact(CN){
         let mut trans:bool = true;
@@ -124,8 +125,8 @@ where
                 bin2[c2] += 1;
                 trans &= c2==0;
             }
-            if CN==4{
-                let alpha: f32 = chunk[3].into();
+            if has_alpha{
+                let alpha: f32 = chunk[USEFUL_CN].into();
                 transparent_pixels += (alpha<=f32::EPSILON && trans) as u64;
             }
     }
