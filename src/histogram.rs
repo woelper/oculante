@@ -5,6 +5,7 @@ use std::fmt::Debug;
 #[derive(Clone, Debug)]
 pub struct ImageStatistics<A: Clone + Debug> {
     pub hist_bins: Vec<Vec<A>>,
+    pub hist_value: Vec<f32>,
     pub distinct_colors: u64,
 }
 
@@ -88,6 +89,11 @@ where
     let mut working_row = vec![V::default(); USEFUL_CN * width];
 
     let bins_count = 1 << BINS_DEPTH;
+    let mut v2: Vec<f32> = vec![0f32; 256]; //TODO: calculate "the right way"
+    for i in 0..256 {
+        v2[i] = i as f32;
+    }
+    
     let mut bin0 = vec![0u64; bins_count];
     let mut bin1 = if USEFUL_CN > 1 {
         vec![0u64; bins_count]
@@ -210,6 +216,7 @@ where
 
     ImageStatistics {
         hist_bins,
+        hist_value: v2,
         distinct_colors,
     }
 }

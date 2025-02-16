@@ -1,5 +1,6 @@
 use arboard::Clipboard;
 
+use font_kit::loaders::default;
 use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
@@ -13,7 +14,7 @@ use std::ffi::OsStr;
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::thread;
+use std::{thread};
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
@@ -190,11 +191,12 @@ impl ExtendedImageInfo {
     }
 
     pub fn from_image(image: &DynamicImage) -> Self {
-        let mut hist_r: [u64; 256] = [0; 256];
-        let mut hist_g: [u64; 256] = [0; 256];
-        let mut hist_b: [u64; 256] = [0; 256];
-        let img = image.as_rgba8().unwrap();
+        //let mut hist_r: [u64; 256] = [0; 256];
+        //let mut hist_g: [u64; 256] = [0; 256];
+        //let mut hist_b: [u64; 256] = [0; 256];
+        let img = image.to_rgba8();
         let stat = histogram::calculate_statistics(image);
+        println!("Hist {:?}", stat);
 
         let num_pixels = img.width() as usize * img.height() as usize;
         let mut num_transparent_pixels = 0;
@@ -203,52 +205,52 @@ impl ExtendedImageInfo {
         const FIXED_RGB_SIZE: usize = 24;
         const SUB_INDEX_SIZE: usize = 5;
         const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
-        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
+        //let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
 
         for p in img.pixels() {
             if is_pixel_fully_transparent(p) {
                 num_transparent_pixels += 1;
             }
 
-            hist_r[p.0[0] as usize] += 1;
-            hist_g[p.0[1] as usize] += 1;
-            hist_b[p.0[2] as usize] += 1;
+            //hist_r[p.0[0] as usize] += 1;
+            //hist_g[p.0[1] as usize] += 1;
+            //hist_b[p.0[2] as usize] += 1;
 
             //Store every existing color combination in a bit
             //Therefore we use a 24 bit index, splitted into a main and a sub index.
-            let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
-            let pos_main = pos >> SUB_INDEX_SIZE;
-            let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
-            color_map[pos_main as usize] |= 1 << pos_sub;
+            //let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
+            //let pos_main = pos >> SUB_INDEX_SIZE;
+            //let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
+            //color_map[pos_main as usize] |= 1 << pos_sub;
         }
 
-        let mut full_colors = 0u32;
+        /*let mut full_colors = 0u32;
         for &intensity in color_map.iter() {
             full_colors += intensity.count_ones();
-        }
+        }*/
 
-        let green_histogram: Vec<(i32, u64)> = hist_g
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
-            .collect();
+        let stat_count = stat.hist_bins.iter().count();
+        let mut red_histogram: Vec<(i32, u64)> = Vec::new();
+        let mut green_histogram: Vec<(i32, u64)> = Vec::new();
+        let mut blue_histogram: Vec<(i32, u64)> = Vec::new();
+        
 
-        let red_histogram: Vec<(i32, u64)> = hist_r
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
-            .collect();
+        if(stat_count>=1)        {
+            red_histogram = stat.hist_bins[0].iter().zip(&stat.hist_value).map(|(bin_count, bin_value)| (*bin_value as i32, *bin_count)).collect();
+    }
 
-        let blue_histogram: Vec<(i32, u64)> = hist_b
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
-            .collect();
+        if(stat_count>=2)        {
+            green_histogram = stat.hist_bins[1].iter().zip(&stat.hist_value).map(|(bin_count, bin_value)| (*bin_value as i32, *bin_count)).collect();
+            }
+
+            if(stat_count>=3)        {
+        blue_histogram = stat.hist_bins[2].iter().zip(&stat.hist_value).map(|(bin_count, bin_value)| (*bin_value as i32, *bin_count)).collect();
+            }
 
         Self {
             num_pixels,
             num_transparent_pixels,
-            num_colors: full_colors as usize,
+            num_colors: stat.distinct_colors as usize,
             blue_histogram,
             green_histogram,
             red_histogram,
