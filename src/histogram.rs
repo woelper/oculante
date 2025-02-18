@@ -12,6 +12,7 @@ pub struct ImageStatistics<A: Clone + Debug> {
 
 trait ArgumentReducer<A, V> {
     fn reduce(&self, a: A) -> V;
+    fn bins(&self) -> Vec<f32>;
 }
 
 #[derive(Clone, Default)]
@@ -34,6 +35,10 @@ impl ArgumentReducer<u8, u8> for ArgumentReducerUnsigned8 {
     fn reduce(&self, a: u8) -> u8 {
         a
     }
+
+    fn bins(&self) -> Vec<f32> {        
+        (0..u8::MAX as i32+1).map(|f|{f as f32}).collect()
+    }
 }
 
 impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsigned16<BIT_DEPTH> {
@@ -46,12 +51,20 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsign
             a.min(max_colors)
         }
     }
+
+    fn bins(&self) -> Vec<f32> {        
+        (0..1<<BIT_DEPTH).map(|f|{f as f32}).collect()
+    }
 }
 
 impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
     #[inline(always)]
     fn reduce(&self, a: f32) -> u16 {
         (a * (u16::MAX as f32)) as u16
+    }
+    fn bins(&self) -> Vec<f32> {  
+        let norm_factor = 1f32/(u16::MAX as f32);      
+        (0..u16::MAX as i32+1).map(|f|{f as f32 * norm_factor}).collect()
     }
 }
 
@@ -60,12 +73,20 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u8> for ArgumentReducerUnsigne
     fn reduce(&self, a: u16) -> u8 {
         a as u8
     }
+    fn bins(&self) -> Vec<f32> {        
+        (0..u8::MAX as i32+1).map(|f|{f as f32}).collect()
+    }
 }
 
 impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
     #[inline(always)]
     fn reduce(&self, a: f32) -> u8 {
         (a * 255.) as u8
+    }
+
+    fn bins(&self) -> Vec<f32> {  
+        let norm_factor = 1f32/(u8::MAX as f32);      
+        (0..u8::MAX as i32+1).map(|f|{f as f32 * norm_factor}).collect()
     }
 }
 
@@ -126,11 +147,7 @@ where
     assert!(CN >= 1 && CN <= 4);
     let mut working_row = vec![V::default(); USEFUL_CN * width];
 
-    let bins_count = 1 << BINS_DEPTH;
-    let mut v2: Vec<f32> = vec![0f32; 256]; //TODO: calculate "the right way"
-    for i in 0..256 {
-        v2[i] = i as f32;
-    }
+    let bins_count = 1 << BINS_DEPTH;    
     
     let mut bin0 = vec![0u64; bins_count];
     let mut bin1 = if USEFUL_CN > 1 {
@@ -282,7 +299,7 @@ where
 
     ImageStatistics {
         hist_bins,
-        hist_value: v2,
+        hist_value: reducer.bins(),
         distinct_colors,
         transparent_pixels
     }
