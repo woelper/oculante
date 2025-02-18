@@ -7,7 +7,9 @@ pub struct ImageStatistics<A: Clone + Debug> {
     pub hist_bins: Vec<Vec<A>>,
     pub hist_value: Vec<f32>,
     pub distinct_colors: u64,
-    pub transparent_pixels: u64
+    pub transparent_pixels: u64,
+    pub max_value:f32,
+    pub min_value:f32
 }
 
 trait ArgumentReducer<A, V> {
@@ -127,12 +129,56 @@ impl AlphaTest for f32 {
     }
 }
 
+pub trait MinMax {
+    const MIN: Self;
+    const MAX: Self;
+    fn mini(self, b:Self)-> Self;
+    fn maxi(self, b:Self)-> Self;
+}
+
+impl MinMax for u8 {
+    const MIN: u8 = u8::MIN;
+    const MAX: u8 = u8::MAX;
+    fn mini(self, b:u8)-> u8{
+        self.min(b)
+    }
+
+    fn maxi(self, b:u8)-> u8{
+        self.max(b)
+    }
+}
+
+impl MinMax for u16 {
+    const MIN: u16 = u16::MIN;
+    const MAX: u16 = u16::MAX;
+    fn mini(self, b:u16)-> u16{
+        self.min(b)
+    }
+
+    fn maxi(self, b:u16)-> u16{
+        self.max(b)
+    }
+}
+
+impl MinMax for f32 {
+    const MIN: f32 = f32::MIN;
+    const MAX: f32 = f32::MAX;
+    fn mini(self, b:f32)-> f32{
+        self.min(b)
+    }
+
+    fn maxi(self, b:f32)-> f32{
+        self.max(b)
+    }
+}
+
 fn calculate_statistics_impl<
-    A: Clone + Debug + Copy + AlphaTest,
+    A: Clone + Debug + Copy + AlphaTest + MinMax + Into<f32>,
     V: Default,
     const CN: usize,
     const USEFUL_CN: usize,
     const BINS_DEPTH: usize,
+    const USE_MIN_MAX: bool
 >(
     image: &[A],
     stride: usize,
@@ -147,9 +193,27 @@ where
     assert!(CN >= 1 && CN <= 4);
     let mut working_row = vec![V::default(); USEFUL_CN * width];
 
-    let bins_count = 1 << BINS_DEPTH;    
+    //Calculate min and max
+    let mut max_value: A = A::MIN;
+    let mut min_value: A = A::MAX;
+    for chunk in image.chunks_exact(CN){
+        let mut max_value_cns: A = A::MIN;
+        let mut min_value_cns: A = A::MAX;
+        for i in 0..USEFUL_CN{
+            max_value_cns = max_value_cns.maxi(chunk[i]);            
+            min_value_cns = min_value_cns.mini(chunk[i]);
+        }
+        max_value = max_value.maxi(max_value_cns);
+        min_value = min_value.mini(min_value_cns);
+    }
     
-    let mut bin0 = vec![0u64; bins_count];
+    let bins_count = 1 << BINS_DEPTH;
+    let mut hist_bins = vec![];
+    for _i in 0..USEFUL_CN{
+        hist_bins.push(vec![0u64; bins_count]);
+    }    
+    
+    /*let mut bin0 = vec![0u64; bins_count];
     let mut bin1 = if USEFUL_CN > 1 {
         vec![0u64; bins_count]
     } else {
@@ -159,29 +223,22 @@ where
         vec![0u64; bins_count]
     } else {
         vec![0u64; 0]
-    };
+    };*/
 
     let mut transparent_pixels: u64 = 0;
     let has_alpha = (CN-USEFUL_CN) == 1;
 
-    for chunk in image.chunks_exact(CN){      
-        let c0: usize = reducer.reduce(chunk[0]).as_();
-            bin0[c0] += 1;
-            let mut trans = chunk[0].is_transparent_alpha();
-            if USEFUL_CN > 1 {
-                let c1: usize = reducer.reduce(chunk[1]).as_();
-                bin1[c1] += 1;
-                trans &= chunk[1].is_transparent_alpha();
-            }
-            if USEFUL_CN > 2 {
-                let c2: usize = reducer.reduce(chunk[2]).as_();
-                bin2[c2] += 1;
-                trans &= chunk[2].is_transparent_alpha();
-            }
-            if has_alpha{                
-                trans &= chunk[USEFUL_CN].is_transparent_alpha();
-                transparent_pixels += (trans) as u64;
-            }
+    for chunk in image.chunks_exact(CN){
+        let mut trans = true;
+        for i in 0..USEFUL_CN{
+            let c: usize = reducer.reduce(chunk[i]).as_();
+            hist_bins[i][c] += 1;
+            trans &= chunk[i].is_transparent_alpha();
+        }
+        if has_alpha{                
+            trans &= chunk[USEFUL_CN].is_transparent_alpha();
+            transparent_pixels += (trans) as u64;
+        }            
     }
 
     /*for row in image.chunks_exact(stride) {
@@ -288,20 +345,13 @@ where
         distinct_colors += ones.count_ones() as u64;
     }
 
-    let mut hist_bins = vec![];
-    hist_bins.push(bin0);
-    if USEFUL_CN > 1 {
-        hist_bins.push(bin1);
-    }
-    if USEFUL_CN > 2 {
-        hist_bins.push(bin2);
-    }
-
     ImageStatistics {
         hist_bins,
         hist_value: reducer.bins(),
         distinct_colors,
-        transparent_pixels
+        transparent_pixels,
+        min_value: min_value.into(),
+        max_value: max_value.into(),
     }
 }
 
@@ -309,70 +359,70 @@ pub fn calculate_statistics(image: &DynamicImage) -> ImageStatistics<u64> {
     let width = image.width() as usize;
     let stride = image.width() as usize * image.color().channel_count() as usize;
     match image {
-        DynamicImage::ImageLuma8(img) => calculate_statistics_impl::<u8, u8, 1, 1, 8>(
+        DynamicImage::ImageLuma8(img) => calculate_statistics_impl::<u8, u8, 1, 1, 8, false>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned8::default(),
             ArgumentReducerUnsigned8::default(),
         ),
-        DynamicImage::ImageLumaA8(img) => calculate_statistics_impl::<u8, u8, 2, 1, 8>(
+        DynamicImage::ImageLumaA8(img) => calculate_statistics_impl::<u8, u8, 2, 1, 8, false>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned8::default(),
             ArgumentReducerUnsigned8::default(),
         ),
-        DynamicImage::ImageRgb8(img) => calculate_statistics_impl::<u8, u8, 3, 3, 8>(
+        DynamicImage::ImageRgb8(img) => calculate_statistics_impl::<u8, u8, 3, 3, 8, false>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned8::default(),
             ArgumentReducerUnsigned8::default(),
         ),
-        DynamicImage::ImageRgba8(img) => calculate_statistics_impl::<u8, u8, 4, 3, 8>(
+        DynamicImage::ImageRgba8(img) => calculate_statistics_impl::<u8, u8, 4, 3, 8, false>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned8::default(),
             ArgumentReducerUnsigned8::default(),
         ),
-        DynamicImage::ImageLuma16(img) => calculate_statistics_impl::<u16, u16, 1, 1, 16>(
-            &img,
-            stride,
-            width,
-            ArgumentReducerUnsigned16::<16>::default(),
-            ArgumentReducerUnsigned16ToU8::<16>::default(),
-        ),
-        DynamicImage::ImageLumaA16(img) => calculate_statistics_impl::<u16, u16, 2, 1, 16>(
+        DynamicImage::ImageLuma16(img) => calculate_statistics_impl::<u16, u16, 1, 1, 16, true>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned16::<16>::default(),
             ArgumentReducerUnsigned16ToU8::<16>::default(),
         ),
-        DynamicImage::ImageRgb16(img) => calculate_statistics_impl::<u16, u16, 3, 3, 16>(
+        DynamicImage::ImageLumaA16(img) => calculate_statistics_impl::<u16, u16, 2, 1, 16, true>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned16::<16>::default(),
             ArgumentReducerUnsigned16ToU8::<16>::default(),
         ),
-        DynamicImage::ImageRgba16(img) => calculate_statistics_impl::<u16, u16, 4, 3, 16>(
+        DynamicImage::ImageRgb16(img) => calculate_statistics_impl::<u16, u16, 3, 3, 16, true>(
             &img,
             stride,
             width,
             ArgumentReducerUnsigned16::<16>::default(),
             ArgumentReducerUnsigned16ToU8::<16>::default(),
         ),
-        DynamicImage::ImageRgb32F(img) => calculate_statistics_impl::<f32, u16, 3, 3, 16>(
+        DynamicImage::ImageRgba16(img) => calculate_statistics_impl::<u16, u16, 4, 3, 16, true>(
+            &img,
+            stride,
+            width,
+            ArgumentReducerUnsigned16::<16>::default(),
+            ArgumentReducerUnsigned16ToU8::<16>::default(),
+        ),
+        DynamicImage::ImageRgb32F(img) => calculate_statistics_impl::<f32, u16, 3, 3, 16, true>(
             &img,
             stride,
             width,
             ArgumentReducerFloat32::default(),
             ArgumentReducerFloat32ToU8::default(),
         ),
-        DynamicImage::ImageRgba32F(img) => calculate_statistics_impl::<f32, u16, 4, 3, 16>(
+        DynamicImage::ImageRgba32F(img) => calculate_statistics_impl::<f32, u16, 4, 3, 16, true>(
             &img,
             stride,
             width,
