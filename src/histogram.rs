@@ -14,7 +14,7 @@ pub struct ImageStatistics<A: Clone + Debug> {
 
 trait ArgumentReducer<A, V> {    
     fn reduce(&self, a: A, min:A, max:A, range:A) -> V;
-    fn bins(&self) -> Vec<f32>;
+    fn bins(&self, min:f32, max:f32, range:f32) -> Vec<f32>;
 }
 
 #[derive(Clone, Default)]
@@ -38,7 +38,7 @@ impl ArgumentReducer<u8, u8> for ArgumentReducerUnsigned8 {
         a
     }
 
-    fn bins(&self) -> Vec<f32> {        
+    fn bins(&self, _min:f32, _max:f32, _range:f32) -> Vec<f32> {        
         (0..u8::MAX as i32+1).map(|f|{f as f32}).collect()
     }
 }
@@ -54,7 +54,7 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsign
         }
     }
 
-    fn bins(&self) -> Vec<f32> {        
+    fn bins(&self, _min:f32, _max:f32, _range:f32) -> Vec<f32> {        
         (0..1<<BIT_DEPTH).map(|f|{f as f32}).collect()
     }
 }
@@ -65,9 +65,9 @@ impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
         ((a-min)/range * (u16::MAX as f32)) as u16
         //(a * (u16::MAX as f32)) as u16
     }
-    fn bins(&self) -> Vec<f32> {  
-        let norm_factor = 1f32/(u16::MAX as f32);      
-        (0..u16::MAX as i32+1).map(|f|{f as f32 * norm_factor}).collect()
+    fn bins(&self, min:f32, _max:f32, range:f32) -> Vec<f32> {  
+        let norm_factor = range/(u16::MAX as f32);      
+        (0..u16::MAX as i32+1).map(|f|{min+f as f32 * norm_factor}).collect()
     }
 }
 
@@ -76,7 +76,7 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u8> for ArgumentReducerUnsigne
     fn reduce(&self, a: u16, _min:u16, _max:u16, _range:u16) -> u8 {
         a as u8
     }
-    fn bins(&self) -> Vec<f32> {        
+    fn bins(&self, _min:f32, _max:f32, _range:f32) -> Vec<f32> {        
         (0..u8::MAX as i32+1).map(|f|{f as f32}).collect()
     }
 }
@@ -88,9 +88,9 @@ impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
         //((a) * 255.) as u8
     }
 
-    fn bins(&self) -> Vec<f32> {  
-        let norm_factor = 1f32/(u8::MAX as f32);      
-        (0..u8::MAX as i32+1).map(|f|{f as f32 * norm_factor}).collect()
+    fn bins(&self, min:f32, _max:f32, range:f32) -> Vec<f32> {  
+        let norm_factor = range/(u8::MAX as f32);      
+        (0..u8::MAX as i32+1).map(|f|{min+f as f32 * norm_factor}).collect()
     }
 }
 
@@ -415,7 +415,7 @@ where
 
     ImageStatistics {
         hist_bins,
-        hist_value: reducer.bins(),
+        hist_value: reducer.bins(min_scale.into(), max_scale.into(), range_scale.into()),
         distinct_colors,
         transparent_pixels,
         min_value: min_value.into(),
