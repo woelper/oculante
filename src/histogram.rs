@@ -61,8 +61,8 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsign
 
 impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
     #[inline(always)]
-    fn reduce(&self, a: f32, _min:f32, _max:f32, _range:f32) -> u16 {
-        (a * (u16::MAX as f32)) as u16
+    fn reduce(&self, a: f32, min:f32, _max:f32, range:f32) -> u16 {
+        ((a-min)/range * (u16::MAX as f32)) as u16
     }
     fn bins(&self) -> Vec<f32> {  
         let norm_factor = 1f32/(u16::MAX as f32);      
@@ -144,10 +144,12 @@ impl MinMax for u8 {
     const MAX: u8 = u8::MAX;
     const RANGE_MIN:u8 = 0u8;
     const RANGE_MAX:u8 = Self::MAX;
+
+    #[inline(always)]
     fn mini(self, b:u8)-> u8{
         self.min(b)
     }
-
+    #[inline(always)]
     fn maxi(self, b:u8)-> u8{
         self.max(b)
     }
@@ -158,10 +160,11 @@ impl MinMax for u16 {
     const MAX: u16 = u16::MAX;
     const RANGE_MIN:u16 = 0u16;
     const RANGE_MAX:u16 = Self::MAX;
+    #[inline(always)]
     fn mini(self, b:u16)-> u16{
         self.min(b)
     }
-
+    #[inline(always)]
     fn maxi(self, b:u16)-> u16{
         self.max(b)
     }
@@ -172,10 +175,11 @@ impl MinMax for f32 {
     const MAX: f32 = f32::MAX;
     const RANGE_MIN:f32 = 0.0f32;
     const RANGE_MAX:f32 = 1.0f32;
+    #[inline(always)]
     fn mini(self, b:f32)-> f32{
         self.min(b)
     }
-
+    #[inline(always)]
     fn maxi(self, b:f32)-> f32{
         self.max(b)
     }
@@ -209,14 +213,10 @@ where
     let mut max_value: A = A::MIN;
     let mut min_value: A = A::MAX;
     for chunk in image.chunks_exact(CN){
-        let mut max_value_cns: A = A::MIN;
-        let mut min_value_cns: A = A::MAX;
         for i in 0..USEFUL_CN{
-            max_value_cns = max_value_cns.maxi(chunk[i]);            
-            min_value_cns = min_value_cns.mini(chunk[i]);
+            max_value = max_value.maxi(chunk[i]);            
+            min_value = min_value.mini(chunk[i]);
         }
-        max_value = max_value.maxi(max_value_cns);
-        min_value = min_value.mini(min_value_cns);
     }
 
     let min_scale: A;
