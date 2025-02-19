@@ -12,8 +12,8 @@ pub struct ImageStatistics<A: Clone + Debug> {
     pub min_value:f32
 }
 
-trait ArgumentReducer<A, V> {
-    fn reduce(&self, a: A) -> V;
+trait ArgumentReducer<A, V> {    
+    fn reduce(&self, a: A, min:A, max:A, range:A) -> V;
     fn bins(&self) -> Vec<f32>;
 }
 
@@ -34,7 +34,7 @@ struct ArgumentReducerFloat32ToU8 {}
 
 impl ArgumentReducer<u8, u8> for ArgumentReducerUnsigned8 {
     #[inline(always)]
-    fn reduce(&self, a: u8) -> u8 {
+    fn reduce(&self, a: u8, _min:u8, _max:u8, _range:u8) -> u8 {
         a
     }
 
@@ -45,7 +45,7 @@ impl ArgumentReducer<u8, u8> for ArgumentReducerUnsigned8 {
 
 impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsigned16<BIT_DEPTH> {
     #[inline(always)]
-    fn reduce(&self, a: u16) -> u16 {
+    fn reduce(&self, a: u16, _min:u16, _max:u16, _range:u16) -> u16 {
         if BIT_DEPTH == 16 {
             a
         } else {
@@ -61,7 +61,7 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u16> for ArgumentReducerUnsign
 
 impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
     #[inline(always)]
-    fn reduce(&self, a: f32) -> u16 {
+    fn reduce(&self, a: f32, _min:f32, _max:f32, _range:f32) -> u16 {
         (a * (u16::MAX as f32)) as u16
     }
     fn bins(&self) -> Vec<f32> {  
@@ -72,7 +72,7 @@ impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
 
 impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u8> for ArgumentReducerUnsigned16ToU8<BIT_DEPTH> {
     #[inline(always)]
-    fn reduce(&self, a: u16) -> u8 {
+    fn reduce(&self, a: u16, _min:u16, _max:u16, _range:u16) -> u8 {
         a as u8
     }
     fn bins(&self) -> Vec<f32> {        
@@ -82,8 +82,8 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u8> for ArgumentReducerUnsigne
 
 impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
     #[inline(always)]
-    fn reduce(&self, a: f32) -> u8 {
-        (a * 255.) as u8
+    fn reduce(&self, a: f32, min:f32, _max:f32, _range:f32) -> u8 {
+        ((a) * 255.) as u8
     }
 
     fn bins(&self) -> Vec<f32> {  
@@ -132,6 +132,9 @@ impl AlphaTest for f32 {
 pub trait MinMax {
     const MIN: Self;
     const MAX: Self;
+    const RANGE_MIN: Self;
+    const RANGE_MAX: Self;
+
     fn mini(self, b:Self)-> Self;
     fn maxi(self, b:Self)-> Self;
 }
@@ -139,6 +142,8 @@ pub trait MinMax {
 impl MinMax for u8 {
     const MIN: u8 = u8::MIN;
     const MAX: u8 = u8::MAX;
+    const RANGE_MIN:u8 = 0u8;
+    const RANGE_MAX:u8 = Self::MAX;
     fn mini(self, b:u8)-> u8{
         self.min(b)
     }
@@ -151,6 +156,8 @@ impl MinMax for u8 {
 impl MinMax for u16 {
     const MIN: u16 = u16::MIN;
     const MAX: u16 = u16::MAX;
+    const RANGE_MIN:u16 = 0u16;
+    const RANGE_MAX:u16 = Self::MAX;
     fn mini(self, b:u16)-> u16{
         self.min(b)
     }
@@ -163,6 +170,8 @@ impl MinMax for u16 {
 impl MinMax for f32 {
     const MIN: f32 = f32::MIN;
     const MAX: f32 = f32::MAX;
+    const RANGE_MIN:f32 = 0.0f32;
+    const RANGE_MAX:f32 = 1.0f32;
     fn mini(self, b:f32)-> f32{
         self.min(b)
     }
@@ -172,8 +181,9 @@ impl MinMax for f32 {
     }
 }
 
+
 fn calculate_statistics_impl<
-    A: Clone + Debug + Copy + AlphaTest + MinMax + Into<f32>,
+    A: Clone + Debug + Copy + AlphaTest + MinMax + Into<f32> + std::ops::Sub<Output = A>,
     V: Default,
     const CN: usize,
     const USEFUL_CN: usize,
@@ -189,10 +199,12 @@ fn calculate_statistics_impl<
 where
     V: AsPrimitive<usize> + AsPrimitive<u32>,
 {
+    use std::time::Instant;
     assert!(USEFUL_CN >= 1 && USEFUL_CN <= 3);
     assert!(CN >= 1 && CN <= 4);
     let mut working_row = vec![V::default(); USEFUL_CN * width];
 
+    let now = Instant::now();
     //Calculate min and max
     let mut max_value: A = A::MIN;
     let mut min_value: A = A::MAX;
@@ -206,7 +218,24 @@ where
         max_value = max_value.maxi(max_value_cns);
         min_value = min_value.mini(min_value_cns);
     }
+
+    let min_scale: A;
+    let max_scale: A;
+    let range_scale: A;
+    if(USE_MIN_MAX){
+        min_scale = max_value;
+        max_scale = min_value;
+    }
+    else {
+        min_scale = A::RANGE_MIN;
+        max_scale = A::RANGE_MAX;        
+    }
+    range_scale = max_scale-min_scale;
+
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
     
+    let now2 = Instant::now();
     let bins_count = 1 << BINS_DEPTH;
     let mut hist_bins = vec![];
     for _i in 0..USEFUL_CN{
@@ -231,7 +260,7 @@ where
     for chunk in image.chunks_exact(CN){
         let mut trans = true;
         for i in 0..USEFUL_CN{
-            let c: usize = reducer.reduce(chunk[i]).as_();
+            let c: usize = reducer.reduce(chunk[i], min_scale, max_scale, range_scale).as_();
             hist_bins[i][c] += 1;
             trans &= chunk[i].is_transparent_alpha();
         }
@@ -240,6 +269,10 @@ where
             transparent_pixels += (trans) as u64;
         }            
     }
+    let elapsed = now2.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
+
+    let now3 = Instant::now();
 
     /*for row in image.chunks_exact(stride) {
         let fixed_row = &row[0..width * CN];
@@ -298,12 +331,12 @@ where
             .chunks_exact_mut(USEFUL_CN)
             .zip(fixed_row.chunks_exact(CN))
         {
-            dst[0] = distinct_colors_reducer.reduce(src[0]);
+            dst[0] = distinct_colors_reducer.reduce(src[0], min_scale, max_scale, range_scale);
             if USEFUL_CN > 1 {
-                dst[1] = distinct_colors_reducer.reduce(src[1]);
+                dst[1] = distinct_colors_reducer.reduce(src[1], min_scale, max_scale, range_scale);
             }
             if USEFUL_CN > 2 {
-                dst[2] = distinct_colors_reducer.reduce(src[2]);
+                dst[2] = distinct_colors_reducer.reduce(src[2], min_scale, max_scale, range_scale);
             }
         }
 
@@ -344,6 +377,9 @@ where
     for &ones in distinct_map.iter() {
         distinct_colors += ones.count_ones() as u64;
     }
+
+    let elapsed = now3.elapsed();
+    println!("Elapsed: {:.2?}", elapsed);
 
     ImageStatistics {
         hist_bins,
