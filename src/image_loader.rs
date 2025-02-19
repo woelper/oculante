@@ -838,8 +838,28 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
         }
         tiff::decoder::DecodingResult::F32(contents) => {
             debug!("TIFF F32");
-            ldr_img = autoscale(&contents).par_iter().map(|x| *x as u8).collect();
+            
+
+            match decoder.colortype()? {                
+                tiff::ColorType::RGB(_) => {
+                    debug!("Loading rgb color");
+                    let i =
+                        image::Rgb32FImage::from_raw(dim.0, dim.1, contents).context("Can't load RGB img")?;
+                    return Ok(DynamicImage::ImageRgb32F(i));
+                }
+                tiff::ColorType::RGBA(_) => {
+                    debug!("Loading rgba color");
+                    let i =
+                        image::Rgba32FImage::from_raw(dim.0, dim.1, contents).context("Can't load RGBA img")?;
+                    return Ok(image::DynamicImage::ImageRgba32F(i));
+                }
+            
+            _ => {}
         }
+        ldr_img = autoscale(&contents).par_iter().map(|x| *x as u8).collect();
+        }
+        
+    
         tiff::decoder::DecodingResult::F64(contents) => {
             debug!("TIFF F64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
