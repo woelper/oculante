@@ -63,6 +63,7 @@ impl ArgumentReducer<f32, u16> for ArgumentReducerFloat32 {
     #[inline(always)]
     fn reduce(&self, a: f32, min:f32, _max:f32, range:f32) -> u16 {
         ((a-min)/range * (u16::MAX as f32)) as u16
+        //(a * (u16::MAX as f32)) as u16
     }
     fn bins(&self) -> Vec<f32> {  
         let norm_factor = 1f32/(u16::MAX as f32);      
@@ -82,8 +83,9 @@ impl<const BIT_DEPTH: usize> ArgumentReducer<u16, u8> for ArgumentReducerUnsigne
 
 impl ArgumentReducer<f32, u8> for ArgumentReducerFloat32ToU8 {
     #[inline(always)]
-    fn reduce(&self, a: f32, min:f32, _max:f32, _range:f32) -> u8 {
-        ((a) * 255.) as u8
+    fn reduce(&self, a: f32, min:f32, _max:f32, range:f32) -> u8 {
+        ((a-min)/range * (u8::MAX as f32)) as u8
+        //((a) * 255.) as u8
     }
 
     fn bins(&self) -> Vec<f32> {  
@@ -223,8 +225,8 @@ where
     let max_scale: A;
     let range_scale: A;
     if(USE_MIN_MAX){
-        min_scale = max_value;
-        max_scale = min_value;
+        min_scale = min_value;
+        max_scale = max_value;
     }
     else {
         min_scale = A::RANGE_MIN;
@@ -257,17 +259,43 @@ where
     let mut transparent_pixels: u64 = 0;
     let has_alpha = (CN-USEFUL_CN) == 1;
 
+    let mut asdf = [0u8; 4];
+    //let mut distinct_map = vec![0u8; 1 << 21];
+    let mut distinct_colors = 0u64;
+
+    //Colors counting
+    const FIXED_RGB_SIZE: usize = 24;
+    const SUB_INDEX_SIZE: usize = 5;
+    const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
+    let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
     for chunk in image.chunks_exact(CN){
         let mut trans = true;
+        
         for i in 0..USEFUL_CN{
             let c: usize = reducer.reduce(chunk[i], min_scale, max_scale, range_scale).as_();
             hist_bins[i][c] += 1;
             trans &= chunk[i].is_transparent_alpha();
+
+            let col_reduced: u8 = distinct_colors_reducer.reduce(chunk[i], min_scale, max_scale, range_scale);
+            asdf[i] = col_reduced;
         }
         if has_alpha{                
             trans &= chunk[USEFUL_CN].is_transparent_alpha();
-            transparent_pixels += (trans) as u64;
+            if trans{
+                transparent_pixels += 1;
+            }
+            
         }            
+
+        let pos: u32 = u32::from_ne_bytes(asdf);
+                /*let full: u32 = v_u32 >> 3;
+                let remainder = v_u32 - (full << 3);
+
+                let bit = 1 << remainder;
+                distinct_map[full as usize] |= bit;*/
+            let pos_main = pos >> SUB_INDEX_SIZE;
+            let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
+            color_map[pos_main as usize] |= 1 << pos_sub;
     }
     let elapsed = now2.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
@@ -313,13 +341,13 @@ where
         }
     }*/
 
-    working_row.resize(0, V::default());
+    /*working_row.resize(0, V::default());
 
-    let mut distinct_colors = 0u64;
+    
 
     let mut d_working_row = vec![0u8; USEFUL_CN * width];
 
-    let mut distinct_map = vec![0u8; 1 << 21];
+    
 
     for row in image.chunks_exact(stride) {
         let fixed_row = &row[0..width * CN];
@@ -372,10 +400,14 @@ where
                 distinct_map[full as usize] |= bit;
             }
         }
-    }
+    }*/
 
-    for &ones in distinct_map.iter() {
+    /*for &ones in distinct_map.iter() {
         distinct_colors += ones.count_ones() as u64;
+    }*/
+
+    for &intensity in color_map.iter() {
+        distinct_colors += intensity.count_ones() as u64;
     }
 
     let elapsed = now3.elapsed();
