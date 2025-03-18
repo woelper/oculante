@@ -98,7 +98,7 @@ convert moss.jpg ./format-test.jxl
 convert moss.jpg ./format-test.avif
 convert moss.jpg ./format-test.tiff
 convert moss.jpg ./format-test.webp
-convert moss.jpg ./format-test.farbfeld
+convert moss.jpg ./format-test.ff # farbfeld
 convert moss.jpg ./format-test.dds
 convert moss.jpg ./format-test.ppm
 convert moss.jpg ./format-test.heic
@@ -113,7 +113,7 @@ convert -resize 4601x6900! moss.jpg ./odd_width-format-test.jxl
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.avif
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.tiff
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.webp
-convert -resize 4601x6900! moss.jpg ./odd_width-format-test.farbfeld
+convert -resize 4601x6900! moss.jpg ./odd_width-format-test.ff # farbfeld
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.dds
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.ppm
 convert -resize 4601x6900! moss.jpg ./odd_width-format-test.heic
@@ -128,7 +128,7 @@ convert -resize 4600x6901! moss.jpg ./odd_height-format-test.jxl
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.avif
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.tiff
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.webp
-convert -resize 4600x6901! moss.jpg ./odd_height-format-test.farbfeld
+convert -resize 4600x6901! moss.jpg ./odd_height-format-test.ff # farbfeld
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.dds
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.ppm
 convert -resize 4600x6901! moss.jpg ./odd_height-format-test.heic
@@ -143,7 +143,7 @@ convert -resize 4601x6901! moss.jpg ./odd-format-test.jxl
 convert -resize 4601x6901! moss.jpg ./odd-format-test.avif
 convert -resize 4601x6901! moss.jpg ./odd-format-test.tiff
 convert -resize 4601x6901! moss.jpg ./odd-format-test.webp
-convert -resize 4601x6901! moss.jpg ./odd-format-test.farbfeld
+convert -resize 4601x6901! moss.jpg ./odd-format-test.ff # farbfeld
 convert -resize 4601x6901! moss.jpg ./odd-format-test.dds
 convert -resize 4601x6901! moss.jpg ./odd-format-test.ppm
 convert -resize 4601x6901! moss.jpg ./odd-format-test.heic
