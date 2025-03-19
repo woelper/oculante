@@ -18,8 +18,9 @@ use strum::IntoEnumIterator;
 fn load_recent_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(read_to_string(
         dirs::cache_dir()
-            .context("Can't get temp dir")?
-            .join(".efd_history"),
+            .context("Can't get cache dir")?
+            .join("oculante")
+            .join(".last_open_directory"),
     )?))
 }
 
@@ -32,8 +33,9 @@ fn save_recent_dir(p: &Path) -> Result<()> {
 
     let mut f = File::create(
         dirs::cache_dir()
-            .context("Can't get temp dir")?
-            .join(".efd_history"),
+            .context("Can't get cache dir")?
+            .join("oculante")
+            .join(".last_open_directory"),
     )?;
     write!(f, "{}", p.to_string_lossy())?;
     Ok(())
