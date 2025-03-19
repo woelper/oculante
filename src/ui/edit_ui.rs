@@ -845,8 +845,8 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             return;
         }
 
-        ui.styled_collapsing("Lossless Jpeg transforms", |ui| {
-            ui.label("These operations will immediately write changes to disk.");
+        ui.styled_collapsing("Lossless JPEG edits", |ui| {
+            ui.label(format!("{WARNING_CIRCLE} These operations will immediately write changes to disk."));
             let mut reload = false;
 
             ui.columns(3, |col| {
@@ -935,7 +935,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 ui.add_enabled_ui(crop != ImageOperation::Crop([0, 0, 0, 0]), |ui| {
 
                     if ui
-                        .button("Crop")
+                        .button("Crop Losslessly")
                         .on_hover_text("Crop according to values defined in the operator stack above")
                         .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
                         .clicked()
