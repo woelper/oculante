@@ -304,7 +304,6 @@ impl EguiExt for Ui {
 
         let (icon, description) = parse_icon_plus_text(text);
         let icon = icon.unwrap_or_default();
-        // let description = text;
 
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
         let spacing = if icon.is_empty() { "" } else { "  " };
