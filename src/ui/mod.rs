@@ -472,18 +472,24 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
     let trimmed = line.trim();
 
-    // 1) Check if the first token is exactly 1 grapheme
+    // Helper to check if a grapheme is an "icon" (e.g., Private Use Area: U+E000 to U+F8FF)
+    fn is_icon(grapheme: &str) -> bool {
+        grapheme.chars().next().map_or(false, |c| {
+            let code = c as u32;
+            (0xE000..=0xF8FF).contains(&code) // Adjust range based on your icons
+        })
+    }
+
+    // 1) Check for icon at the front
     if let Some((candidate, remainder)) = trimmed.split_once(' ') {
-        if candidate.graphemes(true).count() == 1 {
-            // icon at the front
+        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
     }
 
-    // 2) Otherwise, check from the right for a trailing icon
+    // 2) Check for icon at the end
     if let Some((remainder, candidate)) = trimmed.rsplit_once(' ') {
-        if candidate.graphemes(true).count() == 1 {
-            // icon at the end
+        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
     }
