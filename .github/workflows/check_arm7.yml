@@ -1,9 +1,9 @@
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "master" ]
+    branches: ["master"]
 
 name: Check ARM
 jobs:
@@ -13,12 +13,12 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
 
       - name: Update Rust
         run: rustup update
-        
+
       - name: Install cargo cross
         run: cargo install cross
 
@@ -27,4 +27,3 @@ jobs:
 
       - name: Check output
         run: ls target/
-
