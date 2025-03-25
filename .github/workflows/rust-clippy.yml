@@ -11,12 +11,12 @@ name: rust-clippy analyze
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "master" ]
+    branches: ["master"]
   schedule:
-    - cron: '28 16 * * 6'
+    - cron: "28 16 * * 6"
 
 jobs:
   rust-clippy-analyze:
@@ -40,7 +40,7 @@ jobs:
 
       - name: Patch azure linux deps
         run: sudo apt update
-      
+
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
 
@@ -48,8 +48,7 @@ jobs:
         run: cargo install clippy-sarif sarif-fmt
 
       - name: Run rust-clippy
-        run:
-          cargo clippy
+        run: cargo clippy
           --all-features
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
