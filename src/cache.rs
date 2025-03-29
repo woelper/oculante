@@ -28,6 +28,7 @@ impl Cache {
         self.data.clear()
     }
 
+    /// Insert an image into the cache
     pub fn insert(&mut self, path: &Path, img: DynamicImage) {
         self.data.insert(
             path.into(),

@@ -101,6 +101,8 @@ dicom-object = "0.8.0"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14.2"
 open = "5.3.2"
+url = "2.5.4"
+reqwest = { version = "0.12.15", features = ["blocking"], default-features = false}
 
 [features]
 default = [

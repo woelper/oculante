@@ -1,7 +1,10 @@
 #![windows_subsystem = "windows"]
 
+use anyhow::Context;
+use anyhow::Result;
 use clap::Arg;
 use clap::Command;
+use image::DynamicImage;
 use image::GenericImageView;
 use image_editing::LegacyEditState;
 use log::debug;
@@ -22,10 +25,14 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
+use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::sync::mpsc::Sender;
 use std::time::Duration;
+use url::Url;
 
 #[cfg(feature = "file_open")]
 use filebrowser::browse_for_image_path;
@@ -202,7 +209,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     debug!("matches {:?}", matches);
 
-    let paths_to_open = matches
+    let open_candidates = matches
         .get_many("INPUT")
         .unwrap_or_default()
         .cloned()
@@ -211,50 +218,143 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    debug!("Image is: {:?}", paths_to_open);
+    debug!("Image(s) {:?}", open_candidates);
 
-    if paths_to_open.len() == 1 {
-        let location = paths_to_open
-            .first()
-            .expect("It should be tested already that exactly one argument was passed.");
+    for (i, location) in open_candidates.iter().enumerate() {
         if location.is_dir() {
             // Folder - Pick first image from the folder...
             if let Ok(first_img_location) = find_first_image_in_directory(location) {
                 state.is_loaded = false;
                 state.current_path = Some(first_img_location.clone());
-                state.player.load(&first_img_location);
+                if i == 0 {
+                    state.player.load(&first_img_location);
+                } else {
+                    state.player.load_advanced(
+                        &first_img_location,
+                        Some(Frame::ImageCollectionMember(Default::default())),
+                    );
+                }
             }
         } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
-            state.player.load(&location);
+            match Url::parse(&location.to_string_lossy().to_string()) {
+                Ok(url) => {
+                    if url.scheme() == "file" {
+                        debug!("This is a file uri: {}", url);
+                        state.is_loaded = false;
+                        state.current_path = Some(location.clone().clone());
+                        if i == 0 {
+                            state.player.load(&location);
+                        } else {
+                            state.player.load_advanced(
+                                &location,
+                                Some(Frame::ImageCollectionMember(Default::default())),
+                            );
+                        }
+                    } else {
+                        debug!("This is a URL: {}", url);
+                        download_and_send_frame(
+                            url.as_str(),
+                            state.texture_channel.0.clone(),
+                            state.message_channel.0.clone(),
+                        );
+                        state.current_path = Some(PathBuf::from(url.as_str()));
+                    }
+                }
+                Err(_) => {
+                    // If it's not a valid URL/URI, check if it's a plain path
+                    debug!("This is a plain file path: {}", location.display());
+                    state.is_loaded = false;
+                    state.current_path = Some(location.clone().clone());
+                    if i == 0 {
+                        state.player.load(&location);
+                    } else {
+                        state.player.load_advanced(
+                            &location,
+                            Some(Frame::ImageCollectionMember(Default::default())),
+                        );
+                    }
+                }
+            }
         };
+
+        state.scrubber.entries.push(location.clone());
     }
 
-    if paths_to_open.len() > 1 {
-        let location = paths_to_open
-            .first()
-            .expect("It should be verified already that exactly one argument was passed.");
-        if location.is_dir() {
-            // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                state.is_loaded = false;
-                state.current_path = Some(first_img_location.clone());
-                state.player.load_advanced(
-                    &first_img_location,
-                    Some(Frame::ImageCollectionMember(Default::default())),
-                );
-            }
-        } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
-            state.player.load_advanced(
-                &location,
-                Some(Frame::ImageCollectionMember(Default::default())),
-            );
-        };
-        state.scrubber.entries = paths_to_open.clone();
-    }
+    //     state.scrubber.entries = open_candidates.clone();
+
+    // if open_candidates.len() == 1 {
+    //     let location = open_candidates
+    //         .first()
+    //         .expect("It should be tested already that exactly one argument was passed.");
+    //     if location.is_dir() {
+    //         // Folder - Pick first image from the folder...
+    //         if let Ok(first_img_location) = find_first_image_in_directory(location) {
+    //             state.is_loaded = false;
+    //             state.current_path = Some(first_img_location.clone());
+    //             state.player.load(&first_img_location);
+    //         }
+    //     } else {
+    //         match Url::parse(&location.to_string_lossy().to_string()) {
+    //             Ok(url) => {
+    //                 if url.scheme() == "file" {
+    //                     state.is_loaded = false;
+    //                     state.current_path = Some(location.clone().clone());
+    //                     state.player.load(&location);
+    //                     info!("This is a file uri: {}", url);
+    //                 } else {
+    //                     info!("This is a URL: {}", url);
+
+    //                     // let player = Player::new(
+    //                     //     state.texture_channel.0.clone(),
+    //                     //     state.persistent_settings.max_cache,
+    //                     //     state.message_channel.0.clone(),
+    //                     // );
+
+    //                     download_and_send_frame(
+    //                         url.as_str(),
+    //                         state.texture_channel.0.clone(),
+    //                         state.message_channel.0.clone(),
+    //                     );
+    //                     //
+    //                     // download_and_load(&url.to_string(), player);
+    //                     state.current_path = Some(PathBuf::from(url.as_str()));
+    //                 }
+    //             }
+    //             Err(_) => {
+    //                 // If it's not a valid URL/URI, check if it's a plain path
+    //                 info!("This is a plain file path: {}", location.display());
+    //                 state.is_loaded = false;
+    //                 state.current_path = Some(location.clone().clone());
+    //                 state.player.load(&location);
+    //             }
+    //         }
+    //     };
+    // }
+
+    // if open_candidates.len() > 1 {
+    //     let location = open_candidates
+    //         .first()
+    //         .expect("It should be verified already that exactly one argument was passed.");
+    //     if location.is_dir() {
+    //         // Folder - Pick first image from the folder...
+    //         if let Ok(first_img_location) = find_first_image_in_directory(location) {
+    //             state.is_loaded = false;
+    //             state.current_path = Some(first_img_location.clone());
+    //             state.player.load_advanced(
+    //                 &first_img_location,
+    //                 Some(Frame::ImageCollectionMember(Default::default())),
+    //             );
+    //         }
+    //     } else {
+    //         state.is_loaded = false;
+    //         state.current_path = Some(location.clone().clone());
+    //         state.player.load_advanced(
+    //             &location,
+    //             Some(Frame::ImageCollectionMember(Default::default())),
+    //         );
+    //     };
+    //     state.scrubber.entries = open_candidates.clone();
+    // }
 
     if matches.contains_id("stdin") {
         debug!("Trying to read from pipe");
@@ -636,7 +736,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
 
         Event::Drop(file) => {
-            trace!("File drop event");
+            info!("File drop event");
             if let Some(p) = file.path {
                 if let Some(ext) = p.extension() {
                     if SUPPORTED_EXTENSIONS
@@ -834,6 +934,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
                     if let Some(p) = state.current_path.clone() {
                         if state.persistent_settings.max_cache != 0 {
+                            debug!("Inserting {}", &p.display());
                             state.player.cache.insert(&p, img.clone());
                         }
                     }
@@ -1297,4 +1398,49 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
+}
+
+/// Download a file from URL and send tp player
+pub fn download_and_load(url: &str, mut player: Player) {
+    let url = url.to_string();
+    std::thread::spawn(move || match download_to_temp_file(&url) {
+        Ok(i) => {
+            debug!("Sending image!");
+            player.load(&i);
+        }
+        Err(e) => {
+            let msg = format!("ERR loading image: {e} ");
+            error!("{msg}");
+            _ = player.message_sender.send(Message::err(&msg));
+        }
+    });
+}
+fn download_to_dynamicimage(url: &str) -> Result<DynamicImage> {
+    let bytes = reqwest::blocking::get(url)?.bytes()?;
+    let i = image::load_from_memory(bytes.as_ref())?;
+    Ok(i)
+}
+
+fn download_to_temp_file(url: &str) -> Result<PathBuf> {
+    let bytes = reqwest::blocking::get(url)?.bytes()?;
+    let file_path = dirs::cache_dir()
+        .context("No cache dir")?
+        .join("oculante_temp");
+    File::create(&file_path)?.write_all(&bytes)?;
+    Ok(file_path)
+}
+
+fn download_and_send_frame(url: &str, sender: Sender<Frame>, log: Sender<Message>) {
+    let url = url.to_string();
+    std::thread::spawn(move || match download_to_dynamicimage(&url) {
+        Ok(i) => {
+            debug!("Sending image!");
+            let _ = sender.send(utils::Frame::new_reset(i));
+        }
+        Err(e) => {
+            let msg = format!("ERR loading image: {e} - for now, oculante only supports data that can be decoded by the image crate.");
+            error!("{msg}");
+            _ = log.send(Message::err(&msg));
+        }
+    });
 }
