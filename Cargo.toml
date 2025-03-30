@@ -34,14 +34,17 @@ lexical-sort = "0.3"
 libavif-image = { version = "0.14", optional = true }
 log = "0.4"
 nalgebra = "0.33"
-notan = { version = "0.12", default-features = false, features = [
+notan = { version = "0.13", default-features = false, features = [
     "backend",
     "draw",
     "drop_files",
     "egui",
     "clipboard"
 ] }
-egui_plot = "0.27"
+egui_plot = "0.31"
+egui-notify = "0.19"
+egui_extras = { version = "0.31", features = ["image", "file"] }
+egui-modal = "0.6"
 palette = "0.7"
 psd = "0.3"
 quickraw = "0.1.6"
@@ -71,7 +74,6 @@ dark-light = "1.0"
 trash = "5.0"
 lutgen = { version = "0.10.0", features = ["lutgen-palettes"] }
 libheif-rs = { version = "1.0", default-features = false, optional = true }
-egui-notify = "0.14"
 ktx2 = "0.3.0"
 thiserror = "1.0.51"
 bitflags = "2.4.1"
@@ -89,9 +91,8 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
     "openjpeg-sys",
 ] }
 file-format = "0.25.0"
-egui_extras = { version = "0.27.2", features = ["image", "file"] }
+
 libblur = "0.13.5"
-egui-modal = "0.3.6"
 zip = "2.2.0"
 ase-swatch = "0.1.0"
 quantette = { version = "0.3.0", features = ["threads"] }

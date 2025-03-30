@@ -397,10 +397,10 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                             .to_uppercase();
 
                         ui.horizontal(|ui| {
-                            egui::Frame::none()
+                            egui::Frame::new()
                                 .fill(panel_bg_color)
-                                .rounding(ui.style().visuals.widgets.active.rounding)
-                                .inner_margin(Margin::same(6.))
+                                .corner_radius(ui.style().visuals.widgets.active.corner_radius)
+                                .inner_margin(Margin::same(6))
                                 .show(ui, |ui| {
                                     let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
 
@@ -409,6 +409,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                                         ui.get_rounding(BUTTON_HEIGHT_SMALL),
                                         ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
                                         Stroke::NONE,
+                                        StrokeKind::Inside,
                                     );
 
                                     ui.painter().text(

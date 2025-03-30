@@ -6,7 +6,7 @@ use font_kit::{
     family_name::FamilyName, handle::Handle, properties::Properties, source::SystemSource,
 };
 use log::warn;
-use std::{collections::HashMap, fs::read};
+use std::{collections::HashMap, fs::read, sync::Arc};
 
 pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
@@ -73,9 +73,9 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     // style.visuals.widgets.inactive.bg_fill = button_color;
 
     // button rounding
-    style.visuals.widgets.inactive.rounding = Rounding::same(4.);
-    style.visuals.widgets.active.rounding = Rounding::same(4.);
-    style.visuals.widgets.hovered.rounding = Rounding::same(4.);
+    style.visuals.widgets.inactive.corner_radius = CornerRadius::same(4);
+    style.visuals.widgets.active.corner_radius = CornerRadius::same(4);
+    style.visuals.widgets.hovered.corner_radius = CornerRadius::same(4);
 
     // No stroke on buttons
     style.visuals.widgets.hovered.bg_stroke = Stroke::NONE;
@@ -183,7 +183,7 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
             info!("Inserting font {region}");
             fonts
                 .font_data
-                .insert(region.to_owned(), FontData::from_owned(font_data));
+                .insert(region.to_owned(), Arc::new(FontData::from_owned(font_data)));
 
             fonts
                 .families

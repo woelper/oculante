@@ -41,7 +41,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
     ) * zoom;
     let response = ui.allocate_response(size, Sense::click());
-    let rounding = Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+    let rounding = CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
 
     let mut image_rect = response.rect;
     image_rect.max = image_rect.max.round();

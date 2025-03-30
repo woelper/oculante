@@ -648,20 +648,23 @@ fn stroke_ui(
         .styled_checkbox(&mut stroke.fade, "")
         .on_hover_text("Fade out the stroke over its path");
     if r.changed() {
-        combined_response.changed = true;
+        combined_response.mark_changed();
     }
     if r.hovered() {
-        combined_response.hovered = true;
+        // combined_response.chacha
+        combined_response
+            .flags
+            .set(egui::Response::Flags::HOVERED, true);
     }
 
     let r = ui
         .styled_checkbox(&mut stroke.flip_random, "")
         .on_hover_text("Flip brush X and Y randomly to make stroke less uniform");
     if r.changed() {
-        combined_response.changed = true;
+        combined_response.mark_changed();
     }
     if r.hovered() {
-        combined_response.hovered = true;
+        combined_response.mark_changed();
     }
 
     let r = ui.add(
@@ -702,7 +705,7 @@ fn stroke_ui(
                             .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {b_i}"))
                             .clicked()
                         {
-                            combined_response.changed = true
+                            combined_response.mark_changed();
                         }
                     });
                 }
@@ -743,8 +746,8 @@ fn modifier_stack_ui(
         };
         egui::Frame::none()
             .fill(frame_color)
-            .rounding(ui.style().visuals.widgets.active.rounding)
-            .inner_margin(Margin::same(6.))
+            .rounding(ui.style().visuals.widgets.active.rounding())
+            .inner_margin(Margin::same(6))
             .show(ui, |ui| {
                 ui.allocate_space(vec2(ui.available_width(), 0.0));
                 ui.horizontal(|ui| {

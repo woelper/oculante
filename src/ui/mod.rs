@@ -115,7 +115,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn get_rounding(&self, _height: f32) -> f32 {
+    fn get_rounding(&self, _height: f32) -> u8 {
         unimplemented!()
     }
 
@@ -129,11 +129,11 @@ pub trait EguiExt {
 }
 
 impl EguiExt for Ui {
-    fn get_rounding(&self, height: f32) -> f32 {
+    fn get_rounding(&self, height: f32) -> u8 {
         if height > 25. {
-            self.style().visuals.widgets.inactive.rounding.ne * 2.
+            self.style().visuals.widgets.inactive.rounding().ne * 2
         } else {
-            self.style().visuals.widgets.inactive.rounding.ne
+            self.style().visuals.widgets.inactive.rounding().ne
         }
     }
 
@@ -176,13 +176,14 @@ impl EguiExt for Ui {
             let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
             self.painter().add(epaint::RectShape::new(
                 big_icon_rect.expand(visuals.expansion),
-                visuals.rounding,
+                visuals.rounding(),
                 if *checked {
                     color.gamma_multiply(0.3)
                 } else {
                     visuals.weak_bg_fill
                 },
                 visuals.bg_stroke,
+                StrokeKind::Inside,
             ));
             if *checked {
                 // Check mark:
@@ -388,20 +389,29 @@ impl EguiExt for Ui {
 
             style.visuals.widgets.inactive.fg_stroke.width = 7.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.rounding =
-                style.visuals.widgets.inactive.rounding.at_least(18.);
+            // style.visuals.widgets.inactive.rounding =
+            //     style.visuals.widgets.inactive.rounding.at_least(18.);
+
+            style.visuals.widgets.inactive.corner_radius =
+                style.visuals.widgets.inactive.corner_radius.at_least(18);
             style.visuals.widgets.inactive.expansion = -4.0;
 
             style.visuals.widgets.hovered.fg_stroke.width = 9.0;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            style.visuals.widgets.hovered.rounding =
-                style.visuals.widgets.hovered.rounding.at_least(18.);
+            // style.visuals.widgets.hovered.rounding =
+            //     style.visuals.widgets.hovered.rounding.at_least(18.);
+            style.visuals.widgets.hovered.corner_radius =
+                style.visuals.widgets.hovered.corner_radius.at_least(18);
+
             style.visuals.widgets.hovered.expansion = -4.0;
 
             style.visuals.widgets.active.fg_stroke.width = 9.0;
             style.visuals.widgets.active.fg_stroke.color = color;
-            style.visuals.widgets.active.rounding =
-                style.visuals.widgets.active.rounding.at_least(18.);
+            // style.visuals.widgets.active.rounding =
+            //     style.visuals.widgets.active.rounding.at_least(18.);
+            style.visuals.widgets.active.corner_radius =
+                style.visuals.widgets.active.corner_radius.at_least(18);
+
             style.visuals.widgets.active.expansion = -4.0;
 
             ui.horizontal(|ui| {
@@ -441,8 +451,11 @@ impl EguiExt for Ui {
 
             style.visuals.widgets.inactive.fg_stroke.width = 5.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.rounding =
-                style.visuals.widgets.inactive.rounding.at_least(20.);
+            // style.visuals.widgets.inactive.rounding =
+            //     style.visuals.widgets.inactive.rounding.at_least(20.);
+            style.visuals.widgets.inactive.corner_radius =
+                style.visuals.widgets.inactive.corner_radius.at_least(18);
+
             style.visuals.widgets.inactive.expansion = -5.0;
 
             style.spacing.slider_width = available_width;
@@ -797,7 +810,7 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
 
     egui::Frame::none()
         .fill(panel_bg_color)
-        .rounding(ui.style().visuals.widgets.active.rounding)
+        .rounding(ui.style().visuals.widgets.active.rounding())
         .inner_margin(Margin::same(6.))
         .show(ui, |ui| {
             ui.scope(add_contents);
@@ -812,8 +825,8 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
 
     egui::Frame::none()
         .fill(panel_bg_color)
-        .rounding(ui.style().visuals.widgets.active.rounding)
-        .inner_margin(Margin::same(6.))
+        .rounding(ui.style().visuals.widgets.active.rounding())
+        .inner_margin(Margin::same(6))
         .show(ui, |ui| {
             ui.scope(add_contents);
         });
