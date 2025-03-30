@@ -49,7 +49,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
+    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(CornerRadius::ZERO).fill(Color32::TRANSPARENT))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {

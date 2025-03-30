@@ -192,7 +192,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     RichText::new(format!("{search_icon}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -240,7 +240,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     RichText::new(format!("{CHEVRON_UP}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -258,7 +258,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 egui::Button::new(
                     RichText::new(path_icon).color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -426,7 +426,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     if ui
                         .add(
                             egui::Button::new(RichText::new(PLUS).color(col))
-                                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                                 .fill(Color32::TRANSPARENT)
                                 .frame(true)
                                 .stroke(Stroke::new(2., col))

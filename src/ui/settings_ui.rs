@@ -98,7 +98,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
                                         if ui
-                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
+                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).range(0..=10000))
                                         .changed()
                                         {
                                             state.player.cache.cache_size = state.persistent_settings.max_cache;
@@ -131,7 +131,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     configuration_item_ui("Zoom multiplier", "Multiplier of how fast the image will change size when using your mouse wheel or trackpad.", |ui| {
-                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).range(0.05..=10.0).speed(0.01));
                                     }, ui);
 
                                     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
@@ -141,8 +141,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Minimum window size", "Set the minimum size of the main window.", |ui| {
                                         ui.horizontal(|ui| {
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).range(1..=2000).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).range(1..=2000).prefix("y : ").speed(0.01));
                                         });
 
                                     }, ui);
@@ -178,7 +178,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
                                     configuration_item_ui("Color theme", "Customize the look and feel.", |ui| {
-                                        egui::ComboBox::from_id_source("Color theme")
+                                        egui::ComboBox::from_id_salt("Color theme")
                                         .selected_text(format!("{:?}", state.persistent_settings.theme))
                                         .show_ui(ui, |ui| {
                                             let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");

@@ -73,7 +73,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
                 }
 
-                egui::ComboBox::from_id_source("channels")
+                egui::ComboBox::from_id_salt("channels")
                     .icon(blank_icon)
                     .selected_text(RichText::new(
                         state
@@ -199,23 +199,23 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
-            let modal = show_modal(
-                ui.ctx(),
-                format!(
-                    "Are you sure you want to move {} to the trash?",
-                    state
-                        .current_path
-                        .clone()
-                        .unwrap_or_default()
-                        .file_name()
-                        .map(|s| s.to_string_lossy())
-                        .unwrap_or_default()
-                ),
-                |_| {
-                    delete_file(state);
-                },
-                "delete",
-            );
+            // let modal = show_modal(
+            //     ui.ctx(),
+            //     format!(
+            //         "Are you sure you want to move {} to the trash?",
+            //         state
+            //             .current_path
+            //             .clone()
+            //             .unwrap_or_default()
+            //             .file_name()
+            //             .map(|s| s.to_string_lossy())
+            //             .unwrap_or_default()
+            //     ),
+            //     |_| {
+            //         delete_file(state);
+            //     },
+            //     "delete",
+            // );
 
             if tooltip(
                 unframed_button(TRASH, ui),
@@ -225,7 +225,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                modal.open();
+                // modal.open();
             }
         }
 

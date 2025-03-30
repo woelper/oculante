@@ -60,7 +60,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         match thumbnails.get(icon_path) {
             Ok(tp) => {
                 let image = egui::Image::new(format!("file://{}", tp.display()))
-                    .rounding(rounding)
+                    .corner_radius(rounding)
                     .show_loading_spinner(true);
 
                 let load_result = image.load_for_size(ui.ctx(), image_rect.size());
