@@ -903,3 +903,64 @@ fn save_with_encoding(
     thumbnails::generate(path)?;
     Ok(())
 }
+
+
+pub struct Modal {
+    id: String,
+    ctx: egui::Context,
+}
+
+impl Modal {
+    pub fn new(id: &str, ctx: &egui::Context) -> Self {
+        Self {
+            id: id.to_string(),
+            ctx: ctx.clone(),
+        }
+    }
+
+    pub fn show<R>(
+        &self,
+        warning_text: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) {
+        if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
+            return;
+        }
+        egui::Modal::new("m".into()).show(&self.ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical_centered_justified(|ui| {
+                    ui.add_space(10.);
+                    ui.label(
+                        RichText::new(WARNING_CIRCLE)
+                            .size(100.)
+                            .color(ui.style().visuals.warn_fg_color),
+                    );
+                    ui.add_space(20.);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(warning_text);
+                    });
+                    ui.add_space(20.);
+                    ui.scope(|ui| {
+                        let warn_color = Color32::from_rgb(255, 77, 77);
+                        ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                        ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                            Stroke::new(1., Color32::WHITE);
+                        ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                            warn_color.linear_multiply(0.8);
+                        if ui.styled_button("Yes").clicked() {
+                            ui.scope(add_contents);
+                            self.ctx.memory_mut(|w| w.close_popup());
+                        }
+                    });
+                    if ui.styled_button("Cancel").clicked() {
+                        self.ctx.memory_mut(|w| w.close_popup());
+                    }
+                });
+            });
+        });
+    }
+    pub fn open(&self) {
+        self.ctx
+            .memory_mut(|w| w.open_popup(self.id.clone().into()));
+    }
+}
