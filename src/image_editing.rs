@@ -368,10 +368,7 @@ impl ImageOperation {
                     for triplet in val.chunks_mut(3) {
                         ui.horizontal(|ui| {
                             for v in triplet {
-                                if ui
-                                    .add(egui::DragValue::new(v).range(-255..=255))
-                                    .changed()
-                                {
+                                if ui.add(egui::DragValue::new(v).range(-255..=255)).changed() {
                                     x.mark_changed();
                                 }
                                 ui.add_space(30.);
@@ -519,16 +516,10 @@ impl ImageOperation {
             }
             Self::HSV(val) => {
                 let mut r = ui.add(DragValue::new(&mut val.0).range(0..=360));
-                if ui
-                    .add(DragValue::new(&mut val.1).range(0..=200))
-                    .changed()
-                {
+                if ui.add(DragValue::new(&mut val.1).range(0..=200)).changed() {
                     r.mark_changed();
                 }
-                if ui
-                    .add(DragValue::new(&mut val.2).range(0..=200))
-                    .changed()
-                {
+                if ui.add(DragValue::new(&mut val.2).range(0..=200)).changed() {
                     r.mark_changed();
                 }
                 r

@@ -44,7 +44,6 @@ notan = { version = "0.13", default-features = false, features = [
 egui_plot = "0.31"
 egui-notify = "0.19"
 egui_extras = { version = "0.31", features = ["image", "file"] }
-egui-modal = "0.6"
 palette = "0.7"
 psd = "0.3"
 quickraw = "0.1.6"
