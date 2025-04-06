@@ -3,6 +3,8 @@ use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
+use super::Modal;
+
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
@@ -73,7 +75,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
                 }
 
-                egui::ComboBox::from_id_source("channels")
+                egui::ComboBox::from_id_salt("channels")
                     .icon(blank_icon)
                     .selected_text(RichText::new(
                         state
@@ -199,24 +201,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
-            let modal = show_modal(
-                ui.ctx(),
-                format!(
-                    "Are you sure you want to move {} to the trash?",
-                    state
-                        .current_path
-                        .clone()
-                        .unwrap_or_default()
-                        .file_name()
-                        .map(|s| s.to_string_lossy())
-                        .unwrap_or_default()
-                ),
-                |_| {
-                    delete_file(state);
-                },
-                "delete",
+            let delete_text = format!(
+                "Are you sure you want to move {} to the trash?",
+                state
+                    .current_path
+                    .clone()
+                    .unwrap_or_default()
+                    .file_name()
+                    .map(|s| s.to_string_lossy())
+                    .unwrap_or_default()
             );
-
+            
+            let modal = Modal::new("delete", ui.ctx());
+            modal.show( delete_text, |_|{
+                delete_file(state);
+            });
+            
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -387,8 +387,9 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     true => Color32::from_gray(31),
                     false => Color32::from_gray(247),
                 };
-
-                ui.allocate_ui_at_rect(recent_rect, |ui| {
+                
+                // FIXME: This overflows
+                ui.allocate_new_ui(UiBuilder::new().max_rect(recent_rect), |ui| {
                     for r in &state.volatile_settings.recent_images.clone() {
                         let ext = r
                             .extension()
@@ -397,10 +398,10 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                             .to_uppercase();
 
                         ui.horizontal(|ui| {
-                            egui::Frame::none()
+                            egui::Frame::new()
                                 .fill(panel_bg_color)
-                                .rounding(ui.style().visuals.widgets.active.rounding)
-                                .inner_margin(Margin::same(6.))
+                                .corner_radius(ui.style().visuals.widgets.active.corner_radius)
+                                .inner_margin(Margin::same(6))
                                 .show(ui, |ui| {
                                     let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
 
@@ -409,6 +410,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                                         ui.get_rounding(BUTTON_HEIGHT_SMALL),
                                         ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
                                         Stroke::NONE,
+                                        StrokeKind::Inside,
                                     );
 
                                     ui.painter().text(
