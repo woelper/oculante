@@ -16,6 +16,7 @@ pub struct Scrubber {
     pub entries: Vec<PathBuf>,
     pub wrap: bool,
     pub direction: Direction,
+    pub fixed_paths: bool,
 }
 
 impl Scrubber {
@@ -27,6 +28,7 @@ impl Scrubber {
             entries,
             wrap: true,
             direction: Direction::Forward,
+            fixed_paths: false,
         }
     }
 
