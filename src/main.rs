@@ -108,8 +108,8 @@ fn main() -> Result<(), String> {
     match settings::VolatileSettings::load() {
         Ok(volatile_settings) => {
             if volatile_settings.window_geometry != Default::default() {
-                window_config.width = volatile_settings.window_geometry.1 .0 as u32;
-                window_config.height = volatile_settings.window_geometry.1 .1 as u32;
+                window_config.width = volatile_settings.window_geometry.1 .0;
+                window_config.height = volatile_settings.window_geometry.1 .1;
             }
         }
         Err(e) => error!("Could not load volatile settings: {e}"),
@@ -615,8 +615,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
-                            .max(-5.0)
-                            .min(5.0),
+                            .clamp(-5.0, 5.0),
                         state.image_geometry.scale,
                     );
                     trace!("Delta {delta}, raw {delta_y}");
@@ -705,11 +704,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
-    if state.drag_enabled {
-        if !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
-            state.image_geometry.offset += state.mouse_delta;
-            limit_offset(app, state);
-        }
+    if state.drag_enabled && !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
+        state.image_geometry.offset += state.mouse_delta;
+        limit_offset(app, state);
     }
 
     // Since we can't access the window in the event loop, we store it in the state
@@ -796,7 +793,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         ) {
             // Something new came in, update scrubber (index slider) and path
             if let Some(path) = &state.current_path {
-                if state.scrubber.has_folder_changed(&path) {
+                if state.scrubber.has_folder_changed(path) {
                     debug!("Folder has changed, creating new scrubber");
                     state.scrubber = scrubber::Scrubber::new(path);
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
@@ -979,7 +976,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if let Err(error) =
                             state
                                 .current_texture
-                                .set_image(&img, gfx, &state.persistent_settings)
+                                .set_image(img, gfx, &state.persistent_settings)
                         {
                             state.send_message_warn(&format!(
                                 "Error while displaying image: {error}"
@@ -1025,13 +1022,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
 
-        if !state.pointer_over_ui && !state.mouse_grab {
-            if ctx.input(|r| {
+        if !state.pointer_over_ui
+            && !state.mouse_grab
+            && ctx.input(|r| {
                 r.pointer
                     .button_double_clicked(egui::PointerButton::Primary)
-            }) {
-                toggle_fullscreen(app, state);
-            }
+            })
+        {
+            toggle_fullscreen(app, state);
         }
 
         // set info panel color dynamically
@@ -1108,21 +1106,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer()
+        state.mouse_grab = ctx.is_using_pointer()
             || state.edit_state.painting
             || ctx.is_pointer_over_area()
-            || state.edit_state.block_panning
-        {
-            state.mouse_grab = true;
-        } else {
-            state.mouse_grab = false;
-        }
+            || state.edit_state.block_panning;
 
-        if ctx.wants_keyboard_input() {
-            state.key_grab = true;
-        } else {
-            state.key_grab = false;
-        }
+        state.key_grab = ctx.wants_keyboard_input();
 
         if state.reset_image {
             if let Some(current_image) = &state.current_image {
@@ -1160,8 +1149,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
                     .size(
-                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
-                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.width() * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() * state.image_geometry.scale * state.tiling as f32,
                     )
                     .blend_mode(BlendMode::ADD)
                     .translate(aligned_offset_x, aligned_offset_y);
