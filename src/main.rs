@@ -203,11 +203,8 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     debug!("matches {:?}", matches);
 
     let paths_to_open = matches
-        .get_many("INPUT")
+        .get_many::<String>("INPUT")
         .unwrap_or_default()
-        .cloned()
-        .collect::<Vec<String>>()
-        .into_iter()
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
@@ -215,23 +212,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     if paths_to_open.len() == 1 {
         let location = paths_to_open
-            .first()
+            .into_iter()
+            .next()
             .expect("It should be tested already that exactly one argument was passed.");
         if location.is_dir() {
             // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
                 state.is_loaded = false;
-                state.current_path = Some(first_img_location.clone());
                 state.player.load(&first_img_location);
+                state.current_path = Some(first_img_location);
             }
         } else {
             state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
             state.player.load(&location);
+            state.current_path = Some(location);
         };
-    }
-
-    if paths_to_open.len() > 1 {
+    } else if paths_to_open.len() > 1 {
         let location = paths_to_open
             .first()
             .expect("It should be verified already that exactly one argument was passed.");
@@ -253,7 +249,13 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 Some(Frame::ImageCollectionMember(Default::default())),
             );
         };
-        state.scrubber.entries = paths_to_open.clone();
+
+        // If launched with more than one path and none of those paths are directories, it's likely
+        // that the user wants to view a fixed set of images rather than traverse into directories.
+        // This handles the case where the app is launched with files from different dirs as well e.g.
+        // a/1.png b/2.png c/3.png
+        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
+        state.scrubber.entries = paths_to_open;
     }
 
     if matches.contains_id("stdin") {
@@ -779,6 +781,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.volatile_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
+        state.scrubber.fixed_paths = false;
     }
 
     // check if a new loaded image has been sent
@@ -793,7 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         ) {
             // Something new came in, update scrubber (index slider) and path
             if let Some(path) = &state.current_path {
-                if state.scrubber.has_folder_changed(path) {
+                if state.scrubber.has_folder_changed(path) && !state.scrubber.fixed_paths {
                     debug!("Folder has changed, creating new scrubber");
                     state.scrubber = scrubber::Scrubber::new(path);
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
