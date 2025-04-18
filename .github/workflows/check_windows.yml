@@ -1,9 +1,9 @@
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "master" ]
+    branches: ["master"]
 
 name: Check Windows
 jobs:
@@ -12,13 +12,13 @@ jobs:
       matrix:
         # FIXME: Enable legacy windows if required
         # os: [windows-latest, windows-2019]
-        os: [windows-latest,]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
-      
+
       - name: Install Ninja
         run: choco install ninja
 

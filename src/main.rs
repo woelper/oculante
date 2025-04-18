@@ -108,8 +108,8 @@ fn main() -> Result<(), String> {
     match settings::VolatileSettings::load() {
         Ok(volatile_settings) => {
             if volatile_settings.window_geometry != Default::default() {
-                window_config.width = volatile_settings.window_geometry.1 .0 as u32;
-                window_config.height = volatile_settings.window_geometry.1 .1 as u32;
+                window_config.width = volatile_settings.window_geometry.1 .0;
+                window_config.height = volatile_settings.window_geometry.1 .1;
             }
         }
         Err(e) => error!("Could not load volatile settings: {e}"),
@@ -203,11 +203,8 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     debug!("matches {:?}", matches);
 
     let paths_to_open = matches
-        .get_many("INPUT")
+        .get_many::<String>("INPUT")
         .unwrap_or_default()
-        .cloned()
-        .collect::<Vec<String>>()
-        .into_iter()
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
@@ -215,23 +212,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     if paths_to_open.len() == 1 {
         let location = paths_to_open
-            .first()
+            .into_iter()
+            .next()
             .expect("It should be tested already that exactly one argument was passed.");
         if location.is_dir() {
             // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
                 state.is_loaded = false;
-                state.current_path = Some(first_img_location.clone());
                 state.player.load(&first_img_location);
+                state.current_path = Some(first_img_location);
             }
         } else {
             state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
             state.player.load(&location);
+            state.current_path = Some(location);
         };
-    }
-
-    if paths_to_open.len() > 1 {
+    } else if paths_to_open.len() > 1 {
         let location = paths_to_open
             .first()
             .expect("It should be verified already that exactly one argument was passed.");
@@ -253,7 +249,13 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
                 Some(Frame::ImageCollectionMember(Default::default())),
             );
         };
-        state.scrubber.entries = paths_to_open.clone();
+
+        // If launched with more than one path and none of those paths are directories, it's likely
+        // that the user wants to view a fixed set of images rather than traverse into directories.
+        // This handles the case where the app is launched with files from different dirs as well e.g.
+        // a/1.png b/2.png c/3.png
+        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
+        state.scrubber.entries = paths_to_open;
     }
 
     if matches.contains_id("stdin") {
@@ -615,8 +617,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
-                            .max(-5.0)
-                            .min(5.0),
+                            .clamp(-5.0, 5.0),
                         state.image_geometry.scale,
                     );
                     trace!("Delta {delta}, raw {delta_y}");
@@ -705,11 +706,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
     state.cursor = mouse_pos.size_vec();
-    if state.drag_enabled {
-        if !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
-            state.image_geometry.offset += state.mouse_delta;
-            limit_offset(app, state);
-        }
+    if state.drag_enabled && !state.mouse_grab || app.mouse.is_down(MouseButton::Middle) {
+        state.image_geometry.offset += state.mouse_delta;
+        limit_offset(app, state);
     }
 
     // Since we can't access the window in the event loop, we store it in the state
@@ -782,6 +781,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.volatile_settings.last_open_directory = dir.to_path_buf();
         }
         state.current_path = Some(p);
+        state.scrubber.fixed_paths = false;
     }
 
     // check if a new loaded image has been sent
@@ -796,7 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         ) {
             // Something new came in, update scrubber (index slider) and path
             if let Some(path) = &state.current_path {
-                if state.scrubber.has_folder_changed(&path) {
+                if state.scrubber.has_folder_changed(path) && !state.scrubber.fixed_paths {
                     debug!("Folder has changed, creating new scrubber");
                     state.scrubber = scrubber::Scrubber::new(path);
                     state.scrubber.wrap = state.persistent_settings.wrap_folder;
@@ -979,7 +979,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         if let Err(error) =
                             state
                                 .current_texture
-                                .set_image(&img, gfx, &state.persistent_settings)
+                                .set_image(img, gfx, &state.persistent_settings)
                         {
                             state.send_message_warn(&format!(
                                 "Error while displaying image: {error}"
@@ -1023,6 +1023,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
+        }
+
+        if !state.pointer_over_ui
+            && !state.mouse_grab
+            && ctx.input(|r| {
+                r.pointer
+                    .button_double_clicked(egui::PointerButton::Primary)
+            })
+        {
+            toggle_fullscreen(app, state);
         }
 
         // set info panel color dynamically
@@ -1099,21 +1109,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // if there is interaction on the ui (dragging etc)
         // we don't want zoom & pan to work, so we "grab" the pointer
-        if ctx.is_using_pointer()
+        state.mouse_grab = ctx.is_using_pointer()
             || state.edit_state.painting
             || ctx.is_pointer_over_area()
-            || state.edit_state.block_panning
-        {
-            state.mouse_grab = true;
-        } else {
-            state.mouse_grab = false;
-        }
+            || state.edit_state.block_panning;
 
-        if ctx.wants_keyboard_input() {
-            state.key_grab = true;
-        } else {
-            state.key_grab = false;
-        }
+        state.key_grab = ctx.wants_keyboard_input();
 
         if state.reset_image {
             if let Some(current_image) = &state.current_image {
@@ -1151,8 +1152,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             if let Some(checker) = &state.checker_texture {
                 draw.pattern(checker)
                     .size(
-                        texture.width() as f32 * state.image_geometry.scale * state.tiling as f32,
-                        texture.height() as f32 * state.image_geometry.scale * state.tiling as f32,
+                        texture.width() * state.image_geometry.scale * state.tiling as f32,
+                        texture.height() * state.image_geometry.scale * state.tiling as f32,
                     )
                     .blend_mode(BlendMode::ADD)
                     .translate(aligned_offset_x, aligned_offset_y);

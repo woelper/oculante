@@ -34,7 +34,7 @@ use notan::{
     egui::{self, *},
     prelude::{App, Graphics},
 };
-use std::{collections::BTreeSet, ops::RangeInclusive, path::Path, time::Instant};
+use std::{collections::BTreeSet, f32, ops::RangeInclusive, path::Path, time::Instant};
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
 
@@ -472,18 +472,24 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
     let trimmed = line.trim();
 
-    // 1) Check if the first token is exactly 1 grapheme
+    // Helper to check if a grapheme is an "icon" (e.g., Private Use Area: U+E000 to U+F8FF)
+    fn is_icon(grapheme: &str) -> bool {
+        grapheme.chars().next().is_some_and(|c| {
+            let code = c as u32;
+            (0xE000..=0xF8FF).contains(&code) // Adjust range based on your icons
+        })
+    }
+
+    // 1) Check for icon at the front
     if let Some((candidate, remainder)) = trimmed.split_once(' ') {
-        if candidate.graphemes(true).count() == 1 {
-            // icon at the front
+        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
     }
 
-    // 2) Otherwise, check from the right for a trailing icon
+    // 2) Check for icon at the end
     if let Some((remainder, candidate)) = trimmed.rsplit_once(' ') {
-        if candidate.graphemes(true).count() == 1 {
-            // icon at the end
+        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
     }
@@ -761,7 +767,7 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
         )
     });
     let mut text_shape = TextShape::new(response.rect.left_top(), galley, Color32::RED);
-    text_shape.angle = egui::lerp(0.0..=3.141 / 2., openness);
+    text_shape.angle = egui::lerp(0.0..=f32::consts::PI / 2., openness);
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
     let x_offset = 5.0;
