@@ -3,7 +3,7 @@ use super::{basis::basis_buffer_to_image, ktx2_buffer_to_image};
 // use bevy_math::{AspectRatio, UVec2, Vec2};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use thiserror::Error;
+// use thiserror::Error;
 use wgpu::{Extent3d, TextureDimension, TextureFormat};
 
 pub const TEXTURE_ASSET_INDEX: u64 = 0;
@@ -307,28 +307,18 @@ pub enum TranscodeFormat {
 }
 
 /// An error that occurs when loading a texture
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum TextureError {
-    #[error("invalid image mime type: {0}")]
     InvalidImageMimeType(String),
-    #[error("invalid image extension: {0}")]
     InvalidImageExtension(String),
-    #[error("failed to load an image: {0}")]
-    ImageError(#[from] image::ImageError),
-    #[error("unsupported texture format: {0}")]
+    ImageError(String),
     UnsupportedTextureFormat(String),
-    #[error("supercompression not supported: {0}")]
     SuperCompressionNotSupported(String),
-    #[error("failed to load an image: {0}")]
     SuperDecompressionError(String),
-    #[error("invalid data: {0}")]
     InvalidData(String),
-    #[error("transcode error: {0}")]
     TranscodeError(String),
-    #[error("format requires transcoding: {0:?}")]
     FormatRequiresTranscodingError(TranscodeFormat),
     /// Only cubemaps with six faces are supported.
-    #[error("only cubemaps with six faces are supported")]
     IncompleteCubemap,
 }
 

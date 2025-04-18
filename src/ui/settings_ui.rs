@@ -294,11 +294,11 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Thumbnails", "Functionality to test thumbnail generation.", |ui| {
                                         if ui.button("Delete thumbnails").clicked() {
-                                            _ = get_disk_cache_path().map(|p|remove_dir_all(p));
+                                            _ = get_disk_cache_path().map(remove_dir_all);
                                         }
                                         if ui.button("Open thumbnails directory").clicked() {
                                             std::thread::spawn(||{
-                                                _ = get_disk_cache_path().map(|p|open::that(p));
+                                                _ = get_disk_cache_path().map(open::that);
                                             });
                                         }
 

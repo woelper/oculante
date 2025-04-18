@@ -76,8 +76,8 @@ pub fn path_to_id<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 pub fn get_disk_cache_path() -> Result<PathBuf> {
-    Ok(dirs::data_local_dir()
-        .ok_or(anyhow!("Can't get local dir"))?
+    Ok(dirs::cache_dir()
+        .ok_or(anyhow!("Can't get cache dir"))?
         .join("oculante")
         .join("thumbnails"))
 }

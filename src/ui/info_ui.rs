@@ -112,7 +112,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
-                    ui.label_i(&format!("{PALETTE} Color"));
+                    ui.label_i(format!("{PALETTE} Color"));
                     ui.label_right(
                         format!("{:?}", color_type)
                     );
@@ -127,7 +127,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
-                    ui.label_i(&format!("{INTERSECT} UV"));
+                    ui.label_i(format!("{INTERSECT} UV"));
                     ui.label_right(
                         RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
                     );
@@ -166,7 +166,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     }
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
-                            if ui.button(&format!("{FOLDER} Open another image...")).clicked() {
+                            if ui.button(format!("{FOLDER} Open another image...")).clicked() {
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
                                 browse_for_image_path(state);

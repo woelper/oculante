@@ -1,40 +1,33 @@
 use crate::utils::Frame;
 use anyhow::Result;
+use image::guess_format;
 use log::{error, info};
-use std::convert::TryInto;
 use std::io::Read;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::mpsc::Sender;
 use std::thread;
 
 fn handle_client(mut stream: TcpStream, texture_sender: Sender<Frame>) -> Result<()> {
-    let mut data = [0 as u8; 100000]; // using 50 byte buffer
-    let mut imgbuf: Vec<u8> = vec![];
-    while match stream.read(&mut data) {
-        Ok(size) => {
-            let x: Vec<u8> = data[0..size].try_into()?;
-            imgbuf.extend(x);
-
-            match image::load_from_memory(imgbuf.as_ref()) {
-                Ok(i) => {
-                    // println!("got image");
-                    imgbuf.clear();
-                    let _ = texture_sender.send(Frame::new_still(i));
-                    std::thread::sleep(std::time::Duration::from_millis(30));
-                    false
-                }
-                Err(_) => true,
+    let mut imgbuf: Vec<u8> = Vec::with_capacity(100000);
+    match stream.read_to_end(&mut imgbuf) {
+        Ok(_) => match image::load_from_memory(&imgbuf) {
+            Ok(f) => {
+                let _ = texture_sender.send(Frame::new_still(f));
+                std::thread::sleep(std::time::Duration::from_millis(30));
             }
-        }
+            Err(e) => {
+                error!("{e}, terminating connection with {}", stream.peer_addr()?);
+                stream.shutdown(Shutdown::Both)?;
+            }
+        },
         Err(e) => {
             error!(
                 "An error {e} occurred, terminating connection with {}",
                 stream.peer_addr()?
             );
             stream.shutdown(Shutdown::Both)?;
-            false
         }
-    } {}
+    };
     Ok(())
 }
 

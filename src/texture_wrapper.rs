@@ -162,6 +162,7 @@ struct TextureResponse<'a> {
 }
 
 //language=glsl
+#[allow(unexpected_cfgs)]
 const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     r#"
     #version 450
@@ -179,7 +180,7 @@ const FRAGMENT_IMAGE_RENDER: ShaderSource = notan::fragment_shader! {
     layout(binding = 2) uniform OffsetVector {
         vec4 offset;
     };
-    
+
     layout(location = 0) out vec4 color;
 
     void main() {

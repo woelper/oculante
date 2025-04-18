@@ -107,8 +107,9 @@ pub fn open_image(
                 data.as_bytes(),
                 CompressedImageFormats::all(),
                 true,
-            )?;
-            let d = ktx.try_into_dynamic()?;
+            )
+            .map_err(|e| anyhow!("{:?}", e))?;
+            let d = ktx.try_into_dynamic().map_err(|e| anyhow!("{:?}", e))?;
             _ = sender.send(Frame::new_still(d));
             return Ok(receiver);
         }
@@ -354,12 +355,14 @@ pub fn open_image(
                         match d {
                             FlatSamples::F16(_) => bail!("F16 color mode not supported"),
                             FlatSamples::F32(f) => {
-                                let gray_image = GrayImage::from_raw(
+                                let Some(gray_image) = GrayImage::from_raw(
                                     size.width() as u32,
                                     size.height() as u32,
                                     f.par_iter().map(|x| tonemap_f32(*x)).collect::<Vec<_>>(),
-                                )
-                                .context("Can't decode gray alpha buffer")?;
+                                ) else {
+                                    error!("Can't decode gray alpha buffer");
+                                    continue;
+                                };
 
                                 let d = DynamicImage::ImageLuma8(gray_image);
                                 _ = sender.send(Frame::new_still(d));
@@ -695,7 +698,7 @@ pub fn open_image(
             return Ok(receiver);
         }
         "icns" => {
-            let file = BufReader::new(File::open(img_location)?);
+            let file = BufReader::new(File::open(&img_location)?);
             let icon_family = icns::IconFamily::read(file)?;
 
             // loop over the largest icons, take the largest one and return
@@ -706,12 +709,16 @@ pub fn open_image(
                 icns::IconType::RGBA32_128x128,
             ] {
                 let mut target = vec![];
-                let image = icon_family.get_icon_with_type(icon_type)?;
+                let Ok(image) = icon_family.get_icon_with_type(icon_type) else {
+                    continue;
+                };
                 image.write_png(&mut target)?;
                 let d = image::load_from_memory(&target).context("Load icns mem")?;
                 _ = sender.send(Frame::new_still(d));
                 return Ok(receiver);
             }
+
+            bail!("No valid icons in {}", img_location.display());
         }
         "tif" | "tiff" => match load_tiff(&img_location) {
             Ok(buf) => {

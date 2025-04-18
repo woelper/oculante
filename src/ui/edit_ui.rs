@@ -179,7 +179,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     {
                         state.edit_state.painting = false;
                     }
-                } else if ui.button(format!("Paint mode")).clicked() {
+                } else if ui.button("Paint mode").clicked() {
                     state.edit_state.painting = true;
                 }
             });
@@ -486,12 +486,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         }
                     }
 
-                    if ui.button(format!("Save edits")).on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button("Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
                         if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
-                    if ui.button(format!("Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
+                    if ui.button("Save directory edits").on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
                         if let Some(parent) = p.parent() {
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
@@ -503,7 +503,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         });
 
         if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-            let op_present = state.edit_state.image_op_stack.get(0).map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
+            let op_present = state.edit_state.image_op_stack.first().map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
             if !op_present {
                 state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
                 image_changed = true;
@@ -857,8 +857,8 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
             return;
         }
 
-        ui.styled_collapsing("Lossless Jpeg transforms", |ui| {
-            ui.label("These operations will immediately write changes to disk.");
+        ui.styled_collapsing("Lossless JPEG edits", |ui| {
+            ui.label(format!("{WARNING_CIRCLE} These operations will immediately write changes to disk."));
             let mut reload = false;
 
             ui.columns(3, |col| {
@@ -947,7 +947,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 ui.add_enabled_ui(crop != ImageOperation::Crop([0, 0, 0, 0]), |ui| {
 
                     if ui
-                        .button("Crop")
+                        .button("Crop Losslessly")
                         .on_hover_text("Crop according to values defined in the operator stack above")
                         .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
                         .clicked()

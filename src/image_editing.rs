@@ -1519,11 +1519,11 @@ impl ImageOperation {
                 p[2] = res[2] as f32 / 255.;
             }
             Self::Expression(expr) => {
-                let mut context = context_map! {
-                    "r" => p[0] as f64,
-                    "g" => p[1] as f64,
-                    "b" => p[2] as f64,
-                    "a" => p[3] as f64,
+                let mut context: HashMapContext<DefaultNumericTypes> = context_map! {
+                    "r" => float p[0],
+                    "g" => float p[1],
+                    "b" => float p[2],
+                    "a" => float p[3],
                 }?;
 
                 if eval_empty_with_context_mut(expr, &mut context).is_ok() {
