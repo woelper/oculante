@@ -197,9 +197,11 @@ impl VolatileSettings {
 }
 
 pub fn set_system_theme(ctx: &Context) {
-    match dark_light::detect() {
-        dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
-        dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
-        dark_light::Mode::Default => ctx.set_visuals(Visuals::dark()),
+    if let Ok(mode) = dark_light::detect() {
+        match mode {
+            dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
+            dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
+            dark_light::Mode::Unspecified => ctx.set_visuals(Visuals::dark()),
+        }
     }
 }

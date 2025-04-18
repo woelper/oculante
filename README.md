@@ -68,6 +68,10 @@ cargo install oculante
 pacman -S oculante
 ```
 
+```sh
+paru -S oculante-git
+```
+
 - NixOS
 
 ```sh
