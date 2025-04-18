@@ -491,7 +491,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
                     }
-                    
                     if ui.button(format!("Save directory edits")).on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
                         if let Some(parent) = p.parent() {
                             if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
@@ -995,5 +994,3 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
         });
     }
 }
-
-

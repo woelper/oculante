@@ -1,10 +1,9 @@
+use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
-use super::Modal;
-
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
@@ -211,12 +210,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     .map(|s| s.to_string_lossy())
                     .unwrap_or_default()
             );
-            
+
             let modal = Modal::new("delete", ui.ctx());
-            modal.show( delete_text, |_|{
+            modal.show(delete_text, |_| {
                 delete_file(state);
             });
-            
+
             if tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
@@ -387,7 +386,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     true => Color32::from_gray(31),
                     false => Color32::from_gray(247),
                 };
-                
+
                 // FIXME: This overflows
                 ui.allocate_new_ui(UiBuilder::new().max_rect(recent_rect), |ui| {
                     for r in &state.volatile_settings.recent_images.clone() {

@@ -904,7 +904,6 @@ fn save_with_encoding(
     Ok(())
 }
 
-
 pub struct Modal {
     id: String,
     ctx: egui::Context,

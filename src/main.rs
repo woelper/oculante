@@ -1016,8 +1016,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //             .size(app.window().width() as f32, app.window().height() as f32);
     //     }
     // }
-    let mut bbox_tl: egui::Pos2 = Default::default();
-    let mut bbox_br: egui::Pos2 = Default::default();
+    let mut bbox = egui::Rect::NOTHING;
     let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
@@ -1101,7 +1100,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
+            bbox = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1213,7 +1212,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+            draw.rect((0., 0.), (bbox.width() + 24., state.window_size.y))
                 .color(Color::from_rgb(
                     info_panel_color.r() as f32 / 255.,
                     info_panel_color.g() as f32 / 255.,
@@ -1222,9 +1221,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
             texture.draw_zoomed(
                 &mut zoom_image,
-                bbox_tl.x,
-                bbox_tl.y,
-                bbox_br.x - bbox_tl.x,
+                bbox.left_top().x,
+                bbox.left_top().y,
+                bbox.right_bottom().x - bbox.left_top().x,
                 (state.cursor_relative.x, state.cursor_relative.y),
                 8.0,
             );

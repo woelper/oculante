@@ -16,10 +16,9 @@ use crate::appstate::{ImageGeometry, OculanteState};
 use std::path::PathBuf;
 use std::time::Duration;
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
+pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> Rect {
     let mut color_type = ColorType::Rgba8;
-    let mut bbox_tl: Pos2 = Default::default();
-    let mut bbox_br: Pos2 = Default::default();
+    let mut bbox = Rect::NOTHING;
     let mut uv_center: (f64, f64) = Default::default();
     let mut uv_size: (f64, f64) = Default::default();
 
@@ -46,17 +45,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     }
 
     egui::SidePanel::left("info")
-    .show_separator_line(false)
-    .exact_width(PANEL_WIDTH)
-    .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(CornerRadius::ZERO).fill(Color32::TRANSPARENT))
+    // .show_separator_line(false)
+    // .exact_width(PANEL_WIDTH)
+    // .resizable(false)
+    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(CornerRadius::ZERO).fill(Color32::from_rgba_unmultiplied(100, 100, 0, 10)))
     .show(ctx, |ui| {
+        // ui.allocate_space(egui::Vec2::new(PANEL_WIDTH - PANEL_WIDGET_OFFSET, 0.));
+        // ui.allocate_space(egui::Vec2::new(500., 0.));
+
         egui::ScrollArea::vertical().auto_shrink([false,true])
-            .show(ui, |ui| {
+        .show(ui, |ui| {
 
             // Force-expand to prevent spacing issue with scroll bar
-            ui.allocate_space(egui::Vec2::new(PANEL_WIDTH - PANEL_WIDGET_OFFSET, 0.));
-
             if let Some(texture) = &state.current_texture.get() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
@@ -65,9 +65,11 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
+                ui.label("test");
+
                 egui::Grid::new("info")
-                    .num_columns(2)
-                    .show(ui, |ui| {
+                .num_columns(2)
+                .show(ui, |ui| {
                     ui.label_i(format!("{ARROWS_OUT} Size",));
                     ui.label_right(
                         RichText::new(format!(
@@ -116,7 +118,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
-                    ui.label_i("⊞ Pos");
+                    ui.label_i(&format!("{MOVE} Pos"));
                     ui.label_right(
                         RichText::new(format!(
                             "{:.0},{:.0}",
@@ -132,24 +134,32 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     ui.end_row();
                 });
 
+
                 // make sure aspect ratio is compensated for the square preview
                 let ratio = texture.size().0 as f64 / texture.size().1 as f64;
                 uv_size = (scale, scale * ratio);
                 ui.add_space(10.);
 
-                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(ui.available_width()));
+                // preview_rect = preview_rect.shrink(10.);
+                
 
-                let offset = (ui.available_width() - preview_rect.width())/2.;
-                preview_rect = preview_rect.translate(vec2(offset, 0.));
+                // let offset = (ui.available_width() - preview_rect.width())/2.;
+                // preview_rect = preview_rect.translate(vec2(offset, 0.));
                 // Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, StrokeKind::Inside);
-                bbox_tl = preview_rect.left_top();
-                bbox_br = preview_rect.right_bottom();
+                // ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, StrokeKind::Inside);
+                bbox = preview_rect;
                 ui.advance_cursor_after_rect(preview_rect);
+
             }
             ui.add_space(10.);
-            ui.vertical_centered_justified(|ui| {
+
+            // ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
+                    
+                    for i in 0..100 {
+                        ui.label("fof");
+                    }
 
                     if state.persistent_settings.max_cache == 0 {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
@@ -217,61 +227,58 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                         });
                     });
                 });
-            });
+            // });
+            // if state.current_texture.get().is_some() {
+            //     ui.styled_collapsing("Alpha tools", |ui| {
+            //         ui.vertical_centered_justified(|ui| {
+            //             dark_panel(ui, |ui| {
+            //                 if let Some(img) = &state.current_image {
+            //                     if ui
+            //                         .button("Show alpha bleed")
+            //                         .on_hover_text("Highlight pixels with zero alpha and color information")
+            //                         .clicked()
+            //                     {
+            //                         state.edit_state.result_pixel_op = highlight_bleed(img);
+            //                         state.send_frame(crate::utils::Frame::UpdateTexture);
+            //                         ui.ctx().request_repaint();
+            //                     }
+            //                     if ui
+            //                         .button("Show semi-transparent pixels")
+            //                         .on_hover_text(
+            //                             "Highlight pixels that are neither fully opaque nor fully transparent",
+            //                         )
+            //                         .clicked()
+            //                     {
+            //                         state.edit_state.result_pixel_op = highlight_semitrans(img);
+            //                         state.send_frame(crate::utils::Frame::UpdateTexture);
+            //                         ui.ctx().request_repaint();
+            //                     }
+            //                     if ui.button("Reset image").clicked() {
+            //                         state.edit_state.result_pixel_op = Default::default();
 
-            if state.current_texture.get().is_some() {
-                ui.styled_collapsing("Alpha tools", |ui| {
-                    ui.vertical_centered_justified(|ui| {
-                        dark_panel(ui, |ui| {
-                            if let Some(img) = &state.current_image {
-                                if ui
-                                    .button("Show alpha bleed")
-                                    .on_hover_text("Highlight pixels with zero alpha and color information")
-                                    .clicked()
-                                {
-                                    state.edit_state.result_pixel_op = highlight_bleed(img);
-                                    state.send_frame(crate::utils::Frame::UpdateTexture);
-                                    ui.ctx().request_repaint();
-                                }
-                                if ui
-                                    .button("Show semi-transparent pixels")
-                                    .on_hover_text(
-                                        "Highlight pixels that are neither fully opaque nor fully transparent",
-                                    )
-                                    .clicked()
-                                {
-                                    state.edit_state.result_pixel_op = highlight_semitrans(img);
-                                    state.send_frame(crate::utils::Frame::UpdateTexture);
-                                    ui.ctx().request_repaint();
-                                }
-                                if ui.button("Reset image").clicked() {
-                                    state.edit_state.result_pixel_op = Default::default();
+            //                         state.send_frame(crate::utils::Frame::UpdateTexture);
+            //                     }
+            //                 }
+            //             });
+            //         });
+            //     });
 
-                                    state.send_frame(crate::utils::Frame::UpdateTexture);
-                                }
-                            }
-                        });
-                    });
-                });
+            //     palette_ui(ui, state);
 
-                palette_ui(ui, state);
+            //     if state.persistent_settings.experimental_features {
+            //         measure_ui(ui, state);
+            //     }
 
-                if state.persistent_settings.experimental_features {
-                    measure_ui(ui, state);
-                }
-
-                ui.horizontal(|ui| {
-                    ui.label("Tiling");
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
-                    ui.styled_slider(&mut state.tiling, 1..=10);
-                });
-            }
-
-            advanced_ui(ui, state);
-
-        });
-    });
-    (bbox_tl, bbox_br)
+            //     ui.horizontal(|ui| {
+            //         ui.label("Tiling");
+            //         ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
+            //         ui.styled_slider(&mut state.tiling, 1..=10);
+            //     });
+            // }
+            // advanced_ui(ui, state);
+        });//end scrollarea
+    }); // end frame
+    bbox
 }
 
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {

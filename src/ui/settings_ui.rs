@@ -350,25 +350,25 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .num_columns(4)
         .spacing([100.0, 10.0])
         .show(ui, |ui| {
-        for (event, keys) in ordered_shortcuts {
-            ui.label_unselectable(format!("{event:?}"));
-            ui.label_unselectable(lookup(&s, event));
-            if !no_keys_pressed {
-                if ui
-                    .button(format!("Assign {}", keypresses_as_string(&k)))
-                    .clicked()
-                {
-                    *keys = app
-                        .keyboard
-                        .down
-                        .iter()
-                        .map(|(k, _)| format!("{k:?}"))
-                        .collect();
+            for (event, keys) in ordered_shortcuts {
+                ui.label_unselectable(format!("{event:?}"));
+                ui.label_unselectable(lookup(&s, event));
+                if !no_keys_pressed {
+                    if ui
+                        .button(format!("Assign {}", keypresses_as_string(&k)))
+                        .clicked()
+                    {
+                        *keys = app
+                            .keyboard
+                            .down
+                            .iter()
+                            .map(|(k, _)| format!("{k:?}"))
+                            .collect();
+                    }
+                } else {
+                    ui.add_enabled(false, egui::Button::new("Press key(s)..."));
                 }
-            } else {
-                ui.add_enabled(false, egui::Button::new("Press key(s)..."));
+                ui.end_row();
             }
-            ui.end_row();
-        }
-    });
+        });
 }
