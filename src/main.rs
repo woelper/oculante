@@ -1017,6 +1017,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     }
     // }
     let mut bbox = egui::Rect::NOTHING;
+    let mut panel_width = 0.0;
     let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
         state.toasts.show(ctx);
@@ -1101,7 +1102,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            bbox = info_ui(ctx, state, gfx);
+            (bbox, panel_width) = info_ui(ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1204,7 +1205,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            draw.rect((0., 0.), (bbox.width() + 24., state.window_size.y))
+            draw.rect((0., 0.), (panel_width, state.window_size.y))
                 .color(Color::from_rgb(
                     info_panel_color.r() as f32 / 255.,
                     info_panel_color.g() as f32 / 255.,
