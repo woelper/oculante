@@ -932,31 +932,6 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
     app.window().set_title(&title_string);
 }
 
-pub fn compare_next(state: &mut OculanteState) {
-    if let Some(p) = &(state.current_path).clone() {
-        let mut compare_list: Vec<(PathBuf, ImageGeometry)> =
-            state.compare_list.clone().into_iter().collect();
-        compare_list.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let index = compare_list.iter().position(|x| &x.0 == p).unwrap_or(0);
-        let index = if index + 1 < compare_list.len() {
-            index + 1
-        } else {
-            0
-        };
-
-        if let Some((path, geo)) = compare_list.get(index) {
-            state.is_loaded = false;
-            state.current_image = None;
-            state.player.load_advanced(
-                path,
-                Some(Frame::CompareResult(Default::default(), geo.clone())),
-            );
-            state.current_path = Some(path.clone());
-        }
-    }
-}
-
 pub fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) -> f32 {
     (((oldvalue - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
 }

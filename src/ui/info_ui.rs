@@ -1,3 +1,4 @@
+use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 use crate::icons::*;
@@ -171,41 +172,44 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
                                 if state.is_loaded && state.reset_image == false {
                                     if let Some(path) = &state.current_path {
-                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
                                 }
                             }
-                            let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-                            compare_list.sort_by(|a,b| a.0.cmp(&b.0));
 
-                            for (path, geo) in compare_list {
+                            // let compare_list = state.compare_list.iter().cloned().collect();
+                            let mut to_remove = None;
+                            for CompareItem {path, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
                                     if ui.button(X).clicked() {
-                                        state.compare_list.remove(&path);
+                                        to_remove = Some(path.to_owned());
                                     }
                                     ui.vertical_centered_justified(|ui| {
                                         if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                                             state
                                                 .player
-                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), geo.clone())));
+                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
                                             ui.ctx().request_repaint();
                                             ui.ctx().request_repaint_after(Duration::from_millis(500));
-                                            state.current_path = Some(path);
+                                            state.current_path = Some(path.clone());
                                         }
                                     });
                                 });
                             }
+                            if let Some(remove) = to_remove {
+                                state.compare_list.remove(remove);
+                            }
                             if let Some(path) = &state.current_path {
                                 if let Some(geo) = state.compare_list.get(path) {
-                                    if state.image_geometry != *geo {
+                                    if state.image_geometry != geo {
                                         if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
-                                            state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                            state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
                                         }
                                     }
                                 } else {
                                     if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                        state.compare_list.insert(path.clone(), state.image_geometry.clone());
+                                        state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
                                     }
                                 }
                             }
