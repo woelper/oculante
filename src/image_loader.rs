@@ -46,7 +46,8 @@ pub fn open_image(
         .replace("jpeg", "jpg")
         .replace("jpeg", "jpg")
         .replace("ima", "dcm")
-        .replace("heic", "heif");
+        .replace("heic", "heif")
+        .replace("hif", "heic");
 
     // These are detected incorrectly, for example svg is xml etc
     let unchecked_extensions = ["svg", "kra", "tga", "dng"];
@@ -159,7 +160,10 @@ pub fn open_image(
             use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
 
             let lib_heif = LibHeif::new();
-            let ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            if let Ok(num_threads) =  std::thread::available_parallelism() {
+                ctx.set_max_decoding_threads(num_threads.get() as u32);
+            }
             let handle = ctx.primary_image_handle()?;
             let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
             let planes = img.planes();
