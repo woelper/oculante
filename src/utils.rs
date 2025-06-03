@@ -27,6 +27,7 @@ use strum_macros::EnumIter;
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
+use crate::settings::DecoderSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -264,6 +265,7 @@ pub struct Player {
     pub message_sender: Sender<Message>,
     pub cache: Cache,
     watcher: HashMap<PathBuf, SystemTime>,
+    decoder_opts: DecoderSettings,
 }
 
 impl Player {
@@ -272,6 +274,7 @@ impl Player {
         image_sender: Sender<Frame>,
         cache_size: usize,
         message_sender: Sender<Message>,
+        decoder_opts: DecoderSettings,
     ) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
@@ -283,6 +286,7 @@ impl Player {
                 cache_size,
             },
             watcher: Default::default(),
+            decoder_opts,
         }
     }
 
@@ -332,6 +336,7 @@ impl Player {
             self.message_sender.clone(),
             stop_receiver,
             forced_frame_source,
+            self.decoder_opts,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -356,6 +361,7 @@ pub fn send_image_threaded(
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
     forced_frame_source: Option<Frame>,
+    decoder_opts: DecoderSettings,
 ) {
     let loc = img_location.to_owned();
 
@@ -364,7 +370,7 @@ pub fn send_image_threaded(
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
 
-        match open_image(&loc, Some(message_sender.clone())) {
+        match open_image(&loc, Some(message_sender.clone()), Some(decoder_opts)) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
