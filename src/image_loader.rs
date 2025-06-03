@@ -1,4 +1,5 @@
 use crate::ktx2_loader::CompressedImageFormats;
+use crate::settings::DecoderSettings;
 use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
@@ -29,6 +30,7 @@ use zune_png::zune_core::result::DecodingResult;
 pub fn open_image(
     img_location: &Path,
     message_sender: Option<Sender<Message>>,
+    decoder_opts: Option<DecoderSettings>,
 ) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
@@ -161,8 +163,11 @@ pub fn open_image(
 
             let lib_heif = LibHeif::new();
             let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
-            if let Ok(num_threads) =  std::thread::available_parallelism() {
+            if let Ok(num_threads) = std::thread::available_parallelism() {
                 ctx.set_max_decoding_threads(num_threads.get() as u32);
+            }
+            if let Some(DecoderSettings { heif }) = decoder_opts {
+                ctx.set_security_limits(&heif.into())?;
             }
             let handle = ctx.primary_image_handle()?;
             let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
