@@ -224,16 +224,16 @@ pub struct DecoderSettings {
 /// while still working if the Oculante is built without libheif support.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct HeifLimits {
-    image_size_pixels: Limit,
-    number_of_tiles: Limit,
-    bayer_pattern_pixels: Limit,
-    items: Limit,
-    color_profile_size: Limit,
-    memory_block_size: Limit,
-    components: Limit,
-    iloc_extents_per_item: Limit,
-    size_entity_group: Limit,
-    children_per_box: Limit,
+    pub image_size_pixels: Limit,
+    pub number_of_tiles: Limit,
+    pub bayer_pattern_pixels: Limit,
+    pub items: Limit,
+    pub color_profile_size: Limit,
+    pub memory_block_size: Limit,
+    pub components: Limit,
+    pub iloc_extents_per_item: Limit,
+    pub size_entity_group: Limit,
+    pub children_per_box: Limit,
 }
 
 #[cfg(feature = "heif")]
@@ -310,7 +310,7 @@ impl From<HeifLimits> for SecurityLimits {
 /// The default values of [`SecurityLimits`] can only be fetched from libheif itself. Therefore, we
 /// need a way to store preferences regardless if the `heif` feature is enabled.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-enum Limit {
+pub enum Limit {
     #[default]
     Default,
     NoLimit,

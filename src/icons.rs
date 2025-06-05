@@ -9,6 +9,7 @@ pub const CHEVRON_DOWN: &str = "\u{E91C}";
 pub const CHEVRON_UP: &str = "\u{E91B}";
 pub const COPY: &str = "\u{E916}";
 pub const DEBUG: &str = "\u{E90D}";
+pub const DECODERS: &str = "";
 pub const DOWNLOAD: &str = "\u{E912}";
 pub const FILE: &str = "\u{E91A}";
 pub const FOLDER: &str = "\u{E90A}";

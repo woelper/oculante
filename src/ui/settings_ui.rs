@@ -1,9 +1,10 @@
 use std::fs::remove_dir_all;
+use std::sync::{Arc, Mutex};
 
 use super::*;
 use crate::appstate::OculanteState;
 use crate::thumbnails::get_disk_cache_path;
-use crate::utils::*;
+use crate::{settings, utils::*};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
 
@@ -14,6 +15,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         Visual,
         Input,
         Debug,
+        Decoders,
         None,
     }
 
@@ -40,6 +42,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         ui.add_space(14.);
     }
 
+    let config_state = ctx.data_mut(|w| {
+        Arc::clone(
+            &w.get_temp_mut_or_default::<Arc<Mutex<SettingsUiState>>>(Id::new("SETTINGSUISTATE")),
+        )
+    });
+
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
             .collapsible(false)
@@ -60,6 +68,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                         }
                         if ui.styled_button(format!("{MOUSE} Input")).clicked() {
                             scroll_to = SettingsState::Input;
+                        }
+                        if ui.styled_button(format!("{DECODERS} Decoders")).clicked() {
+                            scroll_to = SettingsState::Decoders;
                         }
                         if ui.styled_button(format!("{DEBUG} Debug")).clicked() {
                             scroll_to = SettingsState::Debug;
@@ -270,6 +281,26 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     keybinding_ui(app, state, ui);
                                 });
 
+                                let decoders = ui.heading("Decoders");
+                                if SettingsState::Decoders == scroll_to {
+                                    decoders.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    configuration_item_ui("HEIF max image size", "Set maximum image size in pixels that libheif will decode (0 = unlimited)", |ui| {
+                                        let mut config_state = config_state.lock().unwrap();
+
+                                        let response = ui.add(TextEdit::singleline(&mut config_state.heif_image_size).min_size(vec2(0., BUTTON_HEIGHT_LARGE)).desired_width(ui.available_width()));
+                                        if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                            if config_state.heif_image_size.is_empty() {
+                                                state.persistent_settings.decoders.heif.image_size_pixels = settings::Limit::Default;
+                                            } else {
+                                                let limit = config_state.heif_image_size.parse::<u64>().map(settings::Limit::U64).unwrap_or_default();
+                                                state.persistent_settings.decoders.heif.image_size_pixels = limit;
+                                            }
+                                        }
+                                    }, ui);
+                                });
+
                                 let debug = ui.heading("Debug");
                                 if SettingsState::Debug == scroll_to {
                                     debug.scroll_to_me(Some(Align::TOP));
@@ -369,4 +400,9 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
             ui.end_row();
         }
     });
+}
+
+#[derive(Default, Clone)]
+struct SettingsUiState {
+    pub heif_image_size: String,
 }
