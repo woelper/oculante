@@ -1093,3 +1093,60 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
         .context("Can't load RgbImage from decompressed TurboJPEG")?;
     Ok(DynamicImage::ImageRgb8(i))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::{
+        image_loader::open_image,
+        settings::{DecoderSettings, HeifLimits, Limit},
+    };
+
+    #[cfg(feature = "heif")]
+    use libheif_rs::{HeifError, HeifErrorCode, HeifErrorSubCode};
+
+    #[cfg(feature = "heif")]
+    #[test]
+    fn low_pixel_limit_doesnt_decode_heif() {
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let decoder_opts = Some(DecoderSettings {
+            heif: HeifLimits {
+                image_size_pixels: Limit::U64(50),
+                ..Default::default()
+            },
+        });
+
+        let actual = open_image(&image_location, None, decoder_opts).unwrap_err();
+        let expected = format!(
+            "{:?}({:?})",
+            HeifErrorCode::MemoryAllocationError,
+            HeifErrorSubCode::SecurityLimitExceeded
+        );
+
+        // This looks a bit convoluted because it's hard to construct a libheif error.
+        // A low pixel maximum should cause libheif to fail to decode an image. This simulates
+        // trying to decode a large image with the default or low maximum.
+        assert!(
+            actual.to_string().starts_with(&expected),
+            "libheif should have raised a security error"
+        )
+    }
+
+    #[cfg(feature = "heif")]
+    #[test]
+    fn higher_pixel_limit_decodes_heif() {
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let decoder_opts = Some(DecoderSettings {
+            heif: HeifLimits {
+                image_size_pixels: Limit::NoLimit,
+                ..Default::default()
+            },
+        });
+
+        open_image(&image_location, None, decoder_opts)
+            .expect("libheif should have decoded the image without raising a security error")
+            .recv()
+            .expect("Decoded image should be have sent");
+    }
+}
