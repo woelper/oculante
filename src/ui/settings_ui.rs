@@ -286,10 +286,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     decoders.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-                                    configuration_item_ui("HEIF max image size", "Set maximum image size in pixels that libheif will decode (0 = unlimited)", |ui| {
+                                    configuration_item_ui("HEIF max image size", "Sets the maximum image size in pixels that libheif will decode (0 = unlimited).", |ui| {
                                         let mut config_state = config_state.lock().unwrap();
 
-                                        let response = ui.add(TextEdit::singleline(&mut config_state.heif_image_size).min_size(vec2(0., BUTTON_HEIGHT_LARGE)).desired_width(ui.available_width()));
+                                        let response = ui.add(TextEdit::singleline(&mut config_state.heif_image_size).min_size(vec2(0., BUTTON_HEIGHT_SMALL)));
                                         if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
                                             if config_state.heif_image_size.is_empty() {
                                                 state.persistent_settings.decoders.heif.image_size_pixels = settings::Limit::Default;
