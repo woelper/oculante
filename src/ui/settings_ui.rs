@@ -43,9 +43,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
     }
 
     let config_state = ctx.data_mut(|w| {
-        Arc::clone(
-            &w.get_temp_mut_or_default::<Arc<Mutex<SettingsUiState>>>(Id::new("SETTINGSUISTATE")),
-        )
+        let ui_state =
+            w.get_temp_mut_or_insert_with::<Arc<Mutex<SettingsUiState>>>(Id::new("SETTINGSUISTATE"), || {
+            let mut config_state = SettingsUiState::default();
+            config_state.heif_image_size = state
+                .persistent_settings
+                .decoders
+                .heif
+                .image_size_pixels
+                .to_string();
+            Mutex::new(config_state).into()
+        });
+        Arc::clone(&ui_state)
     });
 
     let mut settings_enabled = state.settings_enabled;
@@ -288,7 +297,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 light_panel(ui, |ui| {
                                     configuration_item_ui("HEIF max image size", "Sets the maximum image size in pixels that libheif will decode (0 = unlimited).", |ui| {
                                         let mut config_state = config_state.lock().unwrap();
-
+                                        
                                         let response = ui.add(TextEdit::singleline(&mut config_state.heif_image_size).min_size(vec2(0., BUTTON_HEIGHT_SMALL)));
                                         if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
                                             if config_state.heif_image_size.is_empty() {

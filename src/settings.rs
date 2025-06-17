@@ -9,6 +9,7 @@ use libheif_rs::SecurityLimits;
 
 use std::{
     collections::{BTreeSet, HashSet},
+    fmt::{self, Display, Formatter},
     fs::{create_dir_all, File},
     path::PathBuf,
 };
@@ -316,4 +317,15 @@ pub enum Limit {
     NoLimit,
     U64(u64),
     U32(u32),
+}
+
+impl Display for Limit {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::Default => write!(f, ""),
+            Self::NoLimit => write!(f, "0"),
+            Self::U64(v) => write!(f, "{v}"),
+            Self::U32(v) => write!(f, "{v}"),
+        }
+    }
 }
