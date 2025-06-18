@@ -78,7 +78,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                         if ui.styled_button(format!("{MOUSE} Input")).clicked() {
                             scroll_to = SettingsState::Input;
                         }
-                        if ui.styled_button(format!("{DECODERS} Decoders")).clicked() {
+                        if ui.styled_button(format!("{DECODER} Decoders")).clicked() {
                             scroll_to = SettingsState::Decoders;
                         }
                         if ui.styled_button(format!("{DEBUG} Debug")).clicked() {

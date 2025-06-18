@@ -64,6 +64,8 @@ pub const TERMINAL: &str = "\u{E939}";
 pub const DRIVE: &str = "\u{E93d}";
 pub const EYE: &str = "\u{E93e}";
 pub const EYEOFF: &str = "\u{E93f}";
+// TODO: This icon for the decoders is awful. I will be remaking this at some point, I just didn't have time to actually make something decent. - @Stoppedpuma
+pub const DECODER: &str = "\u{E940}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.
