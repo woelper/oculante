@@ -1,4 +1,5 @@
 use crate::{
+    comparelist::CompareList,
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
@@ -10,13 +11,13 @@ use crate::{
 use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
+use notan::{prelude::Texture, AppState};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImageGeometry {
     /// The scale of the displayed image
     pub scale: f32,
@@ -50,7 +51,7 @@ impl Message {
 #[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
-    pub compare_list: HashMap<PathBuf, ImageGeometry>,
+    pub compare_list: CompareList,
     pub drag_enabled: bool,
     pub reset_image: bool,
     /// Is the image fully loaded?

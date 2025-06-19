@@ -22,6 +22,7 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
+use oculante::comparelist::CompareItem;
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -412,7 +413,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                 limit_offset(app, state);
             }
             if key_pressed(app, state, CompareNext) {
-                compare_next(state);
+                compare_next(app, state);
             }
             if key_pressed(app, state, ResetView) {
                 state.reset_image = true
@@ -1289,4 +1290,17 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
+}
+
+// Handle [`CompareNext`] events
+fn compare_next(_app: &mut App, state: &mut OculanteState) {
+    if let Some(CompareItem { path, geometry }) = state.compare_list.next() {
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load_advanced(
+            path,
+            Some(Frame::CompareResult(Default::default(), *geometry)),
+        );
+        state.current_path = Some(path.to_owned());
+    }
 }
