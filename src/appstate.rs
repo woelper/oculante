@@ -117,6 +117,8 @@ impl<'b> OculanteState {
 
 impl<'b> Default for OculanteState {
     fn default() -> OculanteState {
+        let persistent_settings = PersistentSettings::load().unwrap_or_default();
+
         let tx_channel = mpsc::channel();
         let msg_channel = mpsc::channel();
         let meta_channel = mpsc::channel();
@@ -133,7 +135,12 @@ impl<'b> Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone(), 20, msg_channel.0.clone()),
+            player: Player::new(
+                tx_channel.0.clone(),
+                20,
+                msg_channel.0.clone(),
+                persistent_settings.decoders,
+            ),
             texture_channel: tx_channel,
             message_channel: msg_channel,
             load_channel: mpsc::channel(),

@@ -199,6 +199,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache,
         state.message_channel.0.clone(),
+        state.persistent_settings.decoders,
     );
 
     debug!("matches {:?}", matches);
