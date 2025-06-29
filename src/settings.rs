@@ -5,6 +5,9 @@ use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "heif")]
+use std::sync::OnceLock;
+
+#[cfg(feature = "heif")]
 use libheif_rs::SecurityLimits;
 
 use std::{
@@ -235,6 +238,7 @@ pub struct HeifLimits {
     pub iloc_extents_per_item: Limit,
     pub size_entity_group: Limit,
     pub children_per_box: Limit,
+    pub override_all: bool,
 }
 
 #[cfg(feature = "heif")]
@@ -303,6 +307,31 @@ impl From<HeifLimits> for SecurityLimits {
         }
 
         context
+    }
+}
+
+impl HeifLimits {
+    /// Return [`SecurityLimits`] if not overridden by LIBHEIF_SECURITY_LIMITS or the settings.
+    #[cfg(feature = "heif")]
+    pub fn maybe_limits(self) -> Option<SecurityLimits> {
+        static OVERRIDE_ALL: OnceLock<bool> = OnceLock::new();
+
+        (!OVERRIDE_ALL.get_or_init(|| {
+            // Override settings if the var was set by the time this function is called or use the
+            // setting if undefined.
+            let override_all = std::env::var("LIBHEIF_SECURITY_LIMITS")
+                .ok()
+                .as_deref()
+                .map(|var| var.eq_ignore_ascii_case("on"))
+                .unwrap_or(self.override_all);
+            std::env::set_var(
+                "LIBHEIF_SECURITY_LIMITS",
+                if override_all { "on" } else { "off" },
+            );
+
+            override_all
+        }))
+        .then(|| self.into())
     }
 }
 

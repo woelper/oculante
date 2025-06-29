@@ -166,8 +166,11 @@ pub fn open_image(
             if let Ok(num_threads) = std::thread::available_parallelism() {
                 ctx.set_max_decoding_threads(num_threads.get() as u32);
             }
-            if let Some(DecoderSettings { heif }) = decoder_opts {
-                ctx.set_security_limits(&heif.into())?;
+            if let Some(limits) = decoder_opts.and_then(|decoders| {
+                let DecoderSettings { heif } = decoders;
+                heif.maybe_limits()
+            }) {
+                ctx.set_security_limits(&limits)?;
             }
             let handle = ctx.primary_image_handle()?;
             let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;

@@ -58,6 +58,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                     iloc_extents_per_item,
                     size_entity_group,
                     children_per_box,
+                    ..
                 } = state.persistent_settings.decoders.heif;
 
                 config_state.heif_image_size = image_size_pixels.to_string();
@@ -321,9 +322,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
 
-                                            let response = ui.add(
-                                            TextEdit::singleline(&mut config_state.heif_image_size)
-                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_image_size)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
                                             if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
                                                 if config_state.heif_image_size.is_empty() {
@@ -348,7 +350,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
 
-                                            let response = ui.add(
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
                                                 TextEdit::singleline(&mut config_state.heif_mem_block)
                                                     .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
@@ -374,9 +377,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         "Sets the max number of tiles to attempt decoding (0 = unlimited)",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
-                                            let response = ui.add(
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
                                                 TextEdit::singleline(&mut config_state.heif_tiles)
-                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
                                             if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
                                                 if config_state.heif_tiles.is_empty() {
@@ -400,7 +404,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         "Sets the max number of bayer pattern pixels (0 = unlimited)",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
-                                            let response = ui.add(
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
                                                 TextEdit::singleline(&mut config_state.heif_bayer_pat)
                                                     .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
@@ -426,7 +431,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         "Set the max number of image items (0 = unlimited)",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
-                                            let response = ui.add(
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
                                                 TextEdit::singleline(&mut config_state.heif_items)
                                                     .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
@@ -451,7 +457,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         "Set the max color profile size (0 = unlimited)",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
-                                            let response = ui.add(
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
                                                 TextEdit::singleline(&mut config_state.heif_color_prof)
                                                     .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                             );
@@ -477,7 +484,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     "Set the max number of components to decode (0 = unlimited)",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
-                                        let response = ui.add(
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
                                             TextEdit::singleline(&mut config_state.heif_components)
                                                 .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                         );
@@ -503,7 +511,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     "Set the max number of image locations (0 = unlimited)",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
-                                        let response = ui.add(
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
                                             TextEdit::singleline(&mut config_state.heif_iloc_extents)
                                                 .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                         );
@@ -536,7 +545,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     "Set the max entity group size (0 = unlimited)",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
-                                        let response = ui.add(
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
                                             TextEdit::singleline(&mut config_state.heif_size_entity)
                                                 .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                         );
@@ -562,7 +572,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     "Set the max number of metadata per box (0 = unlimited)",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
-                                        let response = ui.add(
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
                                             TextEdit::singleline(&mut config_state.heif_child_per_box)
                                                 .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
                                         );
@@ -581,6 +592,18 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     },
                                     ui,
+                                );
+
+                                configuration_item_ui(
+                                    "HEIF security override",
+                                    "Disable all HEIF security limits",
+                                    |ui| {
+                                        ui.checkbox(
+                                            &mut state.persistent_settings.decoders.heif.override_all,
+                                            "Disable security limits"
+                                        );
+                                    },
+                                    ui
                                 );
                                 });
 
