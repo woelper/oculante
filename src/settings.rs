@@ -326,7 +326,7 @@ impl HeifLimits {
                 .unwrap_or(self.override_all);
             std::env::set_var(
                 "LIBHEIF_SECURITY_LIMITS",
-                if override_all { "on" } else { "off" },
+                if override_all { "off" } else { "on" },
             );
 
             override_all
