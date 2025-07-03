@@ -318,7 +318,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 light_panel(ui, |ui| {
                                     configuration_item_ui(
                                         "HEIF security override",
-                                        "Disable all HEIF security limits.",
+                                        "Disable all HEIF security limits. A restart is required to take effect.",
                                         |ui| {
                                             ui.styled_checkbox(
                                                 &mut state.persistent_settings.decoders.heif.override_all,
@@ -332,7 +332,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF max image size",
-                                        "Sets the maximum image size in pixels that libheif will decode (0 = unlimited).",
+                                        "Sets the maximum image size in pixels that libheif will decode (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
 
@@ -360,7 +360,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF memory block size",
-                                        "Sets the max memory block size per image (0 = unlimited).",
+                                        "Sets the max memory block size per image (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
 
@@ -388,7 +388,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF number of tiles",
-                                        "Sets the max number of tiles to attempt decoding (0 = unlimited).",
+                                        "Sets the max number of tiles to attempt decoding (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
                                             let response = ui.add_enabled(
@@ -415,7 +415,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF bayer pattern pixels",
-                                        "Sets the max number of bayer pattern pixels (0 = unlimited).",
+                                        "Sets the max number of bayer pattern pixels (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
                                             let response = ui.add_enabled(
@@ -442,7 +442,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF items",
-                                        "Set the max number of image items (0 = unlimited).",
+                                        "Set the max number of image items (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
                                             let response = ui.add_enabled(
@@ -468,7 +468,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui(
                                         "HEIF color profile size",
-                                        "Set the max color profile size (0 = unlimited).",
+                                        "Set the max color profile size (0 = unlimited). A restart is required to take effect.",
                                         |ui| {
                                             let mut config_state = config_state.lock().unwrap();
                                             let response = ui.add_enabled(
@@ -495,7 +495,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                 configuration_item_ui(
                                     "HEIF components",
-                                    "Set the max number of components to decode (0 = unlimited).",
+                                    "Set the max number of components to decode (0 = unlimited). A restart is required to take effect.",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
                                         let response = ui.add_enabled(
@@ -522,7 +522,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                 configuration_item_ui(
                                     "HEIF iloc extents",
-                                    "Set the max number of image locations (0 = unlimited).",
+                                    "Set the max number of image locations (0 = unlimited). A restart is required to take effect.",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
                                         let response = ui.add_enabled(
@@ -556,7 +556,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                 configuration_item_ui(
                                     "HEIF entity group size",
-                                    "Set the max entity group size (0 = unlimited).",
+                                    "Set the max entity group size (0 = unlimited). A restart is required to take effect.",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
                                         let response = ui.add_enabled(
@@ -583,7 +583,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                 configuration_item_ui(
                                     "HEIF children per box",
-                                    "Set the max number of metadata per box (0 = unlimited).",
+                                    "Set the max number of metadata per box (0 = unlimited). A restart is required to take effect.",
                                     |ui| {
                                         let mut config_state = config_state.lock().unwrap();
                                         let response = ui.add_enabled(
