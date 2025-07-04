@@ -1081,7 +1081,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                         drag_area(ui, state, app);
                         ui.add_space(15.);
-                        draw_hamburger_menu(ui, state, app);
+                        // This behaviour seems odd so i'm commenting it out. See #690 for details.
+                        //draw_hamburger_menu(ui, state, app);
                     });
                 });
         }
