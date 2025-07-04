@@ -9,6 +9,7 @@ pub const CHEVRON_DOWN: &str = "\u{E91C}";
 pub const CHEVRON_UP: &str = "\u{E91B}";
 pub const COPY: &str = "\u{E916}";
 pub const DEBUG: &str = "\u{E90D}";
+pub const DECODERS: &str = "";
 pub const DOWNLOAD: &str = "\u{E912}";
 pub const FILE: &str = "\u{E91A}";
 pub const FOLDER: &str = "\u{E90A}";
@@ -63,6 +64,8 @@ pub const TERMINAL: &str = "\u{E939}";
 pub const DRIVE: &str = "\u{E93d}";
 pub const EYE: &str = "\u{E93e}";
 pub const EYEOFF: &str = "\u{E93f}";
+// TODO: This icon for the decoders is awful. I will be remaking this at some point, I just didn't have time to actually make something decent. - @Stoppedpuma
+pub const DECODER: &str = "\u{E940}";
 
 // TODO: FIX THESE
 // These are used in code, but are not in the list above.

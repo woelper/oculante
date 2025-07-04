@@ -134,6 +134,10 @@ fn main() -> Result<(), String> {
                 window_config = window_config.set_title(&title_string);
             }
             window_config.min_size = Some(settings.min_window_size);
+
+            // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
+            #[cfg(feature = "heif")]
+            settings.decoders.heif.maybe_limits();
         }
         Err(e) => {
             error!("Could not load persistent settings: {e}");
@@ -199,6 +203,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache,
         state.message_channel.0.clone(),
+        state.persistent_settings.decoders,
     );
 
     debug!("matches {:?}", matches);

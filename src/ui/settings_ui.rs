@@ -1,9 +1,10 @@
 use std::fs::remove_dir_all;
+use std::sync::{Arc, Mutex};
 
 use super::*;
 use crate::appstate::OculanteState;
 use crate::thumbnails::get_disk_cache_path;
-use crate::utils::*;
+use crate::{settings, utils::*};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
 
@@ -14,6 +15,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         Visual,
         Input,
         Debug,
+        Decoders,
         None,
     }
 
@@ -40,6 +42,42 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
         ui.add_space(14.);
     }
 
+    let config_state = ctx.data_mut(|w| {
+        let ui_state = w.get_temp_mut_or_insert_with::<Arc<Mutex<SettingsUiState>>>(
+            Id::new("SETTINGSUISTATE"),
+            || {
+                let mut config_state = SettingsUiState::default();
+                let settings::HeifLimits {
+                    image_size_pixels,
+                    number_of_tiles,
+                    bayer_pattern_pixels,
+                    items,
+                    color_profile_size,
+                    memory_block_size,
+                    components,
+                    iloc_extents_per_item,
+                    size_entity_group,
+                    children_per_box,
+                    ..
+                } = state.persistent_settings.decoders.heif;
+
+                config_state.heif_image_size = image_size_pixels.to_string();
+                config_state.heif_tiles = number_of_tiles.to_string();
+                config_state.heif_bayer_pat = bayer_pattern_pixels.to_string();
+                config_state.heif_items = items.to_string();
+                config_state.heif_color_prof = color_profile_size.to_string();
+                config_state.heif_mem_block = memory_block_size.to_string();
+                config_state.heif_components = components.to_string();
+                config_state.heif_iloc_extents = iloc_extents_per_item.to_string();
+                config_state.heif_size_entity = size_entity_group.to_string();
+                config_state.heif_child_per_box = children_per_box.to_string();
+
+                Mutex::new(config_state).into()
+            },
+        );
+        Arc::clone(&ui_state)
+    });
+
     let mut settings_enabled = state.settings_enabled;
     egui::Window::new("Preferences")
             .collapsible(false)
@@ -60,6 +98,9 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                         }
                         if ui.styled_button(format!("{MOUSE} Input")).clicked() {
                             scroll_to = SettingsState::Input;
+                        }
+                        if ui.styled_button(format!("{DECODER} Decoders")).clicked() {
+                            scroll_to = SettingsState::Decoders;
                         }
                         if ui.styled_button(format!("{DEBUG} Debug")).clicked() {
                             scroll_to = SettingsState::Debug;
@@ -270,6 +311,304 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     keybinding_ui(app, state, ui);
                                 });
 
+                                let decoders = ui.heading("Decoders");
+                                if SettingsState::Decoders == scroll_to {
+                                    decoders.scroll_to_me(Some(Align::TOP));
+                                }
+                                light_panel(ui, |ui| {
+                                    configuration_item_ui(
+                                        "HEIF security override",
+                                        "Disable all HEIF security limits. A restart is required to take effect.",
+                                        |ui| {
+                                            ui.styled_checkbox(
+                                                &mut state.persistent_settings.decoders.heif.override_all,
+                                                // Keeping this commented for now to not break design consistency. This is useful in the future if we need to warn users this option can use a lot of ram.
+                                                //"Disable security limits"
+                                                ""
+                                            );
+                                        },
+                                        ui
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF max image size",
+                                        "Sets the maximum image size in pixels that libheif will decode (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_image_size)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_image_size.is_empty() {
+                                                    state.persistent_settings.decoders.heif.image_size_pixels =
+                                                        settings::Limit::Default;
+                                                } else {
+                                                    let limit = config_state
+                                                        .heif_image_size
+                                                        .parse()
+                                                        .map(settings::Limit::U64)
+                                                        .unwrap_or_default();
+                                                    state.persistent_settings.decoders.heif.image_size_pixels = limit;
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF memory block size",
+                                        "Sets the max memory block size per image (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_mem_block)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_mem_block.is_empty() {
+                                                    state.persistent_settings.decoders.heif.memory_block_size =
+                                                        settings::Limit::default();
+                                                } else {
+                                                    let limit = config_state
+                                                        .heif_mem_block
+                                                        .parse()
+                                                        .map(settings::Limit::U64)
+                                                        .unwrap_or_default();
+                                                    state.persistent_settings.decoders.heif.memory_block_size = limit;
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF number of tiles",
+                                        "Sets the max number of tiles to attempt decoding (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_tiles)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_tiles.is_empty() {
+                                                    state.persistent_settings.decoders.heif.number_of_tiles =
+                                                        settings::Limit::default();
+                                                    } else {
+                                                        let limit = config_state
+                                                            .heif_tiles
+                                                            .parse()
+                                                            .map(settings::Limit::U32)
+                                                            .unwrap_or_default();
+                                                        state.persistent_settings.decoders.heif.number_of_tiles = limit;
+                                                    }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF bayer pattern pixels",
+                                        "Sets the max number of bayer pattern pixels (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_bayer_pat)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_bayer_pat.is_empty() {
+                                                state.persistent_settings.decoders.heif.bayer_pattern_pixels =
+                                                    settings::Limit::default();
+                                                } else {
+                                                    let limit = config_state
+                                                        .heif_bayer_pat
+                                                        .parse()
+                                                        .map(settings::Limit::U32)
+                                                        .unwrap_or_default();
+                                                    state.persistent_settings.decoders.heif.bayer_pattern_pixels = limit;
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF items",
+                                        "Set the max number of image items (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_items)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_items.is_empty() {
+                                                    state.persistent_settings.decoders.heif.items = settings::Limit::default();
+                                                } else {
+                                                    let limit = config_state
+                                                        .heif_items
+                                                        .parse()
+                                                        .map(settings::Limit::U32)
+                                                        .unwrap_or_default();
+                                                    state.persistent_settings.decoders.heif.items = limit;
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
+                                        "HEIF color profile size",
+                                        "Set the max color profile size (0 = unlimited). A restart is required to take effect.",
+                                        |ui| {
+                                            let mut config_state = config_state.lock().unwrap();
+                                            let response = ui.add_enabled(
+                                                !state.persistent_settings.decoders.heif.override_all,
+                                                TextEdit::singleline(&mut config_state.heif_color_prof)
+                                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                            );
+                                            if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                                if config_state.heif_color_prof.is_empty() {
+                                                    state.persistent_settings.decoders.heif.color_profile_size =
+                                                        settings::Limit::default();
+                                                } else {
+                                                    let limit = config_state
+                                                        .heif_color_prof
+                                                        .parse()
+                                                        .map(settings::Limit::U32)
+                                                        .unwrap_or_default();
+                                                    state.persistent_settings.decoders.heif.color_profile_size = limit;
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                configuration_item_ui(
+                                    "HEIF components",
+                                    "Set the max number of components to decode (0 = unlimited). A restart is required to take effect.",
+                                    |ui| {
+                                        let mut config_state = config_state.lock().unwrap();
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
+                                            TextEdit::singleline(&mut config_state.heif_components)
+                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                        );
+                                        if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                            if config_state.heif_components.is_empty() {
+                                                state.persistent_settings.decoders.heif.components =
+                                                    settings::Limit::default();
+                                            } else {
+                                                let limit = config_state
+                                                    .heif_components
+                                                    .parse()
+                                                    .map(settings::Limit::U32)
+                                                    .unwrap_or_default();
+                                                state.persistent_settings.decoders.heif.components = limit;
+                                            }
+                                        }
+                                    },
+                                    ui,
+                                );
+
+                                configuration_item_ui(
+                                    "HEIF iloc extents",
+                                    "Set the max number of image locations (0 = unlimited). A restart is required to take effect.",
+                                    |ui| {
+                                        let mut config_state = config_state.lock().unwrap();
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
+                                            TextEdit::singleline(&mut config_state.heif_iloc_extents)
+                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                        );
+                                        if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                            if config_state.heif_iloc_extents.is_empty() {
+                                                state
+                                                    .persistent_settings
+                                                    .decoders
+                                                    .heif
+                                                    .iloc_extents_per_item = settings::Limit::default();
+                                            } else {
+                                                let limit = config_state
+                                                    .heif_iloc_extents
+                                                    .parse()
+                                                    .map(settings::Limit::U32)
+                                                    .unwrap_or_default();
+                                                state
+                                                    .persistent_settings
+                                                    .decoders
+                                                    .heif
+                                                    .iloc_extents_per_item = limit;
+                                            }
+                                        }
+                                    },
+                                    ui,
+                                );
+
+                                configuration_item_ui(
+                                    "HEIF entity group size",
+                                    "Set the max entity group size (0 = unlimited). A restart is required to take effect.",
+                                    |ui| {
+                                        let mut config_state = config_state.lock().unwrap();
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
+                                            TextEdit::singleline(&mut config_state.heif_size_entity)
+                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                        );
+                                        if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                            if config_state.heif_size_entity.is_empty() {
+                                                state.persistent_settings.decoders.heif.size_entity_group =
+                                                    settings::Limit::default();
+                                            } else {
+                                                let limit = config_state
+                                                    .heif_size_entity
+                                                    .parse()
+                                                    .map(settings::Limit::U32)
+                                                    .unwrap_or_default();
+                                                state.persistent_settings.decoders.heif.size_entity_group = limit;
+                                            }
+                                        }
+                                    },
+                                    ui,
+                                );
+
+                                configuration_item_ui(
+                                    "HEIF children per box",
+                                    "Set the max number of metadata per box (0 = unlimited). A restart is required to take effect.",
+                                    |ui| {
+                                        let mut config_state = config_state.lock().unwrap();
+                                        let response = ui.add_enabled(
+                                            !state.persistent_settings.decoders.heif.override_all,
+                                            TextEdit::singleline(&mut config_state.heif_child_per_box)
+                                                .min_size(vec2(0., BUTTON_HEIGHT_SMALL)),
+                                        );
+                                        if response.lost_focus() || ui.input(|i| i.key_pressed(Key::Enter)) {
+                                            if config_state.heif_child_per_box.is_empty() {
+                                                state.persistent_settings.decoders.heif.children_per_box =
+                                                    settings::Limit::default();
+                                            } else {
+                                                let limit = config_state
+                                                    .heif_child_per_box
+                                                    .parse()
+                                                    .map(settings::Limit::U32)
+                                                    .unwrap_or_default();
+                                                state.persistent_settings.decoders.heif.children_per_box = limit;
+                                            }
+                                        }
+                                    },
+                                    ui,
+                                );
+                                });
+
                                 let debug = ui.heading("Debug");
                                 if SettingsState::Debug == scroll_to {
                                     debug.scroll_to_me(Some(Align::TOP));
@@ -369,4 +708,18 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
             ui.end_row();
         }
     });
+}
+
+#[derive(Default)]
+struct SettingsUiState {
+    pub heif_image_size: String,
+    pub heif_tiles: String,
+    pub heif_bayer_pat: String,
+    pub heif_items: String,
+    pub heif_color_prof: String,
+    pub heif_mem_block: String,
+    pub heif_components: String,
+    pub heif_iloc_extents: String,
+    pub heif_size_entity: String,
+    pub heif_child_per_box: String,
 }
