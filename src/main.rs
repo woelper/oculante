@@ -23,7 +23,7 @@ use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
 use oculante::comparelist::CompareItem;
-use std::io::Read;
+use std::io::{stdin, IsTerminal, Read};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -162,7 +162,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
-    let matches = Command::new("Oculante")
+    let mut matches = Command::new("Oculante")
         .arg(
             Arg::new("INPUT")
                 .help("Display this image")
@@ -208,10 +208,16 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     debug!("matches {:?}", matches);
 
-    let paths_to_open = matches
-        .get_many::<String>("INPUT")
+    let paths_to_open = piped_paths(&matches)
+        .map(|iter| iter.collect::<Vec<_>>())
         .unwrap_or_default()
-        .map(PathBuf::from)
+        .into_iter()
+        .chain(
+            matches
+                .remove_many::<String>("INPUT")
+                .unwrap_or_default()
+                .map(PathBuf::from),
+        )
         .collect::<Vec<_>>();
 
     debug!("Image is: {:?}", paths_to_open);
@@ -1308,4 +1314,17 @@ fn compare_next(_app: &mut App, state: &mut OculanteState) {
         );
         state.current_path = Some(path.to_owned());
     }
+}
+
+// Parse piped file names from stdin.
+fn piped_paths(args: &clap::ArgMatches) -> Option<impl Iterator<Item = PathBuf>> {
+    // Don't yield paths if user is piping in raw image data
+    (!args.contains_id("stdin") && !stdin().is_terminal()).then(|| {
+        stdin().lines().flat_map(|line| {
+            line.unwrap_or_default()
+                .split_whitespace()
+                .map(PathBuf::from)
+                .collect::<Vec<_>>()
+        })
+    })
 }
