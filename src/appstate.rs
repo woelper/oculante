@@ -47,6 +47,32 @@ impl Message {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PositionPercentages {
+    /// The X percentage of the image (0.0 to 100.0)
+    pub image_x: f32,
+    /// The Y percentage of the image (0.0 to 100.0)
+    pub image_y: f32,
+    /// The X percentage of the window (0.0 to 100.0)
+    pub window_x: f32,
+    /// The Y percentage of the window (0.0 to 100.0)
+    pub window_y: f32,
+    /// Whether the position dialog is open
+    pub dialog_open: bool,
+}
+
+impl Default for PositionPercentages {
+    fn default() -> Self {
+        Self {
+            image_x: 50.0,
+            image_y: 50.0,
+            window_x: 50.0,
+            window_y: 50.0,
+            dialog_open: false,
+        }
+    }
+}
+
 /// The state of the application
 #[derive(AppState)]
 pub struct OculanteState {
@@ -95,6 +121,8 @@ pub struct OculanteState {
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
     pub thumbnails: Thumbnails,
+    /// Percentages for positioning image
+    pub position_percentages: PositionPercentages,
 }
 
 impl<'b> OculanteState {
@@ -169,6 +197,7 @@ impl<'b> Default for OculanteState {
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
             thumbnails: Default::default(),
+            position_percentages: Default::default(),
         }
     }
 }

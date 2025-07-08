@@ -447,6 +447,13 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
             }
+            if key_pressed(app, state, PositionByPercent) {
+                // Toggle the position dialog
+                state.position_percentages.dialog_open = !state.position_percentages.dialog_open;
+                if state.position_percentages.dialog_open {
+                    state.send_message_info("Position by percentage dialog opened");
+                }
+            }
             if key_pressed(app, state, Copy) {
                 if let Some(img) = &state.current_image {
                     clipboard_copy(img);
@@ -1036,6 +1043,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
         }
+        
+        // Show position dialog if it's open
+        position_dialog(ctx, state);
 
         if !state.pointer_over_ui
             && !state.mouse_grab
