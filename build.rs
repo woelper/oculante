@@ -138,7 +138,7 @@ fn main() {
 
         let readme_wo_keys = readme
             .split("<summary>Default Shortcuts</summary>")
-            .nth(0)
+            .next()
             .unwrap()
             .to_string();
 

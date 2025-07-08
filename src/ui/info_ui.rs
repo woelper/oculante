@@ -1,3 +1,4 @@
+use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
@@ -13,8 +14,6 @@ use notan::{
 };
 
 use super::*;
-use crate::appstate::{ImageGeometry, OculanteState};
-use std::path::PathBuf;
 use std::time::Duration;
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
@@ -169,14 +168,13 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                 ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
                             }
 
-                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
-                                if state.is_loaded && state.reset_image == false {
+                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
+                                && state.is_loaded && !state.reset_image {
                                     if let Some(path) = &state.current_path {
-                                        state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
+                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
                                 }
-                            }
 
                             // let compare_list = state.compare_list.iter().cloned().collect();
                             let mut to_remove = None;
@@ -186,10 +184,10 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                         to_remove = Some(path.to_owned());
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        if ui.selectable_label(state.current_path.as_ref() == Some(path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
                                             state
                                                 .player
-                                                .load_advanced(&path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
+                                                .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
                                             ui.ctx().request_repaint();
                                             ui.ctx().request_repaint_after(Duration::from_millis(500));
                                             state.current_path = Some(path.clone());
@@ -202,21 +200,17 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                             }
                             if let Some(path) = &state.current_path {
                                 if let Some(geo) = state.compare_list.get(path) {
-                                    if state.image_geometry != geo {
-                                        if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
-                                            state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
+                                    if state.image_geometry != geo 
+                                        && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
+                                                state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         }
+                                    } else if ui.button(format!("{PLUS} Add current image")).clicked() {
+                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                     }
-                                } else {
-                                    if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                        state.compare_list.insert(CompareItem::new(&*path, state.image_geometry));
-                                    }
-                                }
                             }
-                            if !state.compare_list.is_empty() {
-                                if ui.button(format!("{TRASH} Clear all")).clicked() {
-                                    state.compare_list.clear();
-                                }
+                            if !state.compare_list.is_empty() 
+                                    && ui.button(format!("{TRASH} Clear all")).clicked() {
+                                        state.compare_list.clear();
                             }
                         });
                     });

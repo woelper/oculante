@@ -36,8 +36,6 @@ use oculante::*;
 use shortcuts::key_pressed;
 use ui::PANEL_WIDTH;
 use ui::*;
-use BOLD_FONT;
-use FONT;
 
 #[cfg(feature = "turbo")]
 use image_editing::lossless_tx;
@@ -255,9 +253,9 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             }
         } else {
             state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
+            state.current_path = Some(location.clone());
             state.player.load_advanced(
-                &location,
+                location,
                 Some(Frame::ImageCollectionMember(Default::default())),
             );
         };
@@ -726,7 +724,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
-    state.image_geometry.dimensions = state.image_geometry.dimensions;
+    if let Some(dimensions) = state.current_image.as_ref().map(|image| image.dimensions()) {
+        state.image_geometry.dimensions = dimensions;
+    }
 
     if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
@@ -800,7 +800,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
 
-        debug!("Got frame: {}", frame.to_string());
+        debug!("Got frame: {}", frame);
 
         if matches!(
             &frame,
@@ -938,7 +938,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             Frame::CompareResult(_, geo) => {
                 debug!("Received compare result");
-                state.image_geometry = geo.clone();
+                state.image_geometry = *geo;
                 // always reset if first image
                 if state.current_texture.get().is_none() {
                     state.reset_image = true;

@@ -682,10 +682,8 @@ impl ImageOperation {
                             }
 
                             // make sure we have at least two points
-                            if len > 2 {
-                                if ui.button("🗑").clicked() {
-                                    delete = Some(i);
-                                }
+                            if len > 2 && ui.button("🗑").clicked() {
+                                delete = Some(i);
                             }
                         });
                     }
@@ -1137,19 +1135,15 @@ impl ImageOperation {
                             dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
 
-                        if r1.changed() {
-                            if *aspect {
-                                dimensions.0 = (dimensions.1 as f32 / ratio) as u32
-                            }
+                        if r1.changed() && *aspect {
+                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
                         }
                         let r2 = ui
                             .styled_checkbox(aspect, "🔒")
                             .on_hover_text("Lock aspect ratio");
 
-                        if r2.changed() {
-                            if *aspect {
-                                dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
-                            }
+                        if r2.changed() && *aspect {
+                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
                         // For this operator, we want to update on release, not on change.
                         // Since all operators are processed the same, we use the hack to emit `changed` just on release.
@@ -1219,10 +1213,8 @@ impl ImageOperation {
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else {
-                            if let Ok(lut_img) = image::open(&lut_name) {
-                                correct_image(&mut external_image, &lut_img.to_rgb8());
-                            }
+                        } else if let Ok(lut_img) = image::open(&lut_name) {
+                            correct_image(&mut external_image, &lut_img.to_rgb8());
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }

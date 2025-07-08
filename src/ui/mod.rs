@@ -577,19 +577,13 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                         if !op.active {
                             continue;
                         }
-                        match &mut op.operation {
-                            ImageOperation::Measure { shapes } => {
-                                for shape in shapes {
-                                    match shape {
-                                        MeasureShape::Rect { points, .. } => {
-                                            points[0].0 = cursor_relative.x as u32;
-                                            points[0].1 = cursor_relative.y as u32;
-                                        }
-                                        _ => {}
-                                    }
+                        if let ImageOperation::Measure { shapes } = &mut op.operation {
+                            for shape in shapes {
+                                if let MeasureShape::Rect { points, .. } = shape {
+                                    points[0].0 = cursor_relative.x as u32;
+                                    points[0].1 = cursor_relative.y as u32;
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -599,19 +593,13 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                         if !op.active {
                             continue;
                         }
-                        match &mut op.operation {
-                            ImageOperation::Measure { shapes } => {
-                                for shape in shapes {
-                                    match shape {
-                                        MeasureShape::Rect { points, .. } => {
-                                            points[1].0 = cursor_relative.x as u32;
-                                            points[1].1 = cursor_relative.y as u32;
-                                        }
-                                        _ => {}
-                                    }
+                        if let ImageOperation::Measure { shapes } = &mut op.operation {
+                            for shape in shapes {
+                                if let MeasureShape::Rect { points, .. } = shape {
+                                    points[1].0 = cursor_relative.x as u32;
+                                    points[1].1 = cursor_relative.y as u32;
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -620,19 +608,13 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                         if !op.active {
                             continue;
                         }
-                        match &mut op.operation {
-                            ImageOperation::Measure { shapes } => {
-                                for shape in shapes {
-                                    match shape {
-                                        MeasureShape::Rect { points, .. } => {
-                                            points[1].0 = cursor_relative.x as u32;
-                                            points[1].1 = cursor_relative.y as u32;
-                                        }
-                                        _ => {}
-                                    }
+                        if let ImageOperation::Measure { shapes } = &mut op.operation {
+                            for shape in shapes {
+                                if let MeasureShape::Rect { points, .. } = shape {
+                                    points[1].0 = cursor_relative.x as u32;
+                                    points[1].1 = cursor_relative.y as u32;
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }

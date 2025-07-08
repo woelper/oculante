@@ -796,7 +796,7 @@ impl ImageExt for DynamicImage {
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
         if let Err(e) = gfx
             .update_texture(texture)
-            .with_data(&self.as_bytes())
+            .with_data(self.as_bytes())
             .update()
         {
             error!("{e}");
@@ -867,7 +867,7 @@ pub fn first_image(state: &mut OculanteState) {
 pub fn clear_image(state: &mut OculanteState) {
     let next_img = state.scrubber.remove_current();
     debug!("Clearing image. Next is {}", next_img.display());
-    if state.scrubber.entries.len() == 0 {
+    if state.scrubber.entries.is_empty() {
         state.current_image = None;
         state.current_texture.clear();
         state.current_path = None;
