@@ -191,7 +191,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new("{search_icon}".to_string())
+                    RichText::new(format!("{search_icon}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
                 .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
@@ -239,7 +239,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new("{CHEVRON_UP}".to_string())
+                    RichText::new(format!("{CHEVRON_UP}"))
                         .color(ui.style().visuals.selection.bg_fill),
                 )
                 .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
