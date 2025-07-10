@@ -200,7 +200,7 @@ impl VolatileSettings {
         }
 
         let f = File::create(local_dir.join("config_volatile.json"))?;
-        let _res = serde_json::to_writer_pretty(f, self)?;
+        serde_json::to_writer_pretty(f, self)?;
         trace!("Saved volatile settings");
         Ok(())
     }

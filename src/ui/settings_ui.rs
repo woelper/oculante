@@ -75,7 +75,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                 Mutex::new(config_state).into()
             },
         );
-        Arc::clone(&ui_state)
+        Arc::clone(ui_state)
     });
 
     let mut settings_enabled = state.settings_enabled;

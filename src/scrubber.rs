@@ -98,7 +98,7 @@ impl Scrubber {
 
     pub fn has_folder_changed(&self, path_to_check: &Path) -> bool {
         self.entries
-            .get(0)
+            .first()
             .map(|e| e.parent() != path_to_check.parent())
             .unwrap_or(true)
     }
@@ -119,7 +119,7 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
 
     // TODO: Are symlinks handled correctly?
     let mut dir_files = info
-        .flat_map(|x| x)
+        .flatten()
         .map(|x| x.path())
         .filter(|x| is_ext_compatible(x))
         .collect::<Vec<PathBuf>>();
@@ -135,7 +135,7 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
         )
     });
 
-    return Ok(dir_files);
+    Ok(dir_files)
 }
 
 /// Find first valid image from the directory

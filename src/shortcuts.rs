@@ -1,7 +1,5 @@
-use std::collections::{BTreeMap, BTreeSet};
-// use hashbrown::{HashMap, HashSet};
 use log::{debug, error, info, trace, warn};
-// use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::appstate::OculanteState;
 use notan::prelude::App;
@@ -89,13 +87,13 @@ impl KeyTrait for SimultaneousKeypresses {
     fn modifiers(&self) -> SimultaneousKeypresses {
         self.iter()
             .filter(|k| is_key_modifier(k))
-            .map(|k| k.clone())
+            .cloned()
             .collect()
     }
     fn alphanumeric(&self) -> SimultaneousKeypresses {
         self.iter()
             .filter(|k| !is_key_modifier(k))
-            .map(|k| k.clone())
+            .cloned()
             .collect()
     }
 }
@@ -160,7 +158,7 @@ impl ShortcutExt for Shortcuts {
     where
         Self: Sized,
     {
-        self.insert(function, keys.into_iter().map(|k| k.to_string()).collect());
+        self.insert(function, keys.iter().map(|k| k.to_string()).collect());
         self
     }
 }
@@ -183,42 +181,32 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     }
 
     // early out if just one key is pressed, and it's a modifier
-    if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
-        if app.keyboard.down.len() == 1 {
-            trace!("alt/shift/ctrl modifier down");
-            return false;
-        }
+    if (app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl())
+        && app.keyboard.down.len() == 1
+    {
+        trace!("alt/shift/ctrl modifier down");
+        return false;
     }
 
     if let Some(keys) = state.persistent_settings.shortcuts.get(&command) {
         // make sure the appropriate number of keys are down
-        if app.keyboard.down.len() != keys.len() {
-            if command != InputEvent::Fullscreen {
-                return false;
-            }
+        if app.keyboard.down.len() != keys.len() && command != InputEvent::Fullscreen {
+            return false;
         }
 
         // make sure all modifiers are down
         for m in keys.modifiers() {
-            if m.contains("Shift") {
-                if !app.keyboard.shift() {
-                    return false;
-                }
+            if m.contains("Shift") && !app.keyboard.shift() {
+                return false;
             }
-            if m.contains("Alt") {
-                if !app.keyboard.alt() {
-                    return false;
-                }
+            if m.contains("Alt") && !app.keyboard.alt() {
+                return false;
             }
-            if m.contains("Control") {
-                if !app.keyboard.ctrl() {
-                    return false;
-                }
+            if m.contains("Control") && !app.keyboard.ctrl() {
+                return false;
             }
-            if m.contains("Win") {
-                if !app.keyboard.logo() {
-                    return false;
-                }
+            if m.contains("Win") && !app.keyboard.logo() {
+                return false;
             }
         }
 
@@ -284,7 +272,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
 }
 
 pub fn lookup(shortcuts: &Shortcuts, command: &InputEvent) -> String {
-    if let Some(keys) = shortcuts.get(&command) {
+    if let Some(keys) = shortcuts.get(command) {
         return keypresses_as_string(keys);
     }
     "None".into()
@@ -313,8 +301,8 @@ pub fn keypresses_as_markdown(keys: &SimultaneousKeypresses) -> String {
 }
 
 fn is_key_modifier(key: &str) -> bool {
-    match key {
-        "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" | "LWin" | "Rwin" => true,
-        _ => false,
-    }
+    matches!(
+        key,
+        "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" | "LWin" | "Rwin"
+    )
 }
