@@ -43,6 +43,7 @@ pub enum InputEvent {
     Browse,
     Quit,
     ZenMode,
+    PositionByPercent,
 }
 
 pub type Shortcuts = BTreeMap<InputEvent, SimultaneousKeypresses>;
@@ -138,7 +139,8 @@ impl ShortcutExt for Shortcuts {
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])
             .add_keys(InputEvent::PanUp, &["LShift", "Up"])
             .add_keys(InputEvent::Paste, &["LControl", "V"])
-            .add_keys(InputEvent::Copy, &["LControl", "C"]);
+            .add_keys(InputEvent::Copy, &["LControl", "C"])
+            .add_keys(InputEvent::PositionByPercent, &["LControl", "P"]);
         #[cfg(target_os = "macos")]
         {
             for (_, keys) in s.iter_mut() {
