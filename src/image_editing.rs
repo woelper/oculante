@@ -233,7 +233,7 @@ impl MeasureShape {
         Self::Rect {
             points,
             color: [255, 255, 255, 255],
-            width: 1,
+            width: 4,
         }
     }
 }
@@ -914,12 +914,13 @@ impl ImageOperation {
                             ui.painter().rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32, Color32::BLACK),
+                                Stroke::new(*width as f32 / 2., Color32::WHITE),
                             );
-                            ui.painter().rect_stroke(
+
+                            ui.painter().rect_filled(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32 / 2., Color32::WHITE),
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 2)
                             );
 
                             ui.painter().text(
@@ -934,15 +935,17 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            ui.painter().line_segment(
-                                [rect.left_center(), rect.right_center()],
-                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
-                            );
+                            // Commenting out the bottom two line segments as they look weird visually, maybe we bring them back if they can be customisable?
 
-                            ui.painter().line_segment(
-                                [rect.center_top(), rect.center_bottom()],
-                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
-                            );
+                            //ui.painter().line_segment(
+                            //    [rect.left_center(), rect.right_center()],
+                            //    Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                            //);
+
+                            //ui.painter().line_segment(
+                            //    [rect.center_top(), rect.center_bottom()],
+                            //    Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                            //);
                         }
                     }
                 }
