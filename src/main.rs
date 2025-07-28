@@ -406,19 +406,19 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             // pan image with keyboard
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
-                state.image_geometry.offset.x += delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanUp) {
-                state.image_geometry.offset.y -= delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanLeft) {
                 state.image_geometry.offset.x -= delta;
                 limit_offset(app, state);
             }
-            if key_pressed(app, state, PanDown) {
+            if key_pressed(app, state, PanUp) {
                 state.image_geometry.offset.y += delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(app, state, PanLeft) {
+                state.image_geometry.offset.x += delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(app, state, PanDown) {
+                state.image_geometry.offset.y -= delta;
                 limit_offset(app, state);
             }
             if key_pressed(app, state, CompareNext) {
