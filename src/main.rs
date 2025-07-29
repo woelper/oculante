@@ -1,4 +1,5 @@
-#![windows_subsystem = "windows"]
+// Commented out for now, for testing.
+// #![windows_subsystem = "windows"]
 
 use clap::Arg;
 use clap::Command;
@@ -132,6 +133,7 @@ fn main() -> Result<(), String> {
                 window_config = window_config.set_title(&title_string);
             }
             window_config.min_size = Some(settings.min_window_size);
+            window_config.max_size = Some(settings.max_window_size);
 
             // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
             #[cfg(feature = "heif")]
@@ -142,7 +144,6 @@ fn main() -> Result<(), String> {
         }
     }
     window_config.always_on_top = true;
-    window_config.max_size = None;
 
     debug!("Starting oculante.");
     notan::init_with(init)
@@ -392,6 +393,30 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
     if state.key_grab {
         return;
     }
+
+    if state.persistent_settings.fit_window_to_image && !state.fitted_window && !app.window().is_fullscreen() && state.current_image.is_some() {
+        let screen_size = app.window().screen_size();
+        let clamped_image_size = (
+            state.image_geometry.dimensions.0.clamp(
+                state.persistent_settings.min_window_size.0,
+                state.persistent_settings.max_window_size.0,
+            ),
+            state.image_geometry.dimensions.1.clamp(
+                state.persistent_settings.min_window_size.1,
+                state.persistent_settings.max_window_size.1,
+            ),
+        );
+        app.window()
+            .set_size(clamped_image_size.0, clamped_image_size.1);
+        state.reset_image = true;
+        // Centers the window.
+        app.window().set_position(
+            screen_size.0 - (clamped_image_size.0 as i32) >> 1,
+            screen_size.1 - (clamped_image_size.1 as i32) >> 1,
+        );
+        state.fitted_window = true;
+    }
+
     match evt {
         Event::KeyUp { .. } => {
             // Fullscreen needs to be on key up on mac (bug)
@@ -655,6 +680,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                     {
                         state.is_loaded = false;
                         state.current_image = None;
+                        state.fitted_window = false;
                         state.player.load(&p);
                         state.current_path = Some(p);
                     } else {
@@ -687,6 +713,16 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
 fn update(app: &mut App, state: &mut OculanteState) {
     if state.first_start {
         app.window().set_always_on_top(false);
+
+        // Ideally there should be an event emitted each time you move the window from one monitor to the other.
+        // Then you can have this done both at launch, and when the window encounters a different monitor.
+        let screen_size = app.window().screen_size();
+        if state.persistent_settings.max_window_size.0 > (screen_size.0 as u32) {
+            state.persistent_settings.max_window_size.0 = screen_size.0 as u32;
+        }
+        if state.persistent_settings.max_window_size.1 > (screen_size.1 as u32) {
+            state.persistent_settings.max_window_size.1 = screen_size.1 as u32;
+        }
     }
 
     if let Some(p) = &state.current_path {

@@ -95,6 +95,7 @@ pub struct OculanteState {
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
     pub thumbnails: Thumbnails,
+    pub fitted_window: bool,
 }
 
 impl<'b> OculanteState {
@@ -169,6 +170,7 @@ impl<'b> Default for OculanteState {
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
             thumbnails: Default::default(),
+            fitted_window: false,
         }
     }
 }
