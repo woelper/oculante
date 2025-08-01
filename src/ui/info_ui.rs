@@ -116,7 +116,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     );
                     ui.end_row();
 
-                    ui.label_i("⊞ Pos");
+                    ui.label_i(format!("{MOVE} Pos"));
                     ui.label_right(
                         RichText::new(format!(
                             "{:.0},{:.0}",
