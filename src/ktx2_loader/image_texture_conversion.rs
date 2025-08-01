@@ -71,7 +71,7 @@ impl Image {
                     .map(|c| [f32::from_le_bytes(c[0..=3].try_into().unwrap())])
                     .flatten()
                     .map(|p| p.powf(2.2))
-                    .map(|p| (p.powf(1.0 / 2.2).max(0.0).min(1.0)))
+                    .map(|p| p.powf(1.0 / 2.2).max(0.0).min(1.0))
                     .collect::<Vec<_>>();
                 Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
                     .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
