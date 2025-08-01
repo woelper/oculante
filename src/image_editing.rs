@@ -935,17 +935,15 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            // Commenting out the bottom two line segments as they look weird visually, maybe we bring them back if they can be customisable?
+                            ui.painter().line_segment(
+                                [rect.left_center(), rect.right_center()],
+                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
+                            );
 
-                            //ui.painter().line_segment(
-                            //    [rect.left_center(), rect.right_center()],
-                            //    Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
-                            //);
-
-                            //ui.painter().line_segment(
-                            //    [rect.center_top(), rect.center_bottom()],
-                            //    Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
-                            //);
+                            ui.painter().line_segment(
+                                [rect.center_top(), rect.center_bottom()],
+                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
+                            );
                         }
                     }
                 }
