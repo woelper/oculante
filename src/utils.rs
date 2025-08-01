@@ -912,6 +912,7 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
         .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
         .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
         .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
+        .replacen("{NUM}", &format!("{}/{}", state.scrubber.index + 1, state.scrubber.entries.len()), 10)
         .replacen(
             "{FILENAME}",
             &p.file_name()
