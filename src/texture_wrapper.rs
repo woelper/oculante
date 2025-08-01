@@ -881,7 +881,7 @@ impl TexWrap {
         Ok(())
     }
 
-    fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_dummy_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse<'_> {
         let tex_width_int = self.width() as i32;
         let tex_height_int = self.height() as i32;
 
@@ -898,7 +898,7 @@ impl TexWrap {
         }
     }
 
-    fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse {
+    fn get_texture_at_xy(&self, xa: i32, ya: i32) -> TextureResponse<'_> {
         let width_int = self.width() as i32;
         let height_int = self.height() as i32;
 
