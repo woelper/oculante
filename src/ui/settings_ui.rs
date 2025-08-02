@@ -292,7 +292,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         if ui
                                         .text_edit_singleline(&mut state.persistent_settings.title_format)
                                         .on_hover_text(
-                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, and {RES}.",
+                                            "Configures the window title. Valid options are: {APP}, {VERSION}, {FULLPATH}, {FILENAME}, {NUM}, and {RES}.",
                                         )
                                         .changed()
                                         {
