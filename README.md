@@ -258,42 +258,42 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 
 ### Simplified Chinese
 
-Heiti SC
-Songti SC
-Noto Sans CJK SC
-Noto Sans SC
-WenQuanYi Zen Hei
-SimSun
-Noto Sans SC
-PingFang SC
-Source Han Sans CN
+- Heiti SC
+- Songti SC
+- Noto Sans CJK SC
+- Noto Sans SC
+- WenQuanYi Zen Hei
+- SimSun
+- Noto Sans SC
+- PingFang SC
+- Source Han Sans CN
 
 ### Traditional Chinese
 
-Source Han Sans HK
+- Source Han Sans HK
 
 ### Japanese
 
-Noto Sans JP
-Noto Sans CJK JP
-Source Han Sans JP
-MS Gothic
+- Noto Sans JP
+- Noto Sans CJK JP
+- Source Han Sans JP
+- MS Gothic
 
 ### Korean
 
-Source Han Sans KR
+- Source Han Sans KR
 
 ### Taiwanese
 
-Source Han Sans TW
+- Source Han Sans TW
 
 ### Arabic
 
-Noto Sans Arabic
-Amiri
-Lateef
-Al Tarikh
-Segoe UI
+- Noto Sans Arabic
+- Amiri
+- Lateef
+- Al Tarikh
+- Segoe UI
 
 </details> 
 
