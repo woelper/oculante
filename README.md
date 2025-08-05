@@ -7,22 +7,15 @@
 [<img src="res/download.svg" height="50">](https://github.com/woelper/oculante/releases/latest)
 
 Oculante's vision is to be a fast, unobtrusive, portable image viewer with a wide range of supported image formats while also offering image analysis and basic editing tools.
-- Free of charge, bloat-free, ad-free, privacy-respecting open source application
-- Fast opening of images, fast startup
-- Available for Windows, Mac, Linux, FreeBSD, and NetBSD
-- Supports a wide range of image formats
-- Caches images for faster reloading
-- Can display unassociated channels correctly (If your image uses alpha and color channels to encode data in a special way)
-- Lets you pick pixels to see their location and color values.
-- Offers basic nondestructive editing such as cropping, resizing, painting, rotating, blur, and more!
-- SIMD-accelerated image editing
+
+Oculante is a free, open-source, bloat-free, and privacy-respecting image viewer that is fast to start up and open images. It is available on Windows, Mac, Linux, FreeBSD, and NetBSD, and supports a wide range of image formats. Oculante caches images for faster reloading and can correctly display unassociated channels. It also includes features for basic image analysis, and offers SIMD-accelerated, basic nondestructive editing tools such as cropping, resizing, painting, rotating, blurring, and more!
 
 [![](https://dcbadge.limes.pink/api/server/https://discord.gg/2Q6cF5ZWe7)](https://discord.gg/https://discord.gg/2Q6cF5ZWe7)
 ---
 [![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
 [![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
 [![Ubuntu](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml)
-[![Check Windows](https://github.com/woelper/oculante/actions/workflows/check_windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_windows.yml)
+[![Windows](https://github.com/woelper/oculante/actions/workflows/check_windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_windows.yml)
 [![ARM](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml)
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
@@ -30,27 +23,32 @@ Oculante's vision is to be a fast, unobtrusive, portable image viewer with a wid
 ![Screenshot](res/previews/front.png "Screenshot")
 
 ## Flipbook
+
 With configurable caching, Oculante can quickly step through image sequences:
 
 ![Screenshot](res/previews/flipbook.avif "Screenshot")
 
 ## Inspection
+
 Get information about pixel values and position, with precise picking:
 
 ![Screenshot](res/picker.gif "Screenshot")
 
 ## File Management
-You can use the File Manager built into Oculante to do basic tasks such as accessing recent images or stepping through a virtual list of files so you can compare easily. There is also a dedicated compare option to flip between images, remembering zoom level and position.
+
+Oculante's built-in File Manager allows you to access files on your system without leaving the application. This makes it easy to compare images, especially with the dedicated compare option that lets you flip between images while preserving the zoom level and position.
 
 ![Screenshot](res/previews/file_manager.png "Screenshot")
 
 ## Correct color channel display:
+
 Images may contain color information that is masked by the alpha channel. Although it is present you will not see it since usually RGB values are multiplied with the A channel when displayed. Oculante allows you to inspect all channels individually and see color data without transparency applied.
 
 ![Screenshot](res/premult.png "Screenshot")
 
 ## Installation
-Get started with Oculante by downloading the executable relevant to your platform from the [releases](https://github.com/woelper/oculante/releases/latest) page. The download size is kept small (currently around 25MB) by linking dependencies statically by default. Packages for ARM Linux are also built, please feel free to open an issue if you want your operating system of choice supported!
+
+Find and download the correct executable for your operating system on the [releases](https://github.com/woelper/oculante/releases/latest) page. The download is small, around 25MB, as we link dependencies statically by default. We also have packages available for ARM Linux. Have a different OS? Please feel free to open an issue if you want your operating system of choice supported!
 
 For those looking to manage Oculante through a package manager, please see the options below.
 
@@ -128,17 +126,34 @@ Mac:
 
 ## Updates
 
-Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date you can use the update button in settings, or download the new releases executable! Updates are also managed through your package manager if you installed through one.
+Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date you can use the update button in settings, or download the new release executable. Updates are also managed through your package manager if you installed through one.
 
 ## Uninstalling
 
-Uninstalling Oculante is a quick process, just delete the executable and delete the data folder. You can find the data folder in the relevant location for your operating system below.
+To uninstall Oculante, simply delete the executable file and the data folder. You can find the data folder in the relevant location for your operating system below.
 
 - Windows: `~/AppData/Local/.oculante`
 - Mac: `~/Library/Application Support/oculante`
 - Linux & BSD: `~/.local/share/oculante`
 
+## Roadmap
+
+You can see what we're currently working on in our [Release Plan](https://github.com/users/woelper/projects/2/views/1), or our [Milestones](https://github.com/woelper/oculante/milestones)!
+
+
 ## Features
+
+- Image info: pixel position, color info, color histogram.
+- Non-destructive editing, painting, and operator stack.
+- Lossless JPEG editing: Crop, rotate, mirror without recompressing data.
+- Built-in File Manager: Bookmark directories, favorite and manage files.
+- Image tools: Image comparison, Measuring tools, Color pallete generation.
+- User Interface: Dark/Light/System Themes, Zen Mode, Always on Top, Position/Scrub Bar, Fit image to view.
+- Metadata and Metafile support: Load EXIF data and save metafile edit stacks.
+- Focused on Performance: Threaded image loading, configurable image caching, Low cpu usage, pretty fast startup / loading time.
+- Color Channel support: Display individual RGBA channels, unassociated / unpremultiplied alpha.
+- Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode, listening on that port.
+- Load files from stdin: pipe your data with `cat image | oculante -s`.
 
 ### Image format support
 
@@ -168,32 +183,6 @@ Uninstalling Oculante is a quick process, just delete the executable and delete 
 - qoi
 - kra (Krita files)
 
-### Platform support
-
-- Linux
-- Mac
-- Windows
-- FreeBSD
-- NetBSD
-
-### Misc features
-
-- Image info (<kbd>i</kbd>) (pixel position, color info)
-- Threaded image loading
-- Fit image to view
-- Window can be configured to be always on top - helpful to keep image as reference
-- Low cpu usage
-- Non-destructive painting and operator stack - edit very large images interactively by scaling them down first, then deleting the downscale operator once you want to export.
-- Metafile support: Edit stack can be saved into a metafile which will be auto-loaded and applied when loading the original.
-- Pretty fast startup / loading time
-- Configurable image caching (Select how many images to keep in memory)
-- Display unassociated / unpremultiplied alpha (<kbd>u</kbd>)
-- Lossless JPEG editing: Crop, rotate, mirror without recompressing data
-- Light/Dark theme and follow system theme mode
-- Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode. You can then pipe raw image data to that port, for example using `nc localhost 8888 < image.jpg`. Image types will be auto-detected. If you pipe image sequences, these will be played at about 30 fps so you can pipe videos to it. This can be useful to visualize images from a headless system.
-- EXIF support: Load metadata if present 
-- Load files from stdin: pipe your data with `cat image | oculante -s`
-
 ### Misc examples:
 
 Viewing EXIF data
@@ -204,17 +193,9 @@ Extracting a signature
 
 ![signature example](res/ex-signature.gif "Extracting a signature")
 
-## Roadmap
+## Credits
 
-- Tests and benchmarks
-- Read EXIF for image rotation
-- Investigate PVR / ETC support
-- Brighness/gamma adjust for HDR
-- Redesigning the User Interface
-
-## Attribution
-
-Test / benchmark / screenshot pictures:
+Photos used in tests and screenshots:
 
 https://unsplash.com/@mohsen_karimi
 
@@ -222,11 +203,13 @@ https://unsplash.com/@frstvisuals
 
 https://unsplash.com/@eberhardgross
 
+UI Design:
+
+[Stoppedpuma](https://github.com/Stoppedpuma)
+
 ## Privacy pledge
 
-Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics.
-Oculante is and will remain free and open source.
-There will never be ads.
+Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics. Oculante is and will remain free and open-source. There will never be ads.
 There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
 - Updating the application (must be triggered manually from settings)
 - Listening for incoming images on a custom port (must be set on command line)
@@ -235,13 +218,12 @@ In addition, Oculante saves some settings locally, for example:
 - UI accent color
 - Keybindings
 - Vsync preferences
-- Keep view offset/scale
 - Whether the directory index bar is displayed
 - Recent files
 
 ## License
-This project is MIT licensed, but some parts such as the LUTs in res/LUT are under the GPL license. As a result, we're making our entire source code public. If you would like to use Oculante without publishing your source code, please remove any GPL-licensed components and their references.
 
+This project is MIT licensed, but some parts such as the LUTs in res/LUT are under the GPL license. As a result, we're making our entire source code public. If you would like to use Oculante without publishing your source code, please remove any GPL-licensed components and their references.
 
 ### Extras
 <details>
@@ -272,7 +254,46 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 <details>
 <summary>Extended Language Support</summary>
 
-Oculante can support some additional languages such as Arabic, Chinese, Japanese, and Korean. This support depends on if your system has a supported font family installed. One supported font family is [Noto Sans](https://fonts.google.com/noto/specimen/Noto+Sans).
+Oculante can support some additional languages such as Arabic, Chinese, Japanese, Korean. This support depends on if your system has a supported font family installed. One supported font family is [Noto Sans](https://fonts.google.com/noto/specimen/Noto+Sans).
+
+### Simplified Chinese
+
+Heiti SC
+Songti SC
+Noto Sans CJK SC
+Noto Sans SC
+WenQuanYi Zen Hei
+SimSun
+Noto Sans SC
+PingFang SC
+Source Han Sans CN
+
+### Traditional Chinese
+
+Source Han Sans HK
+
+### Japanese
+
+Noto Sans JP
+Noto Sans CJK JP
+Source Han Sans JP
+MS Gothic
+
+### Korean
+
+Source Han Sans KR
+
+### Taiwanese
+
+Source Han Sans TW
+
+### Arabic
+
+Noto Sans Arabic
+Amiri
+Lateef
+Al Tarikh
+Segoe UI
 
 </details> 
 
@@ -287,7 +308,6 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 `ctrl + mouse wheel` = prev/next image in folder
 
 `Right mouse` pick color from image (in paint mode)
-
 
 <kbd>T</kbd> = AlwaysOnTop
 
@@ -360,6 +380,5 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 <kbd>Q</kbd> = Quit
 
 <kbd>Z</kbd> = ZenMode
-
 
 </details>
