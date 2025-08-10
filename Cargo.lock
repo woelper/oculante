@@ -213,7 +213,7 @@ dependencies = [
  "log",
  "quick-error",
  "rgb",
- "yuv",
+ "yuv 0.1.9",
 ]
 
 [[package]]
@@ -660,7 +660,7 @@ dependencies = [
  "owning_ref",
  "quick-error",
  "rgb",
- "yuv",
+ "yuv 0.1.9",
 ]
 
 [[package]]
@@ -5518,6 +5518,7 @@ dependencies = [
  "windres",
  "winres",
  "xmltree",
+ "yuv 0.8.6",
  "zip",
  "zune-png",
 ]
@@ -9389,6 +9390,15 @@ checksum = "8cbe2d856acbe6d86c0fa6f458b73e962834061ca2f7f94c6e4633afc9efd4d4"
 dependencies = [
  "num-traits 0.2.19",
  "rgb",
+]
+
+[[package]]
+name = "yuv"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b08262a503468e0123115a872ac2fd250f965e0178489d393686e9dd19b47e6"
+dependencies = [
+ "num-traits 0.2.19",
 ]
 
 [[package]]
