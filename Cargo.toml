@@ -132,6 +132,14 @@ default = [
     "j2k",
     "jxlcms",
 ]
+default_with_shaderc = [
+    "turbo",
+    "avif_native",
+    "update",
+    "shaderc",
+    "j2k",
+    "jxlcms"
+]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
@@ -142,6 +150,7 @@ j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
 lang_support = []
+shaderc = ["notan/shaderc"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
