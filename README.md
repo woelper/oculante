@@ -104,6 +104,8 @@ pkg install oculante
 pkgin install oculante
 ```
 
+###### NetBSD builds currently use glsl-to-spirv instead of shaderc ######
+
 ### Windows
 
 - Scoop

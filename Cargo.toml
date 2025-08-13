@@ -128,7 +128,7 @@ default = [
     "turbo",
     "avif_native",
     "update",
-    "notan/glsl-to-spirv",
+    "notan/shaderc",
     "j2k",
     "jxlcms",
 ]
