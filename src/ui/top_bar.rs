@@ -1,8 +1,131 @@
 use super::*;
-use crate::appstate::OculanteState;
-use crate::utils::*;
+use crate::appstate::{OculanteState, PositionPercentages};
+use crate::utils::{*, get_image_percentage_position};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
+
+/// Show a dialog for positioning an image by percentage
+pub fn position_dialog(ctx: &Context, state: &mut OculanteState) {
+    if !state.position_percentages.dialog_open {
+        return;
+    }
+
+    let mut open = state.position_percentages.dialog_open;
+    Window::new("Position by Percentage")
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(false)
+        .show(ctx, |ui| {
+            ui.label("Position a specific point of the image at a specific point of the window");
+            ui.add_space(10.0);
+            
+            ui.horizontal(|ui| {
+                ui.label("Image point (%):");
+                ui.add(Slider::new(&mut state.position_percentages.image_x, 0.0..=100.0).text("X"));
+                ui.add(Slider::new(&mut state.position_percentages.image_y, 0.0..=100.0).text("Y"));
+            });
+            
+            ui.horizontal(|ui| {
+                ui.label("Window point (%):");
+                ui.add(Slider::new(&mut state.position_percentages.window_x, 0.0..=100.0).text("X"));
+                ui.add(Slider::new(&mut state.position_percentages.window_y, 0.0..=100.0).text("Y"));
+            });
+            
+            ui.add_space(10.0);
+            
+            ui.horizontal(|ui| {
+                if ui.button("Apply").clicked() {
+                    // Calculate and apply the new offset
+                    if let Some(image) = &state.current_image {
+                        let dimensions = (image.width(), image.height());
+                        let offset = calculate_position_offset(
+                            state.position_percentages.image_x,
+                            state.position_percentages.image_y,
+                            state.position_percentages.window_x,
+                            state.position_percentages.window_y,
+                            dimensions,
+                            state.window_size,
+                            state.image_geometry.scale,
+                        );
+                        
+                        state.image_geometry.offset = offset;
+                        state.send_message_info(&format!(
+                            "Positioned image point ({:.1}%, {:.1}%) at window point ({:.1}%, {:.1}%)",
+                            state.position_percentages.image_x,
+                            state.position_percentages.image_y,
+                            state.position_percentages.window_x,
+                            state.position_percentages.window_y,
+                        ));
+                    }
+                }
+                
+                if ui.button("Close").clicked() {
+                    state.position_percentages.dialog_open = false;
+                }
+                
+                // Add some common presets
+                ui.separator();
+                
+                if ui.button("Center").clicked() {
+                    state.position_percentages.image_x = 50.0;
+                    state.position_percentages.image_y = 50.0;
+                    state.position_percentages.window_x = 50.0;
+                    state.position_percentages.window_y = 50.0;
+                }
+                
+                if ui.button("Top Left").clicked() {
+                    state.position_percentages.image_x = 0.0;
+                    state.position_percentages.image_y = 0.0;
+                    state.position_percentages.window_x = 0.0;
+                    state.position_percentages.window_y = 0.0;
+                }
+                
+                if ui.button("Top Right").clicked() {
+                    state.position_percentages.image_x = 100.0;
+                    state.position_percentages.image_y = 0.0;
+                    state.position_percentages.window_x = 100.0;
+                    state.position_percentages.window_y = 0.0;
+                }
+                
+                if ui.button("Bottom Left").clicked() {
+                    state.position_percentages.image_x = 0.0;
+                    state.position_percentages.image_y = 100.0;
+                    state.position_percentages.window_x = 0.0;
+                    state.position_percentages.window_y = 100.0;
+                }
+                
+                if ui.button("Bottom Right").clicked() {
+                    state.position_percentages.image_x = 100.0;
+                    state.position_percentages.image_y = 100.0;
+                    state.position_percentages.window_x = 100.0;
+                    state.position_percentages.window_y = 100.0;
+                }
+            });
+            
+            ui.separator();
+            
+            // Add a button to copy the current cursor position
+            if ui.button("Use Current Cursor Position").clicked() {
+                if let Some(image) = &state.current_image {
+                    let dimensions = (image.width(), image.height());
+                    let (x_percent, y_percent) = get_image_percentage_position(
+                        state.cursor_relative,
+                        dimensions,
+                    );
+                    
+                    state.position_percentages.image_x = x_percent;
+                    state.position_percentages.image_y = y_percent;
+                    
+                    state.send_message_info(&format!(
+                        "Cursor position set to {:.1}%, {:.1}%",
+                        x_percent, y_percent
+                    ));
+                }
+            }
+        });
+    
+    state.position_percentages.dialog_open = open;
+}
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
