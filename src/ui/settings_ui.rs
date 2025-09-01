@@ -180,10 +180,20 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         ui.styled_checkbox(&mut state.persistent_settings.borderless, "");
                                     }, ui);
 
+                                    configuration_item_ui("Maximum window size", "Set the maximum size of the main window.", |ui| {
+                                        ui.horizontal(|ui| {
+                                            let screen_size = app.window().screen_size();
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.max_window_size.0).clamp_range(1..=screen_size.0).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.max_window_size.1).clamp_range(1..=screen_size.1).prefix("y : ").speed(0.01));
+                                        });
+
+                                    }, ui);
+
                                     configuration_item_ui("Minimum window size", "Set the minimum size of the main window.", |ui| {
                                         ui.horizontal(|ui| {
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                            let screen_size = app.window().screen_size();
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=screen_size.0).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=screen_size.1).prefix("y : ").speed(0.01));
                                         });
 
                                     }, ui);

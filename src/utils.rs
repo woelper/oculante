@@ -834,6 +834,7 @@ pub fn clipboard_copy(img: &DynamicImage) {
 
 pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
     state.is_loaded = false;
+    state.fitted_window = false;
     state.player.load(p);
     state.current_path = Some(p.to_owned());
 }
@@ -846,6 +847,7 @@ pub fn last_image(state: &mut OculanteState) {
         if &next_img != img_location {
             state.is_loaded = false;
             *img_location = next_img;
+            state.fitted_window = false;
             state.player.load(img_location);
         }
     }
@@ -858,7 +860,8 @@ pub fn first_image(state: &mut OculanteState) {
         if &next_img != img_location {
             state.is_loaded = false;
             *img_location = next_img;
-            state.player.load(img_location);
+            state.fitted_window = false;
+            state.player.load(img_location)
         }
     }
 }
@@ -878,6 +881,7 @@ pub fn clear_image(state: &mut OculanteState) {
     if Some(&next_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(next_img.clone());
+        state.fitted_window = false;
         state.player.load(&next_img);
     }
 }
@@ -888,6 +892,7 @@ pub fn next_image(state: &mut OculanteState) {
     if Some(&next_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(next_img.clone());
+        state.fitted_window = false;
         state.player.load(&next_img);
     }
 }
@@ -898,6 +903,7 @@ pub fn prev_image(state: &mut OculanteState) {
     if Some(&prev_img) != state.current_path.as_ref() {
         state.is_loaded = false;
         state.current_path = Some(prev_img.clone());
+        state.fitted_window = false;
         state.player.load(&prev_img);
     }
 }
