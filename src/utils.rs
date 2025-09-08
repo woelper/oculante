@@ -711,6 +711,64 @@ pub fn pos_from_coord(
     size
 }
 
+/// Calculate the offset needed to position a specific image percentage at a specific window percentage
+/// 
+/// # Arguments
+/// 
+/// * `image_percent_x` - The X percentage of the image (0.0 to 100.0)
+/// * `image_percent_y` - The Y percentage of the image (0.0 to 100.0)
+/// * `window_percent_x` - The X percentage of the window (0.0 to 100.0)
+/// * `window_percent_y` - The Y percentage of the window (0.0 to 100.0)
+/// * `image_dimensions` - The dimensions of the image (width, height)
+/// * `window_size` - The size of the window (width, height)
+/// * `scale` - The scale of the image
+/// 
+/// # Returns
+/// 
+/// The offset needed to position the image
+pub fn calculate_position_offset(
+    image_percent_x: f32,
+    image_percent_y: f32,
+    window_percent_x: f32,
+    window_percent_y: f32,
+    image_dimensions: (u32, u32),
+    window_size: Vector2<f32>,
+    scale: f32,
+) -> Vector2<f32> {
+    // Convert percentages to actual coordinates
+    let image_x = (image_percent_x / 100.0) * image_dimensions.0 as f32;
+    let image_y = (image_percent_y / 100.0) * image_dimensions.1 as f32;
+    
+    let window_x = (window_percent_x / 100.0) * window_size.x;
+    let window_y = (window_percent_y / 100.0) * window_size.y;
+    
+    // Calculate the offset needed to position the image point at the window point
+    let offset_x = window_x - (image_x * scale);
+    let offset_y = window_y - (image_y * scale);
+    
+    Vector2::new(offset_x, offset_y)
+}
+
+/// Calculate the percentage position of a point on the image
+/// 
+/// # Arguments
+/// 
+/// * `cursor_relative` - The cursor position relative to the image
+/// * `image_dimensions` - The dimensions of the image (width, height)
+/// 
+/// # Returns
+/// 
+/// The percentage position (x%, y%) of the cursor on the image
+pub fn get_image_percentage_position(
+    cursor_relative: Vector2<f32>,
+    image_dimensions: (u32, u32),
+) -> (f32, f32) {
+    let x_percent = (cursor_relative.x / image_dimensions.0 as f32) * 100.0;
+    let y_percent = (cursor_relative.y / image_dimensions.1 as f32) * 100.0;
+    
+    (x_percent, y_percent)
+}
+
 pub fn send_extended_info(
     current_image: &Option<DynamicImage>,
     current_path: &Option<PathBuf>,
