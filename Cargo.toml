@@ -122,6 +122,7 @@ arboard = { version = "3.4", features = ["wayland-data-control"] }
 clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "6.0"
 env_logger = "0.11"
+yuv = { version = "0.8", optional = true }
 
 [features]
 default = [
@@ -132,7 +133,7 @@ default = [
     "j2k",
     "jxlcms",
 ]
-heif = ["libheif-rs"]
+heif = ["libheif-rs", "yuv"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]

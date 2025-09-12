@@ -159,7 +159,7 @@ pub fn open_image(
         #[cfg(feature = "heif")]
         "heif" | "heic" => {
             // Built on work in https://github.com/rsuu/rmg - thanks!
-            use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
+            use libheif_rs::{Chroma, ColorSpace, HeifContext, LibHeif, RgbChroma};
 
             let lib_heif = LibHeif::new();
             let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
@@ -173,34 +173,118 @@ pub fn open_image(
                 ctx.set_security_limits(&limits)?;
             }
             let handle = ctx.primary_image_handle()?;
-            let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
-            let planes = img.planes();
-            let interleaved = planes
-                .interleaved
-                .context("Can't create interleaved plane")?;
+            let img = lib_heif.decode(&handle, ColorSpace::Undefined, None)?;
 
-            let data = interleaved.data;
-            let width = interleaved.width;
-            let height = interleaved.height;
-            let stride = interleaved.stride;
+            let i = match img.color_space() {
+                Some(ColorSpace::Rgb(chroma @ (RgbChroma::Rgb | RgbChroma::Rgba))) => {
+                    let planes = img.planes();
+                    let interleaved = planes
+                        .interleaved
+                        .context("Can't create interleaved plane")?;
 
-            let mut res: Vec<u8> = Vec::new();
-            for y in 0..height {
-                let mut step = y as usize * stride;
+                    let data = interleaved.data;
+                    let width = interleaved.width;
+                    let height = interleaved.height;
 
-                for _ in 0..width {
-                    res.extend_from_slice(&[
-                        data[step],
-                        data[step + 1],
-                        data[step + 2],
-                        data[step + 3],
-                    ]);
-                    step += 4;
+                    match chroma {
+                        RgbChroma::Rgb => DynamicImage::ImageRgb8(
+                            image::RgbImage::from_vec(width, height, data.to_vec())
+                                .context("Failed creating RGB image from HEIC")?,
+                        ),
+                        RgbChroma::Rgba => DynamicImage::ImageRgba8(
+                            image::RgbaImage::from_vec(width, height, data.to_vec())
+                                .context("Failed creating RGBA image from HEIC")?,
+                        ),
+                        _ => unreachable!("Guarded by Rgb | Rgba"),
+                    }
                 }
-            }
-            let buf = image::ImageBuffer::from_vec(width as u32, height as u32, res)
-                .context("Can't create HEIC/HEIF ImageBuffer with given res")?;
-            let i = DynamicImage::ImageRgba8(buf);
+                Some(ColorSpace::YCbCr(chroma)) => {
+                    let planes = img.planes();
+                    let y = planes.y.context("YUV is missing Y")?;
+                    let y_plane = y.data;
+                    let y_stride = y.stride.try_into()?;
+                    let u = planes.cb.context("YUV is missing U")?;
+                    let u_plane = u.data;
+                    let u_stride = u.stride.try_into()?;
+                    let v = planes.cr.context("YUV is missing V")?;
+                    let v_plane = v.data;
+                    let v_stride = v.stride.try_into()?;
+                    let width = img.width();
+                    let height = img.height();
+                    let planar_image = yuv::YuvPlanarImage {
+                        y_plane,
+                        y_stride,
+                        u_plane,
+                        u_stride,
+                        v_plane,
+                        v_stride,
+                        width,
+                        height,
+                    };
+
+                    let rgba_stride = width * 4;
+                    let len = (rgba_stride * height) as usize + (width * 4) as usize;
+                    let mut rgba = vec![0u8; len];
+                    let range = yuv::YuvRange::Limited;
+                    let matrix = yuv::YuvStandardMatrix::Bt601;
+
+                    match chroma {
+                        Chroma::C420 => yuv::yuv420_to_rgba(
+                            &planar_image,
+                            &mut *rgba,
+                            rgba_stride,
+                            range,
+                            matrix,
+                        ),
+                        Chroma::C422 => yuv::yuv422_to_rgba(
+                            &planar_image,
+                            &mut *rgba,
+                            rgba_stride,
+                            range,
+                            matrix,
+                        ),
+                        Chroma::C444 => yuv::yuv444_to_rgba(
+                            &planar_image,
+                            &mut *rgba,
+                            rgba_stride,
+                            range,
+                            matrix,
+                        ),
+                    }?;
+                    DynamicImage::ImageRgba8(
+                        image::RgbaImage::from_vec(width, height, rgba)
+                            .context("RGBA8 image from HEIC")?,
+                    )
+                }
+                Some(ColorSpace::Monochrome) => {
+                    let planes = img.planes();
+                    let y = planes.y.context("Grayscale image is missing luma")?;
+                    let buf = y.data.to_vec();
+                    let width = img.width();
+                    let height = img.height();
+
+                    let i = DynamicImage::ImageLuma8(
+                        GrayImage::from_vec(width, height, buf)
+                            .context("Grayscale image from HEIC")?,
+                    )
+                    .into_rgb8();
+                    DynamicImage::ImageRgb8(i)
+                }
+                _ => {
+                    let planes = img.planes();
+                    let buf = planes
+                        .interleaved
+                        .context("HEIC image is missing data")?
+                        .data
+                        .to_vec();
+                    let width = img.width();
+                    let height = img.height();
+                    DynamicImage::ImageRgba8(
+                        image::RgbaImage::from_vec(width, height, buf)
+                            .context("Unknown image from HEIC")?,
+                    )
+                }
+            };
 
             _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
