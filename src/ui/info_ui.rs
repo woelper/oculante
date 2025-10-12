@@ -120,7 +120,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     ui.label_right(
                         RichText::new(format!(
                             "{:.0},{:.0}",
-                            state.cursor_relative.x, state.cursor_relative.y
+                            state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
                         ))
                     );
                     ui.end_row();
