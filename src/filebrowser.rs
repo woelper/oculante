@@ -178,6 +178,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
     let num_entries = entries.len();
 
+    ui.set_min_width(822.);
+    ui.set_min_height(600.);
+
     let item_spacing = 6.;
     ui.add_space(item_spacing);
 
@@ -343,7 +346,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         }
     });
 
-    ui.horizontal(|ui| {
+    ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
         ui.add_space(item_spacing);
         ui.allocate_ui_with_layout(
             Vec2::new(120., ui.available_height()),
