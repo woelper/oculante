@@ -34,6 +34,7 @@ notan = { version = "0.12", default-features = false, features = [
     "drop_files",
     "egui",
     "clipboard",
+    "glsl-to-spirv",
 ] }
 # === EGUI
 #  These need to match the egui version used in notan and can't be
@@ -128,7 +129,7 @@ default = [
     "turbo",
     "avif_native",
     "update",
-    "notan/shaderc",
+    # "notan/shaderc",
     "j2k",
     "jxlcms",
 ]
