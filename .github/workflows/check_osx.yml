@@ -21,9 +21,6 @@ jobs:
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install shaderc
-        run: brew install shaderc
-
       # - name: Check without default features
       #   run: cargo check --no-default-features --features notan/shaderc
       #   if: matrix.os == 'macos-14'
