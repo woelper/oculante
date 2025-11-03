@@ -175,6 +175,15 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
                                     }, ui);
 
+                                    configuration_item_ui(
+                                        "Auto scale to fit",
+                                        "Automatically scale images up to fit the window.",
+                                        |ui| {
+                                            ui.styled_checkbox(&mut state.persistent_settings.auto_scale, "");
+                                        },
+                                        ui,
+                                    );
+
                                     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
                                     configuration_item_ui("Borderless mode", "Prevents drawing OS window decorations. A restart is required to take effect.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.borderless, "");

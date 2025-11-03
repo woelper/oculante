@@ -1136,9 +1136,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     draw_area.height().min(app.window().height() as f32),
                 );
                 let img_size = current_image.size_vec();
-                state.image_geometry.scale = (window_size.x / img_size.x)
-                    .min(window_size.y / img_size.y)
-                    .min(1.0);
+                let scaled_to_fit = window_size.component_div(&img_size).amin();
+                state.image_geometry.scale = if state.persistent_settings.auto_scale {
+                    scaled_to_fit
+                } else {
+                    scaled_to_fit.min(1.0)
+                };
                 state.image_geometry.offset =
                     window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
                 // offset by left UI elements
