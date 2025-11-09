@@ -1113,45 +1113,74 @@ impl ImageOperation {
                 aspect,
                 filter,
             } => {
-                let ratio = dimensions.1 as f32 / dimensions.0 as f32;
-
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::hover());
+                let aspect_ratio_id = Id::new("resize_aspect_ratio");
 
                 ui.vertical(|ui| {
+                    // This handles the initial state when the filter is first added.
+                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                        let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
+                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                    }
+
+                    // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
+                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
+                        if dimensions.1 > 0 {
+                            dimensions.0 as f64 / dimensions.1 as f64
+                        } else {
+                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                        }
+                    });
+
                     ui.horizontal(|ui| {
-                        let r0 = ui.add(
-                            egui::DragValue::new(&mut dimensions.0)
-                                .speed(4.)
-                                .clamp_range(1..=10000)
+                        let x_response = ui.add(
+                            DragValue::new(&mut dimensions.0)
+                                .speed(0.5)
+                                .clamp_range(10..=10000)
                                 .prefix("X "),
                         );
-                        let r1 = ui.add(
-                            egui::DragValue::new(&mut dimensions.1)
-                                .speed(4.)
-                                .clamp_range(1..=10000)
+
+                        let y_response = ui.add(
+                            DragValue::new(&mut dimensions.1)
+                                .speed(0.5)
+                                .clamp_range(10..=10000)
                                 .prefix("Y "),
                         );
 
-                        if r0.changed() && *aspect {
-                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
+                        if *aspect {
+                            if x_response.changed() {
+                                dimensions.1 = (dimensions.0 as f64 / aspect_ratio).round() as u32;
+                            } else if y_response.changed() {
+                                dimensions.0 = (dimensions.1 as f64 * aspect_ratio).round() as u32;
+                            }
                         }
 
-                        if r1.changed() && *aspect {
-                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
-                        }
-                        let r2 = ui
-                            .styled_checkbox(aspect, "🔒")
-                            .on_hover_text("Lock aspect ratio");
-
-                        if r2.changed() && *aspect {
-                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
-                        }
-                        // For this operator, we want to update on release, not on change.
-                        // Since all operators are processed the same, we use the hack to emit `changed` just on release.
-                        // Users dragging the resize values will now only trigger a resize on release, which feels
-                        // more snappy.
-                        r.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
+                        r.changed = x_response.changed() || y_response.changed();
                     });
+
+                    ui.label(format!("Aspect ratio: {:.5}", aspect_ratio));
+
+                    if ui.styled_checkbox(aspect, "🔒 Lock aspect ratio").clicked() {
+
+                        if *aspect {
+                            // If locking, calculate and store the current aspect ratio.
+                            let ratio_to_store = if dimensions.1 > 0 {
+                                dimensions.0 as f64 / dimensions.1 as f64
+                            } else {
+                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                            };
+                            ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                        } else {
+                            // If unlocking, remove the stored ratio.
+                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
+                        }
+                        r.changed = true;
+                    }
+
+                    if ui.button("Reset").clicked() {
+                        *dimensions = geo.dimensions;
+                        r.changed = true;
+                    }
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
@@ -1169,10 +1198,8 @@ impl ImageOperation {
                                 }
                             }
                         });
-
-                    r
-                })
-                .inner
+                });
+                r
             }
             _ => ui.label("Filter has no options."),
         }
