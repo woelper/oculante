@@ -1047,6 +1047,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             toggle_fullscreen(app, state);
         }
 
+        if state.new_image_loaded {
+            ctx.memory_mut(|m| m.data.remove::<f64>(Id::new("resize_aspect_ratio")));
+        }
+
         // set info panel color dynamically
         info_panel_color = ctx.style().visuals.panel_fill;
 
