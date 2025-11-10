@@ -138,6 +138,7 @@ pub enum ScaleFilter {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 
 pub struct ImgOpItem {
+    pub id: u64,
     pub active: bool,
     pub operation: ImageOperation,
 }
@@ -145,6 +146,7 @@ pub struct ImgOpItem {
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
+            id: rand::thread_rng().gen(),
             active: true,
             operation: op,
         }
@@ -301,6 +303,7 @@ impl ImageOperation {
         geo: &ImageGeometry,
         block_panning: &mut bool,
         settings: &mut VolatileSettings,
+        item_id: u64,
     ) -> Response {
         match self {
             Self::ColorConverter(ct) => {
@@ -1114,7 +1117,7 @@ impl ImageOperation {
                 filter,
             } => {
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::hover());
-                let aspect_ratio_id = Id::new("resize_aspect_ratio");
+                let aspect_ratio_id = Id::new("resize_aspect_ratio").with(item_id);
 
                 ui.vertical(|ui| {
                     // This handles the initial state when the filter is first added.
@@ -1161,7 +1164,6 @@ impl ImageOperation {
                     ui.label(format!("Aspect ratio: {:.5}", aspect_ratio));
 
                     if ui.styled_checkbox(aspect, "🔒 Lock aspect ratio").clicked() {
-
                         if *aspect {
                             // If locking, calculate and store the current aspect ratio.
                             let ratio_to_store = if dimensions.1 > 0 {
