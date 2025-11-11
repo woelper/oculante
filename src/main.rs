@@ -685,6 +685,10 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
 }
 
 fn update(app: &mut App, state: &mut OculanteState) {
+    if state.new_image_loaded {
+        state.new_image_loaded = false;
+    }
+
     if state.first_start {
         app.window().set_always_on_top(false);
     }
@@ -972,6 +976,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     state.send_message_warn(&format!("Error while displaying image: {error}"));
                 }
                 state.current_image = Some(img);
+                state.new_image_loaded = true;
             }
             Frame::UpdateTexture => {
                 // Only update the texture.
