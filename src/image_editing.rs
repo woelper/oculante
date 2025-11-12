@@ -1180,7 +1180,18 @@ impl ImageOperation {
                     }
 
                     if ui.button("Reset").clicked() {
+                        // Reset dimensions to original
                         *dimensions = geo.dimensions;
+
+                        // Reset aspect lock to default (true)
+                        *aspect = true;
+
+                        // Remove the stored aspect ratio from egui's memory.
+                        // This will cause it to be recalculated from the original dimensions
+                        // on the next frame, effectively resetting it.
+                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
+
+                        // Mark the UI as changed
                         r.changed = true;
                     }
 
