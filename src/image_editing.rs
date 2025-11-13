@@ -913,8 +913,9 @@ impl ImageOperation {
                             ui.painter().rect_filled(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                StrokeKind::Inside,
+                                Color32::BLACK,
+                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
+                                // StrokeKind::Inside,
                             );
 
                             ui.painter().text(

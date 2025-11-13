@@ -817,50 +817,50 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         });
 }
 
-// fn show_modal<R>(
-//     ctx: &Context,
-//     warning_text: impl Into<WidgetText>,
-//     add_contents: impl FnOnce(&mut Ui) -> R,
-//     id_source: impl std::fmt::Display,
-// ) -> egui_modal::Modal {
-//     let modal = egui_modal::Modal::new(ctx, id_source);
-//     modal.show(|ui| {
-//         ui.horizontal(|ui| {
-//             ui.vertical_centered_justified(|ui| {
-//                 ui.add_space(10.);
+fn show_modal<R>(
+    ctx: &Context,
+    warning_text: impl Into<WidgetText>,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+    id_source: impl std::fmt::Display,
+) -> egui_modal::Modal {
+    let modal = egui_modal::Modal::new(ctx, id_source);
+    modal.show(|ui| {
+        ui.horizontal(|ui| {
+            ui.vertical_centered_justified(|ui| {
+                ui.add_space(10.);
 
-//                 ui.label(
-//                     RichText::new(WARNING_CIRCLE)
-//                         .size(100.)
-//                         .color(ui.style().visuals.warn_fg_color),
-//                 );
-//                 ui.add_space(20.);
-//                 ui.horizontal_wrapped(|ui| {
-//                     ui.label(warning_text);
-//                 });
-//                 ui.add_space(20.);
-//                 ui.scope(|ui| {
-//                     let warn_color = Color32::from_rgb(255, 77, 77);
-//                     ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
-//                     ui.style_mut().visuals.widgets.inactive.fg_stroke =
-//                         Stroke::new(1., Color32::WHITE);
-//                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
-//                         warn_color.linear_multiply(0.8);
+                ui.label(
+                    RichText::new(WARNING_CIRCLE)
+                        .size(100.)
+                        .color(ui.style().visuals.warn_fg_color),
+                );
+                ui.add_space(20.);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(warning_text);
+                });
+                ui.add_space(20.);
+                ui.scope(|ui| {
+                    let warn_color = Color32::from_rgb(255, 77, 77);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                    ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                        Stroke::new(1., Color32::WHITE);
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                        warn_color.linear_multiply(0.8);
 
-//                     if ui.styled_button("Yes").clicked() {
-//                         ui.scope(add_contents);
-//                         modal.close();
-//                     }
-//                 });
+                    if ui.styled_button("Yes").clicked() {
+                        ui.scope(add_contents);
+                        modal.close();
+                    }
+                });
 
-//                 if ui.styled_button("Cancel").clicked() {
-//                     modal.close();
-//                 }
-//             });
-//         });
-//     });
-//     modal
-// }
+                if ui.styled_button("Cancel").clicked() {
+                    modal.close();
+                }
+            });
+        });
+    });
+    modal
+}
 
 /// Save an image to a path using encoding options and generate a thumbnail
 fn save_with_encoding(

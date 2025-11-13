@@ -123,6 +123,7 @@ anyhow = "1.0"
 arboard = { version = "3.4", features = ["wayland-data-control"] }
 clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "6.0"
+egui-modal = {path = "egui-modal-diag"}
 
 [features]
 default = [
