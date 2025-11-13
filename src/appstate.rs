@@ -1,4 +1,5 @@
 use crate::{
+    comparelist::CompareList,
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
@@ -10,13 +11,13 @@ use crate::{
 use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
+use notan::{prelude::Texture, AppState};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImageGeometry {
     /// The scale of the displayed image
     pub scale: f32,
@@ -50,7 +51,7 @@ impl Message {
 #[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
-    pub compare_list: HashMap<PathBuf, ImageGeometry>,
+    pub compare_list: CompareList,
     pub drag_enabled: bool,
     pub reset_image: bool,
     /// Is the image fully loaded?
@@ -116,6 +117,8 @@ impl<'b> OculanteState {
 
 impl<'b> Default for OculanteState {
     fn default() -> OculanteState {
+        let persistent_settings = PersistentSettings::load().unwrap_or_default();
+
         let tx_channel = mpsc::channel();
         let msg_channel = mpsc::channel();
         let meta_channel = mpsc::channel();
@@ -132,7 +135,12 @@ impl<'b> Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             sampled_color: [0., 0., 0., 0.],
-            player: Player::new(tx_channel.0.clone(), 20, msg_channel.0.clone()),
+            player: Player::new(
+                tx_channel.0.clone(),
+                20,
+                msg_channel.0.clone(),
+                persistent_settings.decoders,
+            ),
             texture_channel: tx_channel,
             message_channel: msg_channel,
             load_channel: mpsc::channel(),

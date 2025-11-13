@@ -27,6 +27,7 @@ use strum_macros::EnumIter;
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
+use crate::settings::DecoderSettings;
 use crate::shortcuts::{lookup, InputEvent, Shortcuts};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -264,6 +265,7 @@ pub struct Player {
     pub message_sender: Sender<Message>,
     pub cache: Cache,
     watcher: HashMap<PathBuf, SystemTime>,
+    decoder_opts: DecoderSettings,
 }
 
 impl Player {
@@ -272,6 +274,7 @@ impl Player {
         image_sender: Sender<Frame>,
         cache_size: usize,
         message_sender: Sender<Message>,
+        decoder_opts: DecoderSettings,
     ) -> Player {
         let (stop_sender, _): (Sender<()>, Receiver<()>) = mpsc::channel();
         Player {
@@ -283,6 +286,7 @@ impl Player {
                 cache_size,
             },
             watcher: Default::default(),
+            decoder_opts,
         }
     }
 
@@ -332,6 +336,7 @@ impl Player {
             self.message_sender.clone(),
             stop_receiver,
             forced_frame_source,
+            self.decoder_opts,
         );
 
         if let Ok(meta) = std::fs::metadata(img_location) {
@@ -356,6 +361,7 @@ pub fn send_image_threaded(
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
     forced_frame_source: Option<Frame>,
+    decoder_opts: DecoderSettings,
 ) {
     let loc = img_location.to_owned();
 
@@ -364,7 +370,7 @@ pub fn send_image_threaded(
         let mut framecache = vec![];
         let mut timer = std::time::Instant::now();
 
-        match open_image(&loc, Some(message_sender.clone())) {
+        match open_image(&loc, Some(message_sender.clone()), Some(decoder_opts)) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
@@ -790,7 +796,7 @@ impl ImageExt for DynamicImage {
     fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
         if let Err(e) = gfx
             .update_texture(texture)
-            .with_data(&self.as_bytes())
+            .with_data(self.as_bytes())
             .update()
         {
             error!("{e}");
@@ -861,7 +867,7 @@ pub fn first_image(state: &mut OculanteState) {
 pub fn clear_image(state: &mut OculanteState) {
     let next_img = state.scrubber.remove_current();
     debug!("Clearing image. Next is {}", next_img.display());
-    if state.scrubber.entries.len() == 0 {
+    if state.scrubber.entries.is_empty() {
         state.current_image = None;
         state.current_texture.clear();
         state.current_path = None;
@@ -907,6 +913,15 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
         .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
         .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
         .replacen(
+            "{NUM}",
+            &format!(
+                "{}/{}",
+                state.scrubber.index + 1,
+                state.scrubber.entries.len()
+            ),
+            10,
+        )
+        .replacen(
             "{FILENAME}",
             &p.file_name()
                 .map(|f| f.to_string_lossy().to_string())
@@ -930,31 +945,6 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
     }
 
     app.window().set_title(&title_string);
-}
-
-pub fn compare_next(state: &mut OculanteState) {
-    if let Some(p) = &(state.current_path).clone() {
-        let mut compare_list: Vec<(PathBuf, ImageGeometry)> =
-            state.compare_list.clone().into_iter().collect();
-        compare_list.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let index = compare_list.iter().position(|x| &x.0 == p).unwrap_or(0);
-        let index = if index + 1 < compare_list.len() {
-            index + 1
-        } else {
-            0
-        };
-
-        if let Some((path, geo)) = compare_list.get(index) {
-            state.is_loaded = false;
-            state.current_image = None;
-            state.player.load_advanced(
-                path,
-                Some(Frame::CompareResult(Default::default(), geo.clone())),
-            );
-            state.current_path = Some(path.clone());
-        }
-    }
 }
 
 pub fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) -> f32 {

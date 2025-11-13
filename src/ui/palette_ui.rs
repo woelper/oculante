@@ -22,10 +22,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
 
                                 let egui_color = Color32::from_rgba_premultiplied(
-                                    (color[0]) as u8,
-                                    (color[1]) as u8,
-                                    (color[2]) as u8,
-                                    (color[3]) as u8,
+                                    color[0], color[1], color[2], color[3],
                                 );
 
                                 let sampled_color = [
@@ -193,27 +190,25 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
                     }
                 }
-                if ui.ctx().input(|r| r.pointer.secondary_clicked()) {
-                    if !state.pointer_over_ui {
-                        ui.ctx().memory_mut(|w| {
-                            let cols = w
-                                .data
-                                .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                if ui.ctx().input(|r| r.pointer.secondary_clicked()) && !state.pointer_over_ui {
+                    ui.ctx().memory_mut(|w| {
+                        let cols = w
+                            .data
+                            .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
 
-                            let sampled_color = [
-                                state.sampled_color[0] as u8,
-                                state.sampled_color[1] as u8,
-                                state.sampled_color[2] as u8,
-                                state.sampled_color[3] as u8,
-                            ];
+                        let sampled_color = [
+                            state.sampled_color[0] as u8,
+                            state.sampled_color[1] as u8,
+                            state.sampled_color[2] as u8,
+                            state.sampled_color[3] as u8,
+                        ];
 
-                            if !cols.contains(&sampled_color) {
-                                cols.push(sampled_color);
-                            } else {
-                                state.send_message_info("Color already in palette");
-                            }
-                        });
-                    }
+                        if !cols.contains(&sampled_color) {
+                            cols.push(sampled_color);
+                        } else {
+                            state.send_message_info("Color already in palette");
+                        }
+                    });
                 }
             });
         });

@@ -1,3 +1,5 @@
+use crate::appstate::OculanteState;
+use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 use crate::icons::*;
@@ -13,8 +15,6 @@ use notan::{
 };
 
 use super::*;
-use crate::appstate::{ImageGeometry, OculanteState};
-use std::path::PathBuf;
 use std::time::Duration;
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Rect, f32) {
@@ -98,21 +98,94 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                     ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
                                 }
 
-                                if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some() {
-                                    if state.is_loaded && state.reset_image == false {
-                                        if let Some(path) = &state.current_path {
-                                            state.compare_list.insert(path.clone(), state.image_geometry.clone());
-                                            ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
-                                        }
+                    ui.label_i(format!("{PALETTE} HEX"));
+                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                    ui.label_right(
+                        RichText::new(hex)
+                    );
+                    ui.end_row();
+
+                    ui.label_i(format!("{PALETTE} Color"));
+                    ui.label_right(
+                        format!("{:?}", color_type)
+                    );
+                    ui.end_row();
+
+                    ui.label_i(format!("{MOVE} Pos"));
+                    ui.label_right(
+                        RichText::new(format!(
+                            "{:.0},{:.0}",
+                            state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
+                        ))
+                    );
+                    ui.end_row();
+
+                    ui.label_i(format!("{INTERSECT} UV"));
+                    ui.label_right(
+                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
+                    );
+                    ui.end_row();
+                });
+
+                // make sure aspect ratio is compensated for the square preview
+                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
+                uv_size = (scale, scale * ratio);
+                ui.add_space(10.);
+
+                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+
+                let offset = (ui.available_width() - preview_rect.width())/2.;
+                preview_rect = preview_rect.translate(vec2(offset, 0.));
+                // Rendering a placeholder rectangle
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
+                bbox_tl = preview_rect.left_top();
+                bbox_br = preview_rect.right_bottom();
+                ui.advance_cursor_after_rect(preview_rect);
+            });
+            ui.add_space(10.);
+            ui.vertical_centered_justified(|ui| {
+                ui.styled_collapsing("Compare", |ui| {
+
+                    if state.persistent_settings.max_cache == 0 {
+                        ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
+                    }
+                    ui.vertical_centered_justified(|ui| {
+                        dark_panel(ui, |ui| {
+                            if ui.button(format!("{FOLDER} Open another image...")).clicked() {
+                                // TODO: Automatically insert image into compare list
+                                #[cfg(feature = "file_open")]
+                                browse_for_image_path(state);
+                                #[cfg(not(feature = "file_open"))]
+                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+
+                                state.is_loaded = false;
+                                // tag to add new image
+                                ui.ctx().data_mut(|w|w.insert_temp("compare".into(), true));
+                            }
+
+                            if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
+                                && state.is_loaded && !state.reset_image {
+                                    if let Some(path) = &state.current_path {
+                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                        ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
                                 }
-                                let mut compare_list: Vec<(PathBuf, ImageGeometry)> = state.compare_list.clone().into_iter().collect();
-                                compare_list.sort_by(|a,b| a.0.cmp(&b.0));
 
-                                for (path, geo) in compare_list {
-                                    ui.horizontal(|ui|{
-                                        if ui.button(X).clicked() {
-                                            state.compare_list.remove(&path);
+                            // let compare_list = state.compare_list.iter().cloned().collect();
+                            let mut to_remove = None;
+                            for CompareItem {path, geometry} in state.compare_list.iter() {
+                                ui.horizontal(|ui|{
+                                    if ui.button(X).clicked() {
+                                        to_remove = Some(path.to_owned());
+                                    }
+                                    ui.vertical_centered_justified(|ui| {
+                                        if ui.selectable_label(state.current_path.as_ref() == Some(path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                            state
+                                                .player
+                                                .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
+                                            ui.ctx().request_repaint();
+                                            ui.ctx().request_repaint_after(Duration::from_millis(500));
+                                            state.current_path = Some(path.clone());
                                         }
                                         ui.vertical_centered_justified(|ui| {
                                             if ui.selectable_label(state.current_path.as_ref() == Some(&path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
@@ -125,26 +198,25 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                             }
                                         });
                                     });
-                                }
-                                if let Some(path) = &state.current_path {
-                                    if let Some(geo) = state.compare_list.get(path) {
-                                        if state.image_geometry != *geo {
-                                            if ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
-                                                state.compare_list.insert(path.clone(), state.image_geometry.clone());
-                                            }
+                                });
+                            }
+                            if let Some(remove) = to_remove {
+                                state.compare_list.remove(remove);
+                            }
+                            if let Some(path) = &state.current_path {
+                                if let Some(geo) = state.compare_list.get(path) {
+                                    if state.image_geometry != geo 
+                                        && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
+                                                state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         }
-                                    } else {
-                                        if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                            state.compare_list.insert(path.clone(), state.image_geometry.clone());
-                                        }
+                                    } else if ui.button(format!("{PLUS} Add current image")).clicked() {
+                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                     }
-                                }
-                                if !state.compare_list.is_empty() {
-                                    if ui.button(format!("{TRASH} Clear all")).clicked() {
+                            }
+                            if !state.compare_list.is_empty() 
+                                    && ui.button(format!("{TRASH} Clear all")).clicked() {
                                         state.compare_list.clear();
-                                    }
-                                }
-                            });
+                            }
                         });
                     });
 

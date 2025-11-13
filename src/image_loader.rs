@@ -1,4 +1,5 @@
 use crate::ktx2_loader::CompressedImageFormats;
+use crate::settings::DecoderSettings;
 use crate::utils::{fit, Frame};
 use crate::{appstate::Message, ktx2_loader, FONT};
 use log::{debug, error, info};
@@ -29,6 +30,7 @@ use zune_png::zune_core::result::DecodingResult;
 pub fn open_image(
     img_location: &Path,
     message_sender: Option<Sender<Message>>,
+    decoder_opts: Option<DecoderSettings>,
 ) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
@@ -46,7 +48,8 @@ pub fn open_image(
         .replace("jpeg", "jpg")
         .replace("jpeg", "jpg")
         .replace("ima", "dcm")
-        .replace("heic", "heif");
+        .replace("heic", "heif")
+        .replace("hif", "heic");
 
     // These are detected incorrectly, for example svg is xml etc
     let unchecked_extensions = ["svg", "kra", "tga", "dng"];
@@ -159,7 +162,16 @@ pub fn open_image(
             use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
 
             let lib_heif = LibHeif::new();
-            let ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            if let Ok(num_threads) = std::thread::available_parallelism() {
+                ctx.set_max_decoding_threads(num_threads.get() as u32);
+            }
+            if let Some(limits) = decoder_opts.and_then(|decoders| {
+                let DecoderSettings { heif } = decoders;
+                heif.maybe_limits()
+            }) {
+                ctx.set_security_limits(&limits)?;
+            }
             let handle = ctx.primary_image_handle()?;
             let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
             let planes = img.planes();
@@ -1083,4 +1095,61 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
     let i = RgbImage::from_raw(width as u32, height as u32, image.pixels)
         .context("Can't load RgbImage from decompressed TurboJPEG")?;
     Ok(DynamicImage::ImageRgb8(i))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::{
+        image_loader::open_image,
+        settings::{DecoderSettings, HeifLimits, Limit},
+    };
+
+    #[cfg(feature = "heif")]
+    use libheif_rs::{HeifError, HeifErrorCode, HeifErrorSubCode};
+
+    #[cfg(feature = "heif")]
+    #[test]
+    fn low_pixel_limit_doesnt_decode_heif() {
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let decoder_opts = Some(DecoderSettings {
+            heif: HeifLimits {
+                image_size_pixels: Limit::U64(50),
+                ..Default::default()
+            },
+        });
+
+        let actual = open_image(&image_location, None, decoder_opts).unwrap_err();
+        let expected = format!(
+            "{:?}({:?})",
+            HeifErrorCode::MemoryAllocationError,
+            HeifErrorSubCode::SecurityLimitExceeded
+        );
+
+        // This looks a bit convoluted because it's hard to construct a libheif error.
+        // A low pixel maximum should cause libheif to fail to decode an image. This simulates
+        // trying to decode a large image with the default or low maximum.
+        assert!(
+            actual.to_string().starts_with(&expected),
+            "libheif should have raised a security error"
+        )
+    }
+
+    #[cfg(feature = "heif")]
+    #[test]
+    fn higher_pixel_limit_decodes_heif() {
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let decoder_opts = Some(DecoderSettings {
+            heif: HeifLimits {
+                image_size_pixels: Limit::NoLimit,
+                ..Default::default()
+            },
+        });
+
+        open_image(&image_location, None, decoder_opts)
+            .expect("libheif should have decoded the image without raising a security error")
+            .recv()
+            .expect("Decoded image should be have sent");
+    }
 }

@@ -166,7 +166,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         .entries
         .as_ref()
         .unwrap_or(&b_entries)
-        .into_iter()
+        .iter()
         .filter(|e| {
             e.file_name()
                 .map(|f| f.to_string_lossy().to_string())
@@ -334,7 +334,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     .map(|f| f.to_string_lossy().to_string())
                     .unwrap_or("Computer".into());
                 if ui
-                    .styled_selectable_label(&current_dir == &c, &format!("{label}  {CARET_RIGHT}"))
+                    .styled_selectable_label(current_dir == c, format!("{label}  {CARET_RIGHT}"))
                     .clicked()
                 {
                     *path = PathBuf::from(c);
@@ -350,14 +350,14 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Layout::top_down_justified(Align::LEFT),
             |ui| {
                 if let Some(d) = dirs::home_dir() {
-                    if ui.styled_button(&format!("{FOLDER} Home")).clicked() {
+                    if ui.styled_button(format!("{FOLDER} Home")).clicked() {
                         *path = d;
                     }
                 }
                 if let Some(drives) = state.drives.as_ref() {
                     for drive in drives {
                         if ui
-                            .styled_button(&format!("{DRIVE} {}", drive.name))
+                            .styled_button(format!("{DRIVE} {}", drive.name))
                             .clicked()
                         {
                             *path = drive.path.clone();
@@ -366,7 +366,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
                 if let Some(d) = dirs::desktop_dir() {
                     if ui
-                        .styled_button(&format!("{FOLDERDESKTOP} Desktop"))
+                        .styled_button(format!("{FOLDERDESKTOP} Desktop"))
                         .clicked()
                     {
                         *path = d;
@@ -374,7 +374,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
                 if let Some(d) = dirs::document_dir() {
                     if ui
-                        .styled_button(&format!("{FOLDERDOCUMENT} Documents"))
+                        .styled_button(format!("{FOLDERDOCUMENT} Documents"))
                         .clicked()
                     {
                         *path = d;
@@ -382,7 +382,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
                 if let Some(d) = dirs::download_dir() {
                     if ui
-                        .styled_button(&format!("{FOLDERDOWNLOAD} Downloads"))
+                        .styled_button(format!("{FOLDERDOWNLOAD} Downloads"))
                         .clicked()
                     {
                         *path = d;
@@ -390,7 +390,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
                 if let Some(d) = dirs::picture_dir() {
                     if ui
-                        .styled_button(&format!("{FOLDERIMAGE} Pictures"))
+                        .styled_button(format!("{FOLDERIMAGE} Pictures"))
                         .clicked()
                     {
                         *path = d;
@@ -398,7 +398,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 }
 
                 for folder in &settings.folder_bookmarks.clone() {
-                    let res = ui.styled_button(&format!(
+                    let res = ui.styled_button(format!(
                         "{FOLDERBOOKMARK} {}",
                         folder
                             .file_name()
@@ -411,10 +411,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.key_released(Key::D)) {
-                            if !ui.ctx().wants_keyboard_input() {
-                                settings.folder_bookmarks.remove(folder);
-                            }
+                        if ui.input(|r| r.key_released(Key::D)) && !ui.ctx().wants_keyboard_input()
+                        {
+                            settings.folder_bookmarks.remove(folder);
                         }
                         if ui.input(|r| r.pointer.secondary_released()) {
                             settings.folder_bookmarks.remove(folder);
@@ -494,7 +493,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                         } else {
                                             for de in visible_entries.iter().filter(|e| e.is_dir())
                                             {
-                                                if render_file_icon(&de, ui, &mut state.thumbnails)
+                                                if render_file_icon(de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
                                                     *path = de.to_path_buf();
@@ -502,27 +501,26 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                             }
 
                                             for de in visible_entries {
-                                                if de.is_file() {
-                                                    if render_file_icon(
-                                                        &de,
+                                                if de.is_file()
+                                                    && render_file_icon(
+                                                        de,
                                                         ui,
                                                         &mut state.thumbnails,
                                                     )
                                                     .clicked()
-                                                    {
-                                                        _ = save_recent_dir(&de);
-                                                        if !save {
-                                                            state.search_active = false;
-                                                            state.search_term.clear();
-                                                            callback(&de);
-                                                        } else {
-                                                            state.filename = de
-                                                                .file_name()
-                                                                .map(|f| {
-                                                                    f.to_string_lossy().to_string()
-                                                                })
-                                                                .unwrap_or_default();
-                                                        }
+                                                {
+                                                    _ = save_recent_dir(de);
+                                                    if !save {
+                                                        state.search_active = false;
+                                                        state.search_term.clear();
+                                                        callback(de);
+                                                    } else {
+                                                        state.filename = de
+                                                            .file_name()
+                                                            .map(|f| {
+                                                                f.to_string_lossy().to_string()
+                                                            })
+                                                            .unwrap_or_default();
                                                     }
                                                 }
                                             }
@@ -572,7 +570,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         }
                     }
 
-                    if ui.button(format!("   Save file   ")).clicked() {
+                    if ui.button("   Save file   ".to_string()).clicked() {
                         state.search_active = false;
                         state.search_term.clear();
                         prev_path = Default::default();
@@ -595,7 +593,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 debug!("Successfully read {}", path.display());
                 let mut contents = contents
                     .into_iter()
-                    .flat_map(|x| x)
+                    .flatten()
                     .filter(|de| !de.file_name().to_string_lossy().starts_with("."))
                     .filter(|de| {
                         de.path().is_dir()
@@ -616,7 +614,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                 .to_lowercase(),
                         )
                 });
-                contents.sort_by(|a, b| b.is_dir().cmp(&a.is_dir()));
+                contents.sort_by_key(|b| std::cmp::Reverse(b.is_dir()));
                 state.entries = Some(contents);
             }
             Err(_e) => {

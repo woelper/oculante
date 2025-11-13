@@ -393,9 +393,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
 
                 #[cfg(feature = "file_open")]
-                if state.current_image.is_some() {
-                    if ui.button(format!("Save as...")).clicked() {
-
+                if state.current_image.is_some()
+                    && ui.button(format!("Save as...")).clicked() {
                         let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
@@ -441,7 +440,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                         ui.ctx().request_repaint();
                     }
-                }
+                
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
@@ -468,14 +467,12 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     }
                 }
 
-                let modal = super::Modal::new("modal", ctx);
-
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
-                    modal.show( "Overwrite?", |_|{
+                    let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
-                    });
+                    }, "overwrite");
 
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
@@ -503,7 +500,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         });
 
         if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-            let op_present = state.edit_state.image_op_stack.first().map(|op| if let ImageOperation::ColorConverter(_) = op.operation {true} else {false}).unwrap_or_default();
+            let op_present = state.edit_state.image_op_stack.first().map(|op| matches!(op.operation, ImageOperation::ColorConverter(_))).unwrap_or_default();
             if !op_present {
                 state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
                 image_changed = true;
@@ -858,65 +855,43 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
         }
 
         ui.styled_collapsing("Lossless JPEG edits", |ui| {
-            ui.label(format!("{WARNING_CIRCLE} These operations will immediately write changes to disk."));
+            ui.label(format!(
+                "{WARNING_CIRCLE} These operations will immediately write changes to disk."
+            ));
             let mut reload = false;
 
             ui.columns(3, |col| {
-                if col[0].button("➡ Rotate 90°").clicked() {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)
-                    )
-                    .is_ok()
-                    {
-                        reload = true;
-                    }
-                }
-                //◑
-                if col[1].button("⬅ Rotate -90°").clicked() {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)
-                    )
-                    .is_ok()
-                    {
-                        reload = true;
-                    }
+                if col[0].button("➡ Rotate 90°").clicked()
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)).is_ok()
+                {
+                    reload = true;
                 }
 
-                if col[2].button("⬇ Rotate 180°").clicked() {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform::op(turbojpeg::TransformOp::Rot180)
-                    )
-                    .is_ok()
-                    {
-                        reload = true;
-                    }
+                //◑
+                if col[1].button("⬅ Rotate -90°").clicked()
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)).is_ok()
+                {
+                    reload = true;
+                }
+
+                if col[2].button("⬇ Rotate 180°").clicked()
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot180)).is_ok()
+                {
+                    reload = true;
                 }
             });
 
-            ui.columns(2,|col| {
-                if col[0].button("Flip H").clicked() {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform::op(turbojpeg::TransformOp::Hflip)
-                    )
-                    .is_ok()
-                    {
-                        reload = true;
-                    }
+            ui.columns(2, |col| {
+                if col[0].button("Flip H").clicked()
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Hflip)).is_ok()
+                {
+                    reload = true;
                 }
 
-                if col[1].button("Flip V").clicked() {
-                    if lossless_tx(
-                        p,
-                        turbojpeg::Transform::op(turbojpeg::TransformOp::Vflip)
-                    )
-                    .is_ok()
-                    {
-                        reload = true;
-                    }
+                if col[1].button("Flip V").clicked()
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Vflip)).is_ok()
+                {
+                    reload = true;
                 }
             });
 
@@ -952,8 +927,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                         .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
                         .clicked()
                     {
-                        match crop {
-                            ImageOperation::Crop(amt) => {
+                        if let ImageOperation::Crop(amt) = crop {
                                 debug!("CROP {:?}", amt);
 
                                 let dim = state
@@ -980,10 +954,8 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                                     Err(e) => log::warn!("{e}"),
                                 };
                             }
-                            _ => (),
                         };
-                    }
-                });
+                    });
                 });
 
             if reload {

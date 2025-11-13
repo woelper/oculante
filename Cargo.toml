@@ -55,7 +55,7 @@ zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/iss
 resvg = "0.44"
 tiny-skia = "0.11"
 usvg = "0.44"
-libheif-rs = { version = "1.0", default-features = false, optional = true }
+libheif-rs = { version = "2", default-features = false, features = ["v1_19"], optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
 dds-rs = "0.7"
@@ -129,7 +129,7 @@ default = [
     "turbo",
     "avif_native",
     "update",
-    "notan/glsl-to-spirv",
+    "notan/shaderc",
     "j2k",
     "jxlcms",
 ]

@@ -234,7 +234,7 @@ impl MeasureShape {
         Self::Rect {
             points,
             color: [255, 255, 255, 255],
-            width: 1,
+            width: 4,
         }
     }
 }
@@ -674,10 +674,8 @@ impl ImageOperation {
                             }
 
                             // make sure we have at least two points
-                            if len > 2 {
-                                if ui.button("🗑").clicked() {
-                                    delete = Some(i);
-                                }
+                            if len > 2 && ui.button("🗑").clicked() {
+                                delete = Some(i);
                             }
                         });
                     }
@@ -911,7 +909,8 @@ impl ImageOperation {
                                 Stroke::new(*width as f32, Color32::BLACK),
                                 StrokeKind::Inside,
                             );
-                            ui.painter().rect_stroke(
+
+                            ui.painter().rect_filled(
                                 rect,
                                 0.0,
                                 Stroke::new(*width as f32 / 2., Color32::WHITE),
@@ -932,12 +931,12 @@ impl ImageOperation {
 
                             ui.painter().line_segment(
                                 [rect.left_center(), rect.right_center()],
-                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
 
                             ui.painter().line_segment(
                                 [rect.center_top(), rect.center_bottom()],
-                                Stroke::new(1., Color32::from_rgb_additive(60, 60, 60)),
+                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
                         }
                     }
@@ -1131,19 +1130,15 @@ impl ImageOperation {
                             dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
 
-                        if r1.changed() {
-                            if *aspect {
-                                dimensions.0 = (dimensions.1 as f32 / ratio) as u32
-                            }
+                        if r1.changed() && *aspect {
+                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
                         }
                         let r2 = ui
                             .styled_checkbox(aspect, "🔒")
                             .on_hover_text("Lock aspect ratio");
 
-                        if r2.changed() {
-                            if *aspect {
-                                dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
-                            }
+                        if r2.changed() && *aspect {
+                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
                         }
                         // For this operator, we want to update on release, not on change.
                         // Since all operators are processed the same, we use the hack to emit `changed` just on release.
@@ -1215,10 +1210,8 @@ impl ImageOperation {
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else {
-                            if let Ok(lut_img) = image::open(&lut_name) {
-                                correct_image(&mut external_image, &lut_img.to_rgb8());
-                            }
+                        } else if let Ok(lut_img) = image::open(&lut_name) {
+                            correct_image(&mut external_image, &lut_img.to_rgb8());
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }

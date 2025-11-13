@@ -12,10 +12,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         use crate::shortcuts::InputEvent::*;
 
         // The Close button
-        if state.persistent_settings.borderless {
-            if unframed_button(X, ui).clicked() {
-                app.backend.exit();
-            }
+        if state.persistent_settings.borderless && unframed_button(X, ui).clicked() {
+            app.backend.exit();
         }
 
         let mut changed_channels = false;
@@ -47,11 +45,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // Force rgba while edit mode is open.
         // TODO: display of channels should be done through a shader
-        if state.persistent_settings.edit_enabled {
-            if state.persistent_settings.current_channel != ColorChannel::Rgba {
-                state.persistent_settings.current_channel = ColorChannel::Rgba;
-                changed_channels = true;
-            }
+        if state.persistent_settings.edit_enabled
+            && state.persistent_settings.current_channel != ColorChannel::Rgba
+        {
+            state.persistent_settings.current_channel = ColorChannel::Rgba;
+            changed_channels = true;
         }
 
         if window_x > ui.cursor().left() + 110. {
@@ -153,8 +151,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
             }
-            if window_x > ui.cursor().left() + 80. {
-                if tooltip(
+            if window_x > ui.cursor().left() + 80.
+                && tooltip(
                     unframed_button_colored(
                         PENCIL_SIMPLE_LINE,
                         state.persistent_settings.edit_enabled,
@@ -165,38 +163,34 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                     ui,
                 )
                 .clicked()
-                {
-                    state.persistent_settings.edit_enabled =
-                        !state.persistent_settings.edit_enabled;
-                }
+            {
+                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
         }
 
-        if window_x > ui.cursor().left() + 80. {
-            if tooltip(
+        if window_x > ui.cursor().left() + 80.
+            && tooltip(
                 unframed_button(ARROWS_OUT_SIMPLE, ui),
                 "Toggle fullscreen",
                 &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
                 ui,
             )
             .clicked()
-            {
-                toggle_fullscreen(app, state);
-            }
+        {
+            toggle_fullscreen(app, state);
         }
 
-        if window_x > ui.cursor().left() + 80. {
-            if tooltip(
+        if window_x > ui.cursor().left() + 80.
+            && tooltip(
                 unframed_button_colored(ARROW_LINE_UP, state.always_on_top, ui),
                 "Always on top",
                 &lookup(&state.persistent_settings.shortcuts, &AlwaysOnTop),
                 ui,
             )
             .clicked()
-            {
-                state.always_on_top = !state.always_on_top;
-                app.window().set_always_on_top(state.always_on_top);
-            }
+        {
+            state.always_on_top = !state.always_on_top;
+            app.window().set_always_on_top(state.always_on_top);
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
@@ -228,17 +222,17 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.get().is_some() && window_x > ui.cursor().left() + 80. {
-            if tooltip(
+        if state.current_texture.get().is_some()
+            && window_x > ui.cursor().left() + 80.
+            && tooltip(
                 unframed_button(PLACEHOLDER, ui),
                 "Clear image",
                 &lookup(&state.persistent_settings.shortcuts, &ClearImage),
                 ui,
             )
             .clicked()
-            {
-                clear_image(state);
-            }
+        {
+            clear_image(state);
         }
 
         if state.scrubber.len() > 1 && window_x > ui.cursor().left() {
@@ -266,22 +260,20 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_path.is_some() {
-            if !state.is_loaded {
-                ui.horizontal(|ui| {
-                    ui.add(egui::Spinner::default());
-                    ui.label(format!(
-                        "Loading {}",
-                        state
-                            .current_path
-                            .as_ref()
-                            .map(|p| p.file_name().unwrap_or_default())
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                    ));
-                });
-                app.window().request_frame();
-            }
+        if state.current_path.is_some() && !state.is_loaded {
+            ui.horizontal(|ui| {
+                ui.add(egui::Spinner::default());
+                ui.label(format!(
+                    "Loading {}",
+                    state
+                        .current_path
+                        .as_ref()
+                        .map(|p| p.file_name().unwrap_or_default())
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                ));
+            });
+            app.window().request_frame();
         }
 
         drag_area(ui, state, app);
@@ -451,7 +443,5 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 });
             });
         });
-
-        // });
     });
 }

@@ -70,7 +70,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
                     &load_result,
                     image_rect,
                     None,
-                    &image.image_options(),
+                    image.image_options(),
                 );
                 if load_result.is_err() {
                     // If an image could not be loaded, reload. This is usually because the image

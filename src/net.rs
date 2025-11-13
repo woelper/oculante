@@ -1,6 +1,5 @@
 use crate::utils::Frame;
 use anyhow::Result;
-use image::guess_format;
 use log::{error, info};
 use std::io::Read;
 use std::net::{Shutdown, TcpListener, TcpStream};

@@ -22,7 +22,8 @@ use notan::egui::FontFamily;
 use notan::egui::FontTweak;
 use notan::egui::Id;
 use notan::prelude::*;
-use std::io::Read;
+use oculante::comparelist::CompareItem;
+use std::io::{stdin, IsTerminal, Read};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -36,8 +37,6 @@ use oculante::*;
 use shortcuts::key_pressed;
 use ui::PANEL_WIDTH;
 use ui::*;
-use BOLD_FONT;
-use FONT;
 
 #[cfg(feature = "turbo")]
 use image_editing::lossless_tx;
@@ -134,6 +133,10 @@ fn main() -> Result<(), String> {
                 window_config = window_config.set_title(&title_string);
             }
             window_config.min_size = Some(settings.min_window_size);
+
+            // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
+            #[cfg(feature = "heif")]
+            settings.decoders.heif.maybe_limits();
         }
         Err(e) => {
             error!("Could not load persistent settings: {e}");
@@ -158,7 +161,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
     // Filter out strange mac args
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
 
-    let matches = Command::new("Oculante")
+    let mut matches = Command::new("Oculante")
         .arg(
             Arg::new("INPUT")
                 .help("Display this image")
@@ -199,14 +202,21 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         state.texture_channel.0.clone(),
         state.persistent_settings.max_cache,
         state.message_channel.0.clone(),
+        state.persistent_settings.decoders,
     );
 
     debug!("matches {:?}", matches);
 
-    let paths_to_open = matches
-        .get_many::<String>("INPUT")
+    let paths_to_open = piped_paths(&matches)
+        .map(|iter| iter.collect::<Vec<_>>())
         .unwrap_or_default()
-        .map(PathBuf::from)
+        .into_iter()
+        .chain(
+            matches
+                .remove_many::<String>("INPUT")
+                .unwrap_or_default()
+                .map(PathBuf::from),
+        )
         .collect::<Vec<_>>();
 
     debug!("Image is: {:?}", paths_to_open);
@@ -244,9 +254,9 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
             }
         } else {
             state.is_loaded = false;
-            state.current_path = Some(location.clone().clone());
+            state.current_path = Some(location.clone());
             state.player.load_advanced(
-                &location,
+                location,
                 Some(Frame::ImageCollectionMember(Default::default())),
             );
         };
@@ -399,23 +409,23 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             // pan image with keyboard
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
-                state.image_geometry.offset.x += delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanUp) {
-                state.image_geometry.offset.y -= delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanLeft) {
                 state.image_geometry.offset.x -= delta;
                 limit_offset(app, state);
             }
-            if key_pressed(app, state, PanDown) {
+            if key_pressed(app, state, PanUp) {
                 state.image_geometry.offset.y += delta;
                 limit_offset(app, state);
             }
+            if key_pressed(app, state, PanLeft) {
+                state.image_geometry.offset.x += delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(app, state, PanDown) {
+                state.image_geometry.offset.y -= delta;
+                limit_offset(app, state);
+            }
             if key_pressed(app, state, CompareNext) {
-                compare_next(state);
+                compare_next(app, state);
             }
             if key_pressed(app, state, ResetView) {
                 state.reset_image = true
@@ -717,7 +727,9 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Since we can't access the window in the event loop, we store it in the state
     state.window_size = app.window().size().size_vec();
 
-    state.image_geometry.dimensions = state.image_geometry.dimensions;
+    if let Some(dimensions) = state.current_image.as_ref().map(|image| image.dimensions()) {
+        state.image_geometry.dimensions = dimensions;
+    }
 
     if state.persistent_settings.info_enabled || state.edit_state.painting {
         state.cursor_relative = pos_from_coord(
@@ -788,7 +800,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     if let Ok(frame) = state.texture_channel.1.try_recv() {
         state.is_loaded = true;
 
-        debug!("Got frame: {}", frame.to_string());
+        debug!("Got frame: {}", frame);
 
         if matches!(
             &frame,
@@ -926,7 +938,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
             Frame::CompareResult(_, geo) => {
                 debug!("Received compare result");
-                state.image_geometry = geo.clone();
+                state.image_geometry = *geo;
                 // always reset if first image
                 if state.current_texture.get().is_none() {
                     state.reset_image = true;
@@ -1124,9 +1136,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     draw_area.height().min(app.window().height() as f32),
                 );
                 let img_size = current_image.size_vec();
-                state.image_geometry.scale = (window_size.x / img_size.x)
-                    .min(window_size.y / img_size.y)
-                    .min(1.0);
+                let scaled_to_fit = window_size.component_div(&img_size).amin();
+                state.image_geometry.scale = if state.persistent_settings.auto_scale {
+                    scaled_to_fit
+                } else {
+                    scaled_to_fit.min(1.0)
+                };
                 state.image_geometry.offset =
                     window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
                 // offset by left UI elements
@@ -1289,4 +1304,30 @@ fn limit_offset(app: &mut App, state: &mut OculanteState) {
         .y
         .min(window_size.1 as f32)
         .max(-scaled_image_size.1);
+}
+
+// Handle [`CompareNext`] events
+fn compare_next(_app: &mut App, state: &mut OculanteState) {
+    if let Some(CompareItem { path, geometry }) = state.compare_list.next() {
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load_advanced(
+            path,
+            Some(Frame::CompareResult(Default::default(), *geometry)),
+        );
+        state.current_path = Some(path.to_owned());
+    }
+}
+
+// Parse piped file names from stdin.
+fn piped_paths(args: &clap::ArgMatches) -> Option<impl Iterator<Item = PathBuf>> {
+    // Don't yield paths if user is piping in raw image data
+    (!args.contains_id("stdin") && !stdin().is_terminal()).then(|| {
+        stdin().lines().flat_map(|line| {
+            line.unwrap_or_default()
+                .split_whitespace()
+                .map(PathBuf::from)
+                .collect::<Vec<_>>()
+        })
+    })
 }
