@@ -8,7 +8,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 10.15
-
+  CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  
 name: Check OSX
 jobs:
   check:
