@@ -8,6 +8,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 10.15
+  SHADERC_LIB_DIR: /opt/homebrew/lib
 
 jobs:
   release_job:
@@ -70,6 +71,10 @@ jobs:
     - name: Install cargo bundle
       run: cargo install cargo-bundle
       if: matrix.os == 'macos-12'
+      
+    - name: Install shaderc
+      run: brew install shaderc
+      if: matrix.os == 'macos-14'
 
       
     - name: Install cargo deb
