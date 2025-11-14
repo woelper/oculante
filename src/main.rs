@@ -26,6 +26,7 @@ use oculante::comparelist::CompareItem;
 use std::io::{stdin, IsTerminal, Read};
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "file_open")]
@@ -317,22 +318,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         fonts.font_data.insert(
             "inter".to_owned(),
-            FontData::from_static(FONT).tweak(FontTweak {
+            Arc::new(FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
                 baseline_offset_factor: 0.0,
-            }),
+            })),
         );
 
         fonts.font_data.insert(
             "inter_bold".to_owned(),
-            FontData::from_static(BOLD_FONT).tweak(FontTweak {
+            Arc::new(FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
                 baseline_offset_factor: 0.0,
-            }),
+            })),
         );
         fonts.families.insert(
             FontFamily::Name("bold".to_owned().into()),
@@ -341,12 +342,14 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         fonts.font_data.insert(
             "icons".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: 1.0,
-                baseline_offset_factor: 0.0,
-            }),
+            Arc::new(
+                FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
+                    scale: 1.0,
+                    y_offset_factor: 0.0,
+                    y_offset: 1.0,
+                    baseline_offset_factor: 0.0,
+                }),
+            ),
         );
 
         fonts
@@ -763,10 +766,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.current_texture.clear();
             }
             Message::Info(m) => {
-                state
-                    .toasts
-                    .info(m)
-                    .set_duration(Some(Duration::from_secs(1)));
+                state.toasts.info(m).duration(Some(Duration::from_secs(1)));
             }
             Message::Warning(m) => {
                 state.toasts.warning(m);

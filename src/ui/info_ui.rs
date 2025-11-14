@@ -34,7 +34,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
         };
 
         // don't do this every frame for performance reasons
-        if ctx.frame_nr() % 5 == 0 {
+        if ctx.cumulative_pass_nr() % 5 == 0 {
             if let Some(p) = get_pixel_checked(
                 img,
                 state.cursor_relative.x as u32,
@@ -83,7 +83,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                         ui.label_i(format!("{} File", IMAGE));
                         let path_label = egui::Label::new(
                             RichText::new(file_name)
-                        ).truncate(true);
+                        ).truncate();
                         ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                             ui.add(path_label)
                             .on_hover_text(format!("{}", path.display()));
@@ -142,7 +142,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 let offset = (ui.available_width() - preview_rect.width())/2.;
                 preview_rect = preview_rect.translate(vec2(offset, 0.));
                 // Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE);
+                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, egui::StrokeKind::Middle);
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
                 ui.advance_cursor_after_rect(preview_rect);
