@@ -23,7 +23,7 @@ jobs:
         run: cargo install cross
 
       - name: Cross-compile arm
-        run: cross check --target armv7-unknown-linux-gnueabihf --no-default-features --features notan/glsl-to-spirv
+        run: cross check --target armv7-unknown-linux-gnueabihf --no-default-features --features notan_glsl-to-spirv
 
       - name: Check output
         run: ls target/

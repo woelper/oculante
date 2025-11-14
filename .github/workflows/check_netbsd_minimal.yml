@@ -15,14 +15,14 @@ jobs:
     - uses: actions/checkout@v4
     - name: Test in NetBSD
       id: test
-      uses: vmactions/netbsd-vm@v1.1.4
+      uses: vmactions/netbsd-vm@v1.2.0
       with:
         usesh: true
         copyback: false
         prepare: |
-          /usr/sbin/pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 libXrender libxcb nasm perl git python39 ninja
+          /usr/sbin/pkg_add curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
-          cargo check --no-default-features  --features notan/glsl-to-spirv
+          cargo check --no-default-features  --features notan_glsl-to-spirv
