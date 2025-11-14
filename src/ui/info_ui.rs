@@ -49,16 +49,16 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).rounding(Rounding::ZERO).fill(Color32::TRANSPARENT))
+    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(0).fill(Color32::TRANSPARENT))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
 
             // Force-expand to prevent spacing issue with scroll bar
-            ui.allocate_space(egui::Vec2::new(PANEL_WIDTH - PANEL_WIDGET_OFFSET, 0.));
+            // ui.allocate_space(egui::Vec2::new(1000., 0.));
 
             if let Some(texture) = &state.current_texture.get() {
-                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64;
+                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
                 let scale = (desired_width / 8.) / texture.size().0 as f64;
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
@@ -137,10 +137,9 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                 uv_size = (scale, scale * ratio);
                 ui.add_space(10.);
 
-                let mut preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
+                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
 
-                let offset = (ui.available_width() - preview_rect.width())/2.;
-                preview_rect = preview_rect.translate(vec2(offset, 0.));
+
                 // Rendering a placeholder rectangle
                 ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, egui::StrokeKind::Middle);
                 bbox_tl = preview_rect.left_top();
@@ -200,7 +199,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                             }
                             if let Some(path) = &state.current_path {
                                 if let Some(geo) = state.compare_list.get(path) {
-                                    if state.image_geometry != geo 
+                                    if state.image_geometry != geo
                                         && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
                                                 state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         }
@@ -208,7 +207,7 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                                         state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                     }
                             }
-                            if !state.compare_list.is_empty() 
+                            if !state.compare_list.is_empty()
                                     && ui.button(format!("{TRASH} Clear all")).clicked() {
                                         state.compare_list.clear();
                             }

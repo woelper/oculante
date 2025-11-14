@@ -1220,7 +1220,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+            draw.rect((0., 0.), (PANEL_WIDTH + 4., state.window_size.y))
                 .color(Color::from_rgb(
                     info_panel_color.r() as f32 / 255.,
                     info_panel_color.g() as f32 / 255.,

@@ -381,12 +381,10 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
 
                 // FIXME: This overflows
                 ui.allocate_new_ui(UiBuilder::new().max_rect(recent_rect), |ui| {
-                    
                     let mut max = 0;
                     for r in &state.volatile_settings.recent_images.clone() {
                         if let Some(filename) = r.file_stem() {
                             max = filename.len().max(max)
-                            
                         }
                     }
 
@@ -403,9 +401,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                                 .corner_radius(ui.style().visuals.widgets.active.corner_radius)
                                 .inner_margin(Margin::same(6))
                                 .show(ui, |ui| {
-
-
-
                                     // ui.vertical_centered_justified(|ui| {
 
                                     let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
@@ -426,16 +421,18 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                                         ui.style().visuals.selection.bg_fill.gamma_multiply(0.8),
                                     );
 
-                                        if let Some(filename) = r.file_stem() {
+                                    if let Some(filename) = r.file_stem() {
+                                        let res = ui.add(
+                                            egui::Button::new(filename.to_string_lossy())
+                                                .min_size(vec2(max as f32 * 10., 0.)),
+                                        );
 
-                                            let res = ui.add(egui::Button::new(filename.to_string_lossy()).min_size(vec2(max as f32 * 10., 0.)));
-
-                                            // let res = ui.button(filename.to_string_lossy());
-                                            if res.clicked() {
-                                                load_image_from_path(r, state);
-                                                ui.close_menu();
-                                            }
+                                        // let res = ui.button(filename.to_string_lossy());
+                                        if res.clicked() {
+                                            load_image_from_path(r, state);
+                                            ui.close_menu();
                                         }
+                                    }
                                     // });
                                 });
                         });
