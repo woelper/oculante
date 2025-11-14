@@ -1,4 +1,6 @@
 name: Check NetBSD minimal
+env:
+    CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
 on:
   push:
