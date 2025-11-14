@@ -27,4 +27,4 @@ jobs:
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
-          cargo check --no-default-features  --features notan_glsl-to-spirv
+          cargo check --no-default-features --features notan_glsl-to-spirv
