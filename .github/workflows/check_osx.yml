@@ -8,7 +8,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 10.15
-
+  CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  SHADERC_LIB_DIR: /opt/homebrew/lib
+  
 name: Check OSX
 jobs:
   check:
@@ -121,6 +123,7 @@ jobs:
         run: |
           rustc --version --verbose
           # cargo install cargo-bundle
+          brew install shaderc
           cargo build
         if: matrix.os == 'macos-14'
 

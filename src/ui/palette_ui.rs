@@ -38,6 +38,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         rect,
                                         1.,
                                         Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                        StrokeKind::Inside,
                                     );
                                 }
                                 if resp.hovered() {

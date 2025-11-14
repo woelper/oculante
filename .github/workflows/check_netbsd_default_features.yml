@@ -2,41 +2,41 @@ name: Check NetBSD
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     name: Build in NetBSD with default features
     steps:
-    - uses: actions/checkout@v4
-    - name: Build in NetBSD
-      id: testnet
-      uses: vmactions/netbsd-vm@v1.1.4
-      with:
-        mem: 4096
-        usesh: true
-        copyback: false
-        prepare: |
-          # pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
-          # gtk3 and libX11 seem to be missing ^^
-          # PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
-          # export PKG_PATH
-          # pkg_add pkgin
-          # pkgin -y install curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
-          # pkgin search gtk3
-          # curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
-          pkg_add modular-xorg
-          echo X11_TYPE=modular > /etc/mk.conf
-          cd /usr/pkgsrc/meta-pkgs/modular-xorg
-          make install
-          ls /usr
-          ls /usr/bin | grep ssl
-        run: |
-          ls
-          # PATH=$HOME/.cargo/bin:$PATH
-          # export PATH
-          # cargo check
+      - uses: actions/checkout@v4
+      - name: Build in NetBSD
+        id: testnet
+        uses: vmactions/netbsd-vm@v1.1.4
+        with:
+          mem: 4096
+          usesh: true
+          copyback: false
+          prepare: |
+            # pkg_add curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
+            # gtk3 and libX11 seem to be missing ^^
+            # PKG_PATH="http://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r|cut -f '1 2' -d.)/All/"
+            # export PKG_PATH
+            # pkg_add pkgin
+            # pkgin -y install curl pkg-config cmake openssl libX11 fontconfig freetype2 gdk-pixbuf2 cairo pango atk glib2 gtk3+ libXrender x11-links libxcb
+            # pkgin search gtk3
+            # curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+            pkg_add modular-xorg
+            echo X11_TYPE=modular > /etc/mk.conf
+            cd /usr/pkgsrc/meta-pkgs/modular-xorg
+            make install
+            ls /usr
+            ls /usr/bin | grep ssl
+          run: |
+            ls
+            # PATH=$HOME/.cargo/bin:$PATH
+            # export PATH
+            # cargo check --features notan/glsl-to-spirv

@@ -18,7 +18,8 @@ use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use notan::egui::epaint::PathShape;
 use notan::egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke, Vec2,
+    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke,
+    StrokeKind, Vec2,
 };
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
@@ -305,7 +306,7 @@ impl ImageOperation {
         match self {
             Self::ColorConverter(ct) => {
                 let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
-                egui::ComboBox::from_id_source("color_types")
+                egui::ComboBox::from_id_salt("color_types")
                     .selected_text(ct.to_string())
                     .show_ui(ui, |ui| {
                         for t in ColorTypeExt::iter() {
@@ -367,10 +368,7 @@ impl ImageOperation {
                     for triplet in val.chunks_mut(3) {
                         ui.horizontal(|ui| {
                             for v in triplet {
-                                if ui
-                                    .add(egui::DragValue::new(v).clamp_range(-255..=255))
-                                    .changed()
-                                {
+                                if ui.add(egui::DragValue::new(v).range(-255..=255)).changed() {
                                     x.mark_changed();
                                 }
                                 ui.add_space(30.);
@@ -483,7 +481,7 @@ impl ImageOperation {
                 let combo_width = 50.;
 
                 ui.horizontal(|ui| {
-                    egui::ComboBox::from_id_source(format!("ccopy 0 {}", val.0 as usize))
+                    egui::ComboBox::from_id_salt(format!("ccopy 0 {}", val.0 as usize))
                         .selected_text(format!("{:?}", val.0))
                         .width(combo_width)
                         .show_ui(ui, |ui| {
@@ -492,14 +490,14 @@ impl ImageOperation {
                                     .selectable_value(&mut val.0, f, format!("{f:?}"))
                                     .clicked()
                                 {
-                                    r.changed = true;
+                                    r.mark_changed();
                                 }
                             }
                         });
 
                     ui.label("=");
 
-                    egui::ComboBox::from_id_source(format!("ccopy 1 {}", val.1 as usize))
+                    egui::ComboBox::from_id_salt(format!("ccopy 1 {}", val.1 as usize))
                         .selected_text(format!("{:?}", val.1))
                         .width(combo_width)
                         .show_ui(ui, |ui| {
@@ -508,7 +506,7 @@ impl ImageOperation {
                                     .selectable_value(&mut val.1, f, format!("{f:?}"))
                                     .clicked()
                                 {
-                                    r.changed = true;
+                                    r.mark_changed();
                                 }
                             }
                         });
@@ -517,18 +515,12 @@ impl ImageOperation {
                 r
             }
             Self::HSV(val) => {
-                let mut r = ui.add(DragValue::new(&mut val.0).clamp_range(0..=360));
-                if ui
-                    .add(DragValue::new(&mut val.1).clamp_range(0..=200))
-                    .changed()
-                {
-                    r.changed = true;
+                let mut r = ui.add(DragValue::new(&mut val.0).range(0..=360));
+                if ui.add(DragValue::new(&mut val.1).range(0..=200)).changed() {
+                    r.mark_changed();
                 }
-                if ui
-                    .add(DragValue::new(&mut val.2).clamp_range(0..=200))
-                    .changed()
-                {
-                    r.changed = true;
+                if ui.add(DragValue::new(&mut val.2).range(0..=200)).changed() {
+                    r.mark_changed();
                 }
                 r
             }
@@ -536,7 +528,7 @@ impl ImageOperation {
             Self::Noise { amt, mono } => {
                 let mut r = ui.styled_slider(amt, 0..=100);
                 if ui.styled_checkbox(mono, "Grey").changed() {
-                    r.changed = true
+                    r.mark_changed();
                 }
                 r
             }
@@ -669,7 +661,7 @@ impl ImageOperation {
                                 .add(
                                     egui::DragValue::new(&mut p.pos)
                                         .speed(0.1)
-                                        .clamp_range(0..=255)
+                                        .range(0..=255)
                                         .custom_formatter(|n, _| {
                                             let n = n / 256.;
                                             format!("{n:.2}")
@@ -708,7 +700,7 @@ impl ImageOperation {
             Self::Flip(horizontal) => {
                 let mut r = ui.radio_value(horizontal, true, "V");
                 if ui.radio_value(horizontal, false, "H").changed() {
-                    r.changed = true
+                    r.mark_changed();
                 }
                 r
             }
@@ -835,7 +827,7 @@ impl ImageOperation {
                         .clicked()
                     {
                         ui.ctx().data_mut(|w| w.insert_temp(id, true));
-                        r.changed = true;
+                        r.mark_changed();
                     }
                 }
 
@@ -914,13 +906,16 @@ impl ImageOperation {
                             ui.painter().rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32 / 2., Color32::WHITE),
+                                Stroke::new(*width as f32, Color32::BLACK),
+                                StrokeKind::Inside,
                             );
 
                             ui.painter().rect_filled(
                                 rect,
                                 0.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 2)
+                                Color32::BLACK,
+                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
+                                // StrokeKind::Inside,
                             );
 
                             ui.painter().text(
@@ -994,7 +989,7 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut float_bounds[0])
                             .speed(0.004)
-                            .clamp_range(0.0..=1.0)
+                            .range(0.0..=1.0)
                             // X
                             .prefix("⏵ "),
                     );
@@ -1002,7 +997,7 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut float_bounds[2])
                             .speed(0.004)
-                            .clamp_range(0.0..=1.0)
+                            .range(0.0..=1.0)
                             // WIDTH
                             .prefix("⏴ "),
                     );
@@ -1010,7 +1005,7 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut float_bounds[1])
                             .speed(0.004)
-                            .clamp_range(0.0..=1.0)
+                            .range(0.0..=1.0)
                             // Y
                             .prefix("⏷ "),
                     );
@@ -1018,13 +1013,13 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut float_bounds[3])
                             .speed(0.004)
-                            .clamp_range(0.0..=1.0)
+                            .range(0.0..=1.0)
                             // HEIGHT
                             .prefix("⏶ "),
                     );
                     // TODO rewrite with any
                     if r2.changed() || r3.changed() || r4.changed() {
-                        r1.changed = true;
+                        r1.mark_changed();
                     }
                     if r1.changed() {
                         // commit back changed vals
@@ -1043,20 +1038,20 @@ impl ImageOperation {
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut bounds.0)
                             // .speed(2.)
-                            .clamp_range(-128..=128)
+                            .range(-128..=128)
                             .prefix("dark "),
                     );
                     let r2 = ui.add_sized(
                         egui::vec2(available_w_single_spacing / 4., ui.available_height()),
                         egui::DragValue::new(&mut bounds.1)
                             .speed(2.)
-                            .clamp_range(64..=2000)
+                            .range(64..=2000)
                             .prefix("bright "),
                     );
 
                     // TODO rewrite with any
                     if r2.changed() {
-                        r1.changed = true;
+                        r1.mark_changed();
                     }
                     r1
                 })
@@ -1122,13 +1117,13 @@ impl ImageOperation {
                         let r0 = ui.add(
                             egui::DragValue::new(&mut dimensions.0)
                                 .speed(4.)
-                                .clamp_range(1..=10000)
+                                .range(1..=10000)
                                 .prefix("X "),
                         );
                         let r1 = ui.add(
                             egui::DragValue::new(&mut dimensions.1)
                                 .speed(4.)
-                                .clamp_range(1..=10000)
+                                .range(1..=10000)
                                 .prefix("Y "),
                         );
 
@@ -1150,10 +1145,12 @@ impl ImageOperation {
                         // Since all operators are processed the same, we use the hack to emit `changed` just on release.
                         // Users dragging the resize values will now only trigger a resize on release, which feels
                         // more snappy.
-                        r.changed = r0.drag_stopped() || r1.drag_stopped() || r2.changed();
+                        if r0.drag_stopped() || r1.drag_stopped() || r2.changed() {
+                            r.mark_changed();
+                        }
                     });
 
-                    egui::ComboBox::from_id_source("filter")
+                    egui::ComboBox::from_id_salt("filter")
                         .selected_text(format!("{filter:?}"))
                         .show_ui(ui, |ui| {
                             for f in [
@@ -1165,7 +1162,7 @@ impl ImageOperation {
                                 ScaleFilter::Lanczos3,
                             ] {
                                 if ui.selectable_value(filter, f, format!("{f:?}")).clicked() {
-                                    r.changed = true;
+                                    r.mark_changed();
                                 }
                             }
                         });

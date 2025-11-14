@@ -70,6 +70,8 @@ pub struct PersistentSettings {
     pub use_mipmaps: bool,
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
+    /// Automatically scale/zoom the image to fit the frame
+    pub auto_scale: bool,
     pub borderless: bool,
     pub min_window_size: (u32, u32),
     pub experimental_features: bool,
@@ -105,6 +107,7 @@ impl Default for PersistentSettings {
             use_mipmaps: true,
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
+            auto_scale: false,
             borderless: false,
             min_window_size: (100, 100),
             experimental_features: false,

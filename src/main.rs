@@ -26,6 +26,7 @@ use oculante::comparelist::CompareItem;
 use std::io::{stdin, IsTerminal, Read};
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "file_open")]
@@ -317,22 +318,22 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         fonts.font_data.insert(
             "inter".to_owned(),
-            FontData::from_static(FONT).tweak(FontTweak {
+            Arc::new(FontData::from_static(FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
                 baseline_offset_factor: 0.0,
-            }),
+            })),
         );
 
         fonts.font_data.insert(
             "inter_bold".to_owned(),
-            FontData::from_static(BOLD_FONT).tweak(FontTweak {
+            Arc::new(FontData::from_static(BOLD_FONT).tweak(FontTweak {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
                 baseline_offset_factor: 0.0,
-            }),
+            })),
         );
         fonts.families.insert(
             FontFamily::Name("bold".to_owned().into()),
@@ -341,12 +342,14 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
         fonts.font_data.insert(
             "icons".to_owned(),
-            FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: 1.0,
-                baseline_offset_factor: 0.0,
-            }),
+            Arc::new(
+                FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
+                    scale: 1.0,
+                    y_offset_factor: 0.0,
+                    y_offset: 1.0,
+                    baseline_offset_factor: 0.0,
+                }),
+            ),
         );
 
         fonts
@@ -763,10 +766,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.current_texture.clear();
             }
             Message::Info(m) => {
-                state
-                    .toasts
-                    .info(m)
-                    .set_duration(Some(Duration::from_secs(1)));
+                state.toasts.info(m).duration(Some(Duration::from_secs(1)));
             }
             Message::Warning(m) => {
                 state.toasts.warning(m);
@@ -1136,9 +1136,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     draw_area.height().min(app.window().height() as f32),
                 );
                 let img_size = current_image.size_vec();
-                state.image_geometry.scale = (window_size.x / img_size.x)
-                    .min(window_size.y / img_size.y)
-                    .min(1.0);
+                let scaled_to_fit = window_size.component_div(&img_size).amin();
+                state.image_geometry.scale = if state.persistent_settings.auto_scale {
+                    scaled_to_fit
+                } else {
+                    scaled_to_fit.min(1.0)
+                };
                 state.image_geometry.offset =
                     window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
                 // offset by left UI elements
@@ -1217,7 +1220,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
         {
-            draw.rect((0., 0.), (PANEL_WIDTH + 24., state.window_size.y))
+            draw.rect((0., 0.), (PANEL_WIDTH + 4., state.window_size.y))
                 .color(Color::from_rgb(
                     info_panel_color.r() as f32 / 255.,
                     info_panel_color.g() as f32 / 255.,

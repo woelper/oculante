@@ -469,9 +469,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
+
                     let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     }, "overwrite");
+
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
                         if p.exists() {
@@ -645,32 +647,40 @@ fn stroke_ui(
         .styled_checkbox(&mut stroke.fade, "")
         .on_hover_text("Fade out the stroke over its path");
     if r.changed() {
-        combined_response.changed = true;
+        combined_response.mark_changed();
     }
     if r.hovered() {
-        combined_response.hovered = true;
+        // combined_response.chacha
+        // combined_response.flags.insert(egui::response::Flags::CLICKED);
+        combined_response
+            .flags
+            .set(egui::response::Flags::CLICKED, true);
+
+        // combined_response
+        //     .flags
+        //     .set(egui::Response::Flags::HOVERED, true);
     }
 
     let r = ui
         .styled_checkbox(&mut stroke.flip_random, "")
         .on_hover_text("Flip brush X and Y randomly to make stroke less uniform");
     if r.changed() {
-        combined_response.changed = true;
+        combined_response.mark_changed();
     }
     if r.hovered() {
-        combined_response.hovered = true;
+        combined_response.mark_changed();
     }
 
     let r = ui.add(
         egui::DragValue::new(&mut stroke.width)
-            .clamp_range(0.0..=0.3)
+            .range(0.0..=0.3)
             .speed(0.001),
     );
     if r.changed() {
-        combined_response.changed = true;
+        combined_response.mark_changed();
     }
     if r.hovered() {
-        combined_response.hovered = true;
+        combined_response.mark_changed();
     }
 
     ui.horizontal(|ui| {
@@ -682,7 +692,7 @@ fn stroke_ui(
             );
         }
 
-        let r = egui::ComboBox::from_id_source(format!("s {:?}", stroke.points))
+        let r = egui::ComboBox::from_id_salt(format!("s {:?}", stroke.points))
             .selected_text(format!("Brush {}", stroke.brush_index))
             .show_ui(ui, |ui| {
                 for (b_i, b) in brushes.iter().enumerate() {
@@ -699,7 +709,7 @@ fn stroke_ui(
                             .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {b_i}"))
                             .clicked()
                         {
-                            combined_response.changed = true
+                            combined_response.mark_changed();
                         }
                     });
                 }
@@ -707,7 +717,9 @@ fn stroke_ui(
             .response;
 
         if r.hovered() {
-            combined_response.hovered = true;
+            combined_response
+                .flags
+                .insert(egui::response::Flags::HOVERED);
         }
     });
 
@@ -738,10 +750,10 @@ fn modifier_stack_ui(
         } else {
             Color32::from_hex("#F2F2F2").unwrap()
         };
-        egui::Frame::none()
+        egui::Frame::new()
             .fill(frame_color)
-            .rounding(ui.style().visuals.widgets.active.rounding)
-            .inner_margin(Margin::same(6.))
+            .corner_radius(ui.style().visuals.widgets.active.corner_radius)
+            .inner_margin(Margin::same(6))
             .show(ui, |ui| {
                 ui.allocate_space(vec2(ui.available_width(), 0.0));
                 ui.horizontal(|ui| {
@@ -945,7 +957,6 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                         };
                     });
                 });
-
 
             if reload {
                 state.is_loaded = false;
