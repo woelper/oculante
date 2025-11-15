@@ -1,0 +1,72 @@
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  MACOSX_DEPLOYMENT_TARGET: 11.0
+  CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  SHADERC_LIB_DIR: /opt/homebrew/lib
+
+name: Check macOS
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [macos-latest, macos-15-intel]
+        include:
+          - os: macos-latest
+            arch: arm
+            brew_root: /opt/homebrew
+          - os: macos-15-intel
+            arch: intel
+            brew_root: /usr/local
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: |
+          brew install libheif shaderc
+
+      - name: Build and bundle
+        run: |
+          rustc --version --verbose
+          cargo install cargo-bundle
+          cargo bundle --release --features "notan/shaderc heif"
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/x265/lib/libx265.*.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/libde265/lib/libde265.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/aom/lib/libaom.3.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/webp/lib/libsharpyuv.0.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          cp ${{ matrix.brew_root }}/opt/libvmaf/lib/libvmaf.*.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
+          install_name_tool -change ${{ matrix.brew_root }}/opt/libheif/lib/libheif.1.dylib "@executable_path/../Frameworks/libheif.1.dylib" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -add_rpath "@executable_path/../Frameworks" target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          install_name_tool -change ${{ matrix.brew_root }}/opt/x265/lib/libx265.*.dylib "@executable_path/../Frameworks/libx265.*.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change ${{ matrix.brew_root }}/opt/libde265/lib/libde265.0.dylib "@executable_path/../Frameworks/libde265.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change ${{ matrix.brew_root }}/opt/aom/lib/libaom.3.dylib "@executable_path/../Frameworks/libaom.3.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change ${{ matrix.brew_root }}/opt/webp/lib/libsharpyuv.0.dylib "@executable_path/../Frameworks/libsharpyuv.0.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          install_name_tool -change ${{ matrix.brew_root }}/opt/libvmaf/lib/libvmaf.*.dylib "@executable_path/../Frameworks/libvmaf.*.dylib" target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libvmaf.*.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libsharpyuv.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libaom.3.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libde265.0.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libx265.*.dylib
+          codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+          otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
+
+      - name: Zip Mac Bundle
+        run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_${{ matrix.arch }}.zip oculante.app
+
+      - name: Archive build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}_build
+          path: oculante_app_${{ matrix.arch }}.zip

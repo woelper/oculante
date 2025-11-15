@@ -235,9 +235,9 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 
 - `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
 
-- `notan/glsl-to-spirv` (on by default) uses the spirv shader compiler
+- `notan_glsl-to-spirv` uses the spirv shader compiler
 
-- `notan/shaderc` uses shaderc as a shader compiler. Longer build time.
+- `notan/shaderc` (on by default) uses shaderc as a shader compiler. Longer build time.
 
 - `update` (on by default) enable app updating.
 
