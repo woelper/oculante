@@ -153,7 +153,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         |ui| {
                                             if ui.add(
                                                 egui::DragValue::new(&mut state.persistent_settings.max_recents)
-                                                    .clamp_range(0..=u8::MAX),
+                                                    .range(0..=12),
                                             )
                                             .changed() 
                                             {
