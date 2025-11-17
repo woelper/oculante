@@ -826,12 +826,17 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             }
 
             if let Some(path) = &state.current_path {
-                if !state.volatile_settings.recent_images.contains(path) {
+                if state.persistent_settings.max_recents > 0
+                    && !state.volatile_settings.recent_images.contains(path)
+                {
                     state
                         .volatile_settings
                         .recent_images
-                        .insert(0, path.clone());
-                    state.volatile_settings.recent_images.truncate(12);
+                        .push_front(path.clone());
+                    state
+                        .volatile_settings
+                        .recent_images
+                        .truncate(state.persistent_settings.max_recents as usize);
                 }
             }
         }
