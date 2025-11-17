@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use libheif_rs::SecurityLimits;
 
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet, VecDeque},
     fmt::{self, Display, Formatter},
     fs::{create_dir_all, File},
     path::PathBuf,
@@ -49,6 +49,8 @@ pub struct PersistentSettings {
     pub keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
+    /// How many recent images to keep track of
+    pub max_recents: u8,
     pub show_scrub_bar: bool,
     pub wrap_folder: bool,
     /// Whether to keep the image edit stack
@@ -89,6 +91,7 @@ impl Default for PersistentSettings {
             shortcuts: Shortcuts::default_keys(),
             keep_view: Default::default(),
             max_cache: 30,
+            max_recents: 12,
             show_scrub_bar: Default::default(),
             wrap_folder: true,
             keep_edits: Default::default(),
@@ -152,7 +155,7 @@ impl PersistentSettings {
 #[serde(default)]
 pub struct VolatileSettings {
     pub favourite_images: HashSet<PathBuf>,
-    pub recent_images: Vec<PathBuf>,
+    pub recent_images: VecDeque<PathBuf>,
     pub window_geometry: ((u32, u32), (u32, u32)),
     pub last_open_directory: PathBuf,
     pub folder_bookmarks: BTreeSet<PathBuf>,

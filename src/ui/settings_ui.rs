@@ -147,6 +147,25 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
+                                    configuration_item_ui(
+                                        "Number of recent images",
+                                        "Remember this many recently opened images.",
+                                        |ui| {
+                                            if ui.add(
+                                                egui::DragValue::new(&mut state.persistent_settings.max_recents)
+                                                    .range(0..=12),
+                                            )
+                                            .changed() 
+                                            {
+                                                state
+                                                    .volatile_settings
+                                                    .recent_images
+                                                    .truncate(state.persistent_settings.max_recents.into());
+                                            }
+                                        },
+                                        ui,
+                                    );
+                                    
                                     configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
                                     }, ui);
