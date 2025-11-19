@@ -10,8 +10,8 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader,
-    Rgb32FImage, RgbImage, RgbaImage,
+    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, RgbImage,
+    RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::Export;
@@ -85,7 +85,7 @@ pub fn open_image(
             let file = File::open(img_location)?;
             let mut reader = BufReader::new(file);
             let dds = DDS::decode(&mut reader).map_err(|e| anyhow!("{:?}", e))?;
-            if let Some(main_layer) = dds.layers.get(0) {
+            if let Some(main_layer) = dds.layers.first() {
                 let buf = main_layer.as_bytes();
                 let buf =
                     image::ImageBuffer::from_raw(dds.header.width, dds.header.height, buf.into())
@@ -162,7 +162,7 @@ pub fn open_image(
             use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
 
             let lib_heif = LibHeif::new();
-            let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy().to_string())?;
+            let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy())?;
             if let Ok(num_threads) = std::thread::available_parallelism() {
                 ctx.set_max_decoding_threads(num_threads.get() as u32);
             }
@@ -198,7 +198,7 @@ pub fn open_image(
                     step += 4;
                 }
             }
-            let buf = image::ImageBuffer::from_vec(width as u32, height as u32, res)
+            let buf = image::ImageBuffer::from_vec(width, height, res)
                 .context("Can't create HEIC/HEIF ImageBuffer with given res")?;
             let i = DynamicImage::ImageRgba8(buf);
 
@@ -409,7 +409,6 @@ pub fn open_image(
             let f = File::open(img_location)?;
             let reader = BufReader::new(f);
             let hdr_decoder = image::codecs::hdr::HdrDecoder::new(reader)?;
-            let meta = hdr_decoder.metadata();
 
             #[cfg(feature = "hdr")]
             {
@@ -420,7 +419,8 @@ pub fn open_image(
 
             #[cfg(not(feature = "hdr"))]
             {
-                let hdr_img: Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
+                let meta = hdr_decoder.metadata();
+                let hdr_img: image::Rgb32FImage = match DynamicImage::from_decoder(hdr_decoder)? {
                     DynamicImage::ImageRgb32F(image) => image,
                     _ => bail!("expected rgb32f image"),
                 };
@@ -459,27 +459,23 @@ pub fn open_image(
             }
 
             let buffer = std::fs::read(img_location)?;
-            let mut decoder = Decoder::new(&buffer)?.into_iter();
+            let decoder = Decoder::new(&buffer)?.into_iter();
             let mut last_timestamp = 0;
 
-            loop {
-                if let Some(frame) = decoder.next() {
-                    let buf = image::ImageBuffer::from_raw(
-                        frame.dimensions().0,
-                        frame.dimensions().1,
-                        frame.data().to_vec(),
-                    )
-                    .context("Can't create imagebuffer from webp")?;
-                    let t = frame.timestamp();
-                    let delay = t - last_timestamp;
-                    debug!("time {t} {delay}");
-                    last_timestamp = t;
-                    let i = DynamicImage::ImageRgba8(buf);
-                    let frame = Frame::new_animation(i, delay as u16);
-                    _ = sender.send(frame);
-                } else {
-                    break;
-                }
+            for frame in decoder {
+                let buf = image::ImageBuffer::from_raw(
+                    frame.dimensions().0,
+                    frame.dimensions().1,
+                    frame.data().to_vec(),
+                )
+                .context("Can't create imagebuffer from webp")?;
+                let t = frame.timestamp();
+                let delay = t - last_timestamp;
+                debug!("time {t} {delay}");
+                last_timestamp = t;
+                let i = DynamicImage::ImageRgba8(buf);
+                let frame = Frame::new_animation(i, delay as u16);
+                _ = sender.send(frame);
             }
 
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
@@ -541,7 +537,7 @@ pub fn open_image(
                         colorspace,
                         &frame,
                         &pix,
-                        background.as_ref().map(|x| x.as_slice()),
+                        background.as_deref(),
                         &mut output,
                         None,
                     )?;
@@ -570,7 +566,7 @@ pub fn open_image(
                         .par_iter()
                         .map(|x| *x as f32 / u16::MAX as f32)
                         .map(|p| p.powf(2.2))
-                        .map(|p| tonemap_f32(p))
+                        .map(tonemap_f32)
                         // .map(|x| x as u8)
                         .collect::<Vec<_>>();
 
@@ -654,22 +650,18 @@ pub fn open_image(
             let mut decoder = gif_opts.read_info(file)?;
             let dim = (decoder.width() as u32, decoder.height() as u32);
             let mut screen = gif_dispose::Screen::new_decoder(&decoder);
-            loop {
-                if let Ok(i) = decoder.read_next_frame() {
-                    debug!("decoded frame");
-                    if let Some(frame) = i {
-                        screen.blit_frame(&frame)?;
-                        let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
-                            dim.0,
-                            dim.1,
-                            screen.pixels_rgba().buf().as_bytes().to_vec(),
-                        );
-                        let buf = buf.context("Can't read gif frame")?;
-                        let i = DynamicImage::ImageRgba8(buf);
-                        _ = sender.send(Frame::new_animation(i, frame.delay * 10));
-                    } else {
-                        break;
-                    }
+            while let Ok(i) = decoder.read_next_frame() {
+                debug!("decoded frame");
+                if let Some(frame) = i {
+                    screen.blit_frame(frame)?;
+                    let buf: Option<image::RgbaImage> = image::ImageBuffer::from_raw(
+                        dim.0,
+                        dim.1,
+                        screen.pixels_rgba().buf().as_bytes().to_vec(),
+                    );
+                    let buf = buf.context("Can't read gif frame")?;
+                    let i = DynamicImage::ImageRgba8(buf);
+                    _ = sender.send(Frame::new_animation(i, frame.delay * 10));
                 } else {
                     break;
                 }
@@ -773,7 +765,7 @@ fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
 }
 
 pub fn tonemap_f32(px: f32) -> u8 {
-    (px.powf(1.0 / 2.2).max(0.0).min(1.0) * 255.0) as u8
+    (px.powf(1.0 / 2.2).clamp(0.0, 1.0) * 255.0) as u8
     // (px.filmic() * 255.) as u8
 }
 
@@ -792,7 +784,7 @@ fn load_raw(img_location: &Path) -> Result<RgbaImage> {
     let raw_data = std::fs::read(img_location)?;
     let (thumbnail_data, _orientation) = Export::export_thumbnail_data(&raw_data)?;
 
-    let i = image::load_from_memory(&thumbnail_data)?;
+    let i = image::load_from_memory(thumbnail_data)?;
     Ok(i.to_rgba8())
 
     // let export_job = Export::new(
@@ -833,83 +825,81 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
     debug!("Color type: {:?}", decoder.colortype());
     let result = decoder.read_image()?;
     // A container for the low dynamic range image
-    let ldr_img: Vec<u8>;
-
-    match result {
+    let ldr_img: Vec<u8> = match result {
         tiff::decoder::DecodingResult::U8(contents) => {
             debug!("TIFF U8");
-            ldr_img = contents;
+            contents
         }
         tiff::decoder::DecodingResult::U16(contents) => {
             debug!("TIFF U16");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::U32(contents) => {
             debug!("TIFF U32");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::U64(contents) => {
             debug!("TIFF U64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::F32(contents) => {
             debug!("TIFF F32");
-            ldr_img = autoscale(&contents).par_iter().map(|x| *x as u8).collect();
+            autoscale(&contents).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::F64(contents) => {
             debug!("TIFF F64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::I8(contents) => {
             debug!("TIFF I8");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::I16(contents) => {
             debug!("TIFF I16");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::I32(contents) => {
             debug!("TIFF I32");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::I64(contents) => {
             debug!("TIFF I64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            ldr_img = autoscale(&values).par_iter().map(|x| *x as u8).collect();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
-    }
+    };
 
     match decoder.colortype()? {
         tiff::ColorType::Gray(_) => {
             debug!("Loading gray color");
             let i =
                 image::GrayImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load gray img")?;
-            return Ok(DynamicImage::ImageLuma8(i));
+            Ok(DynamicImage::ImageLuma8(i))
         }
         tiff::ColorType::RGB(_) => {
             debug!("Loading rgb color");
             let i =
                 image::RgbImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGB img")?;
-            return Ok(DynamicImage::ImageRgb8(i));
+            Ok(DynamicImage::ImageRgb8(i))
         }
         tiff::ColorType::RGBA(_) => {
             debug!("Loading rgba color");
             let i =
                 image::RgbaImage::from_raw(dim.0, dim.1, ldr_img).context("Can't load RGBA img")?;
-            return Ok(image::DynamicImage::ImageRgba8(i));
+            Ok(image::DynamicImage::ImageRgba8(i))
         }
         tiff::ColorType::GrayA(_) => {
             debug!("Loading gray color with alpha");
             let i = image::GrayAlphaImage::from_raw(dim.0, dim.1, ldr_img)
                 .context("Can't load gray alpha img")?;
-            return Ok(image::DynamicImage::ImageLumaA8(i));
+            Ok(image::DynamicImage::ImageLumaA8(i))
         }
         _ => {
             bail!(
@@ -934,7 +924,7 @@ fn autoscale(values: &Vec<f32>) -> Vec<f32> {
     }
 
     values
-        .into_iter()
+        .iter()
         .map(|v| fit(*v, lowest, highest, 0., 255.))
         .collect()
 }
@@ -1080,7 +1070,7 @@ fn load_kra(path: &Path) -> Result<DynamicImage> {
 #[cfg(feature = "turbo")]
 fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
     debug!("Loading jpeg using turbojpeg");
-    let jpeg_data = std::fs::read(&img_location)?;
+    let jpeg_data = std::fs::read(img_location)?;
     let mut decompressor = turbojpeg::Decompressor::new()?;
     let header = decompressor.read_header(&jpeg_data)?;
     let (width, height) = (header.width, header.height);
