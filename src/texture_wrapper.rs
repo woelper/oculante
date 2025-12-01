@@ -559,6 +559,7 @@ impl TexWrap {
         (format, pipeline)
     }
 
+    #[allow(clippy::type_complexity)]
     fn gen_from_dynamic_image(
         gfx: &mut Graphics,
         settings: &PersistentSettings,

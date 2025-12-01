@@ -96,7 +96,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
 
                         #[cfg(feature = "file_open")]
-                        if ui.button(format!("Save ASE")).clicked() {
+                        if ui.button("Save ASE").clicked() {
                             let start_directory =
                                 state.volatile_settings.last_open_directory.clone();
                             std::thread::spawn(move || {

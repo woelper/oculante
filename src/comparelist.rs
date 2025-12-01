@@ -98,7 +98,7 @@ impl Eq for CompareItem {}
 
 impl PartialOrd for CompareItem {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.path.partial_cmp(&other.path)
+        Some(self.cmp(other))
     }
 }
 

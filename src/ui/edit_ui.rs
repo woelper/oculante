@@ -394,13 +394,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 #[cfg(feature = "file_open")]
                 if state.current_image.is_some()
-                    && ui.button(format!("Save as...")).clicked() {
+                    && ui.button("Save as...").clicked() {
                         let start_directory = state.volatile_settings.last_open_directory.clone();
 
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
                         let err_sender = state.message_channel.0.clone();
-                        let image_info = state.image_info.clone();
+                        let image_info = state.image_metadata.clone();
 
                         std::thread::spawn(move || {
                             let file_dialog_result = rfd::FileDialog::new()

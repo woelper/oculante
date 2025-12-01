@@ -97,7 +97,7 @@ pub struct OculanteState {
     pub thumbnails: Thumbnails,
 }
 
-impl<'b> OculanteState {
+impl OculanteState {
     pub fn send_message_info(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::info(msg));
     }
@@ -115,7 +115,7 @@ impl<'b> OculanteState {
     }
 }
 
-impl<'b> Default for OculanteState {
+impl Default for OculanteState {
     fn default() -> OculanteState {
         let persistent_settings = PersistentSettings::load().unwrap_or_default();
 
