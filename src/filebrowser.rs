@@ -191,8 +191,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{search_icon}"))
-                        .color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(search_icon).color(ui.style().visuals.selection.bg_fill),
                 )
                 .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
@@ -239,8 +238,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{CHEVRON_UP}"))
-                        .color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(CHEVRON_UP).color(ui.style().visuals.selection.bg_fill),
                 )
                 .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
@@ -663,11 +661,11 @@ pub fn browse_for_image_path(state: &mut OculanteState) {
     std::thread::spawn(move || {
         let uppercase_lowercase_ext = [
             crate::utils::SUPPORTED_EXTENSIONS
-                .into_iter()
+                .iter()
                 .map(|e| e.to_ascii_lowercase())
                 .collect::<Vec<_>>(),
             crate::utils::SUPPORTED_EXTENSIONS
-                .into_iter()
+                .iter()
                 .map(|e| e.to_ascii_uppercase())
                 .collect::<Vec<_>>(),
         ]
