@@ -13,7 +13,6 @@ use wgpu::{
     AstcBlock, AstcChannel, Extent3d, TextureDimension, TextureFormat, TextureViewDimension,
 };
 
-// use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
 use super::{CompressedImageFormats, DataFormat, Image, TextureError, TranscodeFormat};
 
 pub fn ktx2_buffer_to_image(
@@ -86,12 +85,8 @@ pub fn ktx2_buffer_to_image(
 
                     for level_data in &levels {
                         transcoded.push(
-                            level_data
-                                .iter()
-                                .copied()
-                                // FIXME: colorspace.rs needs to be enabled
-                                // .map(|v| v.nonlinear_to_linear_srgb())
-                                .collect::<Vec<u8>>(),
+                            // FIXME: colorspace.rs needs to be enabled
+                            level_data.to_vec()
                         );
 
                         // Next mip dimensions are half the current, minimum 1x1
@@ -105,13 +100,7 @@ pub fn ktx2_buffer_to_image(
                     let (mut original_width, mut original_height) = (width, height);
 
                     for level_data in &levels {
-                        transcoded.push(
-                            level_data
-                                .iter()
-                                .copied()
-                                // .map(|v| v.nonlinear_to_linear_srgb())
-                                .collect::<Vec<u8>>(),
-                        );
+                        transcoded.push(level_data.to_vec());
 
                         // Next mip dimensions are half the current, minimum 1x1
                         original_width = (original_width / 2).max(1);
@@ -163,8 +152,8 @@ pub fn ktx2_buffer_to_image(
                             (height >> level as u32).max(1),
                         );
                         let (num_blocks_x, num_blocks_y) = (
-                            ((level_width + block_width_pixels - 1) / block_width_pixels) .max(1),
-                            ((level_height + block_height_pixels - 1) / block_height_pixels) .max(1),
+                            level_width.div_ceil(block_width_pixels).max(1),
+                            level_height.div_ceil(block_height_pixels).max(1),
                         );
                         let level_bytes = (num_blocks_x * num_blocks_y * block_bytes) as usize;
 
@@ -242,8 +231,8 @@ pub fn ktx2_buffer_to_image(
             (depth as usize >> level).max(1),
         );
         let (num_blocks_x, num_blocks_y) = (
-            ((level_width + block_width_pixels - 1) / block_width_pixels).max(1),
-            ((level_height + block_height_pixels - 1) / block_height_pixels).max(1),
+            level_width.div_ceil(block_width_pixels).max(1),
+            level_height.div_ceil(block_height_pixels).max(1),
         );
         let level_bytes = num_blocks_x * num_blocks_y * level_depth * block_bytes;
 

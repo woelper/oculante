@@ -1087,7 +1087,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 .min_height(40.)
                 .default_height(40.)
                 .show_separator_line(false)
-                .frame(egui::containers::Frame::none())
+                .frame(egui::containers::Frame::NONE)
                 .show(ctx, |ui| {
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                         drag_area(ui, state, app);

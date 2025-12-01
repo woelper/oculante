@@ -62,18 +62,19 @@ pub struct LegacyEditState {
 
 impl LegacyEditState {
     pub fn upgrade(&self) -> EditState {
-        let mut ne = EditState::default();
-        ne.image_op_stack = self
-            .image_op_stack
-            .iter()
-            .map(|op| ImgOpItem::new(op.clone()))
-            .collect();
-        ne.pixel_op_stack = self
-            .pixel_op_stack
-            .iter()
-            .map(|op| ImgOpItem::new(op.clone()))
-            .collect();
-        ne
+        EditState {
+            image_op_stack: self
+                .image_op_stack
+                .iter()
+                .map(|op| ImgOpItem::new(op.clone()))
+                .collect(),
+            pixel_op_stack: self
+                .pixel_op_stack
+                .iter()
+                .map(|op| ImgOpItem::new(op.clone()))
+                .collect(),
+            ..Default::default()
+        }
     }
 }
 
@@ -279,20 +280,20 @@ impl fmt::Display for ImageOperation {
 
 impl ImageOperation {
     pub fn is_per_pixel(&self) -> bool {
-        match self {
-            Self::Blur(_) => false,
-            Self::Resize { .. } => false,
-            Self::Crop(_) => false,
-            Self::CropPerspective { .. } => false,
-            Self::Rotate(_) => false,
-            Self::ColorConverter(_) => false,
-            Self::Flip(_) => false,
-            Self::ChromaticAberration(_) => false,
-            Self::LUT(_) => false,
-            Self::Filter3x3(_) => false,
-            Self::ScaleImageMinMax => false,
-            _ => true,
-        }
+        !matches!(
+            self,
+            Self::Blur(_)
+                | Self::Resize { .. }
+                | Self::Crop(_)
+                | Self::CropPerspective { .. }
+                | Self::Rotate(_)
+                | Self::ColorConverter(_)
+                | Self::Flip(_)
+                | Self::ChromaticAberration(_)
+                | Self::LUT(_)
+                | Self::Filter3x3(_)
+                | Self::ScaleImageMinMax,
+        )
     }
 
     // Add functionality about how to draw UI here
@@ -301,7 +302,7 @@ impl ImageOperation {
         ui: &mut Ui,
         geo: &ImageGeometry,
         block_panning: &mut bool,
-        settings: &mut VolatileSettings,
+        #[allow(unused)] settings: &mut VolatileSettings,
     ) -> Response {
         match self {
             Self::ColorConverter(ct) => {
@@ -605,7 +606,7 @@ impl ImageOperation {
 
                             // check which point is closest
 
-                            if closest_pt(&pts_cpy, mouse_pos_in_gradient as u8) as usize == ptnum {
+                            if closest_pt(&pts_cpy, mouse_pos_in_gradient as u8) == ptnum {
                                 is_hovered = true;
 
                                 // on click, set the id
@@ -867,10 +868,7 @@ impl ImageOperation {
                                 .collect::<Vec<_>>();
                             for p in points_transformed.chunks(2) {
                                 ui.painter().line_segment(
-                                    [
-                                        Pos2::new(p[0].0 as f32, p[0].1 as f32),
-                                        Pos2::new(p[1].0 as f32, p[1].1 as f32),
-                                    ],
+                                    [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
                                         Color32::from_rgb(color[0], color[1], color[2]),
@@ -1199,19 +1197,16 @@ impl ImageOperation {
                         }
                     }
                     Self::Filter3x3(amt) => {
-                        let kernel = amt
-                            .into_iter()
-                            .map(|a| *a as f32 / 100.)
-                            .collect::<Vec<_>>();
+                        let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
                         *img = imageops::filter3x3(img, &kernel);
                     }
                     Self::LUT(lut_name) => {
                         use lutgen::identity::correct_image;
                         let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
-                            let lut_img = image::load_from_memory(&lut_data).unwrap().to_rgb8();
+                            let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else if let Ok(lut_img) = image::open(&lut_name) {
+                        } else if let Ok(lut_img) = image::open(lut_name) {
                             correct_image(&mut external_image, &lut_img.to_rgb8());
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
@@ -1353,9 +1348,9 @@ impl ImageOperation {
                             //Step 2: Create 8-Bit LUT
                             let mut lut: [u8; 256] = [0u8; 256];
 
-                            for n in min as usize..=max as usize {
+                            for n in min..=max {
                                 let g = n as f64;
-                                lut[n] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
+                                lut[n as usize] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
                             }
 
                             //Step 3: Apply 8-Bit LUT
@@ -1473,9 +1468,9 @@ impl ImageOperation {
             }
             Self::Exposure(amt) => {
                 let amt = (*amt as f32 / 100.) * 4.;
-                p[0] = p[0] * (2_f32).powf(amt);
-                p[1] = p[1] * (2_f32).powf(amt);
-                p[2] = p[2] * (2_f32).powf(amt);
+                p[0] *= (2_f32).powf(amt);
+                p[1] *= (2_f32).powf(amt);
+                p[2] *= (2_f32).powf(amt);
             }
             Self::Equalize(bounds) => {
                 let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
@@ -1657,7 +1652,7 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
         DynamicImage::ImageRgb8(buffer) => {
             buffer.par_chunks_mut(3).for_each(|px| {
                 let mut float_pixel =
-                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0 as f32) / 255.;
+                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0) / 255.;
                 // run pixel operations
                 for operation in operators {
                     if let Err(e) = operation.process_pixel(&mut float_pixel) {
@@ -1745,7 +1740,7 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
             bail!("Pixel operators are not yet supported for this image type.");
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
@@ -1812,7 +1807,7 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
     Ok(())
 }
 
-fn interpolate_u8(data: &Vec<GradientStop>, pt: u8) -> [u8; 3] {
+fn interpolate_u8(data: &[GradientStop], pt: u8) -> [u8; 3] {
     // debug!("Pt is {pt}");
 
     for i in 0..data.len() {
@@ -1849,7 +1844,7 @@ fn interpolate_u8(data: &Vec<GradientStop>, pt: u8) -> [u8; 3] {
     [0, 255, 0]
 }
 
-fn closest_pt(data: &Vec<GradientStop>, value: u8) -> usize {
+fn closest_pt(data: &[GradientStop], value: u8) -> usize {
     // go thru all points of gradient
     for (i, current) in data.iter().enumerate() {
         // make sure there is a next point

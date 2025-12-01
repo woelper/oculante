@@ -8,8 +8,6 @@ use log::debug;
 use wgpu::TextureFormat;
 
 impl Image {
-    /// Converts a [`DynamicImage`] to an [`Image`].
-
     /// Convert a [`Image`] to a [`DynamicImage`]. Useful for editing image
     /// data. Not all [`TextureFormat`] are covered, therefore it will return an
     /// error if the format is unsupported. Supported formats are:
@@ -21,7 +19,7 @@ impl Image {
     /// To convert [`Image`] to a different format see: [`Image::convert`].
     pub fn try_into_dynamic(self) -> Result<DynamicImage, IntoDynamicImageError> {
         debug!(
-            "Attemting to interpret format {:?}",
+            "Attempting to interpret format {:?}",
             self.texture_descriptor.format
         );
         debug!("Mip levels: {:?}", self.texture_descriptor.mip_level_count);
@@ -58,22 +56,20 @@ impl Image {
                 let d = self
                     .data
                     .chunks_exact(2)
-                    .map(|c| [f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32()])
-                    .flatten()
+                    .flat_map(|c| [f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32()])
                     .collect::<Vec<_>>();
-                Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
+                Rgba32FImage::from_vec(self.width(), self.height(), d)
                     .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
             }
             TextureFormat::Rgba32Float => {
                 let d = self
                     .data
                     .chunks_exact(4)
-                    .map(|c| [f32::from_le_bytes(c[0..=3].try_into().unwrap())])
-                    .flatten()
+                    .flat_map(|c| [f32::from_le_bytes(c[0..=3].try_into().unwrap())])
                     .map(|p| p.powf(2.2))
-                    .map(|p| p.powf(1.0 / 2.2).max(0.0).min(1.0))
+                    .map(|p| p.powf(1.0 / 2.2).clamp(0.0, 1.0))
                     .collect::<Vec<_>>();
-                Rgba32FImage::from_vec(self.width() as u32, self.height() as u32, d)
+                Rgba32FImage::from_vec(self.width(), self.height(), d)
                     .map(|i| DynamicImage::ImageRgba8(DynamicImage::ImageRgba32F(i).to_rgba8()))
             }
             // Throw and error if conversion isn't supported
