@@ -1,0 +1,4 @@
+[submodule "lib/notan"]
+	path = lib/notan
+	url = https://github.com/brian6932/notan
+	branch = fix/cmake-shaderc-error
