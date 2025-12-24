@@ -56,7 +56,7 @@ If you are on macOS, you may have to run the following in a terminal:
 xattr -rd com.apple.quarantine /path/to/oculante
 ```
 
-If you still run into issues, please insure you have `libheif` installed through brew.
+If you still run into issues, please ensure you have `libheif` installed through brew.
 
 ```sh
 brew install libheif
