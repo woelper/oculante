@@ -29,7 +29,7 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-notan = { version = "0.13", default-features = false, features = [
+notan = { git = "https://github.com/Nazariglez/notan", rev = "c30c640ec2fc1246996785dfff75f014c144ff8d", default-features = false, features = [
     "backend",
     "draw",
     "drop_files",
