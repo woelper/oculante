@@ -50,6 +50,20 @@ Images may contain color information that is masked by the alpha channel. Althou
 
 Find and download the correct executable for your operating system on the [releases](https://github.com/woelper/oculante/releases/latest) page. The download is small, around 25MB, as we link dependencies statically by default. We also have packages available for ARM Linux. Have a different OS? Please feel free to open an issue if you want your operating system of choice supported!
 
+If you are on macOS, you may have to run the following in a terminal if you run into an issue saying the application is damaged or similar:
+
+```sh
+xattr -rd com.apple.quarantine /path/to/oculante
+```
+
+If you still run into issues, please ensure you have `libheif` installed through brew.
+
+```sh
+brew install libheif
+```
+
+You can also use a version without heif support if you prefer.
+
 For those looking to manage Oculante through a package manager, please see the options below.
 
 ### Cargo
