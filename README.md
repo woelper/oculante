@@ -1,5 +1,7 @@
+### Oculante is currently in maintenance mode. We will only be accepting bug fixes and minor improvements to existing features until we complete our rewrite. More details can be seen [here](https://github.com/woelper/oculante/issues/#746). Progress can be seen on the oculante-next branch.
+
 <h1 align="center">
-    <img alt="banner" src="res/banner.avif">
+    <img alt="banner" src="res/maintenance_banner.png">
 </h1>
 
  _A no-nonsense hardware-accelerated image viewer_
