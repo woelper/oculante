@@ -7,13 +7,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  MACOS_DEPLOYMENT_TARGET: 10.15
+  MACOS_DEPLOYMENT_TARGET: 11
   SHADERC_LIB_DIR: /opt/homebrew/lib
 
 jobs:
   release_job:
     name: Create release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.id }}
@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-14, macos-12, ubuntu-latest]
+        os: [ubuntu-24.04, windows-2025, macos-latest, macos-15-intel, ubuntu-latest]
         rust: [stable]
     steps:
     - uses: actions/checkout@v4
@@ -58,76 +58,75 @@ jobs:
 
     - name: Cross-compile armv7
       run: |
-        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features --features notan/glsl-to-spirv
+        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features --features notan_glsl-to-spirv
         zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
     # - name: Cross-compile arm64
     #   run: |
-    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/glsl-to-spirv
+    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/shaderc
     #     zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
     #   if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
       run: cargo install cargo-bundle
-      if: matrix.os == 'macos-12'
-      
+      if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
+
     - name: Install shaderc
       run: brew install shaderc
-      if: matrix.os == 'macos-14'
-
+      if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
       
     - name: Install cargo deb
       run: cargo install cargo-deb
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-24.04'
 
     - name: Patch azure linux deps
       run: sudo apt update
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-24.04'
 
     - name: Install libheif for ubuntu
       run: |
         ./build_deps_linux.sh
         cd libheif/build && sudo make install
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-24.04'
 
     - name: Update Rust
       run: rustup update
 
     - name: Install linux classic dependencies
       run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-24.04'
 
     - name: Install libheif for Windows
       run: |
         vcpkg integrate install
         vcpkg install libheif:x64-windows-static-md
         vcpkg install libheif:x64-windows-static
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-2025'
 
     - name: Build Windows Application
-      run: cargo build --release --features heif --features notan/glsl-to-spirv
-      if: matrix.os == 'windows-2019'
+      run: cargo build --release --features heif --features notan/shaderc
+      if: matrix.os == 'windows-2025'
 
 
     - name: Build Linux classic Application
       run: |
-        cargo build --release --no-default-features --features notan/glsl-to-spirv
+        cargo build --release --no-default-features --features notan/shaderc
         zip -r oculante_linux_minimal.zip target/release/oculante
         cargo build --release
         zip -r oculante_linux.zip target/release/oculante
         cargo deb
         cp target/debian/oculante_*.deb oculante.deb
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-24.04'
 
 
     - name: Build Mac Silicon Bundle
       run: ./build_mac.sh
-      if: matrix.os == 'macos-14'
+      if: matrix.os == 'macos-latest'
 
     - name: Zip Mac Silicon Bundle
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
-      if: matrix.os == 'macos-14'
+      if: matrix.os == 'macos-latest'
 
     - name: Build Mac Intel Bundle
       # run: ./build_mac.sh
@@ -163,14 +162,14 @@ jobs:
           codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-15-intel'
 
     - name: Zip Mac Intel Bundle
       run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-15-intel'
 
-    - name: Upload Linux 20.04 Release
-      if: matrix.os == 'ubuntu-20.04'
+    - name: Upload Linux 24.04 Release
+      if: matrix.os == 'ubuntu-24.04'
       id: upload-release-asset-lin-classic
       uses: actions/upload-release-asset@v1
       env:
@@ -205,8 +204,8 @@ jobs:
     #     asset_name: oculante_linux_aarch64_minimal.zip
     #     asset_content_type: application/zip
 
-    - name: Upload Linux 20.04 Release zip
-      if: matrix.os == 'ubuntu-20.04'
+    - name: Upload Linux 24.04 Release zip
+      if: matrix.os == 'ubuntu-24.04'
       id: upload-release-asset-lin-classic-zip
       uses: actions/upload-release-asset@v1
       env:
@@ -217,8 +216,8 @@ jobs:
         asset_name: oculante_linux.zip
         asset_content_type: application/zip
 
-    - name: Upload Linux 20.04 Release minimal zip
-      if: matrix.os == 'ubuntu-20.04'
+    - name: Upload Linux 24.04 Release minimal zip
+      if: matrix.os == 'ubuntu-24.04'
       id: upload-release-asset-lin-classic-zip-min
       uses: actions/upload-release-asset@v1
       env:
@@ -229,8 +228,8 @@ jobs:
         asset_name: oculante_linux_minimal.zip
         asset_content_type: application/zip
 
-    - name: Upload Linux 20.04 deb
-      if: matrix.os == 'ubuntu-20.04'
+    - name: Upload Linux 24.04 deb
+      if: matrix.os == 'ubuntu-24.04'
       id: upload-release-asset-lin-classic-deb
       uses: actions/upload-release-asset@v1
       env:
@@ -242,7 +241,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macos-14'
+      if: matrix.os == 'macos-latest'
       id: upload-release-asset-mac
       uses: actions/upload-release-asset@v1
       env:
@@ -254,7 +253,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload Mac Release
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-15-intel'
       id: upload-release-asset-macintel
       uses: actions/upload-release-asset@v1
       env:
@@ -265,8 +264,8 @@ jobs:
         asset_name: oculante_mac_intel.zip
         asset_content_type: application/zip
 
-    - name: Upload Windows 2019 Release exe
-      if: matrix.os == 'windows-2019'
+    - name: Upload Windows 2025 Release exe
+      if: matrix.os == 'windows-2025'
       id: upload-release-asset-windows-classic
       uses: actions/upload-release-asset@v1
       env:
@@ -280,7 +279,7 @@ jobs:
   publish_release:
     name: Publish release
     needs: [build_job, release_job]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Test id
       run: echo "${{ needs.release_job.outputs.release_id }}"

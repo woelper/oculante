@@ -144,6 +144,7 @@ j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
 lang_support = []
+notan_glsl-to-spirv = ["notan/glsl-to-spirv"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
