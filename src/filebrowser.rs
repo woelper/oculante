@@ -4,42 +4,14 @@ use crate::settings::VolatileSettings;
 use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
 use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
-use anyhow::{Context, Result};
 use dirs;
 use log::debug;
 use notan::egui::{self, *};
-use std::io::Write;
 use std::{
-    fs::{self, read_to_string, File},
+    fs,
     path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
-
-fn load_recent_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(read_to_string(
-        dirs::cache_dir()
-            .context("Can't get cache dir")?
-            .join("oculante")
-            .join(".last_open_directory"),
-    )?))
-}
-
-fn save_recent_dir(p: &Path) -> Result<()> {
-    let p = if p.is_file() {
-        p.parent().context("Can't get parent")?.to_path_buf()
-    } else {
-        p.to_path_buf()
-    };
-
-    let mut f = File::create(
-        dirs::cache_dir()
-            .context("Can't get cache dir")?
-            .join("oculante")
-            .join(".last_open_directory"),
-    )?;
-    write!(f, "{}", p.to_string_lossy())?;
-    Ok(())
-}
 
 pub fn browse_modal<F: FnMut(&PathBuf)>(
     save: bool,
@@ -50,7 +22,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
 ) {
     let mut path = ctx
         .data(|r| r.get_temp::<PathBuf>(Id::new("FBPATH")))
-        .unwrap_or(load_recent_dir().unwrap_or_default());
+        .unwrap_or_else(|| settings.last_open_directory.clone());
 
     let mut open = true;
 
@@ -191,10 +163,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{search_icon}"))
-                        .color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(search_icon).color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -214,12 +185,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if state.search_active {
             ui.scope(|ui| {
                 ui.visuals_mut().selection.stroke = Stroke::NONE;
-                ui.visuals_mut().widgets.active.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.inactive.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.hovered.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.active.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
                 let resp = ui.add(
                     TextEdit::singleline(&mut state.search_term)
                         .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
@@ -239,10 +210,9 @@ pub fn browse<F: FnMut(&PathBuf)>(
         if ui
             .add(
                 egui::Button::new(
-                    RichText::new(format!("{CHEVRON_UP}"))
-                        .color(ui.style().visuals.selection.bg_fill),
+                    RichText::new(CHEVRON_UP).color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -260,7 +230,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 egui::Button::new(
                     RichText::new(path_icon).color(ui.style().visuals.selection.bg_fill),
                 )
-                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
@@ -308,12 +278,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     * ui.available_width()) as usize;
                 let mut path_string = path.to_string_lossy().to_string();
                 ui.visuals_mut().selection.stroke = Stroke::NONE;
-                ui.visuals_mut().widgets.active.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.inactive.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
-                ui.visuals_mut().widgets.hovered.rounding =
-                    Rounding::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.active.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.inactive.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
+                ui.visuals_mut().widgets.hovered.corner_radius =
+                    CornerRadius::same(ui.get_rounding(BUTTON_HEIGHT_LARGE));
                 let resp = ui.add(
                     TextEdit::singleline(&mut path_string)
                         .min_size(vec2(0., BUTTON_HEIGHT_LARGE))
@@ -427,7 +397,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     if ui
                         .add(
                             egui::Button::new(RichText::new(PLUS).color(col))
-                                .rounding(ui.get_rounding(BUTTON_HEIGHT_LARGE))
+                                .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
                                 .fill(Color32::TRANSPARENT)
                                 .frame(true)
                                 .stroke(Stroke::new(2., col))
@@ -458,10 +428,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .min(num_entries as f32);
             let num_rows = (num_entries as f32 / (thumbs_per_row).max(1.)).ceil() as usize;
 
-            egui::Frame::none()
+            egui::Frame::new()
                 .fill(panel_bg_color)
-                .rounding(ui.style().visuals.widgets.active.rounding * 2.0)
-                .inner_margin(Margin::same(10.))
+                .corner_radius(ui.style().visuals.widgets.active.corner_radius * 2.0)
+                .inner_margin(Margin::same(10))
                 .show(ui, |ui| {
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
@@ -509,7 +479,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     )
                                                     .clicked()
                                                 {
-                                                    _ = save_recent_dir(de);
+                                                    settings.last_open_directory = if de.is_file() {
+                                                        de.parent()
+                                                            .and_then(|parent| {
+                                                                parent.canonicalize().ok()
+                                                            })
+                                                            .unwrap_or_default()
+                                                    } else {
+                                                        de.clone()
+                                                    };
                                                     if !save {
                                                         state.search_active = false;
                                                         state.search_term.clear();
@@ -663,11 +641,11 @@ pub fn browse_for_image_path(state: &mut OculanteState) {
     std::thread::spawn(move || {
         let uppercase_lowercase_ext = [
             crate::utils::SUPPORTED_EXTENSIONS
-                .into_iter()
+                .iter()
                 .map(|e| e.to_ascii_lowercase())
                 .collect::<Vec<_>>(),
             crate::utils::SUPPORTED_EXTENSIONS
-                .into_iter()
+                .iter()
                 .map(|e| e.to_ascii_uppercase())
                 .collect::<Vec<_>>(),
         ]

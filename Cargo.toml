@@ -28,7 +28,8 @@ identifier = "com.github.woelper.oculante"
 name = "oculante"
 
 [dependencies]
-notan = { version = "0.12", default-features = false, features = [
+env_logger = "0.11"
+notan = { version = "0.13", default-features = false, features = [
     "backend",
     "draw",
     "drop_files",
@@ -38,10 +39,9 @@ notan = { version = "0.12", default-features = false, features = [
 # === EGUI
 #  These need to match the egui version used in notan and can't be
 # updated unless notan updates egui.
-egui_plot = "0.27"
-egui_extras = { version = "0.27.2", features = ["image", "file"] }
-egui-modal = "0.3.6"
-egui-notify = "0.14"
+egui_plot = "0.31"
+egui-notify = "0.19"
+egui_extras = { version = "0.31", features = ["image", "file"] }
 
 # === IMAGE FORMATS
 avif-decode = { version = "1.0", optional = true }
@@ -99,6 +99,8 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
 webbrowser = "1.0"
+thiserror = "1.0.51"
+
 img-parts = "0.3" # for exif saving
 dark-light = "2.0"
 trash = "5.2"
@@ -121,7 +123,7 @@ anyhow = "1.0"
 arboard = { version = "3.4", features = ["wayland-data-control"] }
 clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "6.0"
-env_logger = "0.11"
+egui-modal = {path = "egui-modal-diag"}
 
 [features]
 default = [

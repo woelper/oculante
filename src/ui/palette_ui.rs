@@ -38,6 +38,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         rect,
                                         1.,
                                         Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                        StrokeKind::Inside,
                                     );
                                 }
                                 if resp.hovered() {
@@ -95,7 +96,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
 
                         #[cfg(feature = "file_open")]
-                        if ui.button(format!("Save ASE")).clicked() {
+                        if ui.button("Save ASE").clicked() {
                             let start_directory =
                                 state.volatile_settings.last_open_directory.clone();
                             std::thread::spawn(move || {

@@ -139,7 +139,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
                                         if ui
-                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).clamp_range(0..=10000))
+                                        .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).range(0..=10000))
                                         .changed()
                                         {
                                             state.player.cache.cache_size = state.persistent_settings.max_cache;
@@ -147,6 +147,25 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
                                     }, ui);
 
+                                    configuration_item_ui(
+                                        "Number of recent images",
+                                        "Remember this many recently opened images.",
+                                        |ui| {
+                                            if ui.add(
+                                                egui::DragValue::new(&mut state.persistent_settings.max_recents)
+                                                    .range(0..=12),
+                                            )
+                                            .changed() 
+                                            {
+                                                state
+                                                    .volatile_settings
+                                                    .recent_images
+                                                    .truncate(state.persistent_settings.max_recents.into());
+                                            }
+                                        },
+                                        ui,
+                                    );
+                                    
                                     configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
                                     }, ui);
@@ -172,7 +191,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     configuration_item_ui("Zoom multiplier", "Multiplier of how fast the image will change size when using your mouse wheel or trackpad.", |ui| {
-                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).clamp_range(0.05..=10.0).speed(0.01));
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).range(0.05..=10.0).speed(0.01));
                                     }, ui);
 
                                     configuration_item_ui(
@@ -191,8 +210,8 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Minimum window size", "Set the minimum size of the main window.", |ui| {
                                         ui.horizontal(|ui| {
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).clamp_range(1..=2000).prefix("x : ").speed(0.01));
-                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).clamp_range(1..=2000).prefix("y : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.0).range(1..=2000).prefix("x : ").speed(0.01));
+                                            ui.add(egui::DragValue::new(&mut state.persistent_settings.min_window_size.1).range(1..=2000).prefix("y : ").speed(0.01));
                                         });
 
                                     }, ui);
@@ -228,7 +247,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                 }
                                 light_panel(ui, |ui| {
                                     configuration_item_ui("Color theme", "Customize the look and feel.", |ui| {
-                                        egui::ComboBox::from_id_source("Color theme")
+                                        egui::ComboBox::from_id_salt("Color theme")
                                         .selected_text(format!("{:?}", state.persistent_settings.theme))
                                         .show_ui(ui, |ui| {
                                             let mut r = ui.selectable_value(&mut state.persistent_settings.theme, ColorTheme::Dark, "Dark");
@@ -694,29 +713,31 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .collect::<Vec<_>>();
     ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap_or(std::cmp::Ordering::Equal));
 
-    egui::Grid::new("info").num_columns(4).show(ui, |ui| {
-        for (event, keys) in ordered_shortcuts {
-            ui.label_unselectable(format!("{event:?}"));
-            ui.label_unselectable(lookup(&s, event));
-            ui.add_space(200.);
-            if !no_keys_pressed {
-                if ui
-                    .button(format!("Assign {}", keypresses_as_string(&k)))
-                    .clicked()
-                {
-                    *keys = app
-                        .keyboard
-                        .down
-                        .iter()
-                        .map(|(k, _)| format!("{k:?}"))
-                        .collect();
+    egui::Grid::new("info")
+        .num_columns(4)
+        .spacing([100.0, 10.0])
+        .show(ui, |ui| {
+            for (event, keys) in ordered_shortcuts {
+                ui.label_unselectable(format!("{event:?}"));
+                ui.label_unselectable(lookup(&s, event));
+                if !no_keys_pressed {
+                    if ui
+                        .button(format!("Assign {}", keypresses_as_string(&k)))
+                        .clicked()
+                    {
+                        *keys = app
+                            .keyboard
+                            .down
+                            .iter()
+                            .map(|(k, _)| format!("{k:?}"))
+                            .collect();
+                    }
+                } else {
+                    ui.add_enabled(false, egui::Button::new("Press key(s)..."));
                 }
-            } else {
-                ui.add_enabled(false, egui::Button::new("Press key(s)..."));
+                ui.end_row();
             }
-            ui.end_row();
-        }
-    });
+        });
 }
 
 #[derive(Default)]

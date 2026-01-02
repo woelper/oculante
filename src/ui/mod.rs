@@ -2,7 +2,7 @@ const ICON_SIZE: f32 = 24. * 0.8;
 const ROUNDING: f32 = 8.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
-pub const PANEL_WIDTH: f32 = 240.0;
+pub const PANEL_WIDTH: f32 = 260.0;
 const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 mod info_ui;
@@ -115,7 +115,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn get_rounding(&self, _height: f32) -> f32 {
+    fn get_rounding(&self, _height: f32) -> u8 {
         unimplemented!()
     }
 
@@ -129,11 +129,11 @@ pub trait EguiExt {
 }
 
 impl EguiExt for Ui {
-    fn get_rounding(&self, height: f32) -> f32 {
+    fn get_rounding(&self, height: f32) -> u8 {
         if height > 25. {
-            self.style().visuals.widgets.inactive.rounding.ne * 2.
+            self.style().visuals.widgets.inactive.corner_radius.ne * 2
         } else {
-            self.style().visuals.widgets.inactive.rounding.ne
+            self.style().visuals.widgets.inactive.corner_radius.ne
         }
     }
 
@@ -167,6 +167,7 @@ impl EguiExt for Ui {
             WidgetInfo::selected(
                 WidgetType::Checkbox,
                 *checked,
+                false,
                 galley.as_ref().map_or("", |x| x.text()),
             )
         });
@@ -176,13 +177,14 @@ impl EguiExt for Ui {
             let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
             self.painter().add(epaint::RectShape::new(
                 big_icon_rect.expand(visuals.expansion),
-                visuals.rounding,
+                visuals.corner_radius,
                 if *checked {
                     color.gamma_multiply(0.3)
                 } else {
                     visuals.weak_bg_fill
                 },
                 visuals.bg_stroke,
+                StrokeKind::Inside,
             ));
             if *checked {
                 // Check mark:
@@ -278,7 +280,7 @@ impl EguiExt for Ui {
         let spacing = if icon.is_empty() { "" } else { "       " };
         let r = self.add(
             egui::Button::new(format!("{spacing}{description}"))
-                .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(self.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(140., BUTTON_HEIGHT_LARGE)),
         );
 
@@ -309,7 +311,7 @@ impl EguiExt for Ui {
         let spacing = if icon.is_empty() { "" } else { "  " };
         let r = self.add(
             egui::Button::new(format!("{description}{spacing}"))
-                .rounding(self.get_rounding(BUTTON_HEIGHT_LARGE))
+                .corner_radius(self.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(0., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
         );
 
@@ -368,7 +370,9 @@ impl EguiExt for Ui {
                 )
                 .clicked()
             {
-                r.clicked = true;
+                // r.flags.insert(egui::response::Flags::CLICKED);
+                r.flags.insert(egui::response::Flags::CLICKED);
+                // r.clicked = true;
             }
             r
         })
@@ -388,20 +392,29 @@ impl EguiExt for Ui {
 
             style.visuals.widgets.inactive.fg_stroke.width = 7.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.rounding =
-                style.visuals.widgets.inactive.rounding.at_least(18.);
+            // style.visuals.widgets.inactive.rounding =
+            //     style.visuals.widgets.inactive.rounding.at_least(18.);
+
+            style.visuals.widgets.inactive.corner_radius =
+                style.visuals.widgets.inactive.corner_radius.at_least(18);
             style.visuals.widgets.inactive.expansion = -4.0;
 
             style.visuals.widgets.hovered.fg_stroke.width = 9.0;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            style.visuals.widgets.hovered.rounding =
-                style.visuals.widgets.hovered.rounding.at_least(18.);
+            // style.visuals.widgets.hovered.rounding =
+            //     style.visuals.widgets.hovered.rounding.at_least(18.);
+            style.visuals.widgets.hovered.corner_radius =
+                style.visuals.widgets.hovered.corner_radius.at_least(18);
+
             style.visuals.widgets.hovered.expansion = -4.0;
 
             style.visuals.widgets.active.fg_stroke.width = 9.0;
             style.visuals.widgets.active.fg_stroke.color = color;
-            style.visuals.widgets.active.rounding =
-                style.visuals.widgets.active.rounding.at_least(18.);
+            // style.visuals.widgets.active.rounding =
+            //     style.visuals.widgets.active.rounding.at_least(18.);
+            style.visuals.widgets.active.corner_radius =
+                style.visuals.widgets.active.corner_radius.at_least(18);
+
             style.visuals.widgets.active.expansion = -4.0;
 
             ui.horizontal(|ui| {
@@ -441,8 +454,11 @@ impl EguiExt for Ui {
 
             style.visuals.widgets.inactive.fg_stroke.width = 5.0;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.rounding =
-                style.visuals.widgets.inactive.rounding.at_least(20.);
+            // style.visuals.widgets.inactive.rounding =
+            //     style.visuals.widgets.inactive.rounding.at_least(20.);
+            style.visuals.widgets.inactive.corner_radius =
+                style.visuals.widgets.inactive.corner_radius.at_least(18);
+
             style.visuals.widgets.inactive.expansion = -5.0;
 
             style.spacing.slider_width = available_width;
@@ -778,10 +794,10 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(230),
     };
 
-    egui::Frame::none()
+    egui::Frame::new()
         .fill(panel_bg_color)
-        .rounding(ui.style().visuals.widgets.active.rounding)
-        .inner_margin(Margin::same(6.))
+        .corner_radius(ui.style().visuals.widgets.active.corner_radius)
+        .inner_margin(Margin::same(6))
         .show(ui, |ui| {
             ui.scope(add_contents);
         });
@@ -793,10 +809,10 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         false => Color32::from_gray(217),
     };
 
-    egui::Frame::none()
+    egui::Frame::new()
         .fill(panel_bg_color)
-        .rounding(ui.style().visuals.widgets.active.rounding)
-        .inner_margin(Margin::same(6.))
+        .corner_radius(ui.style().visuals.widgets.active.corner_radius)
+        .inner_margin(Margin::same(6))
         .show(ui, |ui| {
             ui.scope(add_contents);
         });
@@ -869,4 +885,64 @@ fn save_with_encoding(
     }
     thumbnails::generate(path)?;
     Ok(())
+}
+
+pub struct Modal {
+    id: String,
+    ctx: egui::Context,
+}
+
+impl Modal {
+    pub fn new(id: &str, ctx: &egui::Context) -> Self {
+        Self {
+            id: id.to_string(),
+            ctx: ctx.clone(),
+        }
+    }
+
+    pub fn show<R>(
+        &self,
+        warning_text: impl Into<WidgetText>,
+        add_contents: impl FnOnce(&mut Ui) -> R,
+    ) {
+        if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
+            return;
+        }
+        egui::Modal::new("m".into()).show(&self.ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical_centered_justified(|ui| {
+                    ui.add_space(10.);
+                    ui.label(
+                        RichText::new(WARNING_CIRCLE)
+                            .size(100.)
+                            .color(ui.style().visuals.warn_fg_color),
+                    );
+                    ui.add_space(20.);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(warning_text);
+                    });
+                    ui.add_space(20.);
+                    ui.scope(|ui| {
+                        let warn_color = Color32::from_rgb(255, 77, 77);
+                        ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                        ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                            Stroke::new(1., Color32::WHITE);
+                        ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                            warn_color.linear_multiply(0.8);
+                        if ui.styled_button("Yes").clicked() {
+                            ui.scope(add_contents);
+                            self.ctx.memory_mut(|w| w.close_popup());
+                        }
+                    });
+                    if ui.styled_button("Cancel").clicked() {
+                        self.ctx.memory_mut(|w| w.close_popup());
+                    }
+                });
+            });
+        });
+    }
+    pub fn open(&self) {
+        self.ctx
+            .memory_mut(|w| w.open_popup(self.id.clone().into()));
+    }
 }
