@@ -4,42 +4,14 @@ use crate::settings::VolatileSettings;
 use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
 use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
-use anyhow::{Context, Result};
 use dirs;
 use log::debug;
 use notan::egui::{self, *};
-use std::io::Write;
 use std::{
-    fs::{self, read_to_string, File},
+    fs,
     path::{Path, PathBuf},
 };
 use strum::IntoEnumIterator;
-
-fn load_recent_dir() -> Result<PathBuf> {
-    Ok(PathBuf::from(read_to_string(
-        dirs::cache_dir()
-            .context("Can't get cache dir")?
-            .join("oculante")
-            .join(".last_open_directory"),
-    )?))
-}
-
-fn save_recent_dir(p: &Path) -> Result<()> {
-    let p = if p.is_file() {
-        p.parent().context("Can't get parent")?.to_path_buf()
-    } else {
-        p.to_path_buf()
-    };
-
-    let mut f = File::create(
-        dirs::cache_dir()
-            .context("Can't get cache dir")?
-            .join("oculante")
-            .join(".last_open_directory"),
-    )?;
-    write!(f, "{}", p.to_string_lossy())?;
-    Ok(())
-}
 
 pub fn browse_modal<F: FnMut(&PathBuf)>(
     save: bool,
@@ -50,7 +22,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
 ) {
     let mut path = ctx
         .data(|r| r.get_temp::<PathBuf>(Id::new("FBPATH")))
-        .unwrap_or(load_recent_dir().unwrap_or_default());
+        .unwrap_or_else(|| settings.last_open_directory.clone());
 
     let mut open = true;
 
@@ -507,7 +479,15 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                     )
                                                     .clicked()
                                                 {
-                                                    _ = save_recent_dir(de);
+                                                    settings.last_open_directory = if de.is_file() {
+                                                        de.parent()
+                                                            .and_then(|parent| {
+                                                                parent.canonicalize().ok()
+                                                            })
+                                                            .unwrap_or_default()
+                                                    } else {
+                                                        de.clone()
+                                                    };
                                                     if !save {
                                                         state.search_active = false;
                                                         state.search_term.clear();
