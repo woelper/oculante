@@ -106,7 +106,7 @@ dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f1
 trash = "5.2"
 flate2 = "1.0" # for KTX
 bitflags = "2.8" # for KTX
-wgpu = "22" # for KTX
+wgpu = "28" # for KTX
 ruzstd = "0.8" # for KTX
 mouse_position = "0.1.4"
 file-format = "0.26"
