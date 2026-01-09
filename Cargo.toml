@@ -52,9 +52,9 @@ tiff = "0.9"
 jxl-oxide = "0.8"
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
-resvg = "0.44"
+resvg = "0.45"
 tiny-skia = "0.11"
-usvg = "0.44"
+usvg = "0.45"
 libheif-rs = { version = "2", default-features = false, features = ["v1_19"], optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
@@ -62,7 +62,7 @@ dds-rs = "0.7"
 exr = "1.73"
 gif = "0.13.1"
 image = { version = "0.25.5", features = ["hdr"] }
-jpeg2k = { version = "0.9", optional = true, default-features = false, features = [
+jpeg2k = { version = "0.10", optional = true, default-features = false, features = [
     "threads",
     "file-io",
     "openjpeg-sys",
@@ -70,8 +70,8 @@ jpeg2k = { version = "0.9", optional = true, default-features = false, features 
 icns = "0.3.1"
 webp-animation = { version = "0.9.0", features = ["static"] }
 # dicom needs to be the same version
-dicom-pixeldata = { version = "0.8", features = ["image"] }
-dicom-object = "0.8"
+dicom-pixeldata = { version = "0.9", features = ["image"] }
+dicom-object = "0.9"
 libavif-image = { version = "0.14", optional = true }
 gif-dispose = "5.0.1"
 
@@ -81,8 +81,8 @@ lutgen = { version = "0.11", features = ["lutgen-palettes"] }
 quantette = { version = "0.3.0", features = ["threads"] }
 ase-swatch = "0.1.0"
 libblur = "0.14"
-imageproc = { version = "0.25", features = ["rayon"] }
-evalexpr = "12"
+imageproc = { version = "0.26", features = ["rayon"] }
+evalexpr = "13"
 fast_image_resize = { version = "5.1", features = ["rayon"] }
 
 # APP FUNCTIONALITY CRATES
@@ -91,15 +91,15 @@ rand_chacha = "0.3"
 rayon = "1.10"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
-self_update = { version = "0.41", default-features = false, features = [
+self_update = { version = "0.42", default-features = false, features = [
     "rustls",
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-strum = { version = "0.26", features = ["derive"] }
-strum_macros = "0.26"
+strum = { version = "0.27", features = ["derive"] }
+strum_macros = "0.27"
 webbrowser = "1.0"
-thiserror = "1.0.51"
+thiserror = "2.0"
 
 img-parts = "0.3" # for exif saving
 dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
@@ -109,9 +109,9 @@ bitflags = "2.8" # for KTX
 wgpu = "28" # for KTX
 ruzstd = "0.8" # for KTX
 mouse_position = "0.1.4"
-file-format = "0.26"
+file-format = "0.28"
 zip = "7.0"
-sysinfo = "0.33.1"
+sysinfo = "0.37"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14"
 open = "5.3"
@@ -161,8 +161,8 @@ cc = "1.0.46"
 cmake = "0.1"
 
 [dev-dependencies]
-cmd_lib = "1.3.0"
-xmltree = "0.11.0"
+cmd_lib = "2"
+xmltree = "0.12"
 chrono = "0.4.38"
 criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
