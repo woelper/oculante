@@ -79,7 +79,7 @@ pub struct OculanteState {
     pub key_grab: bool,
     pub edit_state: EditState,
     pub pointer_over_ui: bool,
-    /// Things that perisist between launches
+    /// Things that persist between launches
     pub persistent_settings: PersistentSettings,
     pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,

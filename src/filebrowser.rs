@@ -632,10 +632,27 @@ impl PathExt for Path {
 #[cfg(feature = "file_open")]
 use crate::appstate::OculanteState;
 
+#[cfg(feature = "file_open")]
+/// Default directory for file browser.
+#[derive(Clone, Copy, Default)]
+pub enum BrowserDir {
+    #[default]
+    LastOpenDir,
+    CurrentImageDir,
+}
+
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
-pub fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.volatile_settings.last_open_directory.clone();
+pub fn browse_for_image_path(state: &mut OculanteState, wd: BrowserDir) {
+    let start_directory = match wd {
+        BrowserDir::LastOpenDir => state.volatile_settings.last_open_directory.clone(),
+        BrowserDir::CurrentImageDir => state
+            .current_path
+            .as_deref()
+            .and_then(|path| path.parent())
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| state.volatile_settings.last_open_directory.clone()),
+    };
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

@@ -5,6 +5,9 @@ use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
 
+#[cfg(feature = "file_open")]
+use crate::filebrowser::BrowserDir;
+
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
 
@@ -285,7 +288,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
         {
             #[cfg(feature = "file_open")]
-            browse_for_image_path(state);
+            let default_dir = if app.keyboard.shift() {
+                BrowserDir::CurrentImageDir
+            } else {
+                BrowserDir::LastOpenDir
+            };
+
+            #[cfg(feature = "file_open")]
+            browse_for_image_path(state, default_dir);
             #[cfg(not(feature = "file_open"))]
             ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
         }

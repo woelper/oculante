@@ -1,7 +1,7 @@
 use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
-use crate::filebrowser::browse_for_image_path;
+use crate::filebrowser::{browse_for_image_path, BrowserDir};
 use crate::icons::*;
 use crate::utils::*;
 use egui_plot::{Line, Plot, PlotPoints};
@@ -16,7 +16,12 @@ use notan::{
 use super::*;
 use std::time::Duration;
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
+pub fn info_ui(
+    app: &mut App,
+    ctx: &Context,
+    state: &mut OculanteState,
+    _gfx: &mut Graphics,
+) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
@@ -155,10 +160,18 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     }
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
-                            if ui.button(format!("{FOLDER} Open another image...")).clicked() {
+                            let browser_button = ui.button(format!("{FOLDER} Open another image..."));
+                            if browser_button.clicked() {
+                                #[cfg(feature = "file_open")]
+                                let default_dir = if app.keyboard.shift() {
+                                    BrowserDir::CurrentImageDir
+                                } else {
+                                    BrowserDir::LastOpenDir
+                                };
+
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
-                                browse_for_image_path(state);
+                                browse_for_image_path(state, default_dir);
                                 #[cfg(not(feature = "file_open"))]
                                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
 
