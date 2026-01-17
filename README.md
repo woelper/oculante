@@ -127,7 +127,7 @@ Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
 
 Mac:
 `brew install nasm cmake`
-###### You may need this variable when building Oculante on macOS`export SHADERC_LIB_DIR=/opt/homebrew/lib` ######
+###### You may need this variable when building Oculante on macOS: `export SHADERC_LIB_DIR=/opt/homebrew/lib` ######
 
 ## Updates
 
