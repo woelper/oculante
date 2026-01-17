@@ -52,9 +52,9 @@ tiff = "0.9"
 jxl-oxide = "0.8"
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
-resvg = "0.45"
+resvg = "0.46"
+usvg = "0.46"
 tiny-skia = "0.11"
-usvg = "0.45"
 libheif-rs = { version = "2", default-features = false, features = ["v1_19"], optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
@@ -101,7 +101,7 @@ strum_macros = "0.27"
 webbrowser = "1.0"
 thiserror = "2.0"
 
-img-parts = "0.3" # for exif saving
+img-parts = "0.4" # for exif saving
 dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
 trash = "5.2"
 flate2 = "1.0" # for KTX
