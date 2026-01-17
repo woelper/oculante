@@ -1,4 +1,5 @@
 use super::icons::*;
+use crate::appstate::OculanteState;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
 use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
@@ -62,14 +63,14 @@ struct Disk {
 }
 
 #[derive(Debug, Clone)]
-struct BrowserState {
+pub struct BrowserState {
     filename: String,
     thumbnails: Thumbnails,
     search_term: String,
     search_active: bool,
     listview_active: bool,
     path_active: bool,
-    entries: Option<Vec<PathBuf>>,
+    pub entries: Option<Vec<PathBuf>>,
     drives: Option<Vec<Disk>>,
 }
 
@@ -606,9 +607,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
 }
 
 trait PathExt {
-    fn ext(&self) -> String {
-        todo!()
-    }
+    fn ext(&self) -> String;
 }
 
 impl PathExt for PathBuf {
@@ -629,30 +628,32 @@ impl PathExt for Path {
 
 // the native file dialog
 
-#[cfg(feature = "file_open")]
-use crate::appstate::OculanteState;
-
-#[cfg(feature = "file_open")]
 /// Default directory for file browser.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum BrowserDir {
     #[default]
     LastOpenDir,
     CurrentImageDir,
 }
 
+impl BrowserDir {
+    pub fn path_from_state(self, state: &OculanteState) -> PathBuf {
+        match self {
+            BrowserDir::LastOpenDir => state.volatile_settings.last_open_directory.clone(),
+            BrowserDir::CurrentImageDir => state
+                .current_path
+                .as_deref()
+                .and_then(|path| path.parent())
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| state.volatile_settings.last_open_directory.clone()),
+        }
+    }
+}
+
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 pub fn browse_for_image_path(state: &mut OculanteState, wd: BrowserDir) {
-    let start_directory = match wd {
-        BrowserDir::LastOpenDir => state.volatile_settings.last_open_directory.clone(),
-        BrowserDir::CurrentImageDir => state
-            .current_path
-            .as_deref()
-            .and_then(|path| path.parent())
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| state.volatile_settings.last_open_directory.clone()),
-    };
+    let start_directory = wd.path_from_state(state);
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

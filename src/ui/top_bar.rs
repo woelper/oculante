@@ -1,12 +1,10 @@
 use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
+use crate::filebrowser::BrowserDir;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
-
-#[cfg(feature = "file_open")]
-use crate::filebrowser::BrowserDir;
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
@@ -287,7 +285,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for an image")
             .clicked()
         {
-            #[cfg(feature = "file_open")]
             let default_dir = if app.keyboard.shift() {
                 BrowserDir::CurrentImageDir
             } else {
@@ -297,7 +294,20 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             #[cfg(feature = "file_open")]
             browse_for_image_path(state, default_dir);
             #[cfg(not(feature = "file_open"))]
-            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+            {
+                use crate::filebrowser::BrowserState;
+
+                let path_override = default_dir.path_from_state(state);
+                ui.ctx()
+                    .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
+                // A bit hacky. We need to force a reload.
+                if default_dir == BrowserDir::CurrentImageDir {
+                    ui.ctx()
+                        .data_mut(|w| w.remove::<BrowserState>(Id::new("FBSTATE")));
+                }
+
+                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+            }
         }
 
         draw_hamburger_menu(ui, state, app);
