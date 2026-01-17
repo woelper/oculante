@@ -29,7 +29,7 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-notan = { version = "0.13", default-features = false, features = [
+notan = { version = "0.14", default-features = false, features = [
     "backend",
     "draw",
     "drop_files",
@@ -102,7 +102,7 @@ webbrowser = "1.0"
 thiserror = "1.0.51"
 
 img-parts = "0.3" # for exif saving
-dark-light = "2.0"
+dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
 trash = "5.2"
 flate2 = "1.0" # for KTX
 bitflags = "2.8" # for KTX
