@@ -30,7 +30,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "file_open")]
-use filebrowser::{browse_for_image_path, BrowserDir};
+use filebrowser::browse_for_image_path;
+use filebrowser::BrowserDir;
 use oculante::appstate::*;
 use oculante::utils::*;
 use oculante::*;
@@ -508,8 +509,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
             if key_pressed(app, state, Browse) {
-                #[cfg(feature = "file_open")]
-                let default_dir = if app.keyboard.shift() {
+                state.filebrowser_last_dir = if app.keyboard.shift() {
                     BrowserDir::CurrentImageDir
                 } else {
                     BrowserDir::LastOpenDir
@@ -517,7 +517,7 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
 
                 state.redraw = true;
                 #[cfg(feature = "file_open")]
-                browse_for_image_path(state, default_dir);
+                browse_for_image_path(state);
                 #[cfg(not(feature = "file_open"))]
                 {
                     state.filebrowser_id = Some("OPEN".into());

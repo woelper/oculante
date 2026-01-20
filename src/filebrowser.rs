@@ -71,7 +71,31 @@ pub struct BrowserState {
     listview_active: bool,
     path_active: bool,
     pub entries: Option<Vec<PathBuf>>,
+    pub last_dir: BrowserDir,
     drives: Option<Vec<Disk>>,
+}
+
+impl BrowserState {
+    /// Check if the directory needs to be reloaded based on the current [`BrowserDir`].
+    pub fn check_refresh_entries(ui: &Ui, last_dir: BrowserDir) {
+        let saved_last_dir = ui
+            .ctx()
+            .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
+            .map(|state| state.last_dir);
+
+        // Refresh the file browser state if the CWD changed.
+        if saved_last_dir != Some(last_dir) {
+            ui.ctx().data_mut(|w| {
+                w.remove::<BrowserState>(Id::new("FBSTATE"));
+
+                let state = BrowserState {
+                    last_dir,
+                    ..Default::default()
+                };
+                w.insert_temp(Id::new("FBSTATE"), state)
+            });
+        }
+    }
 }
 
 impl Default for BrowserState {
@@ -84,6 +108,7 @@ impl Default for BrowserState {
             listview_active: Default::default(),
             path_active: Default::default(),
             entries: Default::default(),
+            last_dir: BrowserDir::default(),
             drives: Default::default(),
         }
     }
@@ -629,7 +654,7 @@ impl PathExt for Path {
 // the native file dialog
 
 /// Default directory for file browser.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BrowserDir {
     #[default]
     LastOpenDir,
@@ -652,8 +677,8 @@ impl BrowserDir {
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
-pub fn browse_for_image_path(state: &mut OculanteState, wd: BrowserDir) {
-    let start_directory = wd.path_from_state(state);
+pub fn browse_for_image_path(state: &mut OculanteState) {
+    let start_directory = state.filebrowser_last_dir.path_from_state(state);
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

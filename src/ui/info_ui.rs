@@ -1,7 +1,8 @@
 use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
-use crate::filebrowser::{browse_for_image_path, BrowserDir};
+use crate::filebrowser::browse_for_image_path;
+use crate::filebrowser::BrowserDir;
 use crate::icons::*;
 use crate::utils::*;
 use egui_plot::{Line, Plot, PlotPoints};
@@ -162,8 +163,7 @@ pub fn info_ui(
                         dark_panel(ui, |ui| {
                             let browser_button = ui.button(format!("{FOLDER} Open another image..."));
                             if browser_button.clicked() {
-                                #[cfg(feature = "file_open")]
-                                let default_dir = if app.keyboard.shift() {
+                                state.filebrowser_last_dir = if app.keyboard.shift() {
                                     BrowserDir::CurrentImageDir
                                 } else {
                                     BrowserDir::LastOpenDir
@@ -171,9 +171,15 @@ pub fn info_ui(
 
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
-                                browse_for_image_path(state, default_dir);
+                                browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                {
+                                    use crate::filebrowser::BrowserState;
+
+
+                                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                    BrowserState::check_refresh_entries(ui, state.filebrowser_last_dir);
+                                }
 
                                 state.is_loaded = false;
                                 // tag to add new image

@@ -285,26 +285,22 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for an image")
             .clicked()
         {
-            let default_dir = if app.keyboard.shift() {
+            state.filebrowser_last_dir = if app.keyboard.shift() {
                 BrowserDir::CurrentImageDir
             } else {
                 BrowserDir::LastOpenDir
             };
 
             #[cfg(feature = "file_open")]
-            browse_for_image_path(state, default_dir);
+            browse_for_image_path(state);
             #[cfg(not(feature = "file_open"))]
             {
                 use crate::filebrowser::BrowserState;
 
-                let path_override = default_dir.path_from_state(state);
+                BrowserState::check_refresh_entries(ui, state.filebrowser_last_dir);
+                let path_override = state.filebrowser_last_dir.path_from_state(state);
                 ui.ctx()
                     .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
-                // A bit hacky. We need to force a reload.
-                if default_dir == BrowserDir::CurrentImageDir {
-                    ui.ctx()
-                        .data_mut(|w| w.remove::<BrowserState>(Id::new("FBSTATE")));
-                }
 
                 ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
             }
