@@ -835,6 +835,11 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
             autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
+        tiff::decoder::DecodingResult::F16(contents) => {
+            debug!("TIFF F16");
+            let values = contents.par_iter().map(|p| f32::from(*p)).collect::<Vec<_>>();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+        }
         tiff::decoder::DecodingResult::U32(contents) => {
             debug!("TIFF U32");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
