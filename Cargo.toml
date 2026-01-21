@@ -48,7 +48,7 @@ avif-decode = { version = "1.0", optional = true }
 turbojpeg = { version = "1.2", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
-tiff = "0.9"
+tiff = "0.11"
 jxl-oxide = "0.8"
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
