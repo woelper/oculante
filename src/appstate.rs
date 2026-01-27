@@ -14,7 +14,7 @@ use image::DynamicImage;
 use nalgebra::Vector2;
 use notan::{prelude::Texture, AppState};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
 };
 
@@ -114,6 +114,19 @@ impl OculanteState {
 
     pub fn send_frame(&self, frame: Frame) {
         let _ = self.texture_channel.0.send(frame);
+    }
+
+    /// Evaluate the base path for the file browser.
+    pub fn filebrowser_path(&self) -> PathBuf {
+        match self.filebrowser_last_dir {
+            BrowserDir::LastOpenDir => self.volatile_settings.last_open_directory.to_owned(),
+            BrowserDir::CurrentImageDir => self
+                .current_path
+                .as_deref()
+                .and_then(|path| path.parent())
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| self.volatile_settings.last_open_directory.clone()),
+        }
     }
 }
 

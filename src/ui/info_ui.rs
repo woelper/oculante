@@ -177,8 +177,15 @@ pub fn info_ui(
                                     use crate::filebrowser::BrowserState;
 
 
+                                    let path_override = state.filebrowser_path();
+                                    BrowserState::check_refresh_entries(
+                                        ui,
+                                        state.filebrowser_last_dir,
+                                        Some(&path_override),
+                                    );
+                                    ui.ctx()
+                                        .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
                                     ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
-                                    BrowserState::check_refresh_entries(ui, state.filebrowser_last_dir);
                                 }
 
                                 state.is_loaded = false;

@@ -297,8 +297,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             {
                 use crate::filebrowser::BrowserState;
 
-                BrowserState::check_refresh_entries(ui, state.filebrowser_last_dir);
-                let path_override = state.filebrowser_last_dir.path_from_state(state);
+                let path_override = state.filebrowser_path();
+                BrowserState::check_refresh_entries(
+                    ui,
+                    state.filebrowser_last_dir,
+                    Some(&path_override),
+                );
                 ui.ctx()
                     .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
 

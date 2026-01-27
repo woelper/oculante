@@ -77,14 +77,40 @@ pub struct BrowserState {
 
 impl BrowserState {
     /// Check if the directory needs to be reloaded based on the current [`BrowserDir`].
-    pub fn check_refresh_entries(ui: &Ui, last_dir: BrowserDir) {
-        let saved_last_dir = ui
+    pub fn check_refresh_entries(ui: &Ui, last_dir: BrowserDir, this_parent: Option<&Path>) {
+        let (saved_last_dir, last_parent_eq) = ui
             .ctx()
             .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
-            .map(|state| state.last_dir);
+            .map(|state| {
+                (
+                    state.last_dir,
+                    state
+                        .entries
+                        .as_deref()
+                        .and_then(|entries| {
+                            let entry = entries.first()?;
+                            entry.parent()
+                        })
+                        .map(|last_parent| Some(last_parent) == this_parent)
+                        .unwrap_or_default(),
+                )
+            })
+            .unzip();
+        let last_parent_eq = last_parent_eq.unwrap_or_default();
 
         // Refresh the file browser state if the CWD changed.
-        if saved_last_dir != Some(last_dir) {
+        // This can mean that the current image's dir is different from the last image's dir or
+        // that the user switched file browser modes.
+        //
+        // So, the path should refresh if the user shift clicked previously (current image
+        // mode) and clicked this time (last dir mode) or vice versa.
+        //
+        // OR we should refresh the directory if the user shift clicked previously AND this time
+        // BUT the two images are in different directories.
+        if saved_last_dir != Some(last_dir)
+            || saved_last_dir == Some(BrowserDir::CurrentImageDir)
+            || !last_parent_eq
+        {
             ui.ctx().data_mut(|w| {
                 w.remove::<BrowserState>(Id::new("FBSTATE"));
 
@@ -661,24 +687,10 @@ pub enum BrowserDir {
     CurrentImageDir,
 }
 
-impl BrowserDir {
-    pub fn path_from_state(self, state: &OculanteState) -> PathBuf {
-        match self {
-            BrowserDir::LastOpenDir => state.volatile_settings.last_open_directory.clone(),
-            BrowserDir::CurrentImageDir => state
-                .current_path
-                .as_deref()
-                .and_then(|path| path.parent())
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| state.volatile_settings.last_open_directory.clone()),
-        }
-    }
-}
-
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 pub fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.filebrowser_last_dir.path_from_state(state);
+    let start_directory = state.filebrowser_path();
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {
