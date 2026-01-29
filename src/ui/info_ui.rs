@@ -2,6 +2,7 @@ use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
+use crate::filebrowser::BrowserDir;
 use crate::icons::*;
 use crate::utils::*;
 use egui_plot::{Line, Plot, PlotPoints};
@@ -16,7 +17,12 @@ use notan::{
 use super::*;
 use std::time::Duration;
 
-pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) -> (Pos2, Pos2) {
+pub fn info_ui(
+    app: &mut App,
+    ctx: &Context,
+    state: &mut OculanteState,
+    _gfx: &mut Graphics,
+) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
@@ -155,12 +161,32 @@ pub fn info_ui(ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) ->
                     }
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
-                            if ui.button(format!("{FOLDER} Open another image...")).clicked() {
+                            let browser_button = ui.button(format!("{FOLDER} Open another image..."));
+                            if browser_button.clicked() {
+                                state.filebrowser_last_dir = if app.keyboard.shift() {
+                                    BrowserDir::CurrentImageDir
+                                } else {
+                                    BrowserDir::LastOpenDir
+                                };
+
                                 // TODO: Automatically insert image into compare list
                                 #[cfg(feature = "file_open")]
                                 browse_for_image_path(state);
                                 #[cfg(not(feature = "file_open"))]
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                {
+                                    use crate::filebrowser::BrowserState;
+
+
+                                    let path_override = state.filebrowser_path();
+                                    BrowserState::check_refresh_entries(
+                                        ui,
+                                        state.filebrowser_last_dir,
+                                        Some(&path_override),
+                                    );
+                                    ui.ctx()
+                                        .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
+                                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                }
 
                                 state.is_loaded = false;
                                 // tag to add new image

@@ -31,6 +31,7 @@ use std::time::Duration;
 
 #[cfg(feature = "file_open")]
 use filebrowser::browse_for_image_path;
+use filebrowser::BrowserDir;
 use oculante::appstate::*;
 use oculante::utils::*;
 use oculante::*;
@@ -508,6 +509,12 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
             if key_pressed(app, state, Browse) {
+                state.filebrowser_last_dir = if app.keyboard.shift() {
+                    BrowserDir::CurrentImageDir
+                } else {
+                    BrowserDir::LastOpenDir
+                };
+
                 state.redraw = true;
                 #[cfg(feature = "file_open")]
                 browse_for_image_path(state);
@@ -1119,7 +1126,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(app, ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
