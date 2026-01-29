@@ -1,4 +1,5 @@
 use super::icons::*;
+use crate::appstate::OculanteState;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
 use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
@@ -62,15 +63,65 @@ struct Disk {
 }
 
 #[derive(Debug, Clone)]
-struct BrowserState {
+pub struct BrowserState {
     filename: String,
     thumbnails: Thumbnails,
     search_term: String,
     search_active: bool,
     listview_active: bool,
     path_active: bool,
-    entries: Option<Vec<PathBuf>>,
+    pub entries: Option<Vec<PathBuf>>,
+    pub last_dir: BrowserDir,
     drives: Option<Vec<Disk>>,
+}
+
+impl BrowserState {
+    /// Check if the directory needs to be reloaded based on the current [`BrowserDir`].
+    pub fn check_refresh_entries(ui: &Ui, last_dir: BrowserDir, this_parent: Option<&Path>) {
+        let (saved_last_dir, last_parent_eq) = ui
+            .ctx()
+            .data(|r| r.get_temp::<BrowserState>(Id::new("FBSTATE")))
+            .map(|state| {
+                (
+                    state.last_dir,
+                    state
+                        .entries
+                        .as_deref()
+                        .and_then(|entries| {
+                            let entry = entries.first()?;
+                            entry.parent()
+                        })
+                        .map(|last_parent| Some(last_parent) == this_parent)
+                        .unwrap_or_default(),
+                )
+            })
+            .unzip();
+        let last_parent_eq = last_parent_eq.unwrap_or_default();
+
+        // Refresh the file browser state if the CWD changed.
+        // This can mean that the current image's dir is different from the last image's dir or
+        // that the user switched file browser modes.
+        //
+        // So, the path should refresh if the user shift clicked previously (current image
+        // mode) and clicked this time (last dir mode) or vice versa.
+        //
+        // OR we should refresh the directory if the user shift clicked previously AND this time
+        // BUT the two images are in different directories.
+        if saved_last_dir != Some(last_dir)
+            || saved_last_dir == Some(BrowserDir::CurrentImageDir)
+            || !last_parent_eq
+        {
+            ui.ctx().data_mut(|w| {
+                w.remove::<BrowserState>(Id::new("FBSTATE"));
+
+                let state = BrowserState {
+                    last_dir,
+                    ..Default::default()
+                };
+                w.insert_temp(Id::new("FBSTATE"), state)
+            });
+        }
+    }
 }
 
 impl Default for BrowserState {
@@ -83,6 +134,7 @@ impl Default for BrowserState {
             listview_active: Default::default(),
             path_active: Default::default(),
             entries: Default::default(),
+            last_dir: BrowserDir::default(),
             drives: Default::default(),
         }
     }
@@ -606,9 +658,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
 }
 
 trait PathExt {
-    fn ext(&self) -> String {
-        todo!()
-    }
+    fn ext(&self) -> String;
 }
 
 impl PathExt for PathBuf {
@@ -629,13 +679,18 @@ impl PathExt for Path {
 
 // the native file dialog
 
-#[cfg(feature = "file_open")]
-use crate::appstate::OculanteState;
+/// Default directory for file browser.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BrowserDir {
+    #[default]
+    LastOpenDir,
+    CurrentImageDir,
+}
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
 pub fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.volatile_settings.last_open_directory.clone();
+    let start_directory = state.filebrowser_path();
     let load_sender = state.load_channel.0.clone();
     state.redraw = true;
     std::thread::spawn(move || {

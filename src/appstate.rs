@@ -1,5 +1,6 @@
 use crate::{
     comparelist::CompareList,
+    filebrowser::BrowserDir,
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
@@ -13,7 +14,7 @@ use image::DynamicImage;
 use nalgebra::Vector2;
 use notan::{prelude::Texture, AppState};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
 };
 
@@ -79,7 +80,7 @@ pub struct OculanteState {
     pub key_grab: bool,
     pub edit_state: EditState,
     pub pointer_over_ui: bool,
-    /// Things that perisist between launches
+    /// Things that persist between launches
     pub persistent_settings: PersistentSettings,
     pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,
@@ -94,6 +95,7 @@ pub struct OculanteState {
     pub first_start: bool,
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
+    pub filebrowser_last_dir: BrowserDir,
     pub thumbnails: Thumbnails,
     pub new_image_loaded: bool,
 }
@@ -113,6 +115,19 @@ impl OculanteState {
 
     pub fn send_frame(&self, frame: Frame) {
         let _ = self.texture_channel.0.send(frame);
+    }
+
+    /// Evaluate the base path for the file browser.
+    pub fn filebrowser_path(&self) -> PathBuf {
+        match self.filebrowser_last_dir {
+            BrowserDir::LastOpenDir => self.volatile_settings.last_open_directory.to_owned(),
+            BrowserDir::CurrentImageDir => self
+                .current_path
+                .as_deref()
+                .and_then(|path| path.parent())
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| self.volatile_settings.last_open_directory.clone()),
+        }
     }
 }
 
@@ -169,6 +184,7 @@ impl Default for OculanteState {
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
             filebrowser_id: None,
+            filebrowser_last_dir: Default::default(),
             thumbnails: Default::default(),
             new_image_loaded: false,
         }
