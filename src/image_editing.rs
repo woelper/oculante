@@ -27,6 +27,7 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
+use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -1156,7 +1157,11 @@ impl ImageOperation {
                         }
                     });
 
-                    ui.label(format!("Aspect ratio: {:.5}", aspect_ratio));
+                    let g = gcd(dimensions.1, dimensions.0);
+                    let w = dimensions.0 / g;
+                    let h = dimensions.1 / g;
+
+                    ui.label(format!("Aspect ratio: {:.5} ({}:{})", aspect_ratio, w, h));
 
                     if ui.styled_checkbox(aspect, "🔒 Lock aspect ratio").clicked() {
                         if *aspect {
