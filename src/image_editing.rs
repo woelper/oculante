@@ -1155,45 +1155,22 @@ impl ImageOperation {
                         if x_response.changed() || y_response.changed() {
                             r.mark_changed();
                         }
-                    });
 
-                    let g = gcd(dimensions.1, dimensions.0);
-                    let w = dimensions.0 / g;
-                    let h = dimensions.1 / g;
-
-                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
-
-                    if ui.styled_checkbox(aspect, "🔒 Lock aspect ratio").clicked() {
-                        if *aspect {
-                            // If locking, calculate and store the current aspect ratio.
-                            let ratio_to_store = if dimensions.1 > 0 {
-                                dimensions.0 as f64 / dimensions.1 as f64
-                            } else {
-                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
-                            };
-                            ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
-                        } else {
-                            // If unlocking, remove the stored ratio.
-                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
+                        // TODO: Replace the lock emoji with an actual icon - @Stoppedpuma
+                        if ui.styled_checkbox(aspect, "🔒").clicked() {
+                            // TODO: This code can still be slightly off by a pixel or two but I'm not too worried about it for now since it has significantly less problems than the previous solution, but it definitely should be fixed in the future. - @Stoppedpuma
+                            if *aspect {
+                                // If locking, calculate and store the current aspect ratio.
+                                let ratio_to_store = if dimensions.1 > 0 {
+                                    dimensions.0 as f64 / dimensions.1 as f64
+                                } else {
+                                    geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                                };
+                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                            }
+                            r.mark_changed();
                         }
-                        r.mark_changed();
-                    }
-
-                    if ui.button("Reset").clicked() {
-                        // Reset dimensions to original
-                        *dimensions = geo.dimensions;
-
-                        // Reset aspect lock to default (true)
-                        *aspect = true;
-
-                        // Remove the stored aspect ratio from egui's memory.
-                        // This will cause it to be recalculated from the original dimensions
-                        // on the next frame, effectively resetting it.
-                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
-
-                        // Mark the UI as changed
-                        r.mark_changed();
-                    }
+                    });
 
                     egui::ComboBox::from_id_source("filter")
                         .selected_text(format!("{filter:?}"))
@@ -1211,6 +1188,31 @@ impl ImageOperation {
                                 }
                             }
                         });
+
+                    let g = gcd(dimensions.1, dimensions.0);
+                    let w = dimensions.0 / g;
+                    let h = dimensions.1 / g;
+
+                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
+
+                    ui.vertical_centered_justified(|ui| {
+
+                    if ui.button("Reset").clicked() {
+                        // Reset dimensions to original
+                        *dimensions = geo.dimensions;
+
+                        // Reset aspect lock to default (true)
+                        *aspect = true;
+
+                        // Remove the stored aspect ratio from egui's memory.
+                        // This will cause it to be recalculated from the original dimensions
+                        // on the next frame, effectively resetting it.
+                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
+
+                        // Mark the UI as changed
+                        r.mark_changed();
+                    }
+                    });
                 });
                 r
             }
