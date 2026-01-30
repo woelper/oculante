@@ -1161,7 +1161,7 @@ impl ImageOperation {
                     let w = dimensions.0 / g;
                     let h = dimensions.1 / g;
 
-                    ui.label(format!("Aspect ratio: {:.5} ({}:{})", aspect_ratio, w, h));
+                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
 
                     if ui.styled_checkbox(aspect, "🔒 Lock aspect ratio").clicked() {
                         if *aspect {
