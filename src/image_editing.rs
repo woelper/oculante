@@ -1129,6 +1129,13 @@ impl ImageOperation {
                         }
                     });
 
+                    let g = gcd(dimensions.1, dimensions.0);
+                    let w = dimensions.0 / g;
+                    let h = dimensions.1 / g;
+
+                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
+
+
                     ui.horizontal(|ui| {
                         let x_response = ui.add(
                             DragValue::new(&mut dimensions.0)
@@ -1188,12 +1195,6 @@ impl ImageOperation {
                                 }
                             }
                         });
-
-                    let g = gcd(dimensions.1, dimensions.0);
-                    let w = dimensions.0 / g;
-                    let h = dimensions.1 / g;
-
-                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
 
                     ui.vertical_centered_justified(|ui| {
 
