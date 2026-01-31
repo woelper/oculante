@@ -1180,6 +1180,7 @@ impl ImageOperation {
                     });
 
                     egui::ComboBox::from_id_source("filter")
+                        .width(ui.available_width())
                         .selected_text(format!("{filter:?}"))
                         .show_ui(ui, |ui| {
                             for f in [
