@@ -1179,7 +1179,7 @@ impl ImageOperation {
                         }
                     });
 
-                    egui::ComboBox::from_id_source("filter")
+                    egui::ComboBox::from_id_salt("filter")
                         .width(ui.available_width())
                         .selected_text(format!("{filter:?}"))
                         .show_ui(ui, |ui| {
