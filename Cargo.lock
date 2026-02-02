@@ -5645,6 +5645,7 @@ dependencies = [
  "mouse_position",
  "nalgebra 0.33.2",
  "notan",
+ "num-integer",
  "open",
  "palette",
  "psd",

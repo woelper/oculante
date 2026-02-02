@@ -1,6 +1,7 @@
 use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
+use crate::filebrowser::BrowserDir;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use notan::egui::*;
@@ -284,10 +285,29 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for an image")
             .clicked()
         {
+            state.filebrowser_last_dir = if app.keyboard.shift() {
+                BrowserDir::CurrentImageDir
+            } else {
+                BrowserDir::LastOpenDir
+            };
+
             #[cfg(feature = "file_open")]
             browse_for_image_path(state);
             #[cfg(not(feature = "file_open"))]
-            ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+            {
+                use crate::filebrowser::BrowserState;
+
+                let path_override = state.filebrowser_path();
+                BrowserState::check_refresh_entries(
+                    ui,
+                    state.filebrowser_last_dir,
+                    Some(&path_override),
+                );
+                ui.ctx()
+                    .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
+
+                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+            }
         }
 
         draw_hamburger_menu(ui, state, app);
