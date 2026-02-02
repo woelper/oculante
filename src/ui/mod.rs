@@ -643,6 +643,7 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
                 &state.image_geometry,
                 &mut state.mouse_grab,
                 &mut state.volatile_settings,
+                op.id,
             );
         }
     });

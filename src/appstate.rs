@@ -97,6 +97,7 @@ pub struct OculanteState {
     pub filebrowser_id: Option<String>,
     pub filebrowser_last_dir: BrowserDir,
     pub thumbnails: Thumbnails,
+    pub new_image_loaded: bool,
 }
 
 impl OculanteState {
@@ -185,6 +186,7 @@ impl Default for OculanteState {
             filebrowser_id: None,
             filebrowser_last_dir: Default::default(),
             thumbnails: Default::default(),
+            new_image_loaded: false,
         }
     }
 }

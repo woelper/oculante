@@ -798,6 +798,11 @@ fn modifier_stack_ui(
                         .on_hover_text("Remove operator")
                         .clicked()
                     {
+                        // If the deleted op was a resize, we have to clear the stored aspect ratio
+                        if let ImageOperation::Resize { .. } = operation.operation {
+                            let id = Id::new("resize_aspect_ratio").with(operation.id);
+                            ui.ctx().memory_mut(|m| m.data.remove::<f64>(id));
+                        }
                         delete = Some(i);
                         *image_changed = true;
                     }
@@ -814,7 +819,7 @@ fn modifier_stack_ui(
                     ui.add_enabled_ui(operation.active, |ui| {
                         if operation
                             .operation
-                            .ui(ui, geo, mouse_grab, settings)
+                            .ui(ui, geo, mouse_grab, settings, operation.id)
                             .changed()
                         {
                             *image_changed = true;
