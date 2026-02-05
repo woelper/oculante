@@ -1,0 +1,36 @@
+name: Bug report (oculante-next)
+description: Tell us about a problem! (oculante-next)
+labels: "next"
+body:
+  - type: checkboxes
+    attributes:
+      label: This bug is for the oculante-next branch
+      description: Please confirm that you are reporting a bug on the oculante-next branch. If you are not, please use the regular bug report template.
+      options:
+        - label: This bug report is for oculante-next
+          required: true
+  - type: textarea
+    attributes:
+      label: Describe The Bug
+      description: A clear and concise description of what the bug is.
+  - type: textarea
+    attributes:
+      label: Reproducing the bug
+      description: If possible, tell us the steps to reproduce the bug
+      value: "Steps to reproduce the behavior: \n1. Go to '...' \n2. Click on '....' \n3. Scroll down to '....' \n4. See error "
+  - type: textarea
+    attributes:
+      label: Screenshots / sample files
+      description: If applicable, add screenshots to help explain your problem. You can also attach problematic images here to help test the bug. Please pay attention to image copyright.
+  - type: textarea
+    attributes:
+      label: Operating System
+      description: Which operating system are you using? Please also specify OS version. If you are on Linux or BSD, please also include your Distribution, Desktop Environment / Window Manager, and Display Server type.
+      placeholder: "Debian 13, Sway (Wayland)"
+  - type: textarea
+    attributes:
+      label: Commit Version
+      description: Which commit are you using?
+      placeholder: "a1b2c3d4"
+    validations:
+      required: true
