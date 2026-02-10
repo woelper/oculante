@@ -1,1 +1,1 @@
-cargo build --features notan/glsl-to-spirv
+cargo build --features notan_glsl-to-spirv
