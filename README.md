@@ -184,6 +184,13 @@ You can see what we're currently working on in our [Release Plan](https://github
 - HEIC/HEIF (via `libheif-rs`). Enabled on Windows builds, but optional dependency on MacOS and Linux - available behind `heif` flag.
 - qoi
 - kra (Krita files)
+- ora
+- otb
+- pcx
+- sgi
+- wbmp
+- xbm
+- xpm
 
 ### Misc examples:
 
