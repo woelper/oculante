@@ -115,7 +115,14 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
             .map(|p| p.to_path_buf())
             .context("Can't get parent")?;
     }
+
+    // fixes https://github.com/woelper/oculante/issues/482
+    if folder_path.as_os_str().is_empty() {
+        folder_path = PathBuf::from(".");
+    }
+
     let info = std::fs::read_dir(folder_path)?;
+
 
     // TODO: Are symlinks handled correctly?
     let mut dir_files = info
