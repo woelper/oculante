@@ -808,7 +808,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     }
 
     // check if a new loaded image has been sent
-    if let Ok(frame) = state.texture_channel.1.try_recv() {
+    // Drain loop to get latest frame and prevent animation speedup on focus loss
+    let latest_frame = state.texture_channel.1.try_iter().last();
+
+        if let Some(frame) = latest_frame {
         state.is_loaded = true;
 
         debug!("Got frame: {}", frame);
