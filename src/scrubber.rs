@@ -123,7 +123,6 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
 
     let info = std::fs::read_dir(folder_path)?;
 
-
     // TODO: Are symlinks handled correctly?
     let mut dir_files = info
         .flatten()
