@@ -743,7 +743,8 @@ pub fn open_image(
             },
         },
         _ => {
-            // All other supported image files are handled by using `image`
+            // All other supported image files are handled by using `image` and `image_extras`
+            image_extras::register();
             debug!("Loading using generic image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
