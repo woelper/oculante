@@ -22,7 +22,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          /usr/sbin/pkg_add curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
+          /usr/sbin/pkg_add -u curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
         run: |
           PATH=$HOME/.cargo/bin:$PATH
