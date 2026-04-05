@@ -23,8 +23,8 @@ jobs:
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
 
-      - name: Update Rust
-        run: rustup update
+      # - name: Update Rust
+      #   run: rustup update
 
       - name: cargo test
         run: cargo test ci_
