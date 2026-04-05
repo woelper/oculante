@@ -28,7 +28,7 @@ jobs:
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
           mkdir -p $HOME/bin
-          printf '#!/bin/sh\nexec /usr/pkg/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"\n' > $HOME/bin/cmake
+          printf '#!/bin/sh\nif [ "$1" = "--build" ] || [ "$1" = "--install" ] || [ "$1" = "-E" ]; then\n  exec /usr/pkg/bin/cmake "$@"\nelse\n  exec /usr/pkg/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"\nfi\n' > $HOME/bin/cmake
           chmod +x $HOME/bin/cmake
           export PATH=$HOME/bin:$PATH
           cargo check --no-default-features --features notan_glsl-to-spirv
