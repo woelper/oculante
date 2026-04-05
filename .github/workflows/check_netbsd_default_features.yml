@@ -1,4 +1,6 @@
 name: Check NetBSD
+env:
+    CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
 on:
   push:
@@ -15,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build in NetBSD
         id: testnet
-        uses: vmactions/netbsd-vm@v1.1.4
+        uses: vmactions/netbsd-vm@v1.2.0
         with:
           mem: 4096
           usesh: true
@@ -39,4 +41,4 @@ jobs:
             ls
             # PATH=$HOME/.cargo/bin:$PATH
             # export PATH
-            # cargo check --features notan/glsl-to-spirv
+            # cargo check --features notan_glsl-to-spirv
