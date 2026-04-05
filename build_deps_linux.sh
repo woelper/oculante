@@ -7,6 +7,6 @@ cmake --preset=release ..
 make
 cd ../../
 
-export PKG_CONFIG_PATH=`pwd`/libheif/build
+export PKG_CONFIG_PATH=$(pwd)/libheif/build
 #cargo build --release --features heif
 #rm -rf libheif

@@ -31,6 +31,7 @@ use std::time::Duration;
 
 #[cfg(feature = "file_open")]
 use filebrowser::browse_for_image_path;
+use filebrowser::BrowserDir;
 use oculante::appstate::*;
 use oculante::utils::*;
 use oculante::*;
@@ -508,6 +509,12 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
             if key_pressed(app, state, Browse) {
+                state.filebrowser_last_dir = if app.keyboard.shift() {
+                    BrowserDir::CurrentImageDir
+                } else {
+                    BrowserDir::LastOpenDir
+                };
+
                 state.redraw = true;
                 #[cfg(feature = "file_open")]
                 browse_for_image_path(state);
@@ -688,6 +695,10 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
 }
 
 fn update(app: &mut App, state: &mut OculanteState) {
+    if state.new_image_loaded {
+        state.new_image_loaded = false;
+    }
+
     if state.first_start {
         app.window().set_always_on_top(false);
     }
@@ -977,6 +988,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     state.send_message_warn(&format!("Error while displaying image: {error}"));
                 }
                 state.current_image = Some(img);
+                state.new_image_loaded = true;
             }
             Frame::UpdateTexture => {
                 // Only update the texture.
@@ -1052,6 +1064,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             toggle_fullscreen(app, state);
         }
 
+        if state.new_image_loaded {
+            ctx.memory_mut(|m| m.data.remove::<f64>(Id::new("resize_aspect_ratio")));
+        }
+
         // set info panel color dynamically
         info_panel_color = ctx.style().visuals.panel_fill;
 
@@ -1119,7 +1135,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            (bbox_tl, bbox_br) = info_ui(ctx, state, gfx);
+            (bbox_tl, bbox_br) = info_ui(app, ctx, state, gfx);
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();

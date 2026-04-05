@@ -27,6 +27,7 @@ use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
+use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -140,6 +141,7 @@ pub enum ScaleFilter {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 
 pub struct ImgOpItem {
+    pub id: u64,
     pub active: bool,
     pub operation: ImageOperation,
 }
@@ -147,6 +149,7 @@ pub struct ImgOpItem {
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
+            id: rand::thread_rng().gen(),
             active: true,
             operation: op,
         }
@@ -303,6 +306,7 @@ impl ImageOperation {
         geo: &ImageGeometry,
         block_panning: &mut bool,
         #[allow(unused)] settings: &mut VolatileSettings,
+        item_id: u64,
     ) -> Response {
         match self {
             Self::ColorConverter(ct) => {
@@ -1106,49 +1110,77 @@ impl ImageOperation {
                 aspect,
                 filter,
             } => {
-                let ratio = dimensions.1 as f32 / dimensions.0 as f32;
-
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::hover());
+                let aspect_ratio_id = Id::new("resize_aspect_ratio").with(item_id);
 
                 ui.vertical(|ui| {
+                    // This handles the initial state when the filter is first added.
+                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                        let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
+                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                    }
+
+                    // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
+                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
+                        if dimensions.1 > 0 {
+                            dimensions.0 as f64 / dimensions.1 as f64
+                        } else {
+                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                        }
+                    });
+
+                    let g = gcd(dimensions.1, dimensions.0);
+                    let w = dimensions.0 / g;
+                    let h = dimensions.1 / g;
+
+                    ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
+
+
                     ui.horizontal(|ui| {
-                        let r0 = ui.add(
-                            egui::DragValue::new(&mut dimensions.0)
-                                .speed(4.)
-                                .range(1..=10000)
+                        let x_response = ui.add(
+                            DragValue::new(&mut dimensions.0)
+                                .speed(0.5)
+                                .range(10..=10000)
                                 .prefix("X "),
                         );
-                        let r1 = ui.add(
-                            egui::DragValue::new(&mut dimensions.1)
-                                .speed(4.)
-                                .range(1..=10000)
+
+                        let y_response = ui.add(
+                            DragValue::new(&mut dimensions.1)
+                                .speed(0.5)
+                                .range(10..=10000)
                                 .prefix("Y "),
                         );
 
-                        if r0.changed() && *aspect {
-                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
+                        if *aspect {
+                            if x_response.changed() {
+                                dimensions.1 = (dimensions.0 as f64 / aspect_ratio).round() as u32;
+                            } else if y_response.changed() {
+                                dimensions.0 = (dimensions.1 as f64 * aspect_ratio).round() as u32;
+                            }
                         }
 
-                        if r1.changed() && *aspect {
-                            dimensions.0 = (dimensions.1 as f32 / ratio) as u32
+                        if x_response.changed() || y_response.changed() {
+                            r.mark_changed();
                         }
-                        let r2 = ui
-                            .styled_checkbox(aspect, "🔒")
-                            .on_hover_text("Lock aspect ratio");
 
-                        if r2.changed() && *aspect {
-                            dimensions.1 = (dimensions.0 as f32 * ratio) as u32;
-                        }
-                        // For this operator, we want to update on release, not on change.
-                        // Since all operators are processed the same, we use the hack to emit `changed` just on release.
-                        // Users dragging the resize values will now only trigger a resize on release, which feels
-                        // more snappy.
-                        if r0.drag_stopped() || r1.drag_stopped() || r2.changed() {
+                        // TODO: Replace the lock emoji with an actual icon - @Stoppedpuma
+                        if ui.styled_checkbox(aspect, "🔒").clicked() {
+                            // TODO: This code can still be slightly off by a pixel or two but I'm not too worried about it for now since it has significantly less problems than the previous solution, but it definitely should be fixed in the future. - @Stoppedpuma
+                            if *aspect {
+                                // If locking, calculate and store the current aspect ratio.
+                                let ratio_to_store = if dimensions.1 > 0 {
+                                    dimensions.0 as f64 / dimensions.1 as f64
+                                } else {
+                                    geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                                };
+                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                            }
                             r.mark_changed();
                         }
                     });
 
                     egui::ComboBox::from_id_salt("filter")
+                        .width(ui.available_width())
                         .selected_text(format!("{filter:?}"))
                         .show_ui(ui, |ui| {
                             for f in [
@@ -1165,9 +1197,26 @@ impl ImageOperation {
                             }
                         });
 
-                    r
-                })
-                .inner
+                    ui.vertical_centered_justified(|ui| {
+
+                    if ui.button("Reset").clicked() {
+                        // Reset dimensions to original
+                        *dimensions = geo.dimensions;
+
+                        // Reset aspect lock to default (true)
+                        *aspect = true;
+
+                        // Remove the stored aspect ratio from egui's memory.
+                        // This will cause it to be recalculated from the original dimensions
+                        // on the next frame, effectively resetting it.
+                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
+
+                        // Mark the UI as changed
+                        r.mark_changed();
+                    }
+                    });
+                });
+                r
             }
             _ => ui.label("Filter has no options."),
         }

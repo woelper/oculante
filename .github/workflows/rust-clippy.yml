@@ -26,17 +26,17 @@ jobs:
       contents: read
       security-events: write
       actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: clippy
-          override: true
+        run: rustup component add clippy
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Patch azure linux deps
         run: sudo apt update
@@ -44,8 +44,16 @@ jobs:
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm meson ninja-build libdav1d-dev dav1d
 
-      - name: Install required cargo
-        run: cargo install clippy-sarif sarif-fmt
+      - name: Cache cargo bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-${{ runner.os }}-clippy-sarif
+
+      - name: Install required cargo tools
+        run: |
+          command -v clippy-sarif || cargo install clippy-sarif
+          command -v sarif-fmt || cargo install sarif-fmt
 
       - name: Run rust-clippy
         run: cargo clippy
@@ -54,7 +62,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload analysis results to GitHub
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: rust-clippy-results.sarif
           wait-for-processing: true
