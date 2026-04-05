@@ -27,4 +27,5 @@ jobs:
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
+          export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
           cargo check --no-default-features --features notan_glsl-to-spirv
