@@ -22,9 +22,13 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          /usr/sbin/pkg_add curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
+          /usr/sbin/pkg_add -u curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
+          mkdir -p $HOME/bin
+          printf '#!/bin/sh\nif [ "$1" = "--build" ] || [ "$1" = "--install" ] || [ "$1" = "-E" ]; then\n  exec /usr/pkg/bin/cmake "$@"\nelse\n  exec /usr/pkg/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"\nfi\n' > $HOME/bin/cmake
+          chmod +x $HOME/bin/cmake
+          export PATH=$HOME/bin:$PATH
           cargo check --no-default-features --features notan_glsl-to-spirv
