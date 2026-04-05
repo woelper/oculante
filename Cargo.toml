@@ -96,8 +96,8 @@ self_update = { version = "0.42", default-features = false, features = [
 ], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-strum = { version = "0.27", features = ["derive"] }
-strum_macros = "0.27"
+strum = { version = "0.28", features = ["derive"] }
+strum_macros = "0.28"
 webbrowser = "1.0"
 thiserror = "2.0"
 
@@ -106,12 +106,12 @@ dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f1
 trash = "5.2"
 flate2 = "1.0" # for KTX
 bitflags = "2.8" # for KTX
-wgpu = "28" # for KTX
+wgpu = "29" # for KTX
 ruzstd = "0.8" # for KTX
 mouse_position = "0.1.4"
-file-format = "0.28"
-zip = "7.0"
-sysinfo = "0.37"
+file-format = "0.29"
+zip = "8.5"
+sysinfo = "0.38"
 unicode-segmentation = "1.12.0"
 font-kit = "0.14"
 open = "5.3"
