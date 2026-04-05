@@ -187,6 +187,13 @@ You can see what we're currently working on in our [Release Plan](https://github
 - HEIC/HEIF (via `libheif-rs`). Enabled on Windows builds, but optional dependency on MacOS and Linux - available behind `heif` flag.
 - qoi
 - kra (Krita files)
+- ora
+- otb
+- pcx
+- sgi
+- wbmp
+- xbm
+- xpm
 
 ### Misc examples:
 
@@ -238,9 +245,9 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 
 - `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
 
-- `notan/glsl-to-spirv` (on by default) uses the spirv shader compiler
+- `notan_glsl-to-spirv` uses the spirv shader compiler
 
-- `notan/shaderc` uses shaderc as a shader compiler. Longer build time.
+- `notan/shaderc` (on by default) uses shaderc as a shader compiler. Longer build time.
 
 - `update` (on by default) enable app updating.
 

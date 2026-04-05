@@ -24,8 +24,8 @@ jobs:
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
 
-      - name: Update Rust
-        run: rustup update
+      # - name: Update Rust
+      #   run: rustup update
 
       - name: build heif
         run: ./build_deps_linux.sh
@@ -37,8 +37,8 @@ jobs:
       #   run: cargo build
 
       - name: cargo check without default features
-        run: cargo check --no-default-features --features notan/glsl-to-spirv
+        run: cargo check --no-default-features --features notan/shaderc
 
       # - name: cargo check with heif
-        # run: PKG_CONFIG_PATH=libheif/build cargo check --features heif --features notan/glsl-to-spirv
+        # run: PKG_CONFIG_PATH=libheif/build cargo check --features heif --features notan_glsl-to-spirv
 
