@@ -268,6 +268,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         // a/1.png b/2.png c/3.png
         state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
         state.scrubber.entries = paths_to_open;
+        state.scrubber.wrap = state.persistent_settings.wrap_folder;
     }
 
     if matches.contains_id("stdin") {
@@ -312,6 +313,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
+        ctx.set_pixels_per_point(state.persistent_settings.ui_scale);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         info!("This Display has DPI {:?}", gfx.dpi());
