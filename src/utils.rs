@@ -425,7 +425,8 @@ pub fn send_image_threaded(
                     first = false;
                 }
 
-                loop {
+                // loop over the image. For sanity, stop at a limit of iterations.
+                for _ in 0..500 {
                     for frame in &framecache {
                         if stop_receiver.try_recv().is_ok() {
                             debug!("Stopped from receiver.");
