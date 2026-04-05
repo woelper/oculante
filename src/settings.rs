@@ -36,6 +36,8 @@ pub enum ColorTheme {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct PersistentSettings {
+    /// UI Scale
+    pub ui_scale: f32,
     /// The UI accent color
     pub accent_color: [u8; 3],
     /// The BG color
@@ -84,6 +86,7 @@ pub struct PersistentSettings {
 impl Default for PersistentSettings {
     fn default() -> Self {
         PersistentSettings {
+            ui_scale: 1.0,
             accent_color: [255, 0, 75],
             background_color: [30, 30, 30],
             vsync: true,
