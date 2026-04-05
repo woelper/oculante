@@ -313,6 +313,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
+        ctx.set_pixels_per_point(state.persistent_settings.ui_scale);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         info!("This Display has DPI {:?}", gfx.dpi());
