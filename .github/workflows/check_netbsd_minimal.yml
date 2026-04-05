@@ -27,5 +27,8 @@ jobs:
         run: |
           PATH=$HOME/.cargo/bin:$PATH
           export PATH
-          export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          mkdir -p $HOME/bin
+          printf '#!/bin/sh\nexec /usr/pkg/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"\n' > $HOME/bin/cmake
+          chmod +x $HOME/bin/cmake
+          export PATH=$HOME/bin:$PATH
           cargo check --no-default-features --features notan_glsl-to-spirv
