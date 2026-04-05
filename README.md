@@ -1,3 +1,5 @@
+### Oculante is currently in maintenance mode. We will only be accepting bug fixes and minor improvements to existing features until we complete our rewrite. More details can be seen [here](https://github.com/woelper/oculante/issues/#746). Progress can be seen on the oculante-next branch.
+
 <h1 align="center">
     <img alt="banner" src="res/banner.avif">
 </h1>
@@ -49,6 +51,8 @@ Images may contain color information that is masked by the alpha channel. Althou
 ## Installation
 
 Find and download the correct executable for your operating system on the [releases](https://github.com/woelper/oculante/releases/latest) page. The download is small, around 25MB, as we link dependencies statically by default. We also have packages available for ARM Linux. Have a different OS? Please feel free to open an issue if you want your operating system of choice supported!
+
+If you are on macOS, please ensure you have `libheif` installed.
 
 For those looking to manage Oculante through a package manager, please see the options below.
 
@@ -125,6 +129,7 @@ Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
 
 Mac:
 `brew install nasm cmake`
+###### You may need this variable when building Oculante on macOS: `export SHADERC_LIB_DIR=/opt/homebrew/lib` ######
 
 ## Updates
 
