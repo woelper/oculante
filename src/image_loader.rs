@@ -743,7 +743,8 @@ pub fn open_image(
             },
         },
         _ => {
-            // All other supported image files are handled by using `image`
+            // All other supported image files are handled by using `image` and `image_extras`
+            image_extras::register();
             debug!("Loading using generic image library");
             let img = image::open(img_location)?;
             // col.add_still(img.to_rgba8());
@@ -833,6 +834,11 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
         tiff::decoder::DecodingResult::U16(contents) => {
             debug!("TIFF U16");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
+            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+        }
+        tiff::decoder::DecodingResult::F16(contents) => {
+            debug!("TIFF F16");
+            let values = contents.par_iter().map(|p| f32::from(*p)).collect::<Vec<_>>();
             autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::U32(contents) => {
