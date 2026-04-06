@@ -52,7 +52,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
-            FOLDERFILL,
+            FILL_FOLDER,
             FontId::proportional(85.),
             ui.style().visuals.text_color(),
         );

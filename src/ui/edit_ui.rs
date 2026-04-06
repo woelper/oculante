@@ -512,7 +512,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         if let Some(img) = &state.current_image {
             if img.color() != ColorType::Rgba8 {
                 ui.add_space(10.);
-                ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
+                ui.small(format!("{CIRCLE_INFORMATION} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
             }
         }
 
@@ -763,7 +763,7 @@ fn modifier_stack_ui(
 
                     ui.add_enabled_ui(up, |ui| {
                         let ur = ui.add(
-                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                            egui::Button::new(RichText::new(CHEVRON_UP).size(caret_size)).frame(false),
                         );
                         if ur.on_hover_text("Move up").clicked() {
                             swap = Some(((i as i32 - 1).max(0) as usize, i));
@@ -773,7 +773,7 @@ fn modifier_stack_ui(
 
                     ui.add_enabled_ui(down, |ui| {
                         let dr = ui.add(
-                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                            egui::Button::new(RichText::new(CHEVRON_DOWN).size(caret_size)).frame(false),
                         );
                         if dr.on_hover_text("Move down").clicked() {
                             swap = Some((i, i + 1));
@@ -781,7 +781,7 @@ fn modifier_stack_ui(
                         }
                     });
 
-                    let icon = if operation.active { EYE } else { EYEOFF };
+                    let icon = if operation.active { EYE } else { EYE_OFF };
                     if egui::Button::new(RichText::new(icon).size(caret_size))
                         .frame(false)
                         .ui(ui)
@@ -792,7 +792,7 @@ fn modifier_stack_ui(
                         *image_changed = true;
                     }
 
-                    if egui::Button::new(RichText::new("").size(caret_size * 1.5))
+                    if egui::Button::new(RichText::new(X).size(caret_size * 1.5))
                         .frame(false)
                         .ui(ui)
                         .on_hover_text("Remove operator")
@@ -861,7 +861,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
 
         ui.styled_collapsing("Lossless JPEG edits", |ui| {
             ui.label(format!(
-                "{WARNING_CIRCLE} These operations will immediately write changes to disk."
+                "{CIRCLE_WARNING} These operations will immediately write changes to disk."
             ));
             let mut reload = false;
 
