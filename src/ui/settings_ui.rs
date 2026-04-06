@@ -155,7 +155,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                                 egui::DragValue::new(&mut state.persistent_settings.max_recents)
                                                     .range(0..=12),
                                             )
-                                            .changed() 
+                                            .changed()
                                             {
                                                 state
                                                     .volatile_settings
@@ -165,7 +165,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         },
                                         ui,
                                     );
-                                    
+
                                     configuration_item_ui("Do not reset image view", "When a new image is loaded, keep the current zoom and offset.", |ui| {
                                         ui.styled_checkbox(&mut state.persistent_settings.keep_view, "");
                                     }, ui);
@@ -692,7 +692,8 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if no_keys_pressed {
             ui.label_unselectable(
-                egui::RichText::new("Please press & hold a key").color(Color32::from_rgb(255, 76, 76)),
+                egui::RichText::new("Please press & hold a key")
+                    .color(ui.style().visuals.selection.bg_fill),
             );
         }
     });
