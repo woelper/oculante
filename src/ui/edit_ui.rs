@@ -3,7 +3,8 @@ use crate::appstate::OculanteState;
 use crate::utils::*;
 use image::{ColorType, GenericImageView, RgbaImage};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
+use notan::egui::EguiRegisterTexture;
 
 /// Everything related to image editing
 #[allow(unused_variables)]

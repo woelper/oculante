@@ -9,10 +9,8 @@ use egui_plot::{Line, Plot, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::{
-    egui::{self, *},
-    prelude::Graphics,
-};
+use egui::{self, *};
+use notan::prelude::Graphics;
 
 use super::*;
 use std::time::Duration;
@@ -163,7 +161,7 @@ pub fn info_ui(
                         dark_panel(ui, |ui| {
                             let browser_button = ui.button(format!("{FOLDER} Open another image..."));
                             if browser_button.clicked() {
-                                state.filebrowser_last_dir = if app.keyboard.shift() {
+                                state.filebrowser_last_dir = if ui.ctx().input(|i| i.modifiers.shift) {
                                     BrowserDir::CurrentImageDir
                                 } else {
                                     BrowserDir::LastOpenDir

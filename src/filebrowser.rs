@@ -7,7 +7,7 @@ use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use dirs;
 use log::debug;
-use notan::egui::{self, *};
+use egui::{self, *};
 use std::{
     fs,
     path::{Path, PathBuf},

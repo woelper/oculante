@@ -4,10 +4,11 @@ use crate::appstate::OculanteState;
 use crate::filebrowser::BrowserDir;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
 
 pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
+    let ctx = ui.ctx().clone();
 
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
@@ -19,27 +20,27 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         let mut changed_channels = false;
 
-        if key_pressed(app, state, RedChannel) {
+        if key_pressed(&ctx, state, RedChannel) {
             state.persistent_settings.current_channel = ColorChannel::Red;
             changed_channels = true;
         }
-        if key_pressed(app, state, GreenChannel) {
+        if key_pressed(&ctx, state, GreenChannel) {
             state.persistent_settings.current_channel = ColorChannel::Green;
             changed_channels = true;
         }
-        if key_pressed(app, state, BlueChannel) {
+        if key_pressed(&ctx, state, BlueChannel) {
             state.persistent_settings.current_channel = ColorChannel::Blue;
             changed_channels = true;
         }
-        if key_pressed(app, state, AlphaChannel) {
+        if key_pressed(&ctx, state, AlphaChannel) {
             state.persistent_settings.current_channel = ColorChannel::Alpha;
             changed_channels = true;
         }
-        if key_pressed(app, state, RGBChannel) {
+        if key_pressed(&ctx, state, RGBChannel) {
             state.persistent_settings.current_channel = ColorChannel::Rgb;
             changed_channels = true;
         }
-        if key_pressed(app, state, RGBAChannel) {
+        if key_pressed(&ctx, state, RGBAChannel) {
             state.persistent_settings.current_channel = ColorChannel::Rgba;
             changed_channels = true;
         }
@@ -285,7 +286,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for an image")
             .clicked()
         {
-            state.filebrowser_last_dir = if app.keyboard.shift() {
+            state.filebrowser_last_dir = if ctx.input(|i| i.modifiers.shift) {
                 BrowserDir::CurrentImageDir
             } else {
                 BrowserDir::LastOpenDir
@@ -316,6 +317,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
     use crate::shortcuts::InputEvent::*;
+    let ctx = ui.ctx().clone();
 
     ui.scope(|ui| {
         // maybe override font size?
@@ -341,7 +343,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 ui.close_menu();
             }
 
-            let copy_pressed = key_pressed(app, state, Copy);
+            let copy_pressed = key_pressed(&ctx, state, Copy);
             if let Some(img) = &state.current_image {
                 if ui
                     .styled_button(format!("{COPY} Copy"))
@@ -358,7 +360,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
-                || key_pressed(app, state, Paste)
+                || key_pressed(&ctx, state, Paste)
             {
                 match clipboard_to_image() {
                     Ok(img) => {

@@ -30,11 +30,9 @@ use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use nalgebra::Vector2;
-use notan::{
-    egui::{self, *},
-    prelude::{App, Graphics},
-};
-use std::{collections::BTreeSet, f32, ops::RangeInclusive, path::Path, time::Instant};
+use egui::{self, *};
+use notan::prelude::{App, Graphics};
+use std::{f32, ops::RangeInclusive, path::Path, time::Instant};
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
 

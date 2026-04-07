@@ -1,5 +1,5 @@
 use super::*;
-use notan::egui::*;
+use egui::*;
 
 /// Helper function to paint an image - directly from egui as it is private to it
 fn paint_texture_load_result(

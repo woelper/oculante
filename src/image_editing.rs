@@ -16,12 +16,11 @@ use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
-use notan::egui::epaint::PathShape;
-use notan::egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke,
-    StrokeKind, Vec2,
+use egui::epaint::PathShape;
+use egui::{
+    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke,
+    StrokeKind, Ui, Vec2,
 };
-use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};

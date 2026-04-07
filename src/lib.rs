@@ -2,6 +2,7 @@ pub mod appstate;
 pub mod cache;
 pub mod comparelist;
 pub mod image_editing;
+pub mod input;
 pub mod image_loader;
 pub mod ktx2_loader;
 pub mod settings;
@@ -20,6 +21,7 @@ pub mod thumbnails;
 pub mod ui;
 #[cfg(feature = "update")]
 pub mod update;
+pub mod window_config;
 
 // mod events;
 #[cfg(target_os = "macos")]

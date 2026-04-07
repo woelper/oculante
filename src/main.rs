@@ -12,15 +12,14 @@ use log::warn;
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
-use notan::egui;
-use notan::egui::Align;
+use egui::Align;
+use egui::FontData;
+use egui::FontDefinitions;
+use egui::FontFamily;
+use egui::FontTweak;
+use egui::Id;
 use notan::egui::EguiConfig;
 use notan::egui::EguiPluginSugar;
-use notan::egui::FontData;
-use notan::egui::FontDefinitions;
-use notan::egui::FontFamily;
-use notan::egui::FontTweak;
-use notan::egui::Id;
 use notan::prelude::*;
 use oculante::comparelist::CompareItem;
 use std::io::{stdin, IsTerminal, Read};
@@ -43,7 +42,6 @@ use ui::*;
 use image_editing::lossless_tx;
 use image_editing::EditState;
 use scrubber::find_first_image_in_directory;
-use shortcuts::InputEvent::*;
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -58,93 +56,14 @@ fn main() -> Result<(), String> {
     }
     let _ = env_logger::try_init();
 
-    let icon_data = include_bytes!("../icon.ico");
-
-    let mut window_config = WindowConfig::new()
-        .set_title(&format!("Oculante | {}", env!("CARGO_PKG_VERSION")))
-        .set_size(1026, 600) // window's size
-        .set_resizable(true) // window can be resized
-        .set_window_icon_data(Some(icon_data))
-        .set_taskbar_icon_data(Some(icon_data))
-        .set_multisampling(0)
-        .set_app_id("oculante");
-
-    #[cfg(target_os = "windows")]
-    {
-        window_config = window_config
-            .set_lazy_loop(true) // don't redraw every frame on windows
-            .set_vsync(true)
-            .set_high_dpi(true);
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        window_config = window_config
-            .set_lazy_loop(true)
-            .set_vsync(true)
-            .set_high_dpi(true);
-    }
-
-    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
-    {
-        window_config = window_config.set_lazy_loop(true).set_vsync(true);
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        window_config = window_config
-            .set_lazy_loop(true)
-            .set_vsync(true)
-            .set_high_dpi(true);
-    }
-
     #[cfg(target_os = "macos")]
     {
         // MacOS needs an incredible dance performed just to open a file
         let _ = oculante::mac::launch();
     }
 
-    // Unfortunately we need to load the volatile settings here, too - the window settings need
-    // to be set before window creation
-    match settings::VolatileSettings::load() {
-        Ok(volatile_settings) => {
-            if volatile_settings.window_geometry != Default::default() {
-                window_config.width = volatile_settings.window_geometry.1 .0;
-                window_config.height = volatile_settings.window_geometry.1 .1;
-            }
-        }
-        Err(e) => error!("Could not load volatile settings: {e}"),
-    }
-
-    // Unfortunately we need to load the persistent settings here, too - the window settings need
-    // to be set before window creation
-    match settings::PersistentSettings::load() {
-        Ok(settings) => {
-            window_config.vsync = settings.vsync;
-            window_config.lazy_loop = !settings.force_redraw;
-            window_config.decorations = !settings.borderless;
-
-            trace!("Loaded settings.");
-            if settings.zen_mode {
-                let mut title_string = window_config.title.clone();
-                title_string.push_str(&format!(
-                    "          '{}' to disable zen mode",
-                    shortcuts::lookup(&settings.shortcuts, &shortcuts::InputEvent::ZenMode)
-                ));
-                window_config = window_config.set_title(&title_string);
-            }
-            window_config.min_size = Some(settings.min_window_size);
-
-            // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
-            #[cfg(feature = "heif")]
-            settings.decoders.heif.maybe_limits();
-        }
-        Err(e) => {
-            error!("Could not load persistent settings: {e}");
-        }
-    }
-    window_config.always_on_top = true;
-    window_config.max_size = None;
+    let ws = window_config::build_window_settings();
+    let window_config = window_config::to_notan_window_config(&ws);
 
     debug!("Starting oculante.");
     notan::init_with(init)
@@ -395,205 +314,7 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 }
 
 fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
-    if state.key_grab {
-        return;
-    }
     match evt {
-        Event::KeyUp { .. } => {
-            // Fullscreen needs to be on key up on mac (bug)
-            if key_pressed(app, state, Fullscreen) {
-                toggle_fullscreen(app, state);
-            }
-        }
-        Event::KeyDown { .. } => {
-            debug!("key down");
-
-            // return;
-            // pan image with keyboard
-            let delta = 40.;
-            if key_pressed(app, state, PanRight) {
-                state.image_geometry.offset.x -= delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanUp) {
-                state.image_geometry.offset.y += delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanLeft) {
-                state.image_geometry.offset.x += delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, PanDown) {
-                state.image_geometry.offset.y -= delta;
-                limit_offset(app, state);
-            }
-            if key_pressed(app, state, CompareNext) {
-                compare_next(app, state);
-            }
-            if key_pressed(app, state, ResetView) {
-                state.reset_image = true
-            }
-            if key_pressed(app, state, ZenMode) {
-                toggle_zen_mode(state, app);
-            }
-            if key_pressed(app, state, ZoomActualSize) {
-                set_zoom(1.0, None, state);
-            }
-            if key_pressed(app, state, ZoomDouble) {
-                set_zoom(2.0, None, state);
-            }
-            if key_pressed(app, state, ZoomThree) {
-                set_zoom(3.0, None, state);
-            }
-            if key_pressed(app, state, ZoomFour) {
-                set_zoom(4.0, None, state);
-            }
-            if key_pressed(app, state, ZoomFive) {
-                set_zoom(5.0, None, state);
-            }
-            if key_pressed(app, state, Copy) {
-                if let Some(img) = &state.current_image {
-                    clipboard_copy(img);
-                    state.send_message_info("Image copied");
-                }
-            }
-
-            if key_pressed(app, state, Paste) {
-                match clipboard_to_image() {
-                    Ok(img) => {
-                        state.current_path = None;
-                        // Stop in the even that an animation is running
-                        state.player.stop();
-                        _ = state
-                            .player
-                            .image_sender
-                            .send(crate::utils::Frame::new_still(img));
-                        // Since pasted data has no path, make sure it's not set
-                        state.send_message_info("Image pasted");
-                    }
-                    Err(e) => state.send_message_err(&e.to_string()),
-                }
-            }
-            if key_pressed(app, state, Quit) {
-                _ = state.persistent_settings.save_blocking();
-                _ = state.volatile_settings.save_blocking();
-                app.backend.exit();
-            }
-            #[cfg(feature = "turbo")]
-            if key_pressed(app, state, LosslessRotateRight) {
-                debug!("Lossless rotate right");
-
-                if let Some(p) = &state.current_path {
-                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
-                        .is_ok()
-                    {
-                        state.is_loaded = false;
-                        // This needs "deep" reload
-                        state.player.cache.clear();
-                        state.player.load(p);
-                    }
-                }
-            }
-            #[cfg(feature = "turbo")]
-            if key_pressed(app, state, LosslessRotateLeft) {
-                debug!("Lossless rotate left");
-                if let Some(p) = &state.current_path {
-                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
-                        .is_ok()
-                    {
-                        state.is_loaded = false;
-                        // This needs "deep" reload
-                        state.player.cache.clear();
-                        state.player.load(p);
-                    } else {
-                        warn!("rotate left failed")
-                    }
-                }
-            }
-            if key_pressed(app, state, Browse) {
-                state.filebrowser_last_dir = if app.keyboard.shift() {
-                    BrowserDir::CurrentImageDir
-                } else {
-                    BrowserDir::LastOpenDir
-                };
-
-                state.redraw = true;
-                #[cfg(feature = "file_open")]
-                browse_for_image_path(state);
-                #[cfg(not(feature = "file_open"))]
-                {
-                    state.filebrowser_id = Some("OPEN".into());
-                }
-            }
-
-            if key_pressed(app, state, NextImage) {
-                next_image(state)
-            }
-            if key_pressed(app, state, PreviousImage) {
-                prev_image(state)
-            }
-            if key_pressed(app, state, FirstImage) {
-                first_image(state)
-            }
-            if key_pressed(app, state, LastImage) {
-                last_image(state)
-            }
-            if key_pressed(app, state, AlwaysOnTop) {
-                state.always_on_top = !state.always_on_top;
-                app.window().set_always_on_top(state.always_on_top);
-            }
-            if key_pressed(app, state, InfoMode) {
-                state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
-            }
-            if key_pressed(app, state, EditMode) {
-                state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
-            }
-            if key_pressed(app, state, DeleteFile) {
-                // TODO: needs confirmation
-                delete_file(state);
-            }
-            if key_pressed(app, state, ClearImage) {
-                clear_image(state);
-            }
-            if key_pressed(app, state, ZoomIn) {
-                let delta = zoomratio(3.5, state.image_geometry.scale);
-                let new_scale = state.image_geometry.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.image_geometry.offset -= scale_pt(
-                        state.image_geometry.offset,
-                        center,
-                        state.image_geometry.scale,
-                        delta,
-                    );
-                    state.image_geometry.scale += delta;
-                }
-            }
-            if key_pressed(app, state, ZoomOut) {
-                let delta = zoomratio(-3.5, state.image_geometry.scale);
-                let new_scale = state.image_geometry.scale + delta;
-                // limit scale
-                if new_scale > 0.05 && new_scale < 40. {
-                    // We want to zoom towards the center
-                    let center: Vector2<f32> = nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
-                    );
-                    state.image_geometry.offset -= scale_pt(
-                        state.image_geometry.offset,
-                        center,
-                        state.image_geometry.scale,
-                        delta,
-                    );
-                    state.image_geometry.scale += delta;
-                }
-            }
-        }
         Event::WindowResize { width, height } => {
             //TODO: remove this if save on exit works
             state.volatile_settings.window_geometry.1 = (width, height);
@@ -1067,6 +788,190 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             })
         {
             toggle_fullscreen(app, state);
+        }
+
+        // Process keyboard shortcuts via egui input
+        if !state.key_grab {
+            use shortcuts::InputEvent::*;
+
+            // Fullscreen needs to be on key release on mac (bug)
+            if key_pressed(ctx, state, Fullscreen) {
+                toggle_fullscreen(app, state);
+            }
+
+            // pan image with keyboard
+            let delta = 40.;
+            if key_pressed(ctx, state, PanRight) {
+                state.image_geometry.offset.x -= delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(ctx, state, PanUp) {
+                state.image_geometry.offset.y += delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(ctx, state, PanLeft) {
+                state.image_geometry.offset.x += delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(ctx, state, PanDown) {
+                state.image_geometry.offset.y -= delta;
+                limit_offset(app, state);
+            }
+            if key_pressed(ctx, state, CompareNext) {
+                compare_next(app, state);
+            }
+            if key_pressed(ctx, state, ResetView) {
+                state.reset_image = true
+            }
+            if key_pressed(ctx, state, ZenMode) {
+                toggle_zen_mode(state, app);
+            }
+            if key_pressed(ctx, state, ZoomActualSize) {
+                set_zoom(1.0, None, state);
+            }
+            if key_pressed(ctx, state, ZoomDouble) {
+                set_zoom(2.0, None, state);
+            }
+            if key_pressed(ctx, state, ZoomThree) {
+                set_zoom(3.0, None, state);
+            }
+            if key_pressed(ctx, state, ZoomFour) {
+                set_zoom(4.0, None, state);
+            }
+            if key_pressed(ctx, state, ZoomFive) {
+                set_zoom(5.0, None, state);
+            }
+            if key_pressed(ctx, state, Copy) {
+                if let Some(img) = &state.current_image {
+                    clipboard_copy(img);
+                    state.send_message_info("Image copied");
+                }
+            }
+            if key_pressed(ctx, state, Paste) {
+                match clipboard_to_image() {
+                    Ok(img) => {
+                        state.current_path = None;
+                        state.player.stop();
+                        _ = state
+                            .player
+                            .image_sender
+                            .send(crate::utils::Frame::new_still(img));
+                        state.send_message_info("Image pasted");
+                    }
+                    Err(e) => state.send_message_err(&e.to_string()),
+                }
+            }
+            if key_pressed(ctx, state, Quit) {
+                _ = state.persistent_settings.save_blocking();
+                _ = state.volatile_settings.save_blocking();
+                app.backend.exit();
+            }
+            #[cfg(feature = "turbo")]
+            if key_pressed(ctx, state, LosslessRotateRight) {
+                debug!("Lossless rotate right");
+                if let Some(p) = &state.current_path {
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
+                        .is_ok()
+                    {
+                        state.is_loaded = false;
+                        state.player.cache.clear();
+                        state.player.load(p);
+                    }
+                }
+            }
+            #[cfg(feature = "turbo")]
+            if key_pressed(ctx, state, LosslessRotateLeft) {
+                debug!("Lossless rotate left");
+                if let Some(p) = &state.current_path {
+                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
+                        .is_ok()
+                    {
+                        state.is_loaded = false;
+                        state.player.cache.clear();
+                        state.player.load(p);
+                    } else {
+                        warn!("rotate left failed")
+                    }
+                }
+            }
+            if key_pressed(ctx, state, Browse) {
+                state.filebrowser_last_dir = if ctx.input(|i| i.modifiers.shift) {
+                    BrowserDir::CurrentImageDir
+                } else {
+                    BrowserDir::LastOpenDir
+                };
+                state.redraw = true;
+                #[cfg(feature = "file_open")]
+                browse_for_image_path(state);
+                #[cfg(not(feature = "file_open"))]
+                {
+                    state.filebrowser_id = Some("OPEN".into());
+                }
+            }
+            if key_pressed(ctx, state, NextImage) {
+                next_image(state)
+            }
+            if key_pressed(ctx, state, PreviousImage) {
+                prev_image(state)
+            }
+            if key_pressed(ctx, state, FirstImage) {
+                first_image(state)
+            }
+            if key_pressed(ctx, state, LastImage) {
+                last_image(state)
+            }
+            if key_pressed(ctx, state, AlwaysOnTop) {
+                state.always_on_top = !state.always_on_top;
+                app.window().set_always_on_top(state.always_on_top);
+            }
+            if key_pressed(ctx, state, InfoMode) {
+                state.persistent_settings.info_enabled =
+                    !state.persistent_settings.info_enabled;
+            }
+            if key_pressed(ctx, state, EditMode) {
+                state.persistent_settings.edit_enabled =
+                    !state.persistent_settings.edit_enabled;
+            }
+            if key_pressed(ctx, state, DeleteFile) {
+                delete_file(state);
+            }
+            if key_pressed(ctx, state, ClearImage) {
+                clear_image(state);
+            }
+            if key_pressed(ctx, state, ZoomIn) {
+                let delta = zoomratio(3.5, state.image_geometry.scale);
+                let new_scale = state.image_geometry.scale + delta;
+                if new_scale > 0.05 && new_scale < 40. {
+                    let center = nalgebra::Vector2::new(
+                        state.window_size.x / 2.,
+                        state.window_size.y / 2.,
+                    );
+                    state.image_geometry.offset -= scale_pt(
+                        state.image_geometry.offset,
+                        center,
+                        state.image_geometry.scale,
+                        delta,
+                    );
+                    state.image_geometry.scale += delta;
+                }
+            }
+            if key_pressed(ctx, state, ZoomOut) {
+                let delta = zoomratio(-3.5, state.image_geometry.scale);
+                let new_scale = state.image_geometry.scale + delta;
+                if new_scale > 0.05 && new_scale < 40. {
+                    let center = nalgebra::Vector2::new(
+                        state.window_size.x / 2.,
+                        state.window_size.y / 2.,
+                    );
+                    state.image_geometry.offset -= scale_pt(
+                        state.image_geometry.offset,
+                        center,
+                        state.image_geometry.scale,
+                        delta,
+                    );
+                    state.image_geometry.scale += delta;
+                }
+            }
         }
 
         if state.new_image_loaded {

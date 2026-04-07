@@ -2,7 +2,7 @@ use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
 use quantette::{ColorSpace, PalettePipeline};
 
 pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {

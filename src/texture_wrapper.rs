@@ -5,9 +5,9 @@ use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::warn;
+use glam::{Mat4, Vec4};
 use notan::app::Color;
 use notan::draw::*;
-use notan::math::{Mat4, Vec4};
 use notan::prelude::{BlendMode, Buffer, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<Texture>,

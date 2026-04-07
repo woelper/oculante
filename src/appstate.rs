@@ -12,7 +12,7 @@ use crate::{
 use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::{prelude::Texture, AppState};
+use notan::prelude::Texture;
 use std::{
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
@@ -49,7 +49,6 @@ impl Message {
 }
 
 /// The state of the application
-#[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: CompareList,
@@ -190,3 +189,5 @@ impl Default for OculanteState {
         }
     }
 }
+
+impl notan::app::AppState for OculanteState {}

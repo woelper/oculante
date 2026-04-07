@@ -36,9 +36,11 @@ notan = { version = "0.14", default-features = false, features = [
     "egui",
     "clipboard",
 ] }
+glam = "0.29"
 # === EGUI
 #  These need to match the egui version used in notan and can't be
 # updated unless notan updates egui.
+egui = { version = "0.31", features = ["serde"] }
 egui_plot = "0.31"
 egui-notify = "0.19"
 egui_extras = { version = "0.31", features = ["image", "file"] }
