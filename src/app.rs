@@ -105,14 +105,25 @@ impl OculanteApp {
             }
         }
 
-        let filter = if self.state.persistent_settings.linear_mag_filter {
+        let mag_filter = if self.state.persistent_settings.linear_mag_filter {
             egui::TextureFilter::Linear
         } else {
             egui::TextureFilter::Nearest
         };
+        let min_filter = if self.state.persistent_settings.linear_min_filter {
+            egui::TextureFilter::Linear
+        } else {
+            egui::TextureFilter::Nearest
+        };
+        let mipmap_mode = if self.state.persistent_settings.use_mipmaps {
+            Some(egui::TextureFilter::Linear)
+        } else {
+            None
+        };
         let tex_options = egui::TextureOptions {
-            magnification: filter,
-            minification: filter,
+            magnification: mag_filter,
+            minification: min_filter,
+            mipmap_mode,
             ..Default::default()
         };
 
