@@ -2,7 +2,7 @@
 ///
 /// This implements `eframe::App` and replaces notan's init/update/draw callbacks.
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use egui::{Align, FontData, FontDefinitions, FontFamily, FontTweak, Id};
@@ -12,7 +12,7 @@ use nalgebra::Vector2;
 
 use crate::appstate::*;
 use crate::filebrowser::BrowserDir;
-use crate::glow_renderer::{self, GlowRenderer, GlowTexture, TexFormat};
+use crate::glow_renderer;
 use crate::shortcuts::{self, key_pressed};
 use crate::ui::*;
 use crate::utils::*;
@@ -23,164 +23,136 @@ use crate::filebrowser::browse_for_image_path;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 
-/// Render state shared between update() and paint callbacks
-pub struct RenderState {
-    pub renderer: GlowRenderer,
-    /// Current image as glow textures (tiled for large images)
-    pub textures: Vec<GlowTexture>,
-    pub col_count: u32,
-    pub row_count: u32,
-    pub col_translation: u32,
-    pub row_translation: u32,
-    pub image_width: f32,
-    pub image_height: f32,
-    /// Swizzle matrix (color channel selection)
-    pub swizzle_mat: [f32; 16],
-    pub offset_vec: [f32; 4],
-    /// Transform
-    pub offset: [f32; 2],
-    pub scale: f32,
-    pub viewport: [f32; 2],
-    /// Background
-    pub bg_color: [f32; 3],
-    pub tiling: usize,
-    /// Checker texture
-    pub checker_texture: Option<GlowTexture>,
-    pub show_checker: bool,
+/// A tile of the displayed image
+struct ImageTile {
+    texture: egui::TextureHandle,
+    /// Offset in image pixels from top-left
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
 }
 
 pub struct OculanteApp {
     pub state: OculanteState,
-    pub render_state: Option<Arc<Mutex<RenderState>>>,
     first_frame: bool,
-    /// Track if image needs re-upload
-    image_dirty: bool,
+    /// Track if image needs re-upload to egui
+    texture_dirty: bool,
+    /// The current image as one or more tiles
+    image_tiles: Vec<ImageTile>,
+    /// Last channel setting used for swizzle (to detect changes)
+    last_channel: ColorChannel,
+    /// Max texture size (queried once from GL)
+    max_texture_size: u32,
 }
 
 impl OculanteApp {
     pub fn new(state: OculanteState) -> Self {
+        let last_channel = state.persistent_settings.current_channel;
         Self {
             state,
-            render_state: None,
             first_frame: true,
-            image_dirty: false,
+            texture_dirty: false,
+            image_tiles: Vec::new(),
+            last_channel,
+            max_texture_size: 8192, // conservative default, updated on first frame
         }
     }
 
-    fn ensure_render_state(&mut self, gl: &glow::Context) {
-        if self.render_state.is_none() {
-            let renderer = GlowRenderer::new(gl);
-
-            // Create checker texture (8x8 checkerboard)
-            let mut checker_data = vec![0u8; 8 * 8 * 4];
-            for y in 0..8 {
-                for x in 0..8 {
-                    let idx = (y * 8 + x) * 4;
-                    let bright = ((x + y) % 2 == 0) as u8 * 40 + 20;
-                    checker_data[idx] = bright;
-                    checker_data[idx + 1] = bright;
-                    checker_data[idx + 2] = bright;
-                    checker_data[idx + 3] = 255;
-                }
-            }
-            let checker_texture =
-                renderer.create_texture(gl, &checker_data, 8, 8, TexFormat::Rgba8, false, false, false);
-
-            self.render_state = Some(Arc::new(Mutex::new(RenderState {
-                renderer,
-                textures: Vec::new(),
-                col_count: 0,
-                row_count: 0,
-                col_translation: 0,
-                row_translation: 0,
-                image_width: 0.0,
-                image_height: 0.0,
-                swizzle_mat: [
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-                    0.0, 1.0,
-                ],
-                offset_vec: [0.0; 4],
-                offset: [0.0, 0.0],
-                scale: 1.0,
-                viewport: [1.0, 1.0],
-                bg_color: [0.0, 0.12, 0.12],
-                tiling: 1,
-                checker_texture: Some(checker_texture),
-                show_checker: false,
-            })));
-        }
-    }
-
-    fn upload_image(&mut self, gl: &glow::Context) {
+    /// Upload or re-upload the current image as egui texture tile(s).
+    /// Splits into tiles if the image exceeds max_texture_size.
+    /// Applies the color channel swizzle at upload time.
+    fn upload_image_to_egui(&mut self, ctx: &egui::Context) {
         let img = match &self.state.current_image {
             Some(img) => img,
             None => return,
         };
 
-        let rs = self.render_state.as_ref().unwrap();
-        let mut rs = rs.lock().unwrap();
-
-        // Clear old textures
-        let old_textures: Vec<GlowTexture> = rs.textures.drain(..).collect();
-        for tex in old_textures {
-            rs.renderer.delete_texture(gl, tex);
-        }
+        let channel = self.state.persistent_settings.current_channel;
+        let (mat, offset_vec) = glow_renderer::get_swizzle_mat_vec(channel, img.color());
 
         let rgba = img.to_rgba8();
         let (w, h) = (rgba.width(), rgba.height());
-        let max_size = rs.renderer.max_texture_size;
-        let col_count = ((w as f32) / max_size as f32).ceil() as u32;
-        let row_count = ((h as f32) / max_size as f32).ceil() as u32;
-        let col_inc = w.min(max_size);
-        let row_inc = h.min(max_size);
 
-        let settings = &self.state.persistent_settings;
-        let allow_mipmap = (w as usize * h as usize) < (8192 * 8192);
-
-        for row in 0..row_count {
-            let ty = row * row_inc;
-            let th = row_inc.min(h - ty);
-            for col in 0..col_count {
-                let tx = col * col_inc;
-                let tw = col_inc.min(w - tx);
-
-                // Extract tile
-                let tile: Vec<u8> = if col_count == 1 && row_count == 1 {
-                    rgba.as_raw().clone()
-                } else {
-                    let mut tile_data = vec![0u8; (tw * th * 4) as usize];
-                    for y in 0..th {
-                        let src_start = ((ty + y) * w + tx) as usize * 4;
-                        let dst_start = (y * tw) as usize * 4;
-                        let len = tw as usize * 4;
-                        tile_data[dst_start..dst_start + len]
-                            .copy_from_slice(&rgba.as_raw()[src_start..src_start + len]);
-                    }
-                    tile_data
-                };
-
-                let tex = rs.renderer.create_texture(
-                    gl,
-                    &tile,
-                    tw,
-                    th,
-                    TexFormat::Rgba8,
-                    settings.linear_min_filter,
-                    settings.linear_mag_filter,
-                    settings.use_mipmaps && allow_mipmap,
-                );
-                rs.textures.push(tex);
+        // Apply swizzle on CPU if not RGBA passthrough
+        let mut pixels = rgba.into_raw();
+        if channel != ColorChannel::Rgba {
+            let mat_arr = mat.to_cols_array_2d();
+            let off = [offset_vec.x, offset_vec.y, offset_vec.z, offset_vec.w];
+            for chunk in pixels.chunks_exact_mut(4) {
+                let r = chunk[0] as f32 / 255.0;
+                let g = chunk[1] as f32 / 255.0;
+                let b = chunk[2] as f32 / 255.0;
+                let a = chunk[3] as f32 / 255.0;
+                let nr = (mat_arr[0][0] * r + mat_arr[1][0] * g + mat_arr[2][0] * b + mat_arr[3][0] * a + off[0]).clamp(0.0, 1.0);
+                let ng = (mat_arr[0][1] * r + mat_arr[1][1] * g + mat_arr[2][1] * b + mat_arr[3][1] * a + off[1]).clamp(0.0, 1.0);
+                let nb = (mat_arr[0][2] * r + mat_arr[1][2] * g + mat_arr[2][2] * b + mat_arr[3][2] * a + off[2]).clamp(0.0, 1.0);
+                let na = (mat_arr[0][3] * r + mat_arr[1][3] * g + mat_arr[2][3] * b + mat_arr[3][3] * a + off[3]).clamp(0.0, 1.0);
+                chunk[0] = (nr * 255.0) as u8;
+                chunk[1] = (ng * 255.0) as u8;
+                chunk[2] = (nb * 255.0) as u8;
+                chunk[3] = (na * 255.0) as u8;
             }
         }
 
-        rs.col_count = col_count;
-        rs.row_count = row_count;
-        rs.col_translation = col_inc;
-        rs.row_translation = row_inc;
-        rs.image_width = w as f32;
-        rs.image_height = h as f32;
+        let filter = if self.state.persistent_settings.linear_mag_filter {
+            egui::TextureFilter::Linear
+        } else {
+            egui::TextureFilter::Nearest
+        };
+        let tex_options = egui::TextureOptions {
+            magnification: filter,
+            minification: filter,
+            ..Default::default()
+        };
 
-        self.image_dirty = false;
+        // Clear old tiles
+        self.image_tiles.clear();
+
+        let max = self.max_texture_size;
+        let cols = (w + max - 1) / max;
+        let rows = (h + max - 1) / max;
+
+        for row in 0..rows {
+            let ty = row * max;
+            let th = max.min(h - ty);
+            for col in 0..cols {
+                let tx = col * max;
+                let tw = max.min(w - tx);
+
+                // Extract tile pixels
+                let tile_pixels: Vec<u8> = if cols == 1 && rows == 1 {
+                    pixels.clone()
+                } else {
+                    let mut tile = vec![0u8; (tw * th * 4) as usize];
+                    for y in 0..th {
+                        let src = ((ty + y) * w + tx) as usize * 4;
+                        let dst = (y * tw) as usize * 4;
+                        let len = tw as usize * 4;
+                        tile[dst..dst + len].copy_from_slice(&pixels[src..src + len]);
+                    }
+                    tile
+                };
+
+                let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                    [tw as usize, th as usize],
+                    &tile_pixels,
+                );
+                let name = format!("tile_{}_{}", col, row);
+                let texture = ctx.load_texture(&name, color_image, tex_options);
+
+                self.image_tiles.push(ImageTile {
+                    texture,
+                    x: tx,
+                    y: ty,
+                    w: tw,
+                    h: th,
+                });
+            }
+        }
+
+        self.texture_dirty = false;
+        self.last_channel = channel;
     }
 
     fn first_frame_setup(&mut self, ctx: &egui::Context) {
@@ -312,34 +284,51 @@ impl OculanteApp {
                 }
             }
 
+            // Clear metadata for non-animation frames
+            if !matches!(frame, Frame::Animation(_, _)) {
+                self.state.image_metadata = None;
+            }
+
             match frame {
                 Frame::Still(img)
                 | Frame::CompareResult(img, _)
                 | Frame::ImageCollectionMember(img)
                 | Frame::AnimationStart(img) => {
                     debug!("Received image {}x{}", img.width(), img.height());
+                    self.state.image_geometry.dimensions = img.dimensions();
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
                     self.state.reset_image = true;
-                    self.image_dirty = true;
+                    self.texture_dirty = true;
                     ctx.request_repaint();
                 }
                 Frame::EditResult(img) => {
                     self.state.current_image = Some(img);
-                    self.image_dirty = true;
+                    self.texture_dirty = true;
                     ctx.request_repaint();
                 }
                 Frame::Animation(img, delay_ms) => {
+                    self.state.image_geometry.dimensions = img.dimensions();
                     self.state.current_image = Some(img);
-                    self.image_dirty = true;
+                    self.texture_dirty = true;
                     ctx.request_repaint_after(Duration::from_millis(delay_ms as u64));
                 }
                 Frame::UpdateTexture => {
-                    self.image_dirty = true;
+                    self.texture_dirty = true;
                     ctx.request_repaint();
                 }
                 _ => {}
             }
+
+            // Send extended info (histogram, exif, etc.) in background thread
+            send_extended_info(
+                &self.state.current_image,
+                &self.state.current_path,
+                &self.state.extended_info_channel,
+            );
+
+            // Update window title
+            set_title(ctx, &mut self.state);
         }
     }
 
@@ -369,20 +358,6 @@ impl OculanteApp {
             }
         }
     }
-
-    /// Update the swizzle matrix from current channel settings
-    fn update_swizzle(&self, rs: &mut RenderState) {
-        let (mat, vec) = glow_renderer::get_swizzle_mat_vec(
-            self.state.persistent_settings.current_channel,
-            self.state
-                .current_image
-                .as_ref()
-                .map(|i| i.color())
-                .unwrap_or(image::ColorType::Rgba8),
-        );
-        rs.swizzle_mat = mat.to_cols_array();
-        rs.offset_vec = vec.into();
-    }
 }
 
 impl eframe::App for OculanteApp {
@@ -390,14 +365,23 @@ impl eframe::App for OculanteApp {
         // Initialize on first frame
         if self.first_frame {
             self.first_frame_setup(ctx);
+            // Query max texture size from GL
+            if let Some(gl) = frame.gl() {
+                self.max_texture_size =
+                    unsafe { glow::HasContext::get_parameter_i32(gl.as_ref(), glow::MAX_TEXTURE_SIZE) as u32 };
+                debug!("Max texture size: {}", self.max_texture_size);
+            }
         }
 
-        // Initialize glow renderer
-        if let Some(gl) = frame.gl() {
-            self.ensure_render_state(gl);
-            if self.image_dirty {
-                self.upload_image(gl);
-            }
+        // Upload image to egui texture if needed
+        if self.texture_dirty {
+            self.upload_image_to_egui(ctx);
+        }
+        // Re-upload if channel changed
+        if self.state.persistent_settings.current_channel != self.last_channel
+            && self.state.current_image.is_some()
+        {
+            self.upload_image_to_egui(ctx);
         }
 
         // Update window size
@@ -804,100 +788,49 @@ impl eframe::App for OculanteApp {
             }
         }
 
-        // ===== CUSTOM RENDERING via paint callback =====
-        // Update render state for the paint callback
-        if let Some(rs) = &self.render_state {
-            let mut rs = rs.lock().unwrap();
-            self.update_swizzle(&mut rs);
-            rs.offset = [
-                self.state.image_geometry.offset.x,
-                self.state.image_geometry.offset.y,
-            ];
-            rs.scale = self.state.image_geometry.scale;
-            rs.viewport = [self.state.window_size.x, self.state.window_size.y];
-            let c = self.state.persistent_settings.background_color;
-            rs.bg_color = [c[0] as f32 / 255., c[1] as f32 / 255., c[2] as f32 / 255.];
-            rs.bg_color = [1.,1.,1.];
-            rs.tiling = self.state.tiling;
-            rs.show_checker = self.state.persistent_settings.show_checker_background;
-        }
+        // ===== IMAGE RENDERING =====
+        // Render image via egui's CentralPanel (behind side panels, below UI)
+        let bg = self.state.persistent_settings.background_color;
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(bg[0], bg[1], bg[2])))
+            .show(ctx, |ui| {
+                if !self.image_tiles.is_empty() {
+                    let offset = self.state.image_geometry.offset;
+                    let scale = self.state.image_geometry.scale;
+                    let img_w = self.state.image_geometry.dimensions.0 as f32;
+                    let img_h = self.state.image_geometry.dimensions.1 as f32;
+                    let tiling = self.state.tiling.max(1);
+                    let uv = egui::Rect::from_min_max(
+                        egui::pos2(0.0, 0.0),
+                        egui::pos2(1.0, 1.0),
+                    );
 
-        // CentralPanel required for egui layout (side/top panels need it for sizing)
-        // egui::CentralPanel::default()
-        //     .frame(egui::Frame::NONE)
-        //     .show(ctx, |_ui| {});
+                    for rep_y in 0..tiling {
+                        for rep_x in 0..tiling {
+                            let base_x = offset.x + rep_x as f32 * img_w * scale;
+                            let base_y = offset.y + rep_y as f32 * img_h * scale;
 
-        // Image rendering on a background layer (below all egui panels)
-        if self.state.current_image.is_some() {
-            if let Some(rs_arc) = &self.render_state {
-                let rs_arc = rs_arc.clone();
-                let callback = egui::PaintCallback {
-                    rect: ctx.screen_rect(),
-                    callback: Arc::new(egui_glow::CallbackFn::new(move |_info, painter| {
-                        let rs = rs_arc.lock().unwrap();
-                        let gl = painter.gl().as_ref();
-
-                        if rs.textures.is_empty() {
-                            return;
-                        }
-
-                        unsafe {
-                            glow::HasContext::enable(gl, glow::BLEND);
-                            glow::HasContext::blend_func(
-                                gl,
-                                glow::SRC_ALPHA,
-                                glow::ONE_MINUS_SRC_ALPHA,
-                            );
-                        }
-
-                        let viewport = rs.viewport;
-                        let scale = rs.scale;
-                        let base_offset = rs.offset;
-
-                        for ty in 0..rs.tiling.max(1) {
-                            for tx_i in 0..rs.tiling.max(1) {
-                                let tiling_offset = [
-                                    base_offset[0] + tx_i as f32 * rs.image_width * scale,
-                                    base_offset[1] + ty as f32 * rs.image_height * scale,
-                                ];
-
-                                let mut tex_idx = 0;
-                                for row in 0..rs.row_count {
-                                    let row_off =
-                                        row as f32 * rs.row_translation as f32 * scale;
-                                    for col in 0..rs.col_count {
-                                        if tex_idx >= rs.textures.len() {
-                                            break;
-                                        }
-                                        let col_off =
-                                            col as f32 * rs.col_translation as f32 * scale;
-                                        let tex = &rs.textures[tex_idx];
-                                        rs.renderer.draw_image(
-                                            gl,
-                                            tex,
-                                            [
-                                                tiling_offset[0] + col_off,
-                                                tiling_offset[1] + row_off,
-                                            ],
-                                            [scale, scale],
-                                            viewport,
-                                            &rs.swizzle_mat,
-                                            &rs.offset_vec,
-                                            [0.0, 0.0],
-                                            [1.0, 1.0],
-                                            None,
-                                        );
-                                        tex_idx += 1;
-                                    }
-                                }
+                            for tile in &self.image_tiles {
+                                let pos = egui::pos2(
+                                    base_x + tile.x as f32 * scale,
+                                    base_y + tile.y as f32 * scale,
+                                );
+                                let size = egui::vec2(
+                                    tile.w as f32 * scale,
+                                    tile.h as f32 * scale,
+                                );
+                                let rect = egui::Rect::from_min_size(pos, size);
+                                ui.painter().image(
+                                    tile.texture.id(),
+                                    rect,
+                                    uv,
+                                    egui::Color32::WHITE,
+                                );
                             }
                         }
-                    })),
-                };
-
-                ctx.layer_painter(egui::LayerId::background()).add(callback);
-            }
-        }
+                    }
+                }
+            });
 
         // Repaint if needed
         if self.state.network_mode {
