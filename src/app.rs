@@ -840,5 +840,19 @@ impl eframe::App for OculanteApp {
         if self.state.new_image_loaded {
             self.state.new_image_loaded = false;
         }
+
+        // Save window geometry into volatile settings for persistence
+        if let Some(outer) = ctx.input(|i| i.viewport().outer_rect) {
+            self.state.volatile_settings.window_geometry = (
+                (outer.left() as u32, outer.top() as u32),
+                (outer.width() as u32, outer.height() as u32),
+            );
+        }
+    }
+
+    fn on_exit(&mut self, _gl: Option<&glow::Context>) {
+        info!("Saving settings on exit");
+        _ = self.state.persistent_settings.save_blocking();
+        _ = self.state.volatile_settings.save_blocking();
     }
 }
