@@ -282,13 +282,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             ctx.request_repaint();
         }
         
-        // Display an indication in the top bar to see when/if and how many updates happen
-        #[cfg(debug_assertions)]
-        if ctx.has_requested_repaint() {
-            let p = ui.cursor().translate(vec2(10., 10.));
-            ui.label(ARROW_CLOCKWISE);
-            ui.label(format!("pass {}",ctx.cumulative_pass_nr()));
-        }
+       
 
         drag_area(ui, state);
 
@@ -324,6 +318,24 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         }
 
         draw_hamburger_menu(ui, state);
+        
+        
+        // Display an indication in the top bar to see when/if and how many updates happen
+        #[cfg(debug_assertions)]
+        if ctx.has_requested_repaint() {
+            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("debug_overlay")));
+            let pos = ctx.screen_rect().left_top() + vec2(20., 60.);
+            painter.circle(pos, 6., Color32::RED, Stroke::NONE);
+            painter.text(
+                pos + vec2(12., 0.),
+                Align2::LEFT_CENTER,
+                format!("pass {}", ctx.cumulative_pass_nr()),
+                FontId::proportional(11.),
+                Color32::RED,
+            );
+        }
+        
+        
     });
 }
 
