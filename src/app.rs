@@ -315,9 +315,13 @@ impl OculanteApp {
                 }
             }
 
-            // Clear metadata for non-animation frames
+            // Clear metadata and edit state for non-animation frames
             if !matches!(frame, Frame::Animation(_, _)) {
                 self.state.image_metadata = None;
+            }
+            if !matches!(frame, Frame::Animation(_, _) | Frame::EditResult(_) | Frame::UpdateTexture) {
+                self.state.edit_state.result_pixel_op = Default::default();
+                self.state.edit_state.result_image_op = Default::default();
             }
 
             match frame {
