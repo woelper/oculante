@@ -45,6 +45,8 @@ pub struct OculanteApp {
     last_channel: ColorChannel,
     /// Max texture size (queried once from GL)
     max_texture_size: u32,
+    /// True while an animation is playing (keeps repainting)
+    animation_playing: bool,
 }
 
 impl OculanteApp {
@@ -57,6 +59,7 @@ impl OculanteApp {
             image_tiles: Vec::new(),
             last_channel,
             max_texture_size: 8192, // conservative default, updated on first frame
+            animation_playing: false,
         }
     }
 
@@ -293,14 +296,24 @@ impl OculanteApp {
             match frame {
                 Frame::Still(img)
                 | Frame::CompareResult(img, _)
-                | Frame::ImageCollectionMember(img)
-                | Frame::AnimationStart(img) => {
+                | Frame::ImageCollectionMember(img) => {
                     debug!("Received image {}x{}", img.width(), img.height());
                     self.state.image_geometry.dimensions = img.dimensions();
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
                     self.state.reset_image = true;
                     self.texture_dirty = true;
+                    self.animation_playing = false;
+                    ctx.request_repaint();
+                }
+                Frame::AnimationStart(img) => {
+                    debug!("Animation start {}x{}", img.width(), img.height());
+                    self.state.image_geometry.dimensions = img.dimensions();
+                    self.state.current_image = Some(img);
+                    self.state.new_image_loaded = true;
+                    self.state.reset_image = true;
+                    self.texture_dirty = true;
+                    self.animation_playing = true;
                     ctx.request_repaint();
                 }
                 Frame::EditResult(img) => {
@@ -834,7 +847,7 @@ impl eframe::App for OculanteApp {
             });
 
         // Repaint if needed
-        if self.state.network_mode {
+        if self.state.network_mode || self.animation_playing {
             ctx.request_repaint();
         }
         if self.state.new_image_loaded {
