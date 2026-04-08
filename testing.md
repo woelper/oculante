@@ -15,6 +15,7 @@ Obvious defects
 - [ ] Background color does not work
 - [ ] Interpolate while zooming in/out may not work
 - [ ] Animated images do not run when no input (egui isn't refreshing)
+- [ ] When changing the image / loading an image, the current one should only be transformed once the new one is loaded
 
 Cleanup
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
@@ -22,6 +23,7 @@ Cleanup
 
 Things to improve not related to removing Notan
 - [ ] Painting should not be a mode but rather a normal operator
+- [ ] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
 
 
 Things to keep in mind:
