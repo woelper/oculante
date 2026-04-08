@@ -5,17 +5,22 @@ Testing steps after Notan removal
 - [ ] Borderless mode
 - [x] Always on top
 - [ ] Paint mode
+- [ ] OSX file associations
 
 Obvious defects
-- [ ] The loaded image is always drawn in front on top of the ui
+- [x] The loaded image is always drawn in front on top of the ui
+- [x] Background color does not work
+- [ ] Some or all settings don't seem to be saved / restored
+- [ ] Animated images do not run when no input (egui isn't refreshing)
 - [ ] Changing values in the filter does not update the texture / current image
 - [ ] No application icon
-- [ ] Mipmaps possibly unnecessary (is this possible with egui?) if not, remove from settings
+- [ ] Mipmaps don't seem to work
 - [ ] Vsync possible with egui? If not, remove from settings
-- [ ] Background color does not work
-- [ ] Interpolate while zooming in/out may not work
-- [ ] Animated images do not run when no input (egui isn't refreshing)
+- [ ] Interpolate while zooming in/out may not work (when zoomed in it works, zooming out has no effect)
 - [ ] When changing the image / loading an image, the current one should only be transformed once the new one is loaded
+- [ ] Show alpha bleed in info panel not working
+- [ ] Show semi-transparent pixels in info panel not working
+- [ ] Show transparency grid does not work when enabled in settings
 
 Cleanup
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
