@@ -337,8 +337,14 @@ impl OculanteApp {
                 | Frame::CompareResult(img, _)
                 | Frame::ImageCollectionMember(img) => {
                     debug!("Received image {}x{}", img.width(), img.height());
-                    // Don't update dimensions/reset here — wait until texture is uploaded
-                    // so the old image stays stable while the new one loads.
+
+                    // Insert into cache for fast back/forth navigation
+                    if self.state.persistent_settings.max_cache != 0 {
+                        if let Some(p) = self.state.current_path.clone() {
+                            self.state.player.cache.insert(&p, img.clone());
+                        }
+                    }
+
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
                     self.texture_dirty = true;
