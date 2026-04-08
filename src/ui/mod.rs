@@ -31,7 +31,6 @@ use log::{debug, error, info};
 use mouse_position::mouse_position::Mouse;
 use nalgebra::Vector2;
 use egui::{self, *};
-use notan::prelude::{App, Graphics};
 use std::{f32, ops::RangeInclusive, path::Path, time::Instant};
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
@@ -514,8 +513,8 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
-pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if let Some(texture) = &state.current_texture.get() {
+pub fn image_ui(ctx: &Context, state: &mut OculanteState) {
+    if let Some(_img) = &state.current_image {
         let image_rect = Rect::from_center_size(
             Pos2::new(
                 state.image_geometry.offset.x
@@ -700,7 +699,7 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
 }
 
 /// An area that can be dragged by a user to move the window
-pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+pub fn drag_area(ui: &mut Ui, state: &mut OculanteState) {
     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
@@ -710,13 +709,11 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
         );
 
         if r.dragged() {
-            // improve responsiveness
-            app.window().request_frame();
+            ui.ctx().request_repaint();
             let position = Mouse::get_mouse_position();
             match position {
                 Mouse::Position { mut x, mut y } => {
-                    // translate mouse pos into real pixels
-                    let dpi = app.backend.window().dpi();
+                    let dpi = ui.ctx().pixels_per_point() as f64;
                     x = (x as f64 * dpi) as i32;
                     y = (y as f64 * dpi) as i32;
 
@@ -726,14 +723,19 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
                     {
                         Some(o) => o,
                         None => {
-                            let window_pos = app.window().position();
+                            // Get window position from viewport info
+                            let window_pos = ui.ctx().input(|i| {
+                                i.viewport().outer_rect.map(|r| (r.left() as i32, r.top() as i32))
+                            }).unwrap_or((0, 0));
                             let offset = (window_pos.0 - x, window_pos.1 - y);
                             ui.ctx()
                                 .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
                             offset
                         }
                     };
-                    app.window().set_position(x + offset.0, y + offset.1);
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::OuterPosition(
+                        egui::pos2((x + offset.0) as f32, (y + offset.1) as f32),
+                    ));
                 }
                 Mouse::Error => error!("Error getting mouse position"),
             }

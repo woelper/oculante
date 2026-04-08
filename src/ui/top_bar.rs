@@ -6,7 +6,7 @@ use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
 
-pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
+pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
     let ctx = ui.ctx().clone();
 
@@ -15,7 +15,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         // The Close button
         if state.persistent_settings.borderless && unframed_button(X, ui).clicked() {
-            app.backend.exit();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
         let mut changed_channels = false;
@@ -106,11 +106,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             });
         }
 
-        if changed_channels && state.current_image.is_some() {
-            state
-                .current_texture
-                .update_color_selection(gfx, &state.persistent_settings);
-        }
+        // Channel changes are picked up by the renderer each frame via
+        // persistent_settings.current_channel — no GPU state update needed here.
 
         let label_rect = ui.ctx().available_rect().shrink(50.);
 
@@ -179,7 +176,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
         {
-            toggle_fullscreen(app, state);
+            toggle_fullscreen(&ctx, state);
         }
 
         if window_x > ui.cursor().left() + 80.
@@ -192,7 +189,13 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
         {
             state.always_on_top = !state.always_on_top;
-            app.window().set_always_on_top(state.always_on_top);
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
+                if state.always_on_top {
+                    egui::WindowLevel::AlwaysOnTop
+                } else {
+                    egui::WindowLevel::Normal
+                },
+            ));
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
@@ -224,7 +227,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.get().is_some()
+        if state.current_image.is_some()
             && window_x > ui.cursor().left() + 80.
             && tooltip(
                 unframed_button(PLACEHOLDER, ui),
@@ -275,10 +278,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .unwrap_or_default()
                 ));
             });
-            app.window().request_frame();
+            ctx.request_repaint();
         }
 
-        drag_area(ui, state, app);
+        drag_area(ui, state);
 
         ui.add_space(ui.available_width() - ICON_SIZE * 2. - ICON_SIZE / 2.);
 
@@ -311,11 +314,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        draw_hamburger_menu(ui, state, app);
+        draw_hamburger_menu(ui, state);
     });
 }
 
-pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
     use crate::shortcuts::InputEvent::*;
     let ctx = ui.ctx().clone();
 
@@ -335,8 +338,8 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 set_zoom(
                     1.0,
                     Some(nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
+                        state.window_size.x / 2.,
+                        state.window_size.y / 2.,
                     )),
                     state,
                 );
@@ -385,7 +388,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
             }
 
             if ui.styled_button(format!("{EXIT} Quit")).clicked() {
-                app.backend.exit();
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
 
             ui.styled_menu_button(format!("{CLOCK} Recent"), |ui| {

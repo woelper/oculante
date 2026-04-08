@@ -4,7 +4,6 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
-    texture_wrapper::TextureWrapperManager,
     thumbnails::Thumbnails,
     utils::{ExtendedImageInfo, Frame, Player},
 };
@@ -12,7 +11,6 @@ use crate::{
 use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::prelude::Texture;
 use std::{
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
@@ -68,8 +66,6 @@ pub struct OculanteState {
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
-    //pub current_texture: Option<TexWrap>,
-    pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<DynamicImage>,
     pub settings_enabled: bool,
@@ -89,7 +85,6 @@ pub struct OculanteState {
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
-    pub checker_texture: Option<Texture>,
     pub redraw: bool,
     pub first_start: bool,
     pub toasts: Toasts,
@@ -161,7 +156,6 @@ impl Default for OculanteState {
             load_channel: mpsc::channel(),
             extended_info_channel: meta_channel,
             mouse_delta: Default::default(),
-            current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
             settings_enabled: Default::default(),
@@ -178,7 +172,6 @@ impl Default for OculanteState {
             window_size: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
-            checker_texture: Default::default(),
             redraw: Default::default(),
             first_start: true,
             toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
@@ -189,5 +182,3 @@ impl Default for OculanteState {
         }
     }
 }
-
-impl notan::app::AppState for OculanteState {}

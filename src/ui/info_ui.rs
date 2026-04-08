@@ -10,16 +10,13 @@ use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::{self, *};
-use notan::prelude::Graphics;
 
 use super::*;
 use std::time::Duration;
 
 pub fn info_ui(
-    app: &mut App,
     ctx: &Context,
     state: &mut OculanteState,
-    _gfx: &mut Graphics,
 ) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
@@ -61,9 +58,11 @@ pub fn info_ui(
             // Force-expand to prevent spacing issue with scroll bar
             // ui.allocate_space(egui::Vec2::new(1000., 0.));
 
-            if let Some(texture) = &state.current_texture.get() {
+            if state.current_image.is_some() {
+                let img_w = state.image_geometry.dimensions.0 as f64;
+                let img_h = state.image_geometry.dimensions.1 as f64;
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
-                let scale = (desired_width / 8.) / texture.size().0 as f64;
+                let scale = (desired_width / 8.) / img_w.max(1.0);
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
@@ -137,7 +136,7 @@ pub fn info_ui(
                 });
 
                 // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
+                let ratio = img_w / img_h.max(1.0);
                 uv_size = (scale, scale * ratio);
                 ui.add_space(10.);
 
@@ -240,7 +239,7 @@ pub fn info_ui(
                 });
             });
 
-            if state.current_texture.get().is_some() {
+            if state.current_image.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {

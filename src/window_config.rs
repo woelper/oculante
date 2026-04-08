@@ -88,29 +88,3 @@ pub fn build_window_settings() -> WindowSettings {
 
     ws
 }
-
-/// Convert to notan's WindowConfig (temporary bridge).
-pub fn to_notan_window_config(ws: &WindowSettings) -> notan::prelude::WindowConfig {
-    let mut wc = notan::prelude::WindowConfig::new()
-        .set_title(&ws.title)
-        .set_size(ws.width, ws.height)
-        .set_resizable(ws.resizable)
-        .set_multisampling(ws.multisampling)
-        .set_app_id(&ws.app_id);
-
-    if let Some(icon) = ws.icon_data {
-        wc = wc.set_window_icon_data(Some(icon)).set_taskbar_icon_data(Some(icon));
-    }
-
-    wc = wc
-        .set_lazy_loop(ws.lazy_loop)
-        .set_vsync(ws.vsync)
-        .set_high_dpi(ws.high_dpi);
-
-    wc.decorations = ws.decorations;
-    wc.always_on_top = ws.always_on_top;
-    wc.min_size = ws.min_size;
-    wc.max_size = ws.max_size;
-
-    wc
-}

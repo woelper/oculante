@@ -8,7 +8,7 @@ use crate::{settings, utils::*};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
 
-pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
     #[derive(Debug, PartialEq)]
     enum SettingsState {
         General,
@@ -175,9 +175,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     configuration_item_ui("Redraw every frame", "Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.", |ui| {
-                                        if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "").changed(){
-                                            app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
-                                        }
+                                        ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "");
                                     }, ui);
 
                                     configuration_item_ui("Use mipmaps", "When zooming out, less memory will be used. Faster performance, but blurry.", |ui| {
@@ -308,7 +306,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Zen mode", "Hides all UI and fits images to the frame.", |ui| {
                                         if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "").changed(){
-                                            set_title(app, state);
+                                            set_title(ctx, state);
                                         }
                                     }, ui);
 
@@ -323,7 +321,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         )
                                         .changed()
                                         {
-                                            set_title(app, state);
+                                            set_title(ctx, state);
                                         }
                                     });
 
@@ -335,7 +333,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     input.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-                                    keybinding_ui(app, state, ui);
+                                    keybinding_ui(state, ui);
                                 });
 
                                 let decoders = ui.heading("Decoders");
@@ -682,7 +680,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
     state.settings_enabled = settings_enabled;
 }
 
-fn keybinding_ui(_app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
+fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
     use crate::shortcuts::{keypresses_as_string, Shortcut};
 
     state.key_grab = true;

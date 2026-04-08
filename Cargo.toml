@@ -29,17 +29,11 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-notan = { version = "0.14", default-features = false, features = [
-    "backend",
-    "draw",
-    "drop_files",
-    "egui",
-    "clipboard",
-] }
 glam = "0.29"
+eframe = { version = "0.31", default-features = false, features = ["glow"] }
+egui_glow = "0.31"
+glow = "0.16"
 # === EGUI
-#  These need to match the egui version used in notan and can't be
-# updated unless notan updates egui.
 egui = { version = "0.31", features = ["serde"] }
 egui_plot = "0.31"
 egui-notify = "0.19"
@@ -134,7 +128,6 @@ default = [
     "turbo",
     "avif_native",
     "update",
-    "notan/shaderc",
     "j2k",
     "jxlcms",
 ]
@@ -148,7 +141,6 @@ j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
 lang_support = []
-notan_glsl-to-spirv = ["notan/glsl-to-spirv"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
