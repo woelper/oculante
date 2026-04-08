@@ -351,6 +351,7 @@ impl OculanteApp {
                 Frame::Animation(img, delay_ms) => {
                     self.state.current_image = Some(img);
                     self.texture_dirty = true;
+                    self.animation_playing = true;
                     ctx.request_repaint_after(Duration::from_millis(delay_ms as u64));
                 }
                 Frame::UpdateTexture => {
