@@ -24,13 +24,14 @@ use crate::filebrowser::browse_for_image_path;
 use crate::image_editing::lossless_tx;
 
 /// A tile of the displayed image
-struct ImageTile {
-    texture: egui::TextureHandle,
+/// A tile of the displayed image (public so info_ui can use it for zoom preview)
+pub struct ImageTile {
+    pub texture: egui::TextureHandle,
     /// Offset in image pixels from top-left
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
 }
 
 pub struct OculanteApp {
@@ -583,7 +584,7 @@ impl eframe::App for OculanteApp {
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            let (_bbox_tl, _bbox_br) = info_ui(ctx, state);
+            let (_bbox_tl, _bbox_br) = info_ui(ctx, state, &self.image_tiles);
         }
 
         // UI state flags (before keyboard shortcuts, after panels)
