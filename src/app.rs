@@ -47,6 +47,8 @@ pub struct OculanteApp {
     max_texture_size: u32,
     /// True while an animation is playing (keeps repainting)
     animation_playing: bool,
+    /// Set when a new image arrives; cleared after upload resets the view
+    reset_after_upload: bool,
 }
 
 impl OculanteApp {
@@ -60,6 +62,7 @@ impl OculanteApp {
             last_channel,
             max_texture_size: 8192, // conservative default, updated on first frame
             animation_playing: false,
+            reset_after_upload: false,
         }
     }
 
@@ -171,6 +174,13 @@ impl OculanteApp {
                 });
             }
         }
+
+        // Now that the texture is ready, update geometry and reset view
+        self.state.image_geometry.dimensions = (w, h);
+        if !self.state.persistent_settings.keep_view && self.reset_after_upload {
+            self.state.reset_image = true;
+        }
+        self.reset_after_upload = false;
 
         self.texture_dirty = false;
         self.last_channel = channel;
@@ -315,20 +325,20 @@ impl OculanteApp {
                 | Frame::CompareResult(img, _)
                 | Frame::ImageCollectionMember(img) => {
                     debug!("Received image {}x{}", img.width(), img.height());
-                    self.state.image_geometry.dimensions = img.dimensions();
+                    // Don't update dimensions/reset here — wait until texture is uploaded
+                    // so the old image stays stable while the new one loads.
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
-                    self.state.reset_image = true;
                     self.texture_dirty = true;
                     self.animation_playing = false;
+                    self.reset_after_upload = true;
                     ctx.request_repaint();
                 }
                 Frame::AnimationStart(img) => {
                     debug!("Animation start {}x{}", img.width(), img.height());
-                    self.state.image_geometry.dimensions = img.dimensions();
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
-                    self.state.reset_image = true;
+                    self.reset_after_upload = true;
                     self.texture_dirty = true;
                     self.animation_playing = true;
                     ctx.request_repaint();
@@ -339,7 +349,6 @@ impl OculanteApp {
                     ctx.request_repaint();
                 }
                 Frame::Animation(img, delay_ms) => {
-                    self.state.image_geometry.dimensions = img.dimensions();
                     self.state.current_image = Some(img);
                     self.texture_dirty = true;
                     ctx.request_repaint_after(Duration::from_millis(delay_ms as u64));
