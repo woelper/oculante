@@ -67,9 +67,15 @@ impl OculanteApp {
     /// Splits into tiles if the image exceeds max_texture_size.
     /// Applies the color channel swizzle at upload time.
     fn upload_image_to_egui(&mut self, ctx: &egui::Context) {
-        let img = match &self.state.current_image {
-            Some(img) => img,
-            None => return,
+        // Prefer the edit result if present, otherwise use the original image
+        let edit_result = &self.state.edit_state.result_pixel_op;
+        let img = if edit_result.width() > 0 {
+            edit_result
+        } else {
+            match &self.state.current_image {
+                Some(img) => img,
+                None => return,
+            }
         };
 
         let channel = self.state.persistent_settings.current_channel;
