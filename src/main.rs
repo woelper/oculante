@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use clap::{Arg, Command};
 use log::{debug, error};
@@ -134,15 +134,36 @@ fn main() -> eframe::Result<()> {
 
     let ws = build_window_settings();
 
+    // Load application icon from embedded ICO
+    let icon = {
+        let icon_data = include_bytes!("../icon.ico");
+        image::load_from_memory(icon_data)
+            .ok()
+            .map(|img| {
+                let rgba = img.to_rgba8();
+                egui::IconData {
+                    rgba: rgba.as_raw().clone(),
+                    width: rgba.width(),
+                    height: rgba.height(),
+                }
+            })
+    };
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([ws.width as f32, ws.height as f32])
+        .with_min_inner_size([
+            ws.min_size.map(|s| s.0).unwrap_or(100) as f32,
+            ws.min_size.map(|s| s.1).unwrap_or(100) as f32,
+        ])
+        .with_title(ws.title)
+        .with_decorations(ws.decorations);
+
+    if let Some(icon) = icon {
+        viewport = viewport.with_icon(Arc::new(icon));
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([ws.width as f32, ws.height as f32])
-            .with_min_inner_size([
-                ws.min_size.map(|s| s.0).unwrap_or(100) as f32,
-                ws.min_size.map(|s| s.1).unwrap_or(100) as f32,
-            ])
-            .with_title(ws.title)
-            .with_decorations(ws.decorations),
+        viewport,
         vsync: ws.vsync,
         renderer: eframe::Renderer::Glow,
         ..Default::default()
