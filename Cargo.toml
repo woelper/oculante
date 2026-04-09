@@ -30,11 +30,7 @@ name = "oculante"
 [dependencies]
 env_logger = "0.11"
 glam = "0.29"
-eframe = { version = "0.31", default-features = false, features = [
-    "glow",
-    "wayland",
-    "x11",
-] }
+eframe = { version = "0.31", default-features = false, features = ["glow"] }
 egui_glow = "0.31"
 glow = "0.16"
 # === EGUI
@@ -148,6 +144,12 @@ lang_support = []
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.31", default-features = false, features = ["glow", "x11", "wayland"] }
+
+[target.'cfg(any(target_os = "freebsd", target_os = "netbsd"))'.dependencies]
+eframe = { version = "0.31", default-features = false, features = ["glow", "x11"] }
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
