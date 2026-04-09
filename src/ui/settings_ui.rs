@@ -712,7 +712,8 @@ fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
         ui.label_unselectable("While this is open, regular shortcuts will not work.");
         if !has_keys {
             ui.label_unselectable(
-                egui::RichText::new("Please press & hold a key").color(Color32::RED),
+                egui::RichText::new("Please press & hold a key")
+                    .color(ui.style().visuals.selection.bg_fill),
             );
         }
     });
