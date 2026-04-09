@@ -423,6 +423,7 @@ impl ImageOperation {
                             }
 
                             if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
+                                ui.ctx().memory_mut(|w| { w.keep_popup_open(Id::new("LUT")); });
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,

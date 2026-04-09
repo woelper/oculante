@@ -51,7 +51,7 @@ pub fn info_ui(
     .show_separator_line(false)
     .exact_width(PANEL_WIDTH)
     .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(0).fill(Color32::TRANSPARENT))
+    .frame(egui::Frame::side_top_panel(&ctx.style()).corner_radius(0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
             .show(ui, |ui| {
@@ -360,6 +360,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         }
 
         let red_vals = Line::new(
+            "red",
             info.red_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
@@ -369,6 +370,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .color(Color32::RED);
 
         let green_vals = Line::new(
+            "green",
             info.green_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
@@ -378,6 +380,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .color(Color32::GREEN);
 
         let blue_vals = Line::new(
+            "blue",
             info.blue_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])

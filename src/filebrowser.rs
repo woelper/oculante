@@ -41,18 +41,18 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 save,
                 |p| {
                     callback(p);
-                    ctx.memory_mut(|w| w.close_popup());
+                    ctx.memory_mut(|w| w.close_all_popups());
                 },
                 ui,
             );
 
             if ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
-                ui.ctx().memory_mut(|w| w.close_popup());
+                ui.ctx().memory_mut(|w| w.close_all_popups());
             }
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
         });
     if !open {
-        ctx.memory_mut(|w| w.close_popup());
+        ctx.memory_mut(|w| w.close_all_popups());
     }
 }
 

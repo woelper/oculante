@@ -145,7 +145,7 @@ impl ModalState {
         ctx.data_mut(|d| d.get_temp(id).unwrap_or_default())
     }
     fn save(self, ctx: &Context, id: Id) {
-        ctx.data_mut(|d| d.insert_temp(id, self))
+        ctx.data_mut(|d| { d.insert_temp(id, self); })
     }
 }
 
@@ -476,7 +476,7 @@ impl Modal {
                 .interactable(true)
                 .fixed_pos(Pos2::ZERO)
                 .show(&self.ctx, |ui: &mut Ui| {
-                    let screen_rect = ui.ctx().input(|i| i.screen_rect);
+                    let screen_rect = ui.ctx().screen_rect();
                     let area_response = ui.allocate_response(screen_rect.size(), Sense::click());
                     // let current_focus = area_response.ctx.memory().focus().clone();
                     // let top_layer = area_response.ctx.memory().layer_ids().last();

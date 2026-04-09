@@ -463,6 +463,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                     let encoding_options = state.volatile_settings.encoding_options.clone();
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
+                        ctx.memory_mut(|w| { w.keep_popup_open(Id::new("SAVE")); });
                         let msg_sender = state.message_channel.0.clone();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();

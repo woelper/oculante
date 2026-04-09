@@ -211,7 +211,7 @@ impl OculanteApp {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
-                baseline_offset_factor: 0.0,
+                ..Default::default()
             })),
         );
         fonts.font_data.insert(
@@ -220,7 +220,7 @@ impl OculanteApp {
                 scale: 1.0,
                 y_offset_factor: 0.0,
                 y_offset: offset,
-                baseline_offset_factor: 0.0,
+                ..Default::default()
             })),
         );
 
@@ -232,7 +232,7 @@ impl OculanteApp {
                     scale: 1.0,
                     y_offset_factor: 0.0,
                     y_offset: 1.0,
-                    baseline_offset_factor: 0.0,
+                    ..Default::default()
                 }),
             ),
         );
@@ -423,6 +423,9 @@ impl OculanteApp {
 }
 
 impl eframe::App for OculanteApp {
+    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {}
+
+    #[allow(deprecated)]
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Initialize on first frame
         if self.first_frame {
@@ -495,7 +498,7 @@ impl eframe::App for OculanteApp {
         }
 
         // Scroll zoom
-        let scroll_delta = ctx.input(|i| i.raw_scroll_delta.y);
+        let scroll_delta = ctx.input(|i| i.smooth_scroll_delta.y);
         if scroll_delta != 0.0 && !self.state.pointer_over_ui {
             let ctrl = ctx.input(|i| i.modifiers.ctrl || i.modifiers.command);
             if ctrl {
@@ -583,13 +586,14 @@ impl eframe::App for OculanteApp {
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
+                ctx.memory_mut(|w| { w.keep_popup_open(Id::new("OPEN")); });
                 crate::filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
                     &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        ctx.memory_mut(|w| w.close_popup());
+                        ctx.memory_mut(|w| w.close_popup(Id::new("OPEN")));
                     },
                     ctx,
                 );

@@ -752,12 +752,11 @@ pub fn blank_icon(
     _rect: egui::Rect,
     _visuals: &egui::style::WidgetVisuals,
     _is_open: bool,
-    _above_or_below: egui::AboveOrBelow,
 ) {
 }
 
 fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
-    let galley = ui.ctx().fonts(|fonts| {
+    let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
             CARET_RIGHT.to_string(),
             FontId::proportional(12.),
@@ -908,6 +907,7 @@ impl Modal {
         if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
             return;
         }
+        self.ctx.memory_mut(|w| { w.keep_popup_open(self.id.clone().into()); });
         egui::Modal::new("m".into()).show(&self.ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -931,11 +931,11 @@ impl Modal {
                             warn_color.linear_multiply(0.8);
                         if ui.styled_button("Yes").clicked() {
                             ui.scope(add_contents);
-                            self.ctx.memory_mut(|w| w.close_popup());
+                            self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
                         }
                     });
                     if ui.styled_button("Cancel").clicked() {
-                        self.ctx.memory_mut(|w| w.close_popup());
+                        self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
                     }
                 });
             });
