@@ -330,6 +330,9 @@ impl OculanteApp {
             if !matches!(frame, Frame::Animation(_, _) | Frame::EditResult(_) | Frame::UpdateTexture) {
                 self.state.edit_state.result_pixel_op = Default::default();
                 self.state.edit_state.result_image_op = Default::default();
+                if !self.state.persistent_settings.keep_edits {
+                    self.state.edit_state = Default::default();
+                }
             }
 
             match frame {
