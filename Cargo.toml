@@ -30,7 +30,11 @@ name = "oculante"
 [dependencies]
 env_logger = "0.11"
 glam = "0.29"
-eframe = { version = "0.31", default-features = false, features = ["glow"] }
+eframe = { version = "0.31", default-features = false, features = [
+    "glow",
+    "wayland",
+    "x11",
+] }
 egui_glow = "0.31"
 glow = "0.16"
 # === EGUI
