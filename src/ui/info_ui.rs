@@ -51,14 +51,10 @@ pub fn info_ui(
     .show_separator_line(true)
     .default_width(PANEL_WIDTH)
     .resizable(true)
-    .frame(egui::Frame::side_top_panel(&ctx.style()).corner_radius(0))
     .show(ctx, |ui| {
-        egui::ScrollArea::vertical().auto_shrink([false,true])
-            .show(ui, |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
 
-            // Force-expand to prevent spacing issue with scroll bar
-            // ui.allocate_space(egui::Vec2::new(1000., 0.));
-
+            // SECTION 1: Info grid
             if state.current_image.is_some() {
                 let img_w = state.image_geometry.dimensions.0 as f64;
                 let img_h = state.image_geometry.dimensions.1 as f64;
@@ -135,7 +131,7 @@ pub fn info_ui(
                     );
                     ui.end_row();
                 });
-
+                // SECTION 2: Zoom preview
                 ui.add_space(10.);
                 let preview_size = desired_width as f32;
                 let preview_rect = egui::Rect::from_min_size(
@@ -149,7 +145,9 @@ pub fn info_ui(
                 zoom_preview(ui, state, preview_rect, image_tiles);
 
                 ui.advance_cursor_after_rect(preview_rect);
-            }
+            } // end if current_image
+
+            // SECTION 3: Compare
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
@@ -199,7 +197,6 @@ pub fn info_ui(
                                     }
                                 }
 
-                            // let compare_list = state.compare_list.iter().cloned().collect();
                             let mut to_remove = None;
                             for CompareItem {path, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
@@ -240,6 +237,7 @@ pub fn info_ui(
                 });
             });
 
+            // SECTION 4: Alpha tools + palette + measure + tiling
             if state.current_image.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
@@ -283,11 +281,11 @@ pub fn info_ui(
 
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
 
+            // SECTION 5: Advanced (stats, EXIF, DICOM, histogram)
             advanced_ui(ui, state);
 
         });
