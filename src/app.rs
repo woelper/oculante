@@ -18,6 +18,89 @@ use crate::ui::*;
 use crate::utils::*;
 use crate::{BOLD_FONT, FONT};
 
+/// Convert a DynamicImage to Vec<Color32> in a single pass.
+/// Handles each pixel format directly, avoiding intermediate allocations.
+/// For opaque formats (RGB, Luma), alpha is set to 255.
+/// For alpha formats (RGBA, LumaA), alpha is premultiplied for correct egui blending.
+/// If a channel swizzle is active, it's applied inline.
+fn image_to_color32(img: &image::DynamicImage, channel: ColorChannel) -> Vec<egui::Color32> {
+    let needs_swizzle = channel != ColorChannel::Rgba;
+    let swizzle = if needs_swizzle {
+        let (mat, off) = glow_renderer::get_swizzle_mat_vec(channel, img.color());
+        Some((mat.to_cols_array_2d(), [off.x, off.y, off.z, off.w]))
+    } else {
+        None
+    };
+
+    // Apply swizzle to RGBA floats, returning a Color32
+    let apply = |r: f32, g: f32, b: f32, a: f32| -> egui::Color32 {
+        if let Some((m, o)) = &swizzle {
+            let nr = (m[0][0]*r + m[1][0]*g + m[2][0]*b + m[3][0]*a + o[0]).clamp(0.0, 1.0);
+            let ng = (m[0][1]*r + m[1][1]*g + m[2][1]*b + m[3][1]*a + o[1]).clamp(0.0, 1.0);
+            let nb = (m[0][2]*r + m[1][2]*g + m[2][2]*b + m[3][2]*a + o[2]).clamp(0.0, 1.0);
+            let na = (m[0][3]*r + m[1][3]*g + m[2][3]*b + m[3][3]*a + o[3]).clamp(0.0, 1.0);
+            // Premultiply after swizzle
+            egui::Color32::from_rgba_premultiplied(
+                (nr * na * 255.0) as u8,
+                (ng * na * 255.0) as u8,
+                (nb * na * 255.0) as u8,
+                (na * 255.0) as u8,
+            )
+        } else {
+            // Premultiply
+            egui::Color32::from_rgba_premultiplied(
+                (r * a * 255.0) as u8,
+                (g * a * 255.0) as u8,
+                (b * a * 255.0) as u8,
+                (a * 255.0) as u8,
+            )
+        }
+    };
+
+    match img {
+        image::DynamicImage::ImageRgb8(buf) => {
+            if needs_swizzle {
+                buf.as_raw().chunks_exact(3).map(|p| {
+                    apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, 1.0)
+                }).collect()
+            } else {
+                // Fast path: no swizzle, no alpha, no premultiply needed
+                buf.as_raw().chunks_exact(3).map(|p| {
+                    egui::Color32::from_rgb(p[0], p[1], p[2])
+                }).collect()
+            }
+        }
+        image::DynamicImage::ImageRgba8(buf) => {
+            buf.as_raw().chunks_exact(4).map(|p| {
+                apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, p[3] as f32 / 255.0)
+            }).collect()
+        }
+        image::DynamicImage::ImageLuma8(buf) => {
+            if needs_swizzle {
+                buf.as_raw().iter().map(|&l| {
+                    apply(l as f32 / 255.0, l as f32 / 255.0, l as f32 / 255.0, 1.0)
+                }).collect()
+            } else {
+                buf.as_raw().iter().map(|&l| {
+                    egui::Color32::from_rgb(l, l, l)
+                }).collect()
+            }
+        }
+        image::DynamicImage::ImageLumaA8(buf) => {
+            buf.as_raw().chunks_exact(2).map(|p| {
+                apply(p[0] as f32 / 255.0, p[0] as f32 / 255.0, p[0] as f32 / 255.0, p[1] as f32 / 255.0)
+            }).collect()
+        }
+        // For 16-bit and float formats, convert through to_rgba8 (these are rare and large anyway)
+        _ => {
+            let rgba = img.to_rgba8();
+            rgba.as_raw().chunks_exact(4).map(|p| {
+                apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, p[3] as f32 / 255.0)
+            }).collect()
+        }
+    }
+}
+
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 #[cfg(feature = "turbo")]
@@ -67,8 +150,8 @@ impl OculanteApp {
     }
 
     /// Upload or re-upload the current image as egui texture tile(s).
-    /// Splits into tiles if the image exceeds max_texture_size.
-    /// Applies the color channel swizzle at upload time.
+    /// Converts each source pixel format directly to Color32 in a single pass.
+    /// egui only supports RGBA textures, so all formats end up as Color32.
     fn upload_image_to_egui(&mut self, ctx: &egui::Context) {
         // Prefer the edit result if present, otherwise use the original image
         let edit_result = &self.state.edit_state.result_pixel_op;
@@ -81,32 +164,12 @@ impl OculanteApp {
             }
         };
 
+        let (w, h) = (img.width(), img.height());
         let channel = self.state.persistent_settings.current_channel;
-        let (mat, offset_vec) = glow_renderer::get_swizzle_mat_vec(channel, img.color());
 
-        let rgba = img.to_rgba8();
-        let (w, h) = (rgba.width(), rgba.height());
-
-        // Apply swizzle on CPU if not RGBA passthrough
-        let mut pixels = rgba.into_raw();
-        if channel != ColorChannel::Rgba {
-            let mat_arr = mat.to_cols_array_2d();
-            let off = [offset_vec.x, offset_vec.y, offset_vec.z, offset_vec.w];
-            for chunk in pixels.chunks_exact_mut(4) {
-                let r = chunk[0] as f32 / 255.0;
-                let g = chunk[1] as f32 / 255.0;
-                let b = chunk[2] as f32 / 255.0;
-                let a = chunk[3] as f32 / 255.0;
-                let nr = (mat_arr[0][0] * r + mat_arr[1][0] * g + mat_arr[2][0] * b + mat_arr[3][0] * a + off[0]).clamp(0.0, 1.0);
-                let ng = (mat_arr[0][1] * r + mat_arr[1][1] * g + mat_arr[2][1] * b + mat_arr[3][1] * a + off[1]).clamp(0.0, 1.0);
-                let nb = (mat_arr[0][2] * r + mat_arr[1][2] * g + mat_arr[2][2] * b + mat_arr[3][2] * a + off[2]).clamp(0.0, 1.0);
-                let na = (mat_arr[0][3] * r + mat_arr[1][3] * g + mat_arr[2][3] * b + mat_arr[3][3] * a + off[3]).clamp(0.0, 1.0);
-                chunk[0] = (nr * 255.0) as u8;
-                chunk[1] = (ng * 255.0) as u8;
-                chunk[2] = (nb * 255.0) as u8;
-                chunk[3] = (na * 255.0) as u8;
-            }
-        }
+        // Convert source pixels → Vec<Color32> in one pass per format.
+        // This avoids intermediate allocations and redundant passes.
+        let pixels = image_to_color32(img, channel);
 
         let mag_filter = if self.state.persistent_settings.linear_mag_filter {
             egui::TextureFilter::Linear
@@ -130,14 +193,6 @@ impl OculanteApp {
             ..Default::default()
         };
 
-        // Premultiply alpha for correct blending in egui
-        for chunk in pixels.chunks_exact_mut(4) {
-            let a = chunk[3] as f32 / 255.0;
-            chunk[0] = (chunk[0] as f32 * a) as u8;
-            chunk[1] = (chunk[1] as f32 * a) as u8;
-            chunk[2] = (chunk[2] as f32 * a) as u8;
-        }
-
         // Clear old tiles
         self.image_tiles.clear();
 
@@ -145,41 +200,44 @@ impl OculanteApp {
         let cols = (w + max - 1) / max;
         let rows = (h + max - 1) / max;
 
-        for row in 0..rows {
-            let ty = row * max;
-            let th = max.min(h - ty);
-            for col in 0..cols {
-                let tx = col * max;
-                let tw = max.min(w - tx);
+        if cols == 1 && rows == 1 {
+            // Single tile: move pixels directly, no copy
+            let color_image = egui::ColorImage::new([w as usize, h as usize], pixels);
+            let texture = ctx.load_texture("tile_0_0", color_image, tex_options);
+            self.image_tiles.push(ImageTile {
+                texture,
+                x: 0,
+                y: 0,
+                w,
+                h,
+            });
+        } else {
+            // Multiple tiles: extract each from the pixel grid
+            for row in 0..rows {
+                let ty = row * max;
+                let th = max.min(h - ty);
+                for col in 0..cols {
+                    let tx = col * max;
+                    let tw = max.min(w - tx);
 
-                // Extract tile pixels
-                let tile_pixels: Vec<u8> = if cols == 1 && rows == 1 {
-                    pixels.clone()
-                } else {
-                    let mut tile = vec![0u8; (tw * th * 4) as usize];
+                    let mut tile = Vec::with_capacity((tw * th) as usize);
                     for y in 0..th {
-                        let src = ((ty + y) * w + tx) as usize * 4;
-                        let dst = (y * tw) as usize * 4;
-                        let len = tw as usize * 4;
-                        tile[dst..dst + len].copy_from_slice(&pixels[src..src + len]);
+                        let src = ((ty + y) * w + tx) as usize;
+                        tile.extend_from_slice(&pixels[src..src + tw as usize]);
                     }
-                    tile
-                };
 
-                let color_image = egui::ColorImage::from_rgba_premultiplied(
-                    [tw as usize, th as usize],
-                    &tile_pixels,
-                );
-                let name = format!("tile_{}_{}", col, row);
-                let texture = ctx.load_texture(&name, color_image, tex_options);
+                    let color_image = egui::ColorImage::new([tw as usize, th as usize], tile);
+                    let name = format!("tile_{}_{}", col, row);
+                    let texture = ctx.load_texture(&name, color_image, tex_options);
 
-                self.image_tiles.push(ImageTile {
-                    texture,
-                    x: tx,
-                    y: ty,
-                    w: tw,
-                    h: th,
-                });
+                    self.image_tiles.push(ImageTile {
+                        texture,
+                        x: tx,
+                        y: ty,
+                        w: tw,
+                        h: th,
+                    });
+                }
             }
         }
 
