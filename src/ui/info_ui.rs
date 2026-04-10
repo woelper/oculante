@@ -48,9 +48,9 @@ pub fn info_ui(
     }
 
     egui::SidePanel::left("info")
-    .show_separator_line(false)
-    .exact_width(PANEL_WIDTH)
-    .resizable(false)
+    .show_separator_line(true)
+    .default_width(PANEL_WIDTH)
+    .resizable(true)
     .frame(egui::Frame::side_top_panel(&ctx.style()).corner_radius(0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false,true])
