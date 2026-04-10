@@ -382,37 +382,30 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
+            let height = 7.4;
+            let rounding = 6;
+            
             ui.style_mut().spacing.interact_size.y = 18.;
+            ui.style_mut().spacing.slider_rail_height = height;
 
             let color = ui.style().visuals.selection.bg_fill;
             let style = ui.style_mut();
 
-            style.visuals.widgets.inactive.fg_stroke.width = 7.0;
+            // Use fg_stroke for the rail appearance
+            style.visuals.widgets.inactive.fg_stroke.width = height;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            // style.visuals.widgets.inactive.rounding =
-            //     style.visuals.widgets.inactive.rounding.at_least(18.);
-
             style.visuals.widgets.inactive.corner_radius =
-                style.visuals.widgets.inactive.corner_radius.at_least(18);
-            style.visuals.widgets.inactive.expansion = -4.0;
+                style.visuals.widgets.inactive.corner_radius.at_least(rounding);
 
-            style.visuals.widgets.hovered.fg_stroke.width = 9.0;
+            style.visuals.widgets.hovered.fg_stroke.width = height;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            // style.visuals.widgets.hovered.rounding =
-            //     style.visuals.widgets.hovered.rounding.at_least(18.);
             style.visuals.widgets.hovered.corner_radius =
-                style.visuals.widgets.hovered.corner_radius.at_least(18);
+                style.visuals.widgets.hovered.corner_radius.at_least(rounding);
 
-            style.visuals.widgets.hovered.expansion = -4.0;
-
-            style.visuals.widgets.active.fg_stroke.width = 9.0;
+            style.visuals.widgets.active.fg_stroke.width = height;
             style.visuals.widgets.active.fg_stroke.color = color;
-            // style.visuals.widgets.active.rounding =
-            //     style.visuals.widgets.active.rounding.at_least(18.);
             style.visuals.widgets.active.corner_radius =
-                style.visuals.widgets.active.corner_radius.at_least(18);
-
-            style.visuals.widgets.active.expansion = -4.0;
+                style.visuals.widgets.active.corner_radius.at_least(rounding);
 
             ui.horizontal(|ui| {
                 let r = ui.add(
@@ -422,7 +415,11 @@ impl EguiExt for Ui {
                         .show_value(false)
                         .integer(),
                 );
-                ui.monospace(format!("{:.0}", value.to_f64()));
+                ui.allocate_ui_with_layout(
+                    egui::vec2(40.0, ui.available_height()),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| { ui.monospace(format!("{:.0}", value.to_f64())); },
+                );
                 r
             })
             .inner

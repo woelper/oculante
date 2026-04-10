@@ -108,11 +108,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
         }),
     ];
 
-    egui::SidePanel::right("editing")
-        .min_width(100.)
-        // safeguard to not expand too much
-        .max_width(500.)
-        .show_separator_line(false)
+    egui::Panel::right("editing")
+        .default_width(PANEL_WIDTH)
+        .min_size(100.)
+        .max_size(500.)
+        .show_separator_line(true)
         .show(ctx, |ui| {
 
 
