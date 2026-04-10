@@ -132,6 +132,9 @@ pub struct OculanteApp {
     animation_playing: bool,
     /// Set when a new image arrives; cleared after upload resets the view
     reset_after_upload: bool,
+    /// True if egui owned the pointer when the current press started.
+    /// Prevents image drag for the entire press duration.
+    egui_started_press: bool,
 }
 
 impl OculanteApp {
@@ -146,6 +149,7 @@ impl OculanteApp {
             max_texture_size: 8192, // conservative default, updated on first frame
             animation_playing: false,
             reset_after_upload: false,
+            egui_started_press: false,
         }
     }
 
@@ -541,15 +545,26 @@ impl eframe::App for OculanteApp {
         let middle_down = ctx.input(|i| {
             i.pointer.button_down(egui::PointerButton::Middle)
         });
+        let any_down = primary_down || middle_down;
 
-        if middle_down {
+        // Track whether egui owned the pointer at press start.
+        // This persists for the entire press so that slider drags
+        // leaving the window don't turn into image pans.
+        if !any_down {
+            self.egui_started_press = false;
+            self.state.drag_enabled = false;
+        } else if !self.state.drag_enabled && !self.egui_started_press {
+            // Button just went down — check who owns it
+            if ctx.is_using_pointer() || self.state.pointer_over_ui || self.state.mouse_grab {
+                self.egui_started_press = true;
+            }
+        }
+
+        if middle_down && !self.egui_started_press {
             self.state.drag_enabled = true;
             self.state.image_geometry.offset += self.state.mouse_delta;
-        } else if primary_down && !self.state.mouse_grab && !self.state.pointer_over_ui {
+        } else if primary_down && !self.egui_started_press && !self.state.mouse_grab {
             self.state.drag_enabled = true;
-        }
-        if self.state.drag_enabled && !primary_down && !middle_down {
-            self.state.drag_enabled = false;
         }
         if self.state.drag_enabled && !self.state.mouse_grab {
             self.state.image_geometry.offset += self.state.mouse_delta;

@@ -10,7 +10,7 @@
 - [x] The loaded image is always drawn in front on top of the ui
 - [x] Background color does not work
 - [x] Some or all settings don't seem to be saved / restored
-- [ ] Animated images do not run when no input (egui isn't refreshing): This is partially fixed, but does not work on some images, for example $HOME/Pictures/ioslaunch.gig
+- [x] Animated images do not run when no input (egui isn't refreshing): This is partially fixed, but does not work on some images, for example $HOME/Pictures/ioslaunch.gig
 - [x] Changing values in the filter does not update the texture / current image
 - [x] No application icon
 - [x] Mipmaps don't seem to work
@@ -19,16 +19,34 @@
 - [x] When changing the image / loading an image, the current one should only be transformed once the new one is loaded
 - [x] Show alpha bleed in info panel not working
 - [x] Show semi-transparent pixels in info panel not working
-- [ ] Show transparency grid does not work when enabled in settings
-- [ ] Caching does not seem to work any more, going back and forth between images takes a while, it should be instant
+- [x] Show transparency grid does not work when enabled in settings
+- [x] Caching does not seem to work any more, going back and forth between images takes a while, it should be instant
+- [x] When loading a new image and having edit more present, the new image keeps the edit stack. It should honor the keep_edits option.
+- [x] The info panel has a black bar to the right. It also should be resizable now
+- [x] Modifying filter can shift image (this one is a little annoying to reproduce, move the image manually, then v to reset, then remove drag button to the right all the way, may take a few tries)
+- [x] Filter sliders seem off (if they are clicked, they don't exactly match the mouse pos, maybe this is because of the egui update and custom slider styling)
+- [ ] Update position button in compare menu doesn't work (in info panel)
+- [ ] "Modified" and "Original" buttons in edit menu don't work
+- [ ] Draw frame around image doesn't work
+- [x] Info panel scroll bar is not in the correct location
+- [ ] recent files menu is way too large and obscures the whole screen and is cut off
+- [ ] When fullscreen is pressed, the exact same pixel under the cursor should still be under the cursor in full screen. The same should be true when switching back. This was old behavior.
+
+# Performance
+- [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
+- [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
 
 # Cleanup
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
+- [ ] Functionality which can be better isolated / separated should be compined in modules. Some of it makes sense, for example buttons that can be clicked and have a shortcut, other things are scattered all over the place.
 
 
-Things to improve not related to removing Notan
+# Things to improve not related to removing Notan
+- [ ] I am unhappy with the HEIC / HEIF situation. It is widely used by now and the build has been hard as we have not been using a native library and linking to libheif was hard on all platforms. Investigate if this has changed and if there is more robust heif/heic support that we can use, native rust if possible
 - [ ] Painting should not be a mode but rather a normal operator
 - [ ] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
+- [ ] Update dependencies: first egui and helper libraries, than image libraries step by step
+- [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
 
 
 Things to keep in mind:
