@@ -23,7 +23,6 @@ pub fn info_ui(
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
     let mut uv_center: (f64, f64) = Default::default();
-    let mut uv_size: (f64, f64) = Default::default();
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -47,19 +46,16 @@ pub fn info_ui(
         }
     }
 
-    egui::SidePanel::left("info")
+    egui::Panel::left("info")
     .show_separator_line(true)
-    .default_width(PANEL_WIDTH)
+    .default_size(PANEL_WIDTH)
     .resizable(true)
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
 
             // SECTION 1: Info grid
             if state.current_image.is_some() {
-                let img_w = state.image_geometry.dimensions.0 as f64;
-                let img_h = state.image_geometry.dimensions.1 as f64;
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
-                let scale = (desired_width / 8.) / img_w.max(1.0);
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
@@ -438,8 +434,7 @@ fn zoom_preview(
     let px_per_src = rect.width() / src_size;
 
     // Fill background for out-of-bounds areas
-    ui.painter()
-        .rect_filled(rect, 0.0, Color32::from_gray(30));
+    ui.painter().rect_filled(rect, 0.0, Color32::from_gray(30));
 
     // Clip to the preview rect
     let clip = rect;
@@ -468,10 +463,8 @@ fn zoom_preview(
         let uv_top = (overlap_top - ty) / th;
         let uv_right = (overlap_right - tx) / tw;
         let uv_bottom = (overlap_bottom - ty) / th;
-        let uv = egui::Rect::from_min_max(
-            egui::pos2(uv_left, uv_top),
-            egui::pos2(uv_right, uv_bottom),
-        );
+        let uv =
+            egui::Rect::from_min_max(egui::pos2(uv_left, uv_top), egui::pos2(uv_right, uv_bottom));
 
         // Screen position for this overlap region within the preview rect
         let screen_left = rect.left() + (overlap_left - src_left) * px_per_src;
@@ -483,12 +476,9 @@ fn zoom_preview(
             egui::pos2(screen_right, screen_bottom),
         );
 
-        ui.painter().with_clip_rect(clip).image(
-            tile.texture.id(),
-            draw_rect,
-            uv,
-            Color32::WHITE,
-        );
+        ui.painter()
+            .with_clip_rect(clip)
+            .image(tile.texture.id(), draw_rect, uv, Color32::WHITE);
     }
 
     // Crosshair

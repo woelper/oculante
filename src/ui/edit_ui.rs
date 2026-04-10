@@ -1,16 +1,19 @@
 use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
-use image::{ColorType, GenericImageView, RgbaImage};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
+use image::{ColorType, GenericImageView, RgbaImage};
 
 /// Load an RgbaImage into egui as a texture, returning the TextureId.
 /// Uses a stable URI so the texture is cached and not re-uploaded every frame.
 fn load_brush_texture(ctx: &egui::Context, img: &RgbaImage, id: &str) -> TextureId {
     let uri = format!("bytes://brush/{id}");
     // Check if already loaded
-    if ctx.try_load_texture(&uri, Default::default(), Default::default()).is_ok() {
+    if ctx
+        .try_load_texture(&uri, Default::default(), Default::default())
+        .is_ok()
+    {
         // Already loaded — return its ID by loading again (cheap, returns cached)
     }
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
@@ -109,7 +112,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
     ];
 
     egui::Panel::right("editing")
-        .default_width(PANEL_WIDTH)
+        .default_size(PANEL_WIDTH)
         .min_size(100.)
         .max_size(500.)
         .show_separator_line(true)
@@ -452,7 +455,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                         });
                         ui.ctx().request_repaint();
                     }
-                
+
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
@@ -648,11 +651,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
         });
 }
 
-fn stroke_ui(
-    stroke: &mut PaintStroke,
-    brushes: &[RgbaImage],
-    ui: &mut Ui,
-) -> Response {
+fn stroke_ui(stroke: &mut PaintStroke, brushes: &[RgbaImage], ui: &mut Ui) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
     let r = ui
@@ -696,10 +695,17 @@ fn stroke_ui(
     }
 
     ui.horizontal(|ui| {
-        let tex_id = load_brush_texture(ui.ctx(), &brushes[stroke.brush_index], &format!("cur_{}", stroke.brush_index));
+        let tex_id = load_brush_texture(
+            ui.ctx(),
+            &brushes[stroke.brush_index],
+            &format!("cur_{}", stroke.brush_index),
+        );
         ui.add(
-            egui::Image::new(egui::load::SizedTexture::new(tex_id, egui::Vec2::splat(ui.available_height())))
-                .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+            egui::Image::new(egui::load::SizedTexture::new(
+                tex_id,
+                egui::Vec2::splat(ui.available_height()),
+            ))
+            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
         );
 
         let r = egui::ComboBox::from_id_salt(format!("s {:?}", stroke.points))
@@ -709,8 +715,11 @@ fn stroke_ui(
                     ui.horizontal(|ui| {
                         let tex_id = load_brush_texture(ui.ctx(), b, &format!("brush_{b_i}"));
                         ui.add(
-                            egui::Image::new(egui::load::SizedTexture::new(tex_id, egui::Vec2::splat(ui.available_height())))
-                                .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+                            egui::Image::new(egui::load::SizedTexture::new(
+                                tex_id,
+                                egui::Vec2::splat(ui.available_height()),
+                            ))
+                            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
                         );
 
                         if ui

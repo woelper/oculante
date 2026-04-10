@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
 use clap::{Arg, Command};
-use log::{debug, error};
+use log::error;
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
@@ -137,16 +137,14 @@ fn main() -> eframe::Result<()> {
     // Load application icon from embedded ICO
     let icon = {
         let icon_data = include_bytes!("../icon.ico");
-        image::load_from_memory(icon_data)
-            .ok()
-            .map(|img| {
-                let rgba = img.to_rgba8();
-                egui::IconData {
-                    rgba: rgba.as_raw().clone(),
-                    width: rgba.width(),
-                    height: rgba.height(),
-                }
-            })
+        image::load_from_memory(icon_data).ok().map(|img| {
+            let rgba = img.to_rgba8();
+            egui::IconData {
+                rgba: rgba.as_raw().clone(),
+                width: rgba.width(),
+                height: rgba.height(),
+            }
+        })
     };
 
     let mut viewport = egui::ViewportBuilder::default()

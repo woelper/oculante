@@ -19,7 +19,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     }
 
     // Switching theme resets accent color, set it again
-    let mut style: egui::Style = (*ctx.style()).clone();
+    let mut style: egui::Style = (*ctx.global_style()).clone();
     style.spacing.scroll = egui::style::ScrollStyle::solid();
 
     if style.visuals.dark_mode {
@@ -104,7 +104,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
     // Set text on highlighted elements
     style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-    ctx.set_style(style);
+    ctx.set_global_style(style);
 }
 
 /// Attempt to load a system font by any of the given `family_names`, returning the first match.
