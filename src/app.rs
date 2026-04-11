@@ -163,6 +163,8 @@ pub struct OculanteApp {
     max_texture_size: u32,
     /// True while an animation is playing (keeps repainting)
     animation_playing: bool,
+    /// Checker texture for transparency grid
+    checker_texture: Option<egui::TextureHandle>,
     /// Set when a new image arrives; cleared after upload resets the view
     reset_after_upload: bool,
     /// True if egui owned the pointer when the current press started.
@@ -181,6 +183,7 @@ impl OculanteApp {
             last_channel,
             max_texture_size: 8192, // conservative default, updated on first frame
             animation_playing: false,
+            checker_texture: None,
             reset_after_upload: false,
             egui_started_press: false,
         }
@@ -352,6 +355,25 @@ impl OculanteApp {
 
         apply_theme(&mut self.state, ctx);
         ctx.set_fonts(fonts);
+
+        // Load checker texture for transparency grid (once)
+        let checker_data = include_bytes!("../res/checker.png");
+        if let Ok(checker_img) = image::load_from_memory(checker_data) {
+            let rgba = checker_img.to_rgba8();
+            let size = [rgba.width() as usize, rgba.height() as usize];
+            let color_image = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+            self.checker_texture = Some(ctx.load_texture(
+                "checker",
+                color_image,
+                egui::TextureOptions {
+                    magnification: egui::TextureFilter::Nearest,
+                    minification: egui::TextureFilter::Nearest,
+                    wrap_mode: egui::TextureWrapMode::Repeat,
+                    ..Default::default()
+                },
+            ));
+        }
+
         self.first_frame = false;
     }
 
@@ -975,50 +997,34 @@ impl eframe::App for OculanteApp {
                     let tiling = self.state.tiling.max(1);
                     let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
 
-                    // Draw checker background for transparency
+                    // Draw checker background for transparency (single textured quad per tile)
                     if self.state.persistent_settings.show_checker_background {
-                        let check_size = (8.0 * scale).max(2.0);
-                        let light = egui::Color32::from_gray(204);
-                        let dark = egui::Color32::from_gray(153);
-                        let clip = ui.clip_rect();
+                        if let Some(checker) = &self.checker_texture {
+                            // The checker texture tiles via wrap_mode = Repeat.
+                            // UV is scaled so the pattern stays a fixed screen size.
+                            let checker_px = checker.size()[0] as f32;
 
-                        for rep_y in 0..tiling {
-                            for rep_x in 0..tiling {
-                                let base_x = offset.x + rep_x as f32 * img_w * scale;
-                                let base_y = offset.y + rep_y as f32 * img_h * scale;
-                                let img_rect = egui::Rect::from_min_size(
-                                    egui::pos2(base_x, base_y),
-                                    egui::vec2(img_w * scale, img_h * scale),
-                                );
-                                // Only draw checkers in the visible intersection
-                                if let Some(visible) = clip
-                                    .intersect(img_rect)
-                                    .is_positive()
-                                    .then(|| clip.intersect(img_rect))
-                                {
-                                    let start_col =
-                                        ((visible.left() - base_x) / check_size).floor() as i32;
-                                    let start_row =
-                                        ((visible.top() - base_y) / check_size).floor() as i32;
-                                    let end_col =
-                                        ((visible.right() - base_x) / check_size).ceil() as i32;
-                                    let end_row =
-                                        ((visible.bottom() - base_y) / check_size).ceil() as i32;
-                                    for row in start_row..end_row {
-                                        for col in start_col..end_col {
-                                            let color =
-                                                if (row + col) % 2 == 0 { light } else { dark };
-                                            let r = egui::Rect::from_min_size(
-                                                egui::pos2(
-                                                    base_x + col as f32 * check_size,
-                                                    base_y + row as f32 * check_size,
-                                                ),
-                                                egui::vec2(check_size, check_size),
-                                            )
-                                            .intersect(img_rect);
-                                            ui.painter().rect_filled(r, 0.0, color);
-                                        }
-                                    }
+                            for rep_y in 0..tiling {
+                                for rep_x in 0..tiling {
+                                    let base_x = offset.x + rep_x as f32 * img_w * scale;
+                                    let base_y = offset.y + rep_y as f32 * img_h * scale;
+                                    let img_rect = egui::Rect::from_min_size(
+                                        egui::pos2(base_x, base_y),
+                                        egui::vec2(img_w * scale, img_h * scale),
+                                    );
+                                    // UV repeats = image screen size / checker texture size
+                                    let repeats_x = (img_w * scale) / checker_px;
+                                    let repeats_y = (img_h * scale) / checker_px;
+                                    let checker_uv = egui::Rect::from_min_max(
+                                        egui::pos2(0.0, 0.0),
+                                        egui::pos2(repeats_x, repeats_y),
+                                    );
+                                    ui.painter().image(
+                                        checker.id(),
+                                        img_rect,
+                                        checker_uv,
+                                        egui::Color32::WHITE,
+                                    );
                                 }
                             }
                         }
