@@ -3466,7 +3466,7 @@ dependencies = [
  "getrandom 0.3.4",
  "image",
  "itertools 0.14.0",
- "nalgebra 0.34.2",
+ "nalgebra",
  "num",
  "rand 0.9.2",
  "rand_distr 0.5.1",
@@ -4617,22 +4617,6 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.33.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d43ddcacf343185dfd6de2ee786d9e8b1c2301622afab66b6c73baf9882abfd"
-dependencies = [
- "approx",
- "matrixmultiply",
- "nalgebra-macros",
- "num-complex",
- "num-rational",
- "num-traits 0.2.19",
- "simba",
- "typenum",
-]
-
-[[package]]
-name = "nalgebra"
 version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df76ea0ff5c7e6b88689085804d6132ded0ddb9de5ca5b8aeb9eeadc0508a70a"
@@ -4657,6 +4641,7 @@ dependencies = [
  "glam 0.31.1",
  "glam 0.32.1",
  "matrixmultiply",
+ "nalgebra-macros",
  "num-complex",
  "num-rational",
  "num-traits 0.2.19",
@@ -4666,9 +4651,9 @@ dependencies = [
 
 [[package]]
 name = "nalgebra-macros"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "254a5372af8fc138e36684761d3c0cdb758a4410e938babcff1c860ce14ddbfc"
+checksum = "973e7178a678cfd059ccec50887658d482ce16b0aa9da3888ddeab5cd5eb4889"
 dependencies = [
  "proc-macro2",
  "quote 1.0.45",
@@ -5307,7 +5292,7 @@ dependencies = [
  "log",
  "lutgen",
  "mouse_position",
- "nalgebra 0.33.3",
+ "nalgebra",
  "num-integer",
  "open",
  "palette",
