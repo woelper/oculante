@@ -391,7 +391,12 @@ impl OculanteApp {
 
     fn process_texture_channel(&mut self, ctx: &egui::Context) {
         // Drain to get latest frame (prevents animation speedup on focus loss)
-        let latest_frame = self.state.texture_channel.1.try_iter().last();
+        // If an AnimationStart is encountered during drain, preserve its reset flag
+        let latest_frame = self.state.texture_channel.1.try_iter().inspect(|f| {
+            if matches!(f, Frame::AnimationStart(_)) {
+                self.reset_after_upload = true;
+            }
+        }).last();
 
         if let Some(frame) = latest_frame {
             self.state.is_loaded = true;
