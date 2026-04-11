@@ -2,8 +2,8 @@ use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::filebrowser::BrowserDir;
-use crate::utils::*;
 use crate::shortcuts::InputEvent::*;
+use crate::utils::*;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
@@ -13,7 +13,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
     let ctx = ui.ctx().clone();
 
     ui.horizontal_centered(|ui| {
-
         // The Close button
         if state.persistent_settings.borderless && unframed_button(X, ui).clicked() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -190,13 +189,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             .clicked()
         {
             state.always_on_top = !state.always_on_top;
-            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
-                if state.always_on_top {
-                    egui::WindowLevel::AlwaysOnTop
-                } else {
-                    egui::WindowLevel::Normal
-                },
-            ));
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if state.always_on_top {
+                egui::WindowLevel::AlwaysOnTop
+            } else {
+                egui::WindowLevel::Normal
+            }));
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
@@ -281,8 +278,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             });
             ctx.request_repaint();
         }
-        
-       
 
         drag_area(ui, state);
 
@@ -318,15 +313,17 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         }
 
         draw_hamburger_menu(ui, state);
-        
-        
+
         // Display an indication in the top bar to see when/if and how many updates happen
         #[cfg(debug_assertions)]
         {
             let dt = ctx.input(|i| i.stable_dt);
             let fps = if dt > 0.0 { 1.0 / dt } else { 0.0 };
-            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("debug_overlay")));
-            let pos = ctx.content_rect().left_bottom() + vec2(20., -60.);
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                Id::new("debug_overlay"),
+            ));
+            let pos = ctx.content_rect().center_bottom() + vec2(-30., -60.);
             if ctx.has_requested_repaint() {
                 painter.circle(pos, 6., Color32::RED, Stroke::NONE);
             }
@@ -338,8 +335,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
                 Color32::RED,
             );
         }
-        
-        
     });
 }
 
@@ -449,12 +444,11 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                                 accent.gamma_multiply(0.8),
                             );
                             ui.add(
-                                egui::Button::new(
-                                    RichText::new(&filename)
-                                )
-                                .min_size(vec2(300.0, 0.0))
-                                .truncate()
-                            ).clicked()
+                                egui::Button::new(RichText::new(&filename))
+                                    .min_size(vec2(300.0, 0.0))
+                                    .truncate(),
+                            )
+                            .clicked()
                         });
 
                         if res.inner {
@@ -463,17 +457,17 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                         }
                     }
                     ui.separator();
-                    if ui.add(
-                        egui::Button::new(
-                            RichText::new("Clear recent")
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("Clear recent"))
+                                .min_size(vec2(300.0, 0.0))
+                                .truncate(),
                         )
-                        .min_size(vec2(300.0, 0.0))
-                        .truncate()
-                    ).clicked() {
+                        .clicked()
+                    {
                         state.volatile_settings.recent_images.clear();
                         ui.close();
                     }
-                    
                 }
             });
         });
