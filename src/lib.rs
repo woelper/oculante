@@ -4,8 +4,8 @@ pub mod cache;
 pub mod comparelist;
 pub mod glow_renderer;
 pub mod image_editing;
-pub mod input;
 pub mod image_loader;
+pub mod input;
 pub mod ktx2_loader;
 pub mod settings;
 pub mod shortcuts;
@@ -21,8 +21,6 @@ pub mod scrubber;
 // texture_wrapper removed — replaced by glow_renderer
 pub mod thumbnails;
 pub mod ui;
-#[cfg(feature = "update")]
-pub mod update;
 pub mod window_config;
 
 // mod events;

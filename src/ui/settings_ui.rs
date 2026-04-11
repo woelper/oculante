@@ -214,14 +214,6 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
                                     }, ui);
 
-                                    #[cfg(feature = "update")]
-                                    configuration_item_ui("Check for updates", "Check for updates and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
-                                        if ui.button("Check").clicked() {
-                                            state.send_message_info("Checking for updates...");
-                                            crate::update::update(Some(state.message_channel.0.clone()));
-                                            state.settings_enabled = false;
-                                        }
-                                    }, ui);
 
                                     configuration_item_ui("Visit GitHub Repository", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
                                         if ui.link("Check it out!").on_hover_text("https://github.com/woelper/oculante").clicked() {
@@ -694,13 +686,18 @@ fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
         let keys: std::collections::BTreeSet<egui::Key> = i.keys_down.iter().copied().collect();
         // Get modifiers from the most recent key event
         // (input.modifiers is not populated by notan's egui plugin)
-        let mods = i.events.iter().rev().find_map(|e| {
-            if let egui::Event::Key { modifiers, .. } = e {
-                Some(*modifiers)
-            } else {
-                None
-            }
-        }).unwrap_or_default();
+        let mods = i
+            .events
+            .iter()
+            .rev()
+            .find_map(|e| {
+                if let egui::Event::Key { modifiers, .. } = e {
+                    Some(*modifiers)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
         Shortcut {
             keys,
             modifiers: mods,

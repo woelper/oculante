@@ -89,9 +89,6 @@ rand_chacha = "0.3"
 rayon = "1.10"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
-self_update = { version = "0.42", default-features = false, features = [
-    "rustls",
-], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.28", features = ["derive"] }
@@ -126,13 +123,12 @@ num-integer = "0.1.46"
 image-extras = "0.1.0"
 
 [features]
-default = ["turbo", "avif_native", "update", "j2k", "jxlcms"]
+default = ["turbo", "avif_native", "j2k", "jxlcms"]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
-update = ["self_update"]
 j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
