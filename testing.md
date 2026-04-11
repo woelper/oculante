@@ -31,12 +31,12 @@
 - [x] Draw frame around image does not work when enabled in settings (#752)
 - [x] recent files menu is way too large and obscures the whole screen and is cut off
 - [x] When fullscreen is pressed, the exact same pixel under the cursor should still be under the cursor in full screen. The same should be true when switching back. This was old behavior.
-- [ ] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png" - this is likely not an animation problem, but due to the fact that the image is not reset/centered on first load.
+- [x] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png" - this is likely not an animation problem, but due to the fact that the image is not reset/centered on first load.
 - [ ] Measure draw above ui panels (#748) but is partially fixed
 - [ ] Update position button in compare menu doesn't work (in info panel)
 - [ ] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
-- [ ] recent images are not added to list (seems to work on mac, test on linux)
-- [ ] When loading an animated image (at least png) the view does not reset
+- [x] recent images are not added to list (seems to work on mac, test on linux)
+- [x] When loading an animated image (at least png) the view does not reset
 - [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier.
 - [ ] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 
@@ -61,7 +61,7 @@
 - [ ] Update image libraries step by step
 - [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
 - [ ] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
-- [ ] Remove update functionality
+- [x] Remove update functionality
 
 
 Things to keep in mind:
