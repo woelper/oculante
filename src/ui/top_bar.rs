@@ -326,7 +326,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             let dt = ctx.input(|i| i.stable_dt);
             let fps = if dt > 0.0 { 1.0 / dt } else { 0.0 };
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("debug_overlay")));
-            let pos = ctx.screen_rect().left_bottom() + vec2(20., -60.);
+            let pos = ctx.content_rect().left_bottom() + vec2(20., -60.);
             if ctx.has_requested_repaint() {
                 painter.circle(pos, 6., Color32::RED, Stroke::NONE);
             }
@@ -356,7 +356,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
             if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
                 state.reset_image = true;
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
@@ -368,7 +368,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     )),
                     state,
                 );
-                ui.close_menu();
+                ui.close();
             }
 
             let copy_pressed = key_pressed(&ctx, state, Copy);
@@ -380,7 +380,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     || copy_pressed
                 {
                     clipboard_copy(img);
-                    ui.close_menu();
+                    ui.close();
                 }
             }
 
@@ -404,12 +404,12 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     }
                     Err(e) => state.send_message_err(&e.to_string()),
                 }
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{GEAR} Preferences")).clicked() {
                 state.settings_enabled = !state.settings_enabled;
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{EXIT} Quit")).clicked() {
@@ -459,7 +459,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
 
                         if res.inner {
                             load_image_from_path(r, state);
-                            ui.close_menu();
+                            ui.close();
                         }
                     }
                     ui.separator();
@@ -471,7 +471,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                         .truncate()
                     ).clicked() {
                         state.volatile_settings.recent_images.clear();
-                        ui.close_menu();
+                        ui.close();
                     }
                     
                 }

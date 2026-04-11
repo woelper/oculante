@@ -847,8 +847,11 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // enable this if this is used to draw
-                // let id = Id::new("shapes");
+                // Draw on the middle layer — above the image (CentralPanel) but behind side panels
+                let painter = ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    Id::new("measure_overlay"),
+                ));
 
                 // let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
@@ -877,7 +880,7 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
                             for p in points_transformed.chunks(2) {
-                                ui.painter().line_segment(
+                                painter.line_segment(
                                     [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
@@ -911,22 +914,20 @@ impl ImageOperation {
                                 max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             };
 
-                            ui.painter().rect_stroke(
+                            painter.rect_stroke(
                                 rect,
                                 0.0,
                                 Stroke::new(*width as f32, Color32::BLACK),
                                 StrokeKind::Inside,
                             );
 
-                            ui.painter().rect_filled(
+                            painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::BLACK,
-                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                // StrokeKind::Inside,
+                                Color32::from_rgba_unmultiplied(0, 0, 0, 80),
                             );
 
-                            ui.painter().text(
+                            painter.text(
                                 rect.expand(14.).center_bottom(),
                                 Align2::CENTER_CENTER,
                                 format!(
@@ -938,12 +939,12 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.left_center(), rect.right_center()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.center_top(), rect.center_bottom()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );

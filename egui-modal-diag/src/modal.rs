@@ -1,6 +1,6 @@
 use egui::{
     emath::{Align, Align2},
-    epaint::{Color32, Pos2, Rounding},
+    epaint::{Color32, CornerRadius, Pos2},
     Area, Button, Context, Id, Layout, Response, RichText, Sense, Ui, WidgetText, Window,
 };
 
@@ -225,7 +225,7 @@ pub struct Modal {
 }
 
 fn ui_with_margin<R>(ui: &mut Ui, margin: f32, add_contents: impl FnOnce(&mut Ui) -> R) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .inner_margin(margin)
         .show(ui, |ui| add_contents(ui));
 }
@@ -476,7 +476,7 @@ impl Modal {
                 .interactable(true)
                 .fixed_pos(Pos2::ZERO)
                 .show(&self.ctx, |ui: &mut Ui| {
-                    let screen_rect = ui.ctx().screen_rect();
+                    let screen_rect = ui.ctx().content_rect();
                     let area_response = ui.allocate_response(screen_rect.size(), Sense::click());
                     // let current_focus = area_response.ctx.memory().focus().clone();
                     // let top_layer = area_response.ctx.memory().layer_ids().last();
@@ -490,7 +490,7 @@ impl Modal {
                         }
                     }
                     ui.painter()
-                        .rect_filled(screen_rect, Rounding::ZERO, self.style.overlay_color);
+                        .rect_filled(screen_rect, CornerRadius::ZERO, self.style.overlay_color);
                 });
 
             ctx_clone.move_to_top(area_resp.response.layer_id);

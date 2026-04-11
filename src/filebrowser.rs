@@ -1,4 +1,5 @@
 use super::icons::*;
+#[cfg(feature = "file_open")]
 use crate::appstate::OculanteState;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
@@ -433,7 +434,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.key_released(Key::D)) && !ui.ctx().wants_keyboard_input()
+                        if ui.input(|r| r.key_released(Key::D)) && !ui.ctx().egui_wants_keyboard_input()
                         {
                             settings.folder_bookmarks.remove(folder);
                         }
@@ -598,7 +599,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                             continue;
                         }
                         let e = f.ext();
-                        if ui.selectable_label(ext == e, &e).clicked() {
+                        if ui.add(egui::Button::new(&e).selected(ext == e)).clicked() {
                             state.filename = Path::new(&state.filename)
                                 .with_extension(&e)
                                 .to_string_lossy()

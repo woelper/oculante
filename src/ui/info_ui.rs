@@ -200,7 +200,7 @@ pub fn info_ui(
                                         to_remove = Some(path.to_owned());
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.selectable_label(state.current_path.as_ref() == Some(path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        if ui.add(egui::Button::new(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).selected(state.current_path.as_ref() == Some(path))).clicked(){
                                             state
                                                 .player
                                                 .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));

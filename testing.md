@@ -44,6 +44,7 @@
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
+- [ ] switching channels (rgba) is slow
 
 # Cleanup
 - [x] Update to latest egui
@@ -60,6 +61,7 @@
 - [ ] Update image libraries step by step
 - [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
 - [ ] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
+- [ ] Remove update functionality
 
 
 Things to keep in mind:

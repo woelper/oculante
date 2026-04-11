@@ -46,7 +46,7 @@ use crate::{
     },
     paint::PaintStroke,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    shortcuts::{key_pressed, lookup},
     thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
 };
 
@@ -357,12 +357,12 @@ impl EguiExt for Ui {
         self.horizontal(|ui| {
             let mut r = ui.add_sized(
                 egui::Vec2::new(30., ui.available_height()),
-                egui::SelectableLabel::new(selected, RichText::new(icon)),
+                egui::Button::new(RichText::new(icon)).selected(selected),
             );
             if ui
                 .add_sized(
                     egui::Vec2::new(ui.available_width(), ui.available_height()),
-                    egui::SelectableLabel::new(selected, RichText::new(description)),
+                    egui::Button::new(RichText::new(description)).selected(selected),
                 )
                 .clicked()
             {

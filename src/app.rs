@@ -1,13 +1,12 @@
 /// eframe-based application shell.
 ///
 /// This implements `eframe::App` and replaces notan's init/update/draw callbacks.
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use egui::{Align, FontData, FontDefinitions, FontFamily, FontTweak, Id};
 use image::GenericImageView;
-use log::{debug, error, info, warn};
+use log::{debug, info};
 use nalgebra::Vector2;
 
 use crate::appstate::*;
@@ -572,7 +571,7 @@ impl eframe::App for OculanteApp {
         }
 
         // Update window size
-        let screen_rect = ctx.screen_rect();
+        let screen_rect = ctx.content_rect();
         self.state.window_size = Vector2::new(screen_rect.width(), screen_rect.height());
 
         // Process channels
@@ -791,12 +790,12 @@ impl eframe::App for OculanteApp {
             || state.edit_state.painting
             || ctx.is_pointer_over_area()
             || state.edit_state.block_panning;
-        state.key_grab = ctx.wants_keyboard_input();
+        state.key_grab = ctx.egui_wants_keyboard_input();
 
         // Reset image to fit window
         if state.reset_image {
             if let Some(current_image) = &state.current_image {
-                let draw_area = ctx.available_rect();
+                let draw_area = ctx.content_rect();
                 let window_size = Vector2::new(draw_area.width(), draw_area.height());
                 let img_size = current_image.size_vec();
                 let scaled_to_fit = window_size.component_div(&img_size).amin();
