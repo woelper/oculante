@@ -6,8 +6,8 @@ use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
 use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
 
 use dirs;
-use log::debug;
 use egui::{self, *};
+use log::debug;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -513,12 +513,18 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                 }
                                             }
                                         } else {
+                                            // render directories
                                             for de in visible_entries.iter().filter(|e| e.is_dir())
                                             {
                                                 if render_file_icon(de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
                                                     *path = de.to_path_buf();
+                                                    // If user has a search term active, we want to
+                                                    // clear it when changing dir
+                                                    if state.search_active {
+                                                        state.search_term.clear();
+                                                    }
                                                 }
                                             }
 
