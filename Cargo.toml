@@ -29,7 +29,7 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-glam = "0.29"
+glam = "0.32"
 eframe = { version = "0.34", default-features = false, features = ["glow"] }
 egui_glow = "0.34"
 glow = "0.17"

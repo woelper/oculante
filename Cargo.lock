@@ -5283,7 +5283,7 @@ dependencies = [
  "fruitbasket",
  "gif 0.13.3",
  "gif-dispose",
- "glam 0.29.3",
+ "glam 0.32.1",
  "glow",
  "icns",
  "image",
