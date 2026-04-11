@@ -413,77 +413,52 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
             }
 
             ui.styled_menu_button(format!("{CLOCK} Recent"), |ui| {
-                let r = ui.max_rect();
-
-                let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.right_bottom().x + 100., r.left_top().y),
-                    Pos2::new(r.left_bottom().x, r.left_top().y + 0.),
-                );
-
-                let panel_bg_color = match ui.style().visuals.dark_mode {
-                    true => Color32::from_gray(31),
-                    false => Color32::from_gray(247),
-                };
-
-                // FIXME: This overflows
-                ui.allocate_new_ui(UiBuilder::new().max_rect(recent_rect), |ui| {
-                    let mut max = 0;
-                    for r in &state.volatile_settings.recent_images.clone() {
-                        if let Some(filename) = r.file_stem() {
-                            max = filename.len().max(max)
-                        }
-                    }
-
+                ui.set_max_width(300.0);
+                if state.volatile_settings.recent_images.is_empty() {
+                    ui.label("No recent images");
+                } else {
                     for r in &state.volatile_settings.recent_images.clone() {
                         let ext = r
                             .extension()
-                            .map(|e| e.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                            .to_uppercase();
+                            .map(|e| e.to_string_lossy().to_uppercase())
+                            .unwrap_or_default();
+                        let filename = r
+                            .file_stem()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default();
 
-                        ui.horizontal(|ui| {
-                            egui::Frame::new()
-                                .fill(panel_bg_color)
-                                .corner_radius(ui.style().visuals.widgets.active.corner_radius)
-                                .inner_margin(Margin::same(6))
-                                .show(ui, |ui| {
-                                    // ui.vertical_centered_justified(|ui| {
-
-                                    let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
-
-                                    ui.painter().rect(
-                                        icon_rect,
-                                        ui.get_rounding(BUTTON_HEIGHT_SMALL),
-                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
-                                        Stroke::NONE,
-                                        StrokeKind::Inside,
-                                    );
-
-                                    ui.painter().text(
-                                        icon_rect.center(),
-                                        Align2::CENTER_CENTER,
-                                        ext,
-                                        FontId::proportional(10.),
-                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.8),
-                                    );
-
-                                    if let Some(filename) = r.file_stem() {
-                                        let res = ui.add(
-                                            egui::Button::new(filename.to_string_lossy())
-                                                .min_size(vec2(max as f32 * 10., 0.)),
-                                        );
-
-                                        // let res = ui.button(filename.to_string_lossy());
-                                        if res.clicked() {
-                                            load_image_from_path(r, state);
-                                            ui.close_menu();
-                                        }
-                                    }
-                                    // });
-                                });
+                        let res = ui.horizontal(|ui| {
+                            let accent = ui.style().visuals.selection.bg_fill;
+                            let (_, icon_rect) = ui.allocate_space(Vec2::splat(24.));
+                            ui.painter().rect(
+                                icon_rect,
+                                4.0,
+                                accent.gamma_multiply(0.1),
+                                Stroke::NONE,
+                                StrokeKind::Inside,
+                            );
+                            ui.painter().text(
+                                icon_rect.center(),
+                                Align2::CENTER_CENTER,
+                                &ext,
+                                FontId::proportional(9.),
+                                accent.gamma_multiply(0.8),
+                            );
+                            ui.add(
+                                egui::Button::new(
+                                    RichText::new(&filename)
+                                )
+                                .min_size(vec2(300.0, 0.0))
+                                .truncate()
+                            ).clicked()
                         });
+
+                        if res.inner {
+                            load_image_from_path(r, state);
+                            ui.close_menu();
+                        }
                     }
-                });
+                }
             });
         });
     });
