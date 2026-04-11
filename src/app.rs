@@ -1043,6 +1043,20 @@ impl eframe::App for OculanteApp {
                                     egui::Color32::WHITE,
                                 );
                             }
+
+                            // Draw frame around image if enabled
+                            if self.state.persistent_settings.show_frame {
+                                let frame_rect = egui::Rect::from_min_size(
+                                    egui::pos2(base_x, base_y),
+                                    egui::vec2(img_w * scale, img_h * scale),
+                                );
+                                ui.painter().rect_stroke(
+                                    frame_rect,
+                                    0.0,
+                                    egui::Stroke::new(1.0, egui::Color32::GRAY),
+                                    egui::StrokeKind::Inside,
+                                );
+                            }
                         }
                     }
                 }

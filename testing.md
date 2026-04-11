@@ -26,24 +26,24 @@
 - [x] Modifying filter can shift image (this one is a little annoying to reproduce, move the image manually, then v to reset, then remove drag button to the right all the way, may take a few tries)
 - [x] Filter sliders seem off (if they are clicked, they don't exactly match the mouse pos, maybe this is because of the egui update and custom slider styling)
 - [x] Info panel grows indefinitely to the right on Linux
-- [ ] Update position button in compare menu doesn't work (in info panel)
-- [ ] "Modified" and "Original" buttons in edit menu don't work
-- [ ] Draw frame around image does not work when enabled in settings (#752)
+- [x] "Modified" and "Original" buttons in edit menu don't work
 - [x] Info panel scroll bar is not in the correct location
+- [x] Draw frame around image does not work when enabled in settings (#752)
 - [ ] recent files menu is way too large and obscures the whole screen and is cut off
 - [ ] When fullscreen is pressed, the exact same pixel under the cursor should still be under the cursor in full screen. The same should be true when switching back. This was old behavior.
 - [ ] Measure is completely broken, only displays above ui panels (#748)
+- [ ] Update position button in compare menu doesn't work (in info panel)
 - [ ] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
-- [ ] 
+- [ ] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png"
+- [ ] recent images are not added to list
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
-- [ ] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png"
 
 # Cleanup
+- [x] Update to latest egui
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
 - [ ] Functionality which can be better isolated / separated should be compined in modules. Some of it makes sense, for example buttons that can be clicked and have a shortcut, other things are scattered all over the place.
-- [x] Update to latest egui
 - [ ] egui now supports system theme, remove dark-light (#774)
 
 
