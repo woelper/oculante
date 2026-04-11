@@ -408,10 +408,12 @@ impl OculanteApp {
             self.state.is_loaded = true;
 
             // Update scrubber on new images
+            // Also match Animation if an AnimationStart was drained
             if matches!(
                 &frame,
                 Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
-            ) {
+            ) || (self.reset_after_upload && matches!(&frame, Frame::Animation(_, _)))
+            {
                 if let Some(path) = &self.state.current_path {
                     if self.state.scrubber.has_folder_changed(path)
                         && !self.state.scrubber.fixed_paths
@@ -440,7 +442,7 @@ impl OculanteApp {
                         self.state
                             .volatile_settings
                             .recent_images
-                            .push_back(path.clone());
+                            .push_front(path.clone());
                         self.state
                             .volatile_settings
                             .recent_images
