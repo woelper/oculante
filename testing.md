@@ -2,7 +2,7 @@
 - [ ] Shortcuts in the app: Regular, with modifiers, key repeat etc
 - [ ] Shortcut settings menu (known issues with modifiers)
 - [ ] Borderless mode
-- [x] Always on top
+- [ ] Always on top: Works on Mac, does not work on PopOS/Cosmic (Wayland)
 - [ ] Paint mode
 - [ ] OSX file associations
 
@@ -25,6 +25,7 @@
 - [x] The info panel has a black bar to the right. It also should be resizable now
 - [x] Modifying filter can shift image (this one is a little annoying to reproduce, move the image manually, then v to reset, then remove drag button to the right all the way, may take a few tries)
 - [x] Filter sliders seem off (if they are clicked, they don't exactly match the mouse pos, maybe this is because of the egui update and custom slider styling)
+- [x] Info panel grows indefinitely to the right on Linux
 - [ ] Update position button in compare menu doesn't work (in info panel)
 - [ ] "Modified" and "Original" buttons in edit menu don't work
 - [ ] Draw frame around image does not work when enabled in settings (#752)
@@ -37,6 +38,7 @@
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
+- [ ] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png"
 
 # Cleanup
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
@@ -48,9 +50,11 @@
 # Things to improve not related to removing Notan
 - [ ] I am unhappy with the HEIC / HEIF situation. It is widely used by now and the build has been hard as we have not been using a native library and linking to libheif was hard on all platforms. Investigate if this has changed and if there is more robust heif/heic support that we can use, native rust if possible
 - [ ] Painting should not be a mode but rather a normal operator
-- [ ] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
-- [ ] Update dependencies: first egui and helper libraries, than image libraries step by step
+- [x] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
+- [ ] Update dependencies: egui and helper libraries
+- [ ] Update image libraries step by step
 - [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
+- [ ] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
 
 
 Things to keep in mind:
