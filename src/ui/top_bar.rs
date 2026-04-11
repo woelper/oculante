@@ -322,14 +322,18 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         
         // Display an indication in the top bar to see when/if and how many updates happen
         #[cfg(debug_assertions)]
-        if ctx.has_requested_repaint() {
+        {
+            let dt = ctx.input(|i| i.stable_dt);
+            let fps = if dt > 0.0 { 1.0 / dt } else { 0.0 };
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("debug_overlay")));
-            let pos = ctx.screen_rect().left_top() + vec2(20., 60.);
-            painter.circle(pos, 6., Color32::RED, Stroke::NONE);
+            let pos = ctx.screen_rect().left_bottom() + vec2(20., -60.);
+            if ctx.has_requested_repaint() {
+                painter.circle(pos, 6., Color32::RED, Stroke::NONE);
+            }
             painter.text(
                 pos + vec2(12., 0.),
                 Align2::LEFT_CENTER,
-                format!("pass {}", ctx.cumulative_pass_nr()),
+                format!("{:.0} fps  pass {}", fps, ctx.cumulative_pass_nr()),
                 FontId::proportional(11.),
                 Color32::RED,
             );
