@@ -612,12 +612,27 @@ pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
         .unwrap_or(false);
 
     if !fullscreen {
-        // Entering fullscreen: save offset for image position correction
-        // eframe handles the viewport transition, so we just track state
-        state.fullscreen_offset = Some((0, 0));
+        // Entering fullscreen: offset image by window position so the pixel
+        // under the cursor stays in the same screen location.
+        let window_pos = ctx
+            .input(|i| i.viewport().outer_rect)
+            .map(|r| (r.left(), r.top()))
+            .unwrap_or((0.0, 0.0));
+
+        // The menu bar offset: in fullscreen the top panel disappears in zen mode,
+        // but the available_rect shift covers that. We just need the window origin.
+        let offset = (window_pos.0 as i32, window_pos.1 as i32);
+
+        debug!("Entering fullscreen. Window pos: {:?}", offset);
+
+        state.image_geometry.offset.x += offset.0 as f32;
+        state.image_geometry.offset.y += offset.1 as f32;
+        state.fullscreen_offset = Some(offset);
     } else if let Some(sf) = state.fullscreen_offset {
+        // Exiting fullscreen: reverse the offset
         state.image_geometry.offset.x -= sf.0 as f32;
         state.image_geometry.offset.y -= sf.1 as f32;
+        state.fullscreen_offset = None;
     }
     ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
 }
