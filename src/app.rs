@@ -392,11 +392,17 @@ impl OculanteApp {
     fn process_texture_channel(&mut self, ctx: &egui::Context) {
         // Drain to get latest frame (prevents animation speedup on focus loss)
         // If an AnimationStart is encountered during drain, preserve its reset flag
-        let latest_frame = self.state.texture_channel.1.try_iter().inspect(|f| {
-            if matches!(f, Frame::AnimationStart(_)) {
-                self.reset_after_upload = true;
-            }
-        }).last();
+        let latest_frame = self
+            .state
+            .texture_channel
+            .1
+            .try_iter()
+            .inspect(|f| {
+                if matches!(f, Frame::AnimationStart(_)) {
+                    self.reset_after_upload = true;
+                }
+            })
+            .last();
 
         if let Some(frame) = latest_frame {
             self.state.is_loaded = true;
@@ -492,11 +498,11 @@ impl OculanteApp {
                     self.texture_dirty = true;
                     ctx.request_repaint();
                 }
-                Frame::Animation(img, delay_ms) => {
+                Frame::Animation(img, _delay) => {
+                    // delay is not used since the sender delays (sleeps) and we repaint on every frame when anim is playing
                     self.state.current_image = Some(img);
                     self.texture_dirty = true;
                     self.animation_playing = true;
-                    ctx.request_repaint_after(Duration::from_millis(delay_ms as u64));
                 }
                 Frame::UpdateTexture => {
                     debug!("received UpdateTexture");
