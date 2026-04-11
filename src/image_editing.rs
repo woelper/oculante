@@ -23,7 +23,7 @@ use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use num_integer::gcd;
 use palette::{rgb::Rgb, Hsl, IntoColor};
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
@@ -152,7 +152,7 @@ pub struct ImgOpItem {
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random(),
             active: true,
             operation: op,
         }
@@ -1610,10 +1610,10 @@ impl ImageOperation {
             Self::Noise { amt, mono } => {
                 let amt = *amt as f32 / 100.;
 
-                let mut rng = thread_rng();
-                let n_r: f32 = rng.gen();
-                let n_g: f32 = if *mono { n_r } else { rng.gen() };
-                let n_b: f32 = if *mono { n_r } else { rng.gen() };
+                let mut rng = rand::rng();
+                let n_r: f32 = rng.random();
+                let n_g: f32 = if *mono { n_r } else { rng.random() };
+                let n_b: f32 = if *mono { n_r } else { rng.random() };
 
                 p[0] = egui::lerp(p[0]..=n_r, amt);
                 p[1] = egui::lerp(p[1]..=n_g, amt);
@@ -1955,7 +1955,7 @@ impl GradientStop {
 
     pub fn new(pos: u8, rgb: [u8; 3]) -> Self {
         GradientStop {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random::<u64>() as usize,
             pos,
             col: rgb,
         }
