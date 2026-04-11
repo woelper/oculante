@@ -35,10 +35,10 @@ fn image_to_color32(img: &image::DynamicImage, channel: ColorChannel) -> Vec<egu
     // Apply swizzle to RGBA floats, returning a Color32
     let apply = |r: f32, g: f32, b: f32, a: f32| -> egui::Color32 {
         if let Some((m, o)) = &swizzle {
-            let nr = (m[0][0]*r + m[1][0]*g + m[2][0]*b + m[3][0]*a + o[0]).clamp(0.0, 1.0);
-            let ng = (m[0][1]*r + m[1][1]*g + m[2][1]*b + m[3][1]*a + o[1]).clamp(0.0, 1.0);
-            let nb = (m[0][2]*r + m[1][2]*g + m[2][2]*b + m[3][2]*a + o[2]).clamp(0.0, 1.0);
-            let na = (m[0][3]*r + m[1][3]*g + m[2][3]*b + m[3][3]*a + o[3]).clamp(0.0, 1.0);
+            let nr = (m[0][0] * r + m[1][0] * g + m[2][0] * b + m[3][0] * a + o[0]).clamp(0.0, 1.0);
+            let ng = (m[0][1] * r + m[1][1] * g + m[2][1] * b + m[3][1] * a + o[1]).clamp(0.0, 1.0);
+            let nb = (m[0][2] * r + m[1][2] * g + m[2][2] * b + m[3][2] * a + o[2]).clamp(0.0, 1.0);
+            let na = (m[0][3] * r + m[1][3] * g + m[2][3] * b + m[3][3] * a + o[3]).clamp(0.0, 1.0);
             // Premultiply after swizzle
             egui::Color32::from_rgba_premultiplied(
                 (nr * na * 255.0) as u8,
@@ -60,43 +60,76 @@ fn image_to_color32(img: &image::DynamicImage, channel: ColorChannel) -> Vec<egu
     match img {
         image::DynamicImage::ImageRgb8(buf) => {
             if needs_swizzle {
-                buf.as_raw().chunks_exact(3).map(|p| {
-                    apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, 1.0)
-                }).collect()
+                buf.as_raw()
+                    .chunks_exact(3)
+                    .map(|p| {
+                        apply(
+                            p[0] as f32 / 255.0,
+                            p[1] as f32 / 255.0,
+                            p[2] as f32 / 255.0,
+                            1.0,
+                        )
+                    })
+                    .collect()
             } else {
                 // Fast path: no swizzle, no alpha, no premultiply needed
-                buf.as_raw().chunks_exact(3).map(|p| {
-                    egui::Color32::from_rgb(p[0], p[1], p[2])
-                }).collect()
+                buf.as_raw()
+                    .chunks_exact(3)
+                    .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
+                    .collect()
             }
         }
-        image::DynamicImage::ImageRgba8(buf) => {
-            buf.as_raw().chunks_exact(4).map(|p| {
-                apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, p[3] as f32 / 255.0)
-            }).collect()
-        }
+        image::DynamicImage::ImageRgba8(buf) => buf
+            .as_raw()
+            .chunks_exact(4)
+            .map(|p| {
+                apply(
+                    p[0] as f32 / 255.0,
+                    p[1] as f32 / 255.0,
+                    p[2] as f32 / 255.0,
+                    p[3] as f32 / 255.0,
+                )
+            })
+            .collect(),
         image::DynamicImage::ImageLuma8(buf) => {
             if needs_swizzle {
-                buf.as_raw().iter().map(|&l| {
-                    apply(l as f32 / 255.0, l as f32 / 255.0, l as f32 / 255.0, 1.0)
-                }).collect()
+                buf.as_raw()
+                    .iter()
+                    .map(|&l| apply(l as f32 / 255.0, l as f32 / 255.0, l as f32 / 255.0, 1.0))
+                    .collect()
             } else {
-                buf.as_raw().iter().map(|&l| {
-                    egui::Color32::from_rgb(l, l, l)
-                }).collect()
+                buf.as_raw()
+                    .iter()
+                    .map(|&l| egui::Color32::from_rgb(l, l, l))
+                    .collect()
             }
         }
-        image::DynamicImage::ImageLumaA8(buf) => {
-            buf.as_raw().chunks_exact(2).map(|p| {
-                apply(p[0] as f32 / 255.0, p[0] as f32 / 255.0, p[0] as f32 / 255.0, p[1] as f32 / 255.0)
-            }).collect()
-        }
+        image::DynamicImage::ImageLumaA8(buf) => buf
+            .as_raw()
+            .chunks_exact(2)
+            .map(|p| {
+                apply(
+                    p[0] as f32 / 255.0,
+                    p[0] as f32 / 255.0,
+                    p[0] as f32 / 255.0,
+                    p[1] as f32 / 255.0,
+                )
+            })
+            .collect(),
         // For 16-bit and float formats, convert through to_rgba8 (these are rare and large anyway)
         _ => {
             let rgba = img.to_rgba8();
-            rgba.as_raw().chunks_exact(4).map(|p| {
-                apply(p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0, p[3] as f32 / 255.0)
-            }).collect()
+            rgba.as_raw()
+                .chunks_exact(4)
+                .map(|p| {
+                    apply(
+                        p[0] as f32 / 255.0,
+                        p[1] as f32 / 255.0,
+                        p[2] as f32 / 255.0,
+                        p[3] as f32 / 255.0,
+                    )
+                })
+                .collect()
         }
     }
 }
@@ -351,8 +384,7 @@ impl OculanteApp {
                     if self.state.scrubber.has_folder_changed(path)
                         && !self.state.scrubber.fixed_paths
                     {
-                        self.state.scrubber =
-                            crate::scrubber::Scrubber::new(path);
+                        self.state.scrubber = crate::scrubber::Scrubber::new(path);
                         self.state.scrubber.wrap = self.state.persistent_settings.wrap_folder;
                     } else {
                         let index = self
@@ -389,7 +421,10 @@ impl OculanteApp {
             if !matches!(frame, Frame::Animation(_, _)) {
                 self.state.image_metadata = None;
             }
-            if !matches!(frame, Frame::Animation(_, _) | Frame::EditResult(_) | Frame::UpdateTexture) {
+            if !matches!(
+                frame,
+                Frame::Animation(_, _) | Frame::EditResult(_) | Frame::UpdateTexture
+            ) {
                 self.state.edit_state.result_pixel_op = Default::default();
                 self.state.edit_state.result_image_op = Default::default();
                 if !self.state.persistent_settings.keep_edits {
@@ -438,6 +473,7 @@ impl OculanteApp {
                     ctx.request_repaint_after(Duration::from_millis(delay_ms as u64));
                 }
                 Frame::UpdateTexture => {
+                    debug!("received UpdateTexture");
                     self.texture_dirty = true;
                     ctx.request_repaint();
                 }
@@ -494,14 +530,16 @@ impl eframe::App for OculanteApp {
             self.first_frame_setup(ctx);
             // Query max texture size from GL
             if let Some(gl) = frame.gl() {
-                self.max_texture_size =
-                    unsafe { glow::HasContext::get_parameter_i32(gl.as_ref(), glow::MAX_TEXTURE_SIZE) as u32 };
+                self.max_texture_size = unsafe {
+                    glow::HasContext::get_parameter_i32(gl.as_ref(), glow::MAX_TEXTURE_SIZE) as u32
+                };
                 debug!("Max texture size: {}", self.max_texture_size);
             }
         }
 
         // Upload image to egui texture if needed
         if self.texture_dirty {
+            debug!("Texture was dirty. uploading");
             self.upload_image_to_egui(ctx);
         }
         // Re-upload if channel changed
@@ -542,9 +580,7 @@ impl eframe::App for OculanteApp {
 
         // Drag
         let primary_down = ctx.input(|i| i.pointer.primary_down());
-        let middle_down = ctx.input(|i| {
-            i.pointer.button_down(egui::PointerButton::Middle)
-        });
+        let middle_down = ctx.input(|i| i.pointer.button_down(egui::PointerButton::Middle));
         let any_down = primary_down || middle_down;
 
         // Track whether egui owned the pointer at press start.
@@ -659,7 +695,9 @@ impl eframe::App for OculanteApp {
         #[cfg(not(feature = "file_open"))]
         {
             if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
-                ctx.memory_mut(|w| { w.keep_popup_open(Id::new("OPEN")); });
+                ctx.memory_mut(|w| {
+                    w.keep_popup_open(Id::new("OPEN"));
+                });
                 crate::filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
@@ -783,13 +821,11 @@ impl eframe::App for OculanteApp {
             }
             if key_pressed(ctx, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
-                ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
-                    if state.always_on_top {
-                        egui::WindowLevel::AlwaysOnTop
-                    } else {
-                        egui::WindowLevel::Normal
-                    },
-                ));
+                ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if state.always_on_top {
+                    egui::WindowLevel::AlwaysOnTop
+                } else {
+                    egui::WindowLevel::Normal
+                }));
             }
             if key_pressed(ctx, state, NextImage) {
                 next_image(state);
@@ -822,8 +858,7 @@ impl eframe::App for OculanteApp {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
                 if new_scale > 0.05 && new_scale < 40. {
-                    let center =
-                        Vector2::new(state.window_size.x / 2., state.window_size.y / 2.);
+                    let center = Vector2::new(state.window_size.x / 2., state.window_size.y / 2.);
                     state.image_geometry.offset -= scale_pt(
                         state.image_geometry.offset,
                         center,
@@ -837,8 +872,7 @@ impl eframe::App for OculanteApp {
                 let delta = zoomratio(-3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
                 if new_scale > 0.05 && new_scale < 40. {
-                    let center =
-                        Vector2::new(state.window_size.x / 2., state.window_size.y / 2.);
+                    let center = Vector2::new(state.window_size.x / 2., state.window_size.y / 2.);
                     state.image_geometry.offset -= scale_pt(
                         state.image_geometry.offset,
                         center,
@@ -939,10 +973,7 @@ impl eframe::App for OculanteApp {
                     let img_w = self.state.image_geometry.dimensions.0 as f32;
                     let img_h = self.state.image_geometry.dimensions.1 as f32;
                     let tiling = self.state.tiling.max(1);
-                    let uv = egui::Rect::from_min_max(
-                        egui::pos2(0.0, 0.0),
-                        egui::pos2(1.0, 1.0),
-                    );
+                    let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
 
                     // Draw checker background for transparency
                     if self.state.persistent_settings.show_checker_background {
@@ -960,18 +991,31 @@ impl eframe::App for OculanteApp {
                                     egui::vec2(img_w * scale, img_h * scale),
                                 );
                                 // Only draw checkers in the visible intersection
-                                if let Some(visible) = clip.intersect(img_rect).is_positive().then(|| clip.intersect(img_rect)) {
-                                    let start_col = ((visible.left() - base_x) / check_size).floor() as i32;
-                                    let start_row = ((visible.top() - base_y) / check_size).floor() as i32;
-                                    let end_col = ((visible.right() - base_x) / check_size).ceil() as i32;
-                                    let end_row = ((visible.bottom() - base_y) / check_size).ceil() as i32;
+                                if let Some(visible) = clip
+                                    .intersect(img_rect)
+                                    .is_positive()
+                                    .then(|| clip.intersect(img_rect))
+                                {
+                                    let start_col =
+                                        ((visible.left() - base_x) / check_size).floor() as i32;
+                                    let start_row =
+                                        ((visible.top() - base_y) / check_size).floor() as i32;
+                                    let end_col =
+                                        ((visible.right() - base_x) / check_size).ceil() as i32;
+                                    let end_row =
+                                        ((visible.bottom() - base_y) / check_size).ceil() as i32;
                                     for row in start_row..end_row {
                                         for col in start_col..end_col {
-                                            let color = if (row + col) % 2 == 0 { light } else { dark };
+                                            let color =
+                                                if (row + col) % 2 == 0 { light } else { dark };
                                             let r = egui::Rect::from_min_size(
-                                                egui::pos2(base_x + col as f32 * check_size, base_y + row as f32 * check_size),
+                                                egui::pos2(
+                                                    base_x + col as f32 * check_size,
+                                                    base_y + row as f32 * check_size,
+                                                ),
                                                 egui::vec2(check_size, check_size),
-                                            ).intersect(img_rect);
+                                            )
+                                            .intersect(img_rect);
                                             ui.painter().rect_filled(r, 0.0, color);
                                         }
                                     }
@@ -990,10 +1034,7 @@ impl eframe::App for OculanteApp {
                                     base_x + tile.x as f32 * scale,
                                     base_y + tile.y as f32 * scale,
                                 );
-                                let size = egui::vec2(
-                                    tile.w as f32 * scale,
-                                    tile.h as f32 * scale,
-                                );
+                                let size = egui::vec2(tile.w as f32 * scale, tile.h as f32 * scale);
                                 let rect = egui::Rect::from_min_size(pos, size);
                                 ui.painter().image(
                                     tile.texture.id(),

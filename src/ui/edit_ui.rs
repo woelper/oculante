@@ -343,18 +343,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                 }
             }
 
-            ui.horizontal(|ui|{
-                if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
-                    if let Some(img) = &state.current_image {
-                        state.image_geometry.dimensions = img.dimensions();
+            if ui.checkbox(&mut state.edit_state.skip_processing, "Disable all edits").changed() {
+                if state.edit_state.skip_processing {
+                    state.edit_state.result_pixel_op = Default::default();
                         state.send_frame(crate::utils::Frame::UpdateTexture);
-                    }
                 }
-                if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
-                    pixels_changed = true;
-
-                }
-            });
+                pixels_changed = true;
+            }
 
             ui.vertical_centered_justified(|ui| {
                 if ui
@@ -542,6 +537,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
 
             // Do the processing
+            //
+            if state.edit_state.skip_processing {
+
+                return;
+            }
 
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;

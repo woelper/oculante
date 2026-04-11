@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
 use clap::{Arg, Command};
-use log::error;
+use env_logger::Builder;
+use log::{error, LevelFilter};
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
@@ -13,10 +14,17 @@ use oculante::utils::{Frame, Player};
 use oculante::window_config::build_window_settings;
 
 fn main() -> eframe::Result<()> {
+    let mut builder = Builder::from_default_env();
     if std::env::var("RUST_LOG").is_err() {
-        unsafe { std::env::set_var("RUST_LOG", "info") };
+        builder
+            .filter_level(LevelFilter::Debug) // Default level
+            .filter_module("eframe", LevelFilter::Off)
+            .filter_module("tracing", LevelFilter::Off)
+            .filter_module("wgpu_core", LevelFilter::Off)
+            .filter_module("winit", LevelFilter::Off)
+            .filter_module("wgpu_hal", LevelFilter::Off);
     }
-    let _ = env_logger::try_init();
+    builder.init();
 
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
     let mut matches = Command::new("Oculante")

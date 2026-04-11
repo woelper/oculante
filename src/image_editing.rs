@@ -10,23 +10,23 @@ use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
 use anyhow::{bail, Result};
+use egui::epaint::PathShape;
+use egui::{
+    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke,
+    StrokeKind, Ui, Vec2,
+};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
 use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
-use egui::epaint::PathShape;
-use egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke,
-    StrokeKind, Ui, Vec2,
-};
+use num_integer::gcd;
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -39,6 +39,9 @@ pub struct EditState {
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
+    /// Whether to completely bypass processing the edit stack
+    #[serde(skip)]
+    pub skip_processing: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
@@ -91,6 +94,7 @@ impl Default for EditState {
             brushes: default_brushes(),
             pixel_op_stack: vec![],
             image_op_stack: vec![],
+            skip_processing: false,
             export_extension: "png".into(),
         }
     }
@@ -423,7 +427,9 @@ impl ImageOperation {
                             }
 
                             if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
-                                ui.ctx().memory_mut(|w| { w.keep_popup_open(Id::new("LUT")); });
+                                ui.ctx().memory_mut(|w| {
+                                    w.keep_popup_open(Id::new("LUT"));
+                                });
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,
@@ -1115,26 +1121,33 @@ impl ImageOperation {
 
                 ui.vertical(|ui| {
                     // This handles the initial state when the filter is first added.
-                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                    if *aspect
+                        && ui
+                            .ctx()
+                            .data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none())
+                    {
                         let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
-                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                     }
 
                     // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
-                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
-                        if dimensions.1 > 0 {
-                            dimensions.0 as f64 / dimensions.1 as f64
-                        } else {
-                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
-                        }
-                    });
+                    let aspect_ratio = ui
+                        .ctx()
+                        .data(|d| d.get_temp(aspect_ratio_id))
+                        .unwrap_or_else(|| {
+                            if dimensions.1 > 0 {
+                                dimensions.0 as f64 / dimensions.1 as f64
+                            } else {
+                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                            }
+                        });
 
                     let g = gcd(dimensions.1, dimensions.0);
                     let w = dimensions.0 / g;
                     let h = dimensions.1 / g;
 
                     ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
-
 
                     ui.horizontal(|ui| {
                         let x_response = ui.add(
@@ -1173,7 +1186,8 @@ impl ImageOperation {
                                 } else {
                                     geo.dimensions.0 as f64 / geo.dimensions.1 as f64
                                 };
-                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                                ui.ctx()
+                                    .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                             }
                             r.mark_changed();
                         }
@@ -1198,22 +1212,21 @@ impl ImageOperation {
                         });
 
                     ui.vertical_centered_justified(|ui| {
+                        if ui.button("Reset").clicked() {
+                            // Reset dimensions to original
+                            *dimensions = geo.dimensions;
 
-                    if ui.button("Reset").clicked() {
-                        // Reset dimensions to original
-                        *dimensions = geo.dimensions;
+                            // Reset aspect lock to default (true)
+                            *aspect = true;
 
-                        // Reset aspect lock to default (true)
-                        *aspect = true;
+                            // Remove the stored aspect ratio from egui's memory.
+                            // This will cause it to be recalculated from the original dimensions
+                            // on the next frame, effectively resetting it.
+                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
 
-                        // Remove the stored aspect ratio from egui's memory.
-                        // This will cause it to be recalculated from the original dimensions
-                        // on the next frame, effectively resetting it.
-                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
-
-                        // Mark the UI as changed
-                        r.mark_changed();
-                    }
+                            // Mark the UI as changed
+                            r.mark_changed();
+                        }
                     });
                 });
                 r
