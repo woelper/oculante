@@ -458,6 +458,18 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                             ui.close_menu();
                         }
                     }
+                    ui.separator();
+                    if ui.add(
+                        egui::Button::new(
+                            RichText::new("Clear recent")
+                        )
+                        .min_size(vec2(300.0, 0.0))
+                        .truncate()
+                    ).clicked() {
+                        state.volatile_settings.recent_images.clear();
+                        ui.close_menu();
+                    }
+                    
                 }
             });
         });

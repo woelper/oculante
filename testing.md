@@ -29,13 +29,14 @@
 - [x] "Modified" and "Original" buttons in edit menu don't work
 - [x] Info panel scroll bar is not in the correct location
 - [x] Draw frame around image does not work when enabled in settings (#752)
-- [ ] recent files menu is way too large and obscures the whole screen and is cut off
+- [x] recent files menu is way too large and obscures the whole screen and is cut off
 - [ ] When fullscreen is pressed, the exact same pixel under the cursor should still be under the cursor in full screen. The same should be true when switching back. This was old behavior.
 - [ ] Measure is completely broken, only displays above ui panels (#748)
 - [ ] Update position button in compare menu doesn't work (in info panel)
 - [ ] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
 - [ ] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png"
 - [ ] recent images are not added to list
+- [ ] When loading an animated image (at least png) the view does not reset
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
