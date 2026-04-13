@@ -484,7 +484,7 @@ fn zoom_preview(
     // Crosshair
     let center_x = rect.left() + radius * px_per_src;
     let center_y = rect.top() + radius * px_per_src;
-    let stroke = egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(128, 128, 128, 128));
+    let stroke = egui::Stroke::new(7.0, Color32::from_rgba_unmultiplied(128, 128, 128, 128));
     ui.painter().line_segment(
         [
             egui::pos2(center_x + px_per_src / 2.0, rect.top()),
@@ -506,7 +506,7 @@ fn zoom_preview(
     ui.painter().rect_stroke(
         center_rect,
         0.0,
-        egui::Stroke::new(1.5, Color32::from_gray(40)),
-        egui::StrokeKind::Middle,
+        egui::Stroke::new(1.0, Color32::from_gray(40)),
+        egui::StrokeKind::Inside,
     );
 }
