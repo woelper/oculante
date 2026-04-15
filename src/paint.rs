@@ -1,5 +1,5 @@
 use image::{Pixel, Rgba, RgbaImage};
-use notan::egui::{Color32, Pos2};
+use egui::{Color32, Pos2};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ impl PaintStroke {
             .map(|p| Pos2::new(img.width() as f32 * p.0, img.height() as f32 * p.1))
             .collect::<Vec<_>>();
 
-        let points = notan::egui::Shape::dotted_line(
+        let points = egui::Shape::dotted_line(
             &abs_points,
             Color32::DARK_RED,
             (brush.width() as f32 / 4.0).max(1.5), // .min(60.)
@@ -72,8 +72,8 @@ impl PaintStroke {
                 let mut rng =
                     ChaCha8Rng::seed_from_u64(pos_on_line.x as u64 + pos_on_line.y as u64);
 
-                let flip_x: bool = rng.gen();
-                let flip_y: bool = rng.gen();
+                let flip_x: bool = rng.random();
+                let flip_y: bool = rng.random();
 
                 if flip_x {
                     image::imageops::flip_horizontal_in_place(&mut brush);

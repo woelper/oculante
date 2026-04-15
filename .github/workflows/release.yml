@@ -8,7 +8,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 11
-  SHADERC_LIB_DIR: /opt/homebrew/lib
 
 jobs:
   release_job:
@@ -58,13 +57,13 @@ jobs:
 
     - name: Cross-compile armv7
       run: |
-        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features --features notan_glsl-to-spirv
+        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features
         zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
     # - name: Cross-compile arm64
     #   run: |
-    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/shaderc
+    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features
     #     zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
     #   if: matrix.os == 'ubuntu-latest'
 
@@ -72,10 +71,6 @@ jobs:
       run: cargo install cargo-bundle
       if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
 
-    - name: Install shaderc
-      run: brew install shaderc
-      if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
-      
     - name: Install cargo deb
       run: cargo install cargo-deb
       if: matrix.os == 'ubuntu-24.04'
@@ -102,13 +97,13 @@ jobs:
       if: matrix.os == 'windows-2025'
 
     - name: Build Windows Application
-      run: cargo build --release --features heif --features notan/shaderc
+      run: cargo build --release --features heif
       if: matrix.os == 'windows-2025'
 
 
     - name: Build Linux classic Application
       run: |
-        cargo build --release --no-default-features --features notan/shaderc
+        cargo build --release --no-default-features
         zip -r oculante_linux_minimal.zip target/release/oculante
         cargo build --release
         zip -r oculante_linux.zip target/release/oculante
@@ -131,7 +126,7 @@ jobs:
           rustc --version --verbose
           brew install libheif
           cargo install cargo-bundle
-          cargo bundle --release --features "notan/shaderc heif"
+          cargo bundle --release --features "heif"
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/

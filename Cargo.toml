@@ -29,19 +29,15 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-notan = { version = "0.14", default-features = false, features = [
-    "backend",
-    "draw",
-    "drop_files",
-    "egui",
-    "clipboard",
-] }
+glam = "0.32"
+eframe = { version = "0.34", default-features = false, features = ["glow"] }
+egui_glow = "0.34"
+glow = "0.17"
 # === EGUI
-#  These need to match the egui version used in notan and can't be
-# updated unless notan updates egui.
-egui_plot = "0.31"
-egui-notify = "0.19"
-egui_extras = { version = "0.31", features = ["image", "file"] }
+egui = { version = "0.34", features = ["serde"] }
+egui_plot = "0.35"
+egui-notify = "0.22"
+egui_extras = { version = "0.34", features = ["image", "file"] }
 
 # === IMAGE FORMATS
 avif-decode = { version = "1.0", optional = true }
@@ -50,16 +46,18 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.8"
-zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
+zune-png = "0.5.2"                                 # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
 resvg = "0.46"
 usvg = "0.46"
 tiny-skia = "0.11"
-libheif-rs = { version = "2", default-features = false, features = ["v1_19"], optional = true }
+libheif-rs = { version = "2", default-features = false, features = [
+    "v1_19",
+], optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
 dds-rs = "0.7"
-exr = "1.73"
+exr = "1.74"
 gif = "0.13.1"
 image = { version = "0.25.5", features = ["hdr"] }
 jpeg2k = { version = "0.10", optional = true, default-features = false, features = [
@@ -67,7 +65,7 @@ jpeg2k = { version = "0.10", optional = true, default-features = false, features
     "file-io",
     "openjpeg-sys",
 ] }
-icns = "0.3.1"
+icns = "0.4"
 webp-animation = { version = "0.9.0", features = ["static"] }
 # dicom needs to be the same version
 dicom-pixeldata = { version = "0.9", features = ["image"] }
@@ -86,28 +84,24 @@ evalexpr = "13"
 fast_image_resize = { version = "5.1", features = ["rayon"] }
 
 # APP FUNCTIONALITY CRATES
-rand = "0.8"
-rand_chacha = "0.3"
-rayon = "1.10"
+rand = "0.10"
+rand_chacha = "0.10"
+rayon = "1.11"
 rfd = { version = "0.14", optional = true }
 rgb = "0.8"
-self_update = { version = "0.42", default-features = false, features = [
-    "rustls",
-], optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.28", features = ["derive"] }
 strum_macros = "0.28"
-webbrowser = "1.0"
+webbrowser = "1.2"
 thiserror = "2.0"
-
-img-parts = "0.4" # for exif saving
+img-parts = "0.4"                                                                                                        # for exif saving
 dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
 trash = "5.2"
-flate2 = "1.0" # for KTX
-bitflags = "2.8" # for KTX
-wgpu = "29" # for KTX
-ruzstd = "0.8" # for KTX
+flate2 = "1.0"                                                                                                           # for KTX
+bitflags = "2.8"                                                                                                         # for KTX
+wgpu = "29"                                                                                                              # for KTX
+ruzstd = "0.8"                                                                                                           # for KTX
 mouse_position = "0.1.4"
 file-format = "0.29"
 zip = "8.5"
@@ -118,38 +112,42 @@ open = "5.3"
 kamadak-exif = "0.6"
 lexical-sort = "0.3"
 log = "0.4"
-nalgebra = "0.33"
+nalgebra = "0.34"
 anyhow = "1.0"
 arboard = { version = "3.4", features = ["wayland-data-control"] }
-clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
+clap = "3.2"                                                                                                             # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "6.0"
-egui-modal = {path = "egui-modal-diag"}
+egui-modal = { path = "egui-modal-diag" }
 num-integer = "0.1.46"
 image-extras = "0.1.0"
 
 [features]
-default = [
-    "turbo",
-    "avif_native",
-    "update",
-    "notan/shaderc",
-    "j2k",
-    "jxlcms",
-]
+default = ["turbo", "avif_native", "j2k", "jxlcms"]
 heif = ["libheif-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
-update = ["self_update"]
 j2k = ["jpeg2k"]
 jxlcms = ["jxl-oxide/lcms2"]
 hdr = []
 lang_support = []
-notan_glsl-to-spirv = ["notan/glsl-to-spirv"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.34", default-features = false, features = [
+    "glow",
+    "x11",
+    "wayland",
+] }
+
+[target.'cfg(any(target_os = "freebsd", target_os = "netbsd"))'.dependencies]
+eframe = { version = "0.34", default-features = false, features = [
+    "glow",
+    "x11",
+] }
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
@@ -178,9 +176,10 @@ codegen-units = 1
 
 [profile.dev]
 debug = false
-opt-level = 2
+opt-level = 0
 lto = false
 codegen-units = 64
+incremental = true
 
 
 [[bench]]

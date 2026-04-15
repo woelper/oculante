@@ -1,5 +1,5 @@
 use super::*;
-use notan::egui::*;
+use egui::*;
 
 /// Helper function to paint an image - directly from egui as it is private to it
 fn paint_texture_load_result(
@@ -112,7 +112,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     // the generic hover effect, a rect over everything
     if response.hovered() {
         ui.painter()
-            .rect_filled(image_rect, rounding, Color32::from_white_alpha(5));
+            .rect_filled(image_rect, rounding, Color32::from_white_alpha(50));
 
         let text_pos = image_rect.expand(6.).center_bottom();
 

@@ -1,8 +1,11 @@
+pub mod app;
 pub mod appstate;
 pub mod cache;
 pub mod comparelist;
+pub mod glow_renderer;
 pub mod image_editing;
 pub mod image_loader;
+pub mod input;
 pub mod ktx2_loader;
 pub mod settings;
 pub mod shortcuts;
@@ -15,11 +18,10 @@ pub mod icons;
 pub mod net;
 pub mod paint;
 pub mod scrubber;
-pub mod texture_wrapper;
+// texture_wrapper removed — replaced by glow_renderer
 pub mod thumbnails;
 pub mod ui;
-#[cfg(feature = "update")]
-pub mod update;
+pub mod window_config;
 
 // mod events;
 #[cfg(target_os = "macos")]
