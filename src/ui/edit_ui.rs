@@ -343,7 +343,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                 }
             }
 
-            if ui.checkbox(&mut state.edit_state.skip_processing, "Disable all edits").changed() {
+            if ui.styled_checkbox(&mut state.edit_state.skip_processing, "Disable all edits").changed() {
                 if state.edit_state.skip_processing {
                     state.edit_state.result_pixel_op = Default::default();
                         state.send_frame(crate::utils::Frame::UpdateTexture);
