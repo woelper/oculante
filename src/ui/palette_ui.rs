@@ -2,7 +2,7 @@ use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
 use quantette::{ColorSpace, PalettePipeline};
 
 pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
@@ -54,8 +54,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         });
                                     }
                                     if ui.ctx().input(|r| r.pointer.primary_clicked()) {
-                                        ui.ctx()
-                                            .output_mut(|w| w.copied_text = egui_color.to_hex());
+                                        ui.ctx().copy_text(egui_color.to_hex());
                                         state.send_message_info(&format!(
                                             "Copied color: {}",
                                             egui_color.to_hex()
@@ -131,6 +130,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                         #[cfg(not(feature = "file_open"))]
                         if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                            ui.ctx().memory_mut(|w| { w.keep_popup_open(Id::new("SAVEASE")); });
                             filebrowser::browse_modal(
                                 true,
                                 &["ase"],

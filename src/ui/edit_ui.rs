@@ -1,13 +1,31 @@
 use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
-use image::{ColorType, GenericImageView, RgbaImage};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
+use image::{ColorType, GenericImageView, RgbaImage};
+
+/// Load an RgbaImage into egui as a texture, returning the TextureId.
+/// Uses a stable URI so the texture is cached and not re-uploaded every frame.
+fn load_brush_texture(ctx: &egui::Context, img: &RgbaImage, id: &str) -> TextureId {
+    let uri = format!("bytes://brush/{id}");
+    // Check if already loaded
+    if ctx
+        .try_load_texture(&uri, Default::default(), Default::default())
+        .is_ok()
+    {
+        // Already loaded — return its ID by loading again (cheap, returns cached)
+    }
+    let color_image = egui::ColorImage::from_rgba_unmultiplied(
+        [img.width() as usize, img.height() as usize],
+        img.as_raw(),
+    );
+    ctx.load_texture(&uri, color_image, Default::default()).id()
+}
 
 /// Everything related to image editing
 #[allow(unused_variables)]
-pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
     // A flag to indicate that the image needs to be rebuilt
     let mut image_changed = false;
     let mut pixels_changed = false;
@@ -93,11 +111,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         }),
     ];
 
-    egui::SidePanel::right("editing")
-        .min_width(100.)
-        // safeguard to not expand too much
-        .max_width(500.)
-        .show_separator_line(false)
+    egui::Panel::right("editing")
+        .default_size(PANEL_WIDTH)
+        .min_size(100.)
+        .max_size(500.)
+        .show_separator_line(true)
         .show(ctx, |ui| {
 
 
@@ -200,7 +218,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             ui.label("Brush");
                             ui.end_row();
 
-                            stroke_ui(stroke, &state.edit_state.brushes, ui, gfx);
+                            stroke_ui(stroke, &state.edit_state.brushes, ui);
                         }
                     }
                 });
@@ -255,7 +273,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                 stroke,
                                                 &state.edit_state.brushes,
                                                 ui,
-                                                gfx,
                                             );
                                             if r.changed() {
                                                 pixels_changed = true;
@@ -326,20 +343,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             }
 
-            ui.horizontal(|ui|{
-                if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
-                    if let Some(img) = &state.current_image {
-                        state.image_geometry.dimensions = img.dimensions();
-                        if let Err(error) = state.current_texture.set_image(img, gfx, &state.persistent_settings){
-                            state.send_message_warn(&format!("Error while displaying image: {error}"));
-                        }
-                    }
+            if ui.styled_checkbox(&mut state.edit_state.skip_processing, "Disable all edits").changed() {
+                if state.edit_state.skip_processing {
+                    state.edit_state.result_pixel_op = Default::default();
+                        state.send_frame(crate::utils::Frame::UpdateTexture);
                 }
-                if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
-                    pixels_changed = true;
-
-                }
-            });
+                pixels_changed = true;
+            }
 
             ui.vertical_centered_justified(|ui| {
                 if ui
@@ -387,7 +397,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
                             let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
-                            set_title(app, state);
+                            set_title(ctx, state);
                         }
                     }
                 }
@@ -440,7 +450,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                         ui.ctx().request_repaint();
                     }
-                
+
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
@@ -451,6 +461,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     let encoding_options = state.volatile_settings.encoding_options.clone();
 
                     if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
+                        ctx.memory_mut(|w| { w.keep_popup_open(Id::new("SAVE")); });
                         let msg_sender = state.message_channel.0.clone();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
@@ -526,6 +537,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
 
             // Do the processing
+            //
+            if state.edit_state.skip_processing {
+
+                return;
+            }
 
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;
@@ -635,12 +651,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         });
 }
 
-fn stroke_ui(
-    stroke: &mut PaintStroke,
-    brushes: &[RgbaImage],
-    ui: &mut Ui,
-    gfx: &mut Graphics,
-) -> Response {
+fn stroke_ui(stroke: &mut PaintStroke, brushes: &[RgbaImage], ui: &mut Ui) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
     let r = ui
@@ -684,26 +695,32 @@ fn stroke_ui(
     }
 
     ui.horizontal(|ui| {
-        if let Some(notan_texture) = brushes[stroke.brush_index].to_texture_premult(gfx) {
-            let texture_id = gfx.egui_register_texture(&notan_texture);
-            ui.add(
-                egui::Image::new(texture_id)
-                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
-            );
-        }
+        let tex_id = load_brush_texture(
+            ui.ctx(),
+            &brushes[stroke.brush_index],
+            &format!("cur_{}", stroke.brush_index),
+        );
+        ui.add(
+            egui::Image::new(egui::load::SizedTexture::new(
+                tex_id,
+                egui::Vec2::splat(ui.available_height()),
+            ))
+            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+        );
 
         let r = egui::ComboBox::from_id_salt(format!("s {:?}", stroke.points))
             .selected_text(format!("Brush {}", stroke.brush_index))
             .show_ui(ui, |ui| {
                 for (b_i, b) in brushes.iter().enumerate() {
                     ui.horizontal(|ui| {
-                        if let Some(notan_texture) = b.to_texture_premult(gfx) {
-                            let texture_id = gfx.egui_register_texture(&notan_texture);
-                            ui.add(
-                                egui::Image::new(texture_id)
-                                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
-                            );
-                        }
+                        let tex_id = load_brush_texture(ui.ctx(), b, &format!("brush_{b_i}"));
+                        ui.add(
+                            egui::Image::new(egui::load::SizedTexture::new(
+                                tex_id,
+                                egui::Vec2::splat(ui.available_height()),
+                            ))
+                            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+                        );
 
                         if ui
                             .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {b_i}"))

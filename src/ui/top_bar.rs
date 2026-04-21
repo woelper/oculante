@@ -2,44 +2,45 @@ use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::filebrowser::BrowserDir;
+use crate::shortcuts::InputEvent::*;
 use crate::utils::*;
-#[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
 
-pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mut Graphics) {
+#[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
+use egui::*;
+
+pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
     let window_x = state.window_size.x - ui.style().spacing.icon_spacing * 2. - 100.;
+    let ctx = ui.ctx().clone();
 
     ui.horizontal_centered(|ui| {
-        use crate::shortcuts::InputEvent::*;
-
         // The Close button
         if state.persistent_settings.borderless && unframed_button(X, ui).clicked() {
-            app.backend.exit();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
         let mut changed_channels = false;
 
-        if key_pressed(app, state, RedChannel) {
+        if key_pressed(&ctx, state, RedChannel) {
             state.persistent_settings.current_channel = ColorChannel::Red;
             changed_channels = true;
         }
-        if key_pressed(app, state, GreenChannel) {
+        if key_pressed(&ctx, state, GreenChannel) {
             state.persistent_settings.current_channel = ColorChannel::Green;
             changed_channels = true;
         }
-        if key_pressed(app, state, BlueChannel) {
+        if key_pressed(&ctx, state, BlueChannel) {
             state.persistent_settings.current_channel = ColorChannel::Blue;
             changed_channels = true;
         }
-        if key_pressed(app, state, AlphaChannel) {
+        if key_pressed(&ctx, state, AlphaChannel) {
             state.persistent_settings.current_channel = ColorChannel::Alpha;
             changed_channels = true;
         }
-        if key_pressed(app, state, RGBChannel) {
+        if key_pressed(&ctx, state, RGBChannel) {
             state.persistent_settings.current_channel = ColorChannel::Rgb;
             changed_channels = true;
         }
-        if key_pressed(app, state, RGBAChannel) {
+        if key_pressed(&ctx, state, RGBAChannel) {
             state.persistent_settings.current_channel = ColorChannel::Rgba;
             changed_channels = true;
         }
@@ -105,11 +106,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             });
         }
 
-        if changed_channels && state.current_image.is_some() {
-            state
-                .current_texture
-                .update_color_selection(gfx, &state.persistent_settings);
-        }
+        // Channel changes are picked up by the renderer each frame via
+        // persistent_settings.current_channel — no GPU state update needed here.
 
         let label_rect = ui.ctx().available_rect().shrink(50.);
 
@@ -178,7 +176,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
         {
-            toggle_fullscreen(app, state);
+            toggle_fullscreen(&ctx, state);
         }
 
         if window_x > ui.cursor().left() + 80.
@@ -191,7 +189,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .clicked()
         {
             state.always_on_top = !state.always_on_top;
-            app.window().set_always_on_top(state.always_on_top);
+            ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if state.always_on_top {
+                egui::WindowLevel::AlwaysOnTop
+            } else {
+                egui::WindowLevel::Normal
+            }));
         }
 
         if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
@@ -223,7 +225,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_texture.get().is_some()
+        if state.current_image.is_some()
             && window_x > ui.cursor().left() + 80.
             && tooltip(
                 unframed_button(PLACEHOLDER, ui),
@@ -274,10 +276,10 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                         .unwrap_or_default()
                 ));
             });
-            app.window().request_frame();
+            ctx.request_repaint();
         }
 
-        drag_area(ui, state, app);
+        drag_area(ui, state);
 
         ui.add_space(ui.available_width() - ICON_SIZE * 2. - ICON_SIZE / 2.);
 
@@ -285,7 +287,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for an image")
             .clicked()
         {
-            state.filebrowser_last_dir = if app.keyboard.shift() {
+            state.filebrowser_last_dir = if ctx.input(|i| i.modifiers.shift) {
                 BrowserDir::CurrentImageDir
             } else {
                 BrowserDir::LastOpenDir
@@ -310,12 +312,35 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        draw_hamburger_menu(ui, state, app);
+        draw_hamburger_menu(ui, state);
+
+        // Display an indication in the top bar to see when/if and how many updates happen
+        #[cfg(debug_assertions)]
+        {
+            let dt = ctx.input(|i| i.stable_dt);
+            let fps = if dt > 0.0 { 1.0 / dt } else { 0.0 };
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                Id::new("debug_overlay"),
+            ));
+            let pos = ctx.content_rect().center_bottom() + vec2(-30., -60.);
+            if ctx.has_requested_repaint() {
+                painter.circle(pos, 6., Color32::RED, Stroke::NONE);
+            }
+            painter.text(
+                pos + vec2(12., 0.),
+                Align2::LEFT_CENTER,
+                format!("{:.0} fps  pass {}", fps, ctx.cumulative_pass_nr()),
+                FontId::proportional(11.),
+                Color32::RED,
+            );
+        }
     });
 }
 
-pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
     use crate::shortcuts::InputEvent::*;
+    let ctx = ui.ctx().clone();
 
     ui.scope(|ui| {
         // maybe override font size?
@@ -326,22 +351,22 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
         ui.menu_button(RichText::new(LIST).size(ICON_SIZE), |ui| {
             if ui.styled_button(format!("{MOVE} Reset view")).clicked() {
                 state.reset_image = true;
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{FRAME} View 1:1")).clicked() {
                 set_zoom(
                     1.0,
                     Some(nalgebra::Vector2::new(
-                        app.window().width() as f32 / 2.,
-                        app.window().height() as f32 / 2.,
+                        state.window_size.x / 2.,
+                        state.window_size.y / 2.,
                     )),
                     state,
                 );
-                ui.close_menu();
+                ui.close();
             }
 
-            let copy_pressed = key_pressed(app, state, Copy);
+            let copy_pressed = key_pressed(&ctx, state, Copy);
             if let Some(img) = &state.current_image {
                 if ui
                     .styled_button(format!("{COPY} Copy"))
@@ -350,7 +375,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     || copy_pressed
                 {
                     clipboard_copy(img);
-                    ui.close_menu();
+                    ui.close();
                 }
             }
 
@@ -358,7 +383,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
-                || key_pressed(app, state, Paste)
+                || key_pressed(&ctx, state, Paste)
             {
                 match clipboard_to_image() {
                     Ok(img) => {
@@ -374,90 +399,76 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                     }
                     Err(e) => state.send_message_err(&e.to_string()),
                 }
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{GEAR} Preferences")).clicked() {
                 state.settings_enabled = !state.settings_enabled;
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.styled_button(format!("{EXIT} Quit")).clicked() {
-                app.backend.exit();
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
 
             ui.styled_menu_button(format!("{CLOCK} Recent"), |ui| {
-                let r = ui.max_rect();
-
-                let recent_rect = Rect::from_two_pos(
-                    Pos2::new(r.right_bottom().x + 100., r.left_top().y),
-                    Pos2::new(r.left_bottom().x, r.left_top().y + 0.),
-                );
-
-                let panel_bg_color = match ui.style().visuals.dark_mode {
-                    true => Color32::from_gray(31),
-                    false => Color32::from_gray(247),
-                };
-
-                // FIXME: This overflows
-                ui.allocate_new_ui(UiBuilder::new().max_rect(recent_rect), |ui| {
-                    let mut max = 0;
-                    for r in &state.volatile_settings.recent_images.clone() {
-                        if let Some(filename) = r.file_stem() {
-                            max = filename.len().max(max)
-                        }
-                    }
-
+                ui.set_max_width(300.0);
+                if state.volatile_settings.recent_images.is_empty() {
+                    ui.label("No recent images");
+                } else {
                     for r in &state.volatile_settings.recent_images.clone() {
                         let ext = r
                             .extension()
-                            .map(|e| e.to_string_lossy().to_string())
-                            .unwrap_or_default()
-                            .to_uppercase();
+                            .map(|e| e.to_string_lossy().to_uppercase())
+                            .unwrap_or_default();
+                        let filename = r
+                            .file_stem()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_default();
 
-                        ui.horizontal(|ui| {
-                            egui::Frame::new()
-                                .fill(panel_bg_color)
-                                .corner_radius(ui.style().visuals.widgets.active.corner_radius)
-                                .inner_margin(Margin::same(6))
-                                .show(ui, |ui| {
-                                    // ui.vertical_centered_justified(|ui| {
-
-                                    let (_, icon_rect) = ui.allocate_space(Vec2::splat(28.));
-
-                                    ui.painter().rect(
-                                        icon_rect,
-                                        ui.get_rounding(BUTTON_HEIGHT_SMALL),
-                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.1),
-                                        Stroke::NONE,
-                                        StrokeKind::Inside,
-                                    );
-
-                                    ui.painter().text(
-                                        icon_rect.center(),
-                                        Align2::CENTER_CENTER,
-                                        ext,
-                                        FontId::proportional(10.),
-                                        ui.style().visuals.selection.bg_fill.gamma_multiply(0.8),
-                                    );
-
-                                    if let Some(filename) = r.file_stem() {
-                                        let res = ui.add(
-                                            egui::Button::new(filename.to_string_lossy())
-                                                .min_size(vec2(max as f32 * 10., 0.)),
-                                        );
-
-                                        // let res = ui.button(filename.to_string_lossy());
-                                        if res.clicked() {
-                                            load_image_from_path(r, state);
-                                            ui.close_menu();
-                                        }
-                                    }
-                                    // });
-                                });
+                        let res = ui.horizontal(|ui| {
+                            let accent = ui.style().visuals.selection.bg_fill;
+                            let (_, icon_rect) = ui.allocate_space(Vec2::splat(24.));
+                            ui.painter().rect(
+                                icon_rect,
+                                4.0,
+                                accent.gamma_multiply(0.1),
+                                Stroke::NONE,
+                                StrokeKind::Inside,
+                            );
+                            ui.painter().text(
+                                icon_rect.center(),
+                                Align2::CENTER_CENTER,
+                                &ext,
+                                FontId::proportional(9.),
+                                accent.gamma_multiply(0.8),
+                            );
+                            ui.add(
+                                egui::Button::new(RichText::new(&filename))
+                                    .min_size(vec2(300.0, 0.0))
+                                    .truncate(),
+                            )
+                            .clicked()
                         });
+
+                        if res.inner {
+                            load_image_from_path(r, state);
+                            ui.close();
+                        }
                     }
-                });
+                    ui.separator();
+                    if ui
+                        .add(
+                            egui::Button::new(RichText::new("Clear recent"))
+                                .min_size(vec2(300.0, 0.0))
+                                .truncate(),
+                        )
+                        .clicked()
+                    {
+                        state.volatile_settings.recent_images.clear();
+                        ui.close();
+                    }
+                }
             });
         });
     });

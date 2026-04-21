@@ -5,9 +5,9 @@ use image::DynamicImage;
 use log::debug;
 use log::error;
 use log::warn;
+use glam::{Mat4, Vec4};
 use notan::app::Color;
 use notan::draw::*;
-use notan::math::{Mat4, Vec4};
 use notan::prelude::{BlendMode, Buffer, Graphics, ShaderSource, Texture, TextureFilter};
 pub struct TexWrap {
     texture_array: Vec<Texture>,
@@ -82,7 +82,7 @@ impl TextureWrapperManager {
         }
     }
 
-    fn get_mat_vec(channel_selection: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
+    pub fn get_mat_vec(channel_selection: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
         //Currently we have two types of textures: rgba and gray ones.
         //All other types will be converted to rgba, so we only need to take care of those types here
         if image_color == image::ColorType::L8 || image_color == image::ColorType::L16 {

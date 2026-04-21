@@ -1,5 +1,4 @@
 const ICON_SIZE: f32 = 24. * 0.8;
-const ROUNDING: f32 = 8.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 pub const PANEL_WIDTH: f32 = 260.0;
@@ -30,11 +29,8 @@ use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use nalgebra::Vector2;
-use notan::{
-    egui::{self, *},
-    prelude::{App, Graphics},
-};
-use std::{collections::BTreeSet, f32, ops::RangeInclusive, path::Path, time::Instant};
+use egui::{self, *};
+use std::{f32, ops::RangeInclusive, path::Path, time::Instant};
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
 
@@ -50,7 +46,7 @@ use crate::{
     },
     paint::PaintStroke,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    shortcuts::{key_pressed, lookup},
     thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
 };
 
@@ -361,12 +357,12 @@ impl EguiExt for Ui {
         self.horizontal(|ui| {
             let mut r = ui.add_sized(
                 egui::Vec2::new(30., ui.available_height()),
-                egui::SelectableLabel::new(selected, RichText::new(icon)),
+                egui::Button::new(RichText::new(icon)).selected(selected),
             );
             if ui
                 .add_sized(
                     egui::Vec2::new(ui.available_width(), ui.available_height()),
-                    egui::SelectableLabel::new(selected, RichText::new(description)),
+                    egui::Button::new(RichText::new(description)).selected(selected),
                 )
                 .clicked()
             {
@@ -385,37 +381,30 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
+            let height = 7.4;
+            let rounding = 6;
+            
             ui.style_mut().spacing.interact_size.y = 18.;
+            ui.style_mut().spacing.slider_rail_height = height;
 
             let color = ui.style().visuals.selection.bg_fill;
             let style = ui.style_mut();
 
-            style.visuals.widgets.inactive.fg_stroke.width = 7.0;
+            // Use fg_stroke for the rail appearance
+            style.visuals.widgets.inactive.fg_stroke.width = height;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            // style.visuals.widgets.inactive.rounding =
-            //     style.visuals.widgets.inactive.rounding.at_least(18.);
-
             style.visuals.widgets.inactive.corner_radius =
-                style.visuals.widgets.inactive.corner_radius.at_least(18);
-            style.visuals.widgets.inactive.expansion = -4.0;
+                style.visuals.widgets.inactive.corner_radius.at_least(rounding);
 
-            style.visuals.widgets.hovered.fg_stroke.width = 9.0;
+            style.visuals.widgets.hovered.fg_stroke.width = height;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            // style.visuals.widgets.hovered.rounding =
-            //     style.visuals.widgets.hovered.rounding.at_least(18.);
             style.visuals.widgets.hovered.corner_radius =
-                style.visuals.widgets.hovered.corner_radius.at_least(18);
+                style.visuals.widgets.hovered.corner_radius.at_least(rounding);
 
-            style.visuals.widgets.hovered.expansion = -4.0;
-
-            style.visuals.widgets.active.fg_stroke.width = 9.0;
+            style.visuals.widgets.active.fg_stroke.width = height;
             style.visuals.widgets.active.fg_stroke.color = color;
-            // style.visuals.widgets.active.rounding =
-            //     style.visuals.widgets.active.rounding.at_least(18.);
             style.visuals.widgets.active.corner_radius =
-                style.visuals.widgets.active.corner_radius.at_least(18);
-
-            style.visuals.widgets.active.expansion = -4.0;
+                style.visuals.widgets.active.corner_radius.at_least(rounding);
 
             ui.horizontal(|ui| {
                 let r = ui.add(
@@ -425,7 +414,11 @@ impl EguiExt for Ui {
                         .show_value(false)
                         .integer(),
                 );
-                ui.monospace(format!("{:.0}", value.to_f64()));
+                ui.allocate_ui_with_layout(
+                    egui::vec2(40.0, ui.available_height()),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| { ui.monospace(format!("{:.0}", value.to_f64())); },
+                );
                 r
             })
             .inner
@@ -516,8 +509,8 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
 /// Proof-of-concept funtion to draw texture completely with egui
 #[allow(unused)]
-pub fn image_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
-    if let Some(texture) = &state.current_texture.get() {
+pub fn image_ui(ctx: &Context, state: &mut OculanteState) {
+    if let Some(_img) = &state.current_image {
         let image_rect = Rect::from_center_size(
             Pos2::new(
                 state.image_geometry.offset.x
@@ -702,7 +695,7 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
 }
 
 /// An area that can be dragged by a user to move the window
-pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
+pub fn drag_area(ui: &mut Ui, state: &mut OculanteState) {
     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
@@ -712,13 +705,11 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
         );
 
         if r.dragged() {
-            // improve responsiveness
-            app.window().request_frame();
+            ui.ctx().request_repaint();
             let position = Mouse::get_mouse_position();
             match position {
                 Mouse::Position { mut x, mut y } => {
-                    // translate mouse pos into real pixels
-                    let dpi = app.backend.window().dpi();
+                    let dpi = ui.ctx().pixels_per_point() as f64;
                     x = (x as f64 * dpi) as i32;
                     y = (y as f64 * dpi) as i32;
 
@@ -728,14 +719,19 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState, app: &mut App) {
                     {
                         Some(o) => o,
                         None => {
-                            let window_pos = app.window().position();
+                            // Get window position from viewport info
+                            let window_pos = ui.ctx().input(|i| {
+                                i.viewport().outer_rect.map(|r| (r.left() as i32, r.top() as i32))
+                            }).unwrap_or((0, 0));
                             let offset = (window_pos.0 - x, window_pos.1 - y);
                             ui.ctx()
                                 .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
                             offset
                         }
                     };
-                    app.window().set_position(x + offset.0, y + offset.1);
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::OuterPosition(
+                        egui::pos2((x + offset.0) as f32, (y + offset.1) as f32),
+                    ));
                 }
                 Mouse::Error => error!("Error getting mouse position"),
             }
@@ -752,12 +748,11 @@ pub fn blank_icon(
     _rect: egui::Rect,
     _visuals: &egui::style::WidgetVisuals,
     _is_open: bool,
-    _above_or_below: egui::AboveOrBelow,
 ) {
 }
 
 fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
-    let galley = ui.ctx().fonts(|fonts| {
+    let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
             CARET_RIGHT.to_string(),
             FontId::proportional(12.),
@@ -908,6 +903,7 @@ impl Modal {
         if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
             return;
         }
+        self.ctx.memory_mut(|w| { w.keep_popup_open(self.id.clone().into()); });
         egui::Modal::new("m".into()).show(&self.ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -931,11 +927,11 @@ impl Modal {
                             warn_color.linear_multiply(0.8);
                         if ui.styled_button("Yes").clicked() {
                             ui.scope(add_contents);
-                            self.ctx.memory_mut(|w| w.close_popup());
+                            self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
                         }
                     });
                     if ui.styled_button("Cancel").clicked() {
-                        self.ctx.memory_mut(|w| w.close_popup());
+                        self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
                     }
                 });
             });

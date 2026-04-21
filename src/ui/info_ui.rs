@@ -9,25 +9,20 @@ use egui_plot::{Line, Plot, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::{
-    egui::{self, *},
-    prelude::Graphics,
-};
+use egui::{self, *};
 
 use super::*;
 use std::time::Duration;
 
 pub fn info_ui(
-    app: &mut App,
     ctx: &Context,
     state: &mut OculanteState,
-    _gfx: &mut Graphics,
+    image_tiles: &[crate::app::ImageTile],
 ) -> (Pos2, Pos2) {
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
     let mut uv_center: (f64, f64) = Default::default();
-    let mut uv_size: (f64, f64) = Default::default();
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -51,21 +46,16 @@ pub fn info_ui(
         }
     }
 
-    egui::SidePanel::left("info")
-    .show_separator_line(false)
-    .exact_width(PANEL_WIDTH)
-    .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(0).fill(Color32::TRANSPARENT))
+    egui::Panel::left("info")
+    .show_separator_line(true)
+    .default_size(PANEL_WIDTH)
+    .resizable(true)
     .show(ctx, |ui| {
-        egui::ScrollArea::vertical().auto_shrink([false,true])
-            .show(ui, |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
 
-            // Force-expand to prevent spacing issue with scroll bar
-            // ui.allocate_space(egui::Vec2::new(1000., 0.));
-
-            if let Some(texture) = &state.current_texture.get() {
+            // SECTION 1: Info grid
+            if state.current_image.is_some() {
                 let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
-                let scale = (desired_width / 8.) / texture.size().0 as f64;
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
@@ -137,21 +127,23 @@ pub fn info_ui(
                     );
                     ui.end_row();
                 });
-
-                // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                uv_size = (scale, scale * ratio);
+                // SECTION 2: Zoom preview
                 ui.add_space(10.);
-
-                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
-
-
-                // Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, egui::StrokeKind::Middle);
+                let preview_size = desired_width as f32;
+                let preview_rect = egui::Rect::from_min_size(
+                    ui.cursor().left_top(),
+                    egui::Vec2::splat(preview_size),
+                );
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
+
+                // Draw magnified pixel preview
+                zoom_preview(ui, state, preview_rect, image_tiles);
+
                 ui.advance_cursor_after_rect(preview_rect);
-            }
+            } // end if current_image
+
+            // SECTION 3: Compare
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
@@ -163,7 +155,7 @@ pub fn info_ui(
                         dark_panel(ui, |ui| {
                             let browser_button = ui.button(format!("{FOLDER} Open another image..."));
                             if browser_button.clicked() {
-                                state.filebrowser_last_dir = if app.keyboard.shift() {
+                                state.filebrowser_last_dir = if ui.ctx().input(|i| i.modifiers.shift) {
                                     BrowserDir::CurrentImageDir
                                 } else {
                                     BrowserDir::LastOpenDir
@@ -201,7 +193,6 @@ pub fn info_ui(
                                     }
                                 }
 
-                            // let compare_list = state.compare_list.iter().cloned().collect();
                             let mut to_remove = None;
                             for CompareItem {path, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
@@ -209,7 +200,7 @@ pub fn info_ui(
                                         to_remove = Some(path.to_owned());
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.selectable_label(state.current_path.as_ref() == Some(path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        if ui.add(egui::Button::new(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).selected(state.current_path.as_ref() == Some(path))).clicked(){
                                             state
                                                 .player
                                                 .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
@@ -242,7 +233,8 @@ pub fn info_ui(
                 });
             });
 
-            if state.current_texture.get().is_some() {
+            // SECTION 4: Alpha tools + palette + measure + tiling
+            if state.current_image.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
@@ -285,11 +277,11 @@ pub fn info_ui(
 
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
 
+            // SECTION 5: Advanced (stats, EXIF, DICOM, histogram)
             advanced_ui(ui, state);
 
         });
@@ -362,6 +354,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         }
 
         let red_vals = Line::new(
+            "red",
             info.red_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
@@ -371,6 +364,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .color(Color32::RED);
 
         let green_vals = Line::new(
+            "green",
             info.green_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
@@ -380,6 +374,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
         .color(Color32::GREEN);
 
         let blue_vals = Line::new(
+            "blue",
             info.blue_histogram
                 .iter()
                 .map(|(k, v)| [*k as f64, *v as f64])
@@ -400,4 +395,118 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                 plot_ui.line(blue_vals);
             });
     }
+}
+
+/// Renders a magnified, pixel-perfect view by reusing existing image tiles.
+/// No image conversion or texture upload — just draws UV-cropped quads from
+/// the tiles already on the GPU.
+fn zoom_preview(
+    ui: &mut Ui,
+    state: &OculanteState,
+    rect: egui::Rect,
+    tiles: &[crate::app::ImageTile],
+) {
+    if tiles.is_empty() {
+        return;
+    }
+
+    let img_w = state.image_geometry.dimensions.0 as f32;
+    let img_h = state.image_geometry.dimensions.1 as f32;
+    if img_w < 1.0 || img_h < 1.0 {
+        return;
+    }
+
+    // Snap to integer pixel coordinates so the preview locks to pixel grid
+    let cx = state.cursor_relative.x.floor();
+    let cy = state.cursor_relative.y.floor();
+
+    // How many source pixels the preview spans in each direction
+    let radius: f32 = 16.0;
+    let src_size = radius * 2.0 + 1.0;
+
+    // Source region in image pixel coordinates
+    let src_left = cx - radius;
+    let src_top = cy - radius;
+    let src_right = cx + radius + 1.0;
+    let src_bottom = cy + radius + 1.0;
+
+    // How many screen pixels per source pixel
+    let px_per_src = rect.width() / src_size;
+
+    // Fill background for out-of-bounds areas
+    ui.painter().rect_filled(rect, 0.0, Color32::from_gray(30));
+
+    // Clip to the preview rect
+    let clip = rect;
+
+    // Draw each tile that overlaps the source region
+    for tile in tiles {
+        let tx = tile.x as f32;
+        let ty = tile.y as f32;
+        let tw = tile.w as f32;
+        let th = tile.h as f32;
+        let tile_right = tx + tw;
+        let tile_bottom = ty + th;
+
+        // Check overlap between source region and this tile
+        let overlap_left = src_left.max(tx);
+        let overlap_top = src_top.max(ty);
+        let overlap_right = src_right.min(tile_right);
+        let overlap_bottom = src_bottom.min(tile_bottom);
+
+        if overlap_left >= overlap_right || overlap_top >= overlap_bottom {
+            continue; // No overlap
+        }
+
+        // UV coordinates within this tile for the overlapping region
+        let uv_left = (overlap_left - tx) / tw;
+        let uv_top = (overlap_top - ty) / th;
+        let uv_right = (overlap_right - tx) / tw;
+        let uv_bottom = (overlap_bottom - ty) / th;
+        let uv =
+            egui::Rect::from_min_max(egui::pos2(uv_left, uv_top), egui::pos2(uv_right, uv_bottom));
+
+        // Screen position for this overlap region within the preview rect
+        let screen_left = rect.left() + (overlap_left - src_left) * px_per_src;
+        let screen_top = rect.top() + (overlap_top - src_top) * px_per_src;
+        let screen_right = rect.left() + (overlap_right - src_left) * px_per_src;
+        let screen_bottom = rect.top() + (overlap_bottom - src_top) * px_per_src;
+        let draw_rect = egui::Rect::from_min_max(
+            egui::pos2(screen_left, screen_top),
+            egui::pos2(screen_right, screen_bottom),
+        );
+
+        ui.painter()
+            .with_clip_rect(clip)
+            .image(tile.texture.id(), draw_rect, uv, Color32::WHITE);
+    }
+
+    // Crosshair
+    let center_x = rect.left() + radius * px_per_src;
+    let center_y = rect.top() + radius * px_per_src;
+    let stroke = egui::Stroke::new(7.0, Color32::from_rgba_unmultiplied(128, 128, 128, 128));
+    ui.painter().line_segment(
+        [
+            egui::pos2(center_x + px_per_src / 2.0, rect.top()),
+            egui::pos2(center_x + px_per_src / 2.0, rect.bottom()),
+        ],
+        stroke,
+    );
+    ui.painter().line_segment(
+        [
+            egui::pos2(rect.left(), center_y + px_per_src / 2.0),
+            egui::pos2(rect.right(), center_y + px_per_src / 2.0),
+        ],
+        stroke,
+    );
+    let center_rect = egui::Rect::from_min_size(
+        egui::pos2(center_x, center_y),
+        egui::vec2(px_per_src, px_per_src),
+    );
+    ui.painter().rect_stroke(
+        center_rect,
+        0.0,
+        egui::Stroke::new(1.0, Color32::from_gray(40)),
+        egui::StrokeKind::Inside,
+    );
 }
