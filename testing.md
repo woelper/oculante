@@ -40,6 +40,7 @@
 - [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier.
 - [ ] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 - [ ] Fit image on window resize is broken
+- [ ] Modifier keys don't work correctly in keybinds part of preferences
 
 
 # Performance
