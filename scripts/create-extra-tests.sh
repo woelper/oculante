@@ -3,7 +3,7 @@
 ### libavif       https://github.com/AOMediaCodec/libavif
 ### exiftool      https://github.com/exiftool/exiftool
 
-KARIMI=./mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg
+KARIMI=$(git rev-parse --show-toplevel)/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg
 
 #libavif - aom
 

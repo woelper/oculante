@@ -53,6 +53,10 @@
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
 - [ ] Functionality which can be better isolated / separated should be compined in modules. Some of it makes sense, for example buttons that can be clicked and have a shortcut, other things are scattered all over the place.
 - [ ] egui now supports system theme, remove dark-light (#774)
+- [x] Create and move scripts into a scripts folder
+- [ ] Update macOS plist
+- [ ] See if we can replace or drop fruitbasket
+
 
 
 # Things to improve not related to removing Notan

@@ -8,6 +8,9 @@ then
     exit
 fi
 
+current_dir=$PWD
+cd $(git rev-parse --show-toplevel)
+
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
@@ -34,3 +37,5 @@ git push --tags
 git push
 # this needs no-verify as we modify the plist during the build, and cargo does not accept that.
 cargo publish --no-verify
+
+cd $current_dir
