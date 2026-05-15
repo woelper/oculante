@@ -28,7 +28,7 @@ jobs:
       #   run: rustup update
 
       - name: build heif
-        run: ./build_deps_linux.sh
+        run: ./scripts/build_deps_linux.sh
 
       - name: install heif
         run: cd libheif/build && sudo make install

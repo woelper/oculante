@@ -81,7 +81,7 @@ jobs:
 
     - name: Install libheif for ubuntu
       run: |
-        ./build_deps_linux.sh
+        ./scripts/build_deps_linux.sh
         cd libheif/build && sudo make install
       if: matrix.os == 'ubuntu-24.04'
 
@@ -113,7 +113,7 @@ jobs:
 
 
     - name: Build Mac Silicon Bundle
-      run: ./build_mac.sh
+      run: ./scripts/build_mac.sh
       if: matrix.os == 'macos-latest'
 
     - name: Zip Mac Silicon Bundle
@@ -121,7 +121,7 @@ jobs:
       if: matrix.os == 'macos-latest'
 
     - name: Build Mac Intel Bundle
-      # run: ./build_mac.sh
+      # run: ./scripts/build_mac.sh
       run: |
           rustc --version --verbose
           brew install libheif
