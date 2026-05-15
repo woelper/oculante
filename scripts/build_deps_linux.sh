@@ -1,3 +1,6 @@
+current_dir=$PWD
+cd $(git rev-parse --show-toplevel)
+
 rm -rf libheif
 git clone --branch v1.17.3 https://github.com/strukturag/libheif.git
 cd libheif
@@ -10,3 +13,5 @@ cd ../../
 export PKG_CONFIG_PATH=$(pwd)/libheif/build
 #cargo build --release --features heif
 #rm -rf libheif
+
+cd $current_dir

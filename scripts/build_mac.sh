@@ -8,6 +8,10 @@ brew install libheif ffmpeg nasm --quiet
 rustup target add aarch64-apple-darwin
 # rustup target add x86_64-apple-darwin
 
+current_dir=$PWD
+
+cd $(git rev-parse --show-toplevel)
+
 cargo bundle --release --features "notan/shaderc heif"
 # cargo build --release --target aarch64-apple-darwin --features "notan/shaderc heif"
 # cargo build --release --target x86_64-apple-darwin --features notan/shaderc
@@ -58,3 +62,5 @@ echo you can test target/release/bundle/osx/oculante.app now
 
 otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
 otool -L target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
+
+cd $current_dir

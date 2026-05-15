@@ -1,7 +1,7 @@
 use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
 use anyhow::{anyhow, Result};
 use log::{debug, info, trace};
-use notan::egui::{Context, Visuals};
+use egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "heif")]
@@ -91,7 +91,7 @@ impl Default for PersistentSettings {
             background_color: [30, 30, 30],
             vsync: true,
             force_redraw: false,
-            shortcuts: Shortcuts::default_keys(),
+            shortcuts: default_shortcuts(),
             keep_view: Default::default(),
             max_cache: 30,
             max_recents: 12,
