@@ -3,7 +3,10 @@
 ### libavif       https://github.com/AOMediaCodec/libavif
 ### exiftool      https://github.com/exiftool/exiftool
 
-KARIMI=$(git rev-parse --show-toplevel)/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg
+KARIMI=$(git rev-parse --show-toplevel)/res/tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg
+
+current_dir=$PWD
+cd $(git rev-parse --show-toplevel)/res/tests
 
 #libavif - aom
 
@@ -237,3 +240,5 @@ if [ "$INPUT" = "I AM 100 PERCENT SURE I WANT TO HARDLINK 38K IMAGES" ]; then
 else
   echo "Cancelling";
 fi
+
+cd $current_dir

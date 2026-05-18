@@ -147,8 +147,8 @@ fn test_thumbs() {
     std::env::set_var("RUST_LOG", "debug");
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
-    _ = thumbs.get("tests/rust.png");
-    _ = thumbs.get("tests/ultrahigh.png");
-    _ = thumbs.get("tests/mohsen-karimi.webp");
+    _ = thumbs.get("res/tests/rust.png");
+    _ = thumbs.get("res/tests/ultrahigh.png");
+    _ = thumbs.get("res/tests/mohsen-karimi.webp");
     std::thread::sleep(std::time::Duration::from_millis(1000));
 }

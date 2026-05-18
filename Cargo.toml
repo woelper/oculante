@@ -11,7 +11,7 @@ exclude = [
     "res/screen*.png",
     "res/*.avif",
     "res/*.gif",
-    "tests/*",
+    "res/tests/*",
     "res/screenshots/*",
     "res/previews/*",
 ]

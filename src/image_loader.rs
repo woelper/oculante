@@ -1108,7 +1108,7 @@ mod tests {
     #[cfg(feature = "heif")]
     #[test]
     fn low_pixel_limit_doesnt_decode_heif() {
-        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("res/tests/orange.heic");
         let decoder_opts = Some(DecoderSettings {
             heif: HeifLimits {
                 image_size_pixels: Limit::U64(50),
@@ -1135,7 +1135,7 @@ mod tests {
     #[cfg(feature = "heif")]
     #[test]
     fn higher_pixel_limit_decodes_heif() {
-        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/orange.heic");
+        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("res/tests/orange.heic");
         let decoder_opts = Some(DecoderSettings {
             heif: HeifLimits {
                 image_size_pixels: Limit::NoLimit,
