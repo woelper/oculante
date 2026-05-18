@@ -56,6 +56,7 @@
 - [x] Create and move scripts into a scripts folder
 - [ ] Update macOS plist
 - [ ] See if we can replace or drop fruitbasket
+- [x] Move test files to res/tests
 
 
 
