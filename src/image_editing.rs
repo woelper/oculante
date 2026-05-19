@@ -1269,9 +1269,9 @@ impl ImageOperation {
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else if let Ok(lut_img) = image::open(lut_name) {
+                        } else { match image::open(lut_name) { Ok(lut_img) => {
                             correct_image(&mut external_image, &lut_img.to_rgb8());
-                        }
+                        } _ => {}}}
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
                     Self::Crop(dim) => {
@@ -1978,7 +1978,8 @@ fn range_test() {
         GradientStop::new(128, [255, 83, 0]),
         GradientStop::new(255, [224, 255, 0]),
     ];
-    std::env::set_var("RUST_LOG", "debug");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     let _ = env_logger::try_init();
     let res = interpolate_u8(&map, 5);
 

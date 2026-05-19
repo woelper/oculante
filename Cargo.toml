@@ -1,7 +1,7 @@
 [package]
 authors = ["Johann Woelper <woelper@gmail.com>"]
 description = "A minimalistic image viewer with analysis and editing tools"
-edition = "2021"
+edition = "2024"
 exclude = [
     ".github/*",
     "res/fonts/NotoSansSC-Regular.ttf",

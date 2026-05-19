@@ -313,16 +313,16 @@ fn gl_format(format: TexFormat) -> (u32, u32, u32) {
     }
 }
 
-unsafe fn set_uniform_2f(gl: &glow::Context, program: glow::Program, name: &str, v: [f32; 2]) {
+unsafe fn set_uniform_2f(gl: &glow::Context, program: glow::Program, name: &str, v: [f32; 2]) { unsafe {
     let loc = gl.get_uniform_location(program, name);
     gl.uniform_2_f32(loc.as_ref(), v[0], v[1]);
-}
+}}
 
 unsafe fn compile_program(
     gl: &glow::Context,
     vertex_src: &str,
     fragment_src: &str,
-) -> glow::Program {
+) -> glow::Program { unsafe {
     let program = gl.create_program().expect("Failed to create program");
 
     let vs = gl.create_shader(glow::VERTEX_SHADER).expect("Failed to create VS");
@@ -352,7 +352,7 @@ unsafe fn compile_program(
     gl.delete_shader(fs);
 
     program
-}
+}}
 
 /// Compute the swizzle matrix and offset vector for a given color channel selection.
 pub fn get_swizzle_mat_vec(

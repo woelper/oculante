@@ -144,7 +144,8 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
 
 #[test]
 fn test_thumbs() {
-    std::env::set_var("RUST_LOG", "debug");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
     _ = thumbs.get("res/tests/rust.png");
