@@ -43,7 +43,7 @@ impl Default for WindowSettings {
 
 /// Build window settings from the current platform and user preferences.
 pub fn build_window_settings() -> WindowSettings {
-    let icon_data: &'static [u8] = include_bytes!("../icon.ico");
+    let icon_data: &'static [u8] = include_bytes!("../res/icons/icon.ico");
 
     let mut ws = WindowSettings {
         icon_data: Some(icon_data),
