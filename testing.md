@@ -41,6 +41,8 @@
 - [ ] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 - [ ] Fit image on window resize is broken
 - [ ] Modifier keys don't work correctly in keybinds part of preferences
+- [ ] Scrolling on menu items can change window zoom
+- [ ] Animated images are broken (as of 2026-05-19)
 
 
 # Performance
