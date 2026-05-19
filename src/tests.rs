@@ -22,7 +22,10 @@ fn assert_valid_image(frame: &Frame) {
         | Frame::EditResult(img)
         | Frame::CompareResult(img, _)
         | Frame::ImageCollectionMember(img) => {
-            assert!(img.width() > 0 && img.height() > 0, "Image has zero dimensions");
+            assert!(
+                img.width() > 0 && img.height() > 0,
+                "Image has zero dimensions"
+            );
         }
         Frame::UpdateTexture => panic!("Expected an image frame, got UpdateTexture"),
     }

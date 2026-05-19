@@ -1,11 +1,11 @@
 use crate::ktx2_loader::CompressedImageFormats;
 use crate::settings::DecoderSettings;
-use crate::utils::{fit, Frame};
-use crate::{appstate::Message, ktx2_loader, FONT};
+use crate::utils::{Frame, fit};
+use crate::{FONT, appstate::Message, ktx2_loader};
 use log::{debug, error, info};
 use psd::Psd;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
@@ -20,7 +20,7 @@ use rgb::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use tiff::decoder::Limits;
 use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
@@ -482,9 +482,9 @@ pub fn open_image(
             return Ok(receiver);
         }
         "png" | "apng" => {
+            use zune_png::PngDecoder;
             use zune_png::zune_core::bytestream::ZCursor;
             use zune_png::zune_core::options::EncoderOptions;
-            use zune_png::PngDecoder;
 
             let contents = std::fs::read(&img_location)?;
             let mut decoder = PngDecoder::new(ZCursor::new(contents));
@@ -738,7 +738,9 @@ pub fn open_image(
                     return Ok(receiver);
                 }
                 Err(raw_error) => {
-                    bail!("Could not load tiff: {tiff_error}, tried as raw and still got error: {raw_error}")
+                    bail!(
+                        "Could not load tiff: {tiff_error}, tried as raw and still got error: {raw_error}"
+                    )
                 }
             },
         },
@@ -838,7 +840,10 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
         }
         tiff::decoder::DecodingResult::F16(contents) => {
             debug!("TIFF F16");
-            let values = contents.par_iter().map(|p| f32::from(*p)).collect::<Vec<_>>();
+            let values = contents
+                .par_iter()
+                .map(|p| f32::from(*p))
+                .collect::<Vec<_>>();
             autoscale(&values).par_iter().map(|x| *x as u8).collect()
         }
         tiff::decoder::DecodingResult::U32(contents) => {

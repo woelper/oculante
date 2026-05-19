@@ -4,10 +4,10 @@
 
 use crate::ui::EguiExt;
 use anyhow::Result;
+use egui::Ui;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, PngEncoder};
 use image::{DynamicImage, ImageEncoder};
-use egui::Ui;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufWriter;

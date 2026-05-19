@@ -150,10 +150,7 @@ pub fn default_shortcuts() -> Shortcuts {
     s.insert(InputEvent::ZoomFour, Shortcut::key(Num4));
     s.insert(InputEvent::ZoomFive, Shortcut::key(Num5));
     s.insert(InputEvent::LosslessRotateLeft, Shortcut::key(OpenBracket));
-    s.insert(
-        InputEvent::LosslessRotateRight,
-        Shortcut::key(CloseBracket),
-    );
+    s.insert(InputEvent::LosslessRotateRight, Shortcut::key(CloseBracket));
     s.insert(InputEvent::ZenMode, Shortcut::key(Z));
     s.insert(InputEvent::DeleteFile, Shortcut::key(Delete));
     s.insert(InputEvent::ClearImage, Shortcut::shift_key(Delete));

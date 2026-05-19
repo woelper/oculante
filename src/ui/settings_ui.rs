@@ -673,7 +673,7 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 }
 
 fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
-    use crate::shortcuts::{keypresses_as_string, Shortcut};
+    use crate::shortcuts::{Shortcut, keypresses_as_string};
 
     state.key_grab = true;
 

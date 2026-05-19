@@ -1,8 +1,8 @@
 use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
+use crate::filebrowser::BrowserDir;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
-use crate::filebrowser::BrowserDir;
 use crate::icons::*;
 use crate::utils::*;
 use egui_plot::{Line, Plot, PlotPoints};

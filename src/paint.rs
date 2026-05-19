@@ -1,5 +1,5 @@
-use image::{Pixel, Rgba, RgbaImage};
 use egui::{Color32, Pos2};
+use image::{Pixel, Rgba, RgbaImage};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};

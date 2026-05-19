@@ -130,7 +130,9 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
 
                         #[cfg(not(feature = "file_open"))]
                         if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
-                            ui.ctx().memory_mut(|w| { w.keep_popup_open(Id::new("SAVEASE")); });
+                            ui.ctx().memory_mut(|w| {
+                                w.keep_popup_open(Id::new("SAVEASE"));
+                            });
                             filebrowser::browse_modal(
                                 true,
                                 &["ase"],

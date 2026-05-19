@@ -3,8 +3,8 @@ use super::icons::*;
 use crate::appstate::OculanteState;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
-use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
+use crate::thumbnails::{THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails};
+use crate::ui::{BUTTON_HEIGHT_LARGE, EguiExt, render_file_icon};
 
 use dirs;
 use egui::{self, *};
@@ -434,7 +434,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.key_released(Key::D)) && !ui.ctx().egui_wants_keyboard_input()
+                        if ui.input(|r| r.key_released(Key::D))
+                            && !ui.ctx().egui_wants_keyboard_input()
                         {
                             settings.folder_bookmarks.remove(folder);
                         }

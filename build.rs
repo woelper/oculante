@@ -1,7 +1,7 @@
 use std::env;
+use std::fs::File;
 use std::fs::read_to_string;
 use std::fs::remove_file;
-use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
@@ -146,7 +146,9 @@ fn main() {
 
         let shortcuts = read_to_string(shortcut_file).unwrap();
         let mouse_keys = "`mouse wheel` = zoom\n\n`left mouse`,`middle mouse` = pan\n\n`ctrl + mouse wheel` = prev/next image in folder\n\n`Right mouse` pick color from image (in paint mode)\n\n";
-        let new_readme = format!("{readme_wo_keys}<summary>Default Shortcuts</summary>\n\n### Shortcuts:\n{mouse_keys}\n{shortcuts}\n</details>");
+        let new_readme = format!(
+            "{readme_wo_keys}<summary>Default Shortcuts</summary>\n\n### Shortcuts:\n{mouse_keys}\n{shortcuts}\n</details>"
+        );
         File::create("README.md")
             .unwrap()
             .write_all(new_readme.as_bytes())

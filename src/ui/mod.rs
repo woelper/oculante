@@ -23,13 +23,13 @@ pub use thumbnail_rendering::*;
 use crate::filebrowser::browse_for_image_path;
 use crate::icons::*;
 use crate::utils::*;
+use egui::{self, *};
 use epaint::TextShape;
 use image::DynamicImage;
 use log::{debug, error, info};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use mouse_position::mouse_position::Mouse;
 use nalgebra::Vector2;
-use egui::{self, *};
 use std::{f32, ops::RangeInclusive, path::Path, time::Instant};
 use strum::IntoEnumIterator;
 use text::{LayoutJob, TextWrapping};
@@ -41,13 +41,13 @@ use crate::{
     appstate::{ImageGeometry, OculanteState},
     file_encoder::FileEncoder,
     image_editing::{
-        process_pixels, Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem,
-        MeasureShape, ScaleFilter,
+        Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter,
+        process_pixels,
     },
     paint::PaintStroke,
-    settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
+    settings::{ColorTheme, PersistentSettings, VolatileSettings, set_system_theme},
     shortcuts::{key_pressed, lookup},
-    thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
+    thumbnails::{self, THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails},
 };
 
 #[cfg(feature = "turbo")]
@@ -383,7 +383,7 @@ impl EguiExt for Ui {
         self.scope(|ui| {
             let height = 7.4;
             let rounding = 6;
-            
+
             ui.style_mut().spacing.interact_size.y = 18.;
             ui.style_mut().spacing.slider_rail_height = height;
 
@@ -393,18 +393,30 @@ impl EguiExt for Ui {
             // Use fg_stroke for the rail appearance
             style.visuals.widgets.inactive.fg_stroke.width = height;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            style.visuals.widgets.inactive.corner_radius =
-                style.visuals.widgets.inactive.corner_radius.at_least(rounding);
+            style.visuals.widgets.inactive.corner_radius = style
+                .visuals
+                .widgets
+                .inactive
+                .corner_radius
+                .at_least(rounding);
 
             style.visuals.widgets.hovered.fg_stroke.width = height;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            style.visuals.widgets.hovered.corner_radius =
-                style.visuals.widgets.hovered.corner_radius.at_least(rounding);
+            style.visuals.widgets.hovered.corner_radius = style
+                .visuals
+                .widgets
+                .hovered
+                .corner_radius
+                .at_least(rounding);
 
             style.visuals.widgets.active.fg_stroke.width = height;
             style.visuals.widgets.active.fg_stroke.color = color;
-            style.visuals.widgets.active.corner_radius =
-                style.visuals.widgets.active.corner_radius.at_least(rounding);
+            style.visuals.widgets.active.corner_radius = style
+                .visuals
+                .widgets
+                .active
+                .corner_radius
+                .at_least(rounding);
 
             ui.horizontal(|ui| {
                 let r = ui.add(
@@ -417,7 +429,9 @@ impl EguiExt for Ui {
                 ui.allocate_ui_with_layout(
                     egui::vec2(40.0, ui.available_height()),
                     egui::Layout::right_to_left(egui::Align::Center),
-                    |ui| { ui.monospace(format!("{:.0}", value.to_f64())); },
+                    |ui| {
+                        ui.monospace(format!("{:.0}", value.to_f64()));
+                    },
                 );
                 r
             })
@@ -720,18 +734,25 @@ pub fn drag_area(ui: &mut Ui, state: &mut OculanteState) {
                         Some(o) => o,
                         None => {
                             // Get window position from viewport info
-                            let window_pos = ui.ctx().input(|i| {
-                                i.viewport().outer_rect.map(|r| (r.left() as i32, r.top() as i32))
-                            }).unwrap_or((0, 0));
+                            let window_pos = ui
+                                .ctx()
+                                .input(|i| {
+                                    i.viewport()
+                                        .outer_rect
+                                        .map(|r| (r.left() as i32, r.top() as i32))
+                                })
+                                .unwrap_or((0, 0));
                             let offset = (window_pos.0 - x, window_pos.1 - y);
                             ui.ctx()
                                 .memory_mut(|w| w.data.insert_temp(Id::new("offset"), offset));
                             offset
                         }
                     };
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::OuterPosition(
-                        egui::pos2((x + offset.0) as f32, (y + offset.1) as f32),
-                    ));
+                    ui.ctx()
+                        .send_viewport_cmd(egui::ViewportCommand::OuterPosition(egui::pos2(
+                            (x + offset.0) as f32,
+                            (y + offset.1) as f32,
+                        )));
                 }
                 Mouse::Error => error!("Error getting mouse position"),
             }
@@ -903,7 +924,9 @@ impl Modal {
         if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
             return;
         }
-        self.ctx.memory_mut(|w| { w.keep_popup_open(self.id.clone().into()); });
+        self.ctx.memory_mut(|w| {
+            w.keep_popup_open(self.id.clone().into());
+        });
         egui::Modal::new("m".into()).show(&self.ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical_centered_justified(|ui| {
@@ -927,11 +950,13 @@ impl Modal {
                             warn_color.linear_multiply(0.8);
                         if ui.styled_button("Yes").clicked() {
                             ui.scope(add_contents);
-                            self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
+                            self.ctx
+                                .memory_mut(|w| w.close_popup(self.id.clone().into()));
                         }
                     });
                     if ui.styled_button("Cancel").clicked() {
-                        self.ctx.memory_mut(|w| w.close_popup(self.id.clone().into()));
+                        self.ctx
+                            .memory_mut(|w| w.close_popup(self.id.clone().into()));
                     }
                 });
             });

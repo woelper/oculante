@@ -1062,7 +1062,7 @@ pub fn ktx2_dfd_to_texture_format(
                         return Err(TextureError::UnsupportedTextureFormat(format!(
                             "Invalid ETC2 sample channel type: {}",
                             sample.channel_type
-                        )))
+                        )));
                     }
                 }
             }
@@ -1124,7 +1124,7 @@ pub fn ktx2_dfd_to_texture_format(
                     return Err(TextureError::UnsupportedTextureFormat(format!(
                         "Invalid ASTC dimension: {} x {}",
                         d.0, d.1
-                    )))
+                    )));
                 }
             },
             channel: if is_srgb {
@@ -1159,7 +1159,7 @@ pub fn ktx2_dfd_to_texture_format(
                     channel_type => {
                         return Err(TextureError::UnsupportedTextureFormat(format!(
                             "Invalid KTX2 UASTC channel type: {channel_type}",
-                        )))
+                        )));
                     }
                 }),
             ));
@@ -1469,7 +1469,7 @@ pub fn ktx2_format_to_texture_format(
         _ => {
             return Err(TextureError::UnsupportedTextureFormat(format!(
                 "{ktx2_format:?}"
-            )))
+            )));
         }
     })
 }

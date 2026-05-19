@@ -2,7 +2,7 @@ use arboard::Clipboard;
 
 use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error, info};
-use nalgebra::{clamp, Vector2};
+use nalgebra::{Vector2, clamp};
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
 use crate::settings::DecoderSettings;
-use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::shortcuts::{InputEvent, Shortcuts, lookup};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -607,9 +607,7 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
 }
 
 pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
-    let fullscreen = ctx
-        .input(|i| i.viewport().fullscreen)
-        .unwrap_or(false);
+    let fullscreen = ctx.input(|i| i.viewport().fullscreen).unwrap_or(false);
 
     if !fullscreen {
         // Entering fullscreen: offset image by window position so the pixel

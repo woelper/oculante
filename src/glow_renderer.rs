@@ -151,10 +151,26 @@ impl GlowRenderer {
                 glow::NEAREST
             };
 
-            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, min_filter as i32);
-            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, mag_filter as i32);
-            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::CLAMP_TO_EDGE as i32);
-            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::CLAMP_TO_EDGE as i32);
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                min_filter as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                mag_filter as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_S,
+                glow::CLAMP_TO_EDGE as i32,
+            );
+            gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_WRAP_T,
+                glow::CLAMP_TO_EDGE as i32,
+            );
 
             if mipmaps {
                 gl.generate_mipmap(glow::TEXTURE_2D);
@@ -172,12 +188,7 @@ impl GlowRenderer {
     }
 
     /// Update an existing texture's data (must be same dimensions and format).
-    pub fn update_texture(
-        &self,
-        gl: &glow::Context,
-        tex: &GlowTexture,
-        bytes: &[u8],
-    ) {
+    pub fn update_texture(&self, gl: &glow::Context, tex: &GlowTexture, bytes: &[u8]) {
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
             let (_internal, fmt, typ) = gl_format(tex.format);
@@ -313,52 +324,57 @@ fn gl_format(format: TexFormat) -> (u32, u32, u32) {
     }
 }
 
-unsafe fn set_uniform_2f(gl: &glow::Context, program: glow::Program, name: &str, v: [f32; 2]) { unsafe {
-    let loc = gl.get_uniform_location(program, name);
-    gl.uniform_2_f32(loc.as_ref(), v[0], v[1]);
-}}
+unsafe fn set_uniform_2f(gl: &glow::Context, program: glow::Program, name: &str, v: [f32; 2]) {
+    unsafe {
+        let loc = gl.get_uniform_location(program, name);
+        gl.uniform_2_f32(loc.as_ref(), v[0], v[1]);
+    }
+}
 
 unsafe fn compile_program(
     gl: &glow::Context,
     vertex_src: &str,
     fragment_src: &str,
-) -> glow::Program { unsafe {
-    let program = gl.create_program().expect("Failed to create program");
+) -> glow::Program {
+    unsafe {
+        let program = gl.create_program().expect("Failed to create program");
 
-    let vs = gl.create_shader(glow::VERTEX_SHADER).expect("Failed to create VS");
-    gl.shader_source(vs, vertex_src);
-    gl.compile_shader(vs);
-    if !gl.get_shader_compile_status(vs) {
-        panic!("Vertex shader error: {}", gl.get_shader_info_log(vs));
+        let vs = gl
+            .create_shader(glow::VERTEX_SHADER)
+            .expect("Failed to create VS");
+        gl.shader_source(vs, vertex_src);
+        gl.compile_shader(vs);
+        if !gl.get_shader_compile_status(vs) {
+            panic!("Vertex shader error: {}", gl.get_shader_info_log(vs));
+        }
+
+        let fs = gl
+            .create_shader(glow::FRAGMENT_SHADER)
+            .expect("Failed to create FS");
+        gl.shader_source(fs, fragment_src);
+        gl.compile_shader(fs);
+        if !gl.get_shader_compile_status(fs) {
+            panic!("Fragment shader error: {}", gl.get_shader_info_log(fs));
+        }
+
+        gl.attach_shader(program, vs);
+        gl.attach_shader(program, fs);
+        gl.link_program(program);
+        if !gl.get_program_link_status(program) {
+            panic!("Program link error: {}", gl.get_program_info_log(program));
+        }
+
+        gl.detach_shader(program, vs);
+        gl.detach_shader(program, fs);
+        gl.delete_shader(vs);
+        gl.delete_shader(fs);
+
+        program
     }
-
-    let fs = gl.create_shader(glow::FRAGMENT_SHADER).expect("Failed to create FS");
-    gl.shader_source(fs, fragment_src);
-    gl.compile_shader(fs);
-    if !gl.get_shader_compile_status(fs) {
-        panic!("Fragment shader error: {}", gl.get_shader_info_log(fs));
-    }
-
-    gl.attach_shader(program, vs);
-    gl.attach_shader(program, fs);
-    gl.link_program(program);
-    if !gl.get_program_link_status(program) {
-        panic!("Program link error: {}", gl.get_program_info_log(program));
-    }
-
-    gl.detach_shader(program, vs);
-    gl.detach_shader(program, fs);
-    gl.delete_shader(vs);
-    gl.delete_shader(fs);
-
-    program
-}}
+}
 
 /// Compute the swizzle matrix and offset vector for a given color channel selection.
-pub fn get_swizzle_mat_vec(
-    channel: ColorChannel,
-    image_color: image::ColorType,
-) -> (Mat4, Vec4) {
+pub fn get_swizzle_mat_vec(channel: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
     if image_color == image::ColorType::L8 || image_color == image::ColorType::L16 {
         get_swizzle_gray(channel)
     } else {

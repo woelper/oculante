@@ -1,7 +1,7 @@
 use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
-use anyhow::{anyhow, Result};
-use log::{debug, info, trace};
+use anyhow::{Result, anyhow};
 use egui::{Context, Visuals};
+use log::{debug, info, trace};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "heif")]
@@ -13,7 +13,7 @@ use libheif_rs::SecurityLimits;
 use std::{
     collections::{BTreeSet, HashSet, VecDeque},
     fmt::{self, Display, Formatter},
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     path::PathBuf,
 };
 

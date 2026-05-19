@@ -4,15 +4,15 @@ pub const MAX_THREADS: usize = 4;
 
 use std::{
     collections::HashSet,
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
-use image::{imageops, DynamicImage, GenericImageView};
+use anyhow::{Context, Result, anyhow, bail};
+use image::{DynamicImage, GenericImageView, imageops};
 use log::{debug, error, trace, warn};
 
 use crate::image_loader::open_image;

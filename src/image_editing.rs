@@ -9,20 +9,20 @@ use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use egui::epaint::PathShape;
 use egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke,
-    StrokeKind, Ui, Vec2,
+    self, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke, StrokeKind,
+    Ui, Vec2, lerp, vec2,
 };
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
+use image::{ColorType, DynamicImage, Rgba, RgbaImage, imageops};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
 use num_integer::gcd;
-use palette::{rgb::Rgb, Hsl, IntoColor};
+use palette::{Hsl, IntoColor, rgb::Rgb};
 use rand::RngExt;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
@@ -1269,9 +1269,14 @@ impl ImageOperation {
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else { match image::open(lut_name) { Ok(lut_img) => {
-                            correct_image(&mut external_image, &lut_img.to_rgb8());
-                        } _ => {}}}
+                        } else {
+                            match image::open(lut_name) {
+                                Ok(lut_img) => {
+                                    correct_image(&mut external_image, &lut_img.to_rgb8());
+                                }
+                                _ => {}
+                            }
+                        }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
                     Self::Crop(dim) => {

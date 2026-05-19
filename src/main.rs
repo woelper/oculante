@@ -1,11 +1,11 @@
 #![windows_subsystem = "windows"]
 
 use std::path::PathBuf;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 use clap::{Arg, Command};
 use env_logger::Builder;
-use log::{error, LevelFilter};
+use log::{LevelFilter, error};
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
