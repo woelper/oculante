@@ -236,8 +236,8 @@ impl OculanteApp {
         self.image_tiles.clear();
 
         let max = self.max_texture_size;
-        let cols = (w + max - 1) / max;
-        let rows = (h + max - 1) / max;
+        let cols = w.div_ceil(max);
+        let rows = h.div_ceil(max);
 
         if cols == 1 && rows == 1 {
             // Single tile: move pixels directly, no copy
@@ -435,8 +435,8 @@ impl OculanteApp {
                 }
 
                 // Update recent images
-                if let Some(path) = &self.state.current_path {
-                    if self.state.persistent_settings.max_recents > 0
+                if let Some(path) = &self.state.current_path
+                    && self.state.persistent_settings.max_recents > 0
                         && !self.state.volatile_settings.recent_images.contains(path)
                     {
                         self.state
@@ -448,7 +448,6 @@ impl OculanteApp {
                             .recent_images
                             .truncate(self.state.persistent_settings.max_recents.into());
                     }
-                }
             }
 
             // Clear metadata and edit state for non-animation frames
@@ -473,11 +472,10 @@ impl OculanteApp {
                     debug!("Received image {}x{}", img.width(), img.height());
 
                     // Insert into cache for fast back/forth navigation
-                    if self.state.persistent_settings.max_cache != 0 {
-                        if let Some(p) = self.state.current_path.clone() {
+                    if self.state.persistent_settings.max_cache != 0
+                        && let Some(p) = self.state.current_path.clone() {
                             self.state.player.cache.insert(&p, img.clone());
                         }
-                    }
 
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
@@ -673,9 +671,9 @@ impl eframe::App for OculanteApp {
         // File drop
         ctx.input(|i| {
             for file in &i.raw.dropped_files {
-                if let Some(path) = &file.path {
-                    if let Some(ext) = path.extension() {
-                        if SUPPORTED_EXTENSIONS
+                if let Some(path) = &file.path
+                    && let Some(ext) = path.extension()
+                        && SUPPORTED_EXTENSIONS
                             .contains(&ext.to_string_lossy().to_lowercase().as_str())
                         {
                             self.state.is_loaded = false;
@@ -683,8 +681,6 @@ impl eframe::App for OculanteApp {
                             self.state.player.load(path);
                             self.state.current_path = Some(path.clone());
                         }
-                    }
-                }
             }
         });
 
@@ -806,8 +802,8 @@ impl eframe::App for OculanteApp {
         state.key_grab = ctx.egui_wants_keyboard_input();
 
         // Reset image to fit window
-        if state.reset_image {
-            if let Some(current_image) = &state.current_image {
+        if state.reset_image
+            && let Some(current_image) = &state.current_image {
                 let draw_area = ctx.content_rect();
                 let window_size = Vector2::new(draw_area.width(), draw_area.height());
                 let img_size = current_image.size_vec();
@@ -824,7 +820,6 @@ impl eframe::App for OculanteApp {
                 state.reset_image = false;
                 ctx.request_repaint();
             }
-        }
 
         // Settings (last — blocks keyboard for hotkey assignment)
         settings_ui(ctx, state);
@@ -929,12 +924,11 @@ impl eframe::App for OculanteApp {
             if key_pressed(ctx, state, PanDown) {
                 state.image_geometry.offset.y -= pan_delta;
             }
-            if key_pressed(ctx, state, Copy) {
-                if let Some(img) = &state.current_image {
+            if key_pressed(ctx, state, Copy)
+                && let Some(img) = &state.current_image {
                     clipboard_copy(img);
                     state.send_message_info("Image copied");
                 }
-            }
             if key_pressed(ctx, state, Paste) {
                 match clipboard_to_image() {
                     Ok(img) => {
@@ -970,29 +964,25 @@ impl eframe::App for OculanteApp {
                 }
             }
             #[cfg(feature = "turbo")]
-            if key_pressed(ctx, state, LosslessRotateRight) {
-                if let Some(p) = &state.current_path {
-                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
+            if key_pressed(ctx, state, LosslessRotateRight)
+                && let Some(p) = &state.current_path
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
                         .is_ok()
                     {
                         state.is_loaded = false;
                         state.player.cache.clear();
                         state.player.load(p);
                     }
-                }
-            }
             #[cfg(feature = "turbo")]
-            if key_pressed(ctx, state, LosslessRotateLeft) {
-                if let Some(p) = &state.current_path {
-                    if lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
+            if key_pressed(ctx, state, LosslessRotateLeft)
+                && let Some(p) = &state.current_path
+                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
                         .is_ok()
                     {
                         state.is_loaded = false;
                         state.player.cache.clear();
                         state.player.load(p);
                     }
-                }
-            }
         }
 
         // ===== IMAGE RENDERING =====
@@ -1010,8 +1000,8 @@ impl eframe::App for OculanteApp {
                     let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
 
                     // Draw checker background for transparency (single textured quad per tile)
-                    if self.state.persistent_settings.show_checker_background {
-                        if let Some(checker) = &self.checker_texture {
+                    if self.state.persistent_settings.show_checker_background
+                        && let Some(checker) = &self.checker_texture {
                             // The checker texture tiles via wrap_mode = Repeat.
                             // UV is scaled so the pattern stays a fixed screen size.
                             let checker_px = checker.size()[0] as f32;
@@ -1040,7 +1030,6 @@ impl eframe::App for OculanteApp {
                                 }
                             }
                         }
-                    }
 
                     for rep_y in 0..tiling {
                         for rep_x in 0..tiling {

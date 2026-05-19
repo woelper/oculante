@@ -702,7 +702,7 @@ impl ImageOperation {
 
                     // Make sure points are monotonic ascending by position
 
-                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+                    pts.sort_by_key(|a| a.pos);
 
                     response
                 })
@@ -1241,8 +1241,8 @@ impl ImageOperation {
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
-                    Self::Blur(amt) => {
-                        if *amt != 0 {
+                    Self::Blur(amt)
+                        if *amt != 0 => {
                             let i = img.clone();
                             let mut data = i.into_raw();
                             libblur::stack_blur(
@@ -1258,7 +1258,6 @@ impl ImageOperation {
                             *img = RgbaImage::from_raw(img.width(), img.height(), data)
                                 .context("Can't construct image from blur result")?;
                         }
-                    }
                     Self::Filter3x3(amt) => {
                         let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
                         *img = imageops::filter3x3(img, &kernel);
@@ -1270,24 +1269,20 @@ impl ImageOperation {
                             let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
                         } else {
-                            match image::open(lut_name) {
-                                Ok(lut_img) => {
-                                    correct_image(&mut external_image, &lut_img.to_rgb8());
-                                }
-                                _ => {}
+                            if let Ok(lut_img) = image::open(lut_name) {
+                                correct_image(&mut external_image, &lut_img.to_rgb8());
                             }
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
-                    Self::Crop(dim) => {
-                        if *dim != [0, 0, 0, 0] {
+                    Self::Crop(dim)
+                        if *dim != [0, 0, 0, 0] => {
                             let window = cropped_range(dim, &(img.width(), img.height()));
                             let sub_img = image::imageops::crop_imm(
                                 img, window[0], window[1], window[2], window[3],
                             );
                             *img = sub_img.to_image();
                         }
-                    }
                     Self::CropPerspective { points, .. } => {
                         let img_dim = img.dimensions();
 
@@ -1333,8 +1328,8 @@ impl ImageOperation {
                     }
                     Self::Resize {
                         dimensions, filter, ..
-                    } => {
-                        if *dimensions != Default::default() {
+                    }
+                        if *dimensions != Default::default() => {
                             let filter = match filter {
                                 ScaleFilter::Box => fr::FilterType::Box,
                                 ScaleFilter::Bilinear => fr::FilterType::Bilinear,
@@ -1379,7 +1374,6 @@ impl ImageOperation {
                                 "Can't create RgbaImage",
                             )?;
                         }
-                    }
                     Self::Rotate(angle) => match angle {
                         90 => *img = image::imageops::rotate90(img),
                         -90 => *img = image::imageops::rotate270(img),
@@ -1584,26 +1578,22 @@ impl ImageOperation {
                 }?;
 
                 if eval_empty_with_context_mut(expr, &mut context).is_ok() {
-                    if let Some(r) = context.get_value("r") {
-                        if let Ok(r) = r.as_float() {
+                    if let Some(r) = context.get_value("r")
+                        && let Ok(r) = r.as_float() {
                             p[0] = r as f32
                         }
-                    }
-                    if let Some(g) = context.get_value("g") {
-                        if let Ok(g) = g.as_float() {
+                    if let Some(g) = context.get_value("g")
+                        && let Ok(g) = g.as_float() {
                             p[1] = g as f32
                         }
-                    }
-                    if let Some(b) = context.get_value("b") {
-                        if let Ok(b) = b.as_float() {
+                    if let Some(b) = context.get_value("b")
+                        && let Ok(b) = b.as_float() {
                             p[2] = b as f32
                         }
-                    }
-                    if let Some(a) = context.get_value("a") {
-                        if let Ok(a) = a.as_float() {
+                    if let Some(a) = context.get_value("a")
+                        && let Ok(a) = a.as_float() {
                             p[3] = a as f32
                         }
-                    }
                 }
             }
             Self::Posterize(levels) => {

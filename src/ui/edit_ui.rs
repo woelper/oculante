@@ -174,9 +174,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
 
-                    if ctx.input(|i|i.pointer.secondary_down()) {
-                        if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
+                    if ctx.input(|i|i.pointer.secondary_down())
+                        && let Some(stroke) = state.edit_state.paint_strokes.last_mut()
+                            && let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -185,8 +185,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                                 ];
                                 // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
                             }
-                        }
-                    }
 
                     if ui
                         .add(
@@ -209,8 +207,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                         .on_hover_text("Keeps all paint history and allows edits to it. Slower.");
                     ui.end_row();
 
-                    if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                        if stroke.is_empty() {
+                    if let Some(stroke) = state.edit_state.paint_strokes.last_mut()
+                        && stroke.is_empty() {
                             ui.label("Color");
                             ui.label("Fade");
                             ui.label("Flip");
@@ -220,7 +218,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
                             stroke_ui(stroke, &state.edit_state.brushes, ui);
                         }
-                    }
                 });
 
                 if state
@@ -356,15 +353,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                     .button("Apply all edits")
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
-                {
-                    if let Some(img) = &mut state.current_image {
+                    && let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result_pixel_op.clone();
                         state.edit_state = Default::default();
                         // state.dimensions = img.dimensions();
                         pixels_changed = true;
                         image_changed = true;
                     }
-                }
 
                 if ui.button("Remove all edits").clicked() {
                     state.edit_state = Default::default();
@@ -374,8 +369,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
 
             ui.vertical_centered_justified(|ui| {
-                if let Some(path) = &state.current_path {
-                    if ui
+                if let Some(path) = &state.current_path
+                    && ui
                         .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
@@ -384,7 +379,6 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                         state.player.cache.clear();
                         state.player.load(path);
                     }
-                }
 
 
                 #[cfg(feature = "turbo")]
@@ -494,18 +488,15 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                         }
                     }
 
-                    if ui.button("Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
-                        if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
+                    if ui.button("Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked()
+                        && let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
-                    }
-                    if ui.button("Save directory edits").on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
-                        if let Some(parent) = p.parent() {
-                            if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
+                    if ui.button("Save directory edits").on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked()
+                        && let Some(parent) = p.parent()
+                            && let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                             }
-                        }
-                    }
                 }
             });
         });
@@ -520,12 +511,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
             }
         }
 
-        if let Some(img) = &state.current_image {
-            if img.color() != ColorType::Rgba8 {
+        if let Some(img) = &state.current_image
+            && img.color() != ColorType::Rgba8 {
                 ui.add_space(10.);
                 ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
             }
-        }
 
         #[cfg(debug_assertions)]
         {
@@ -595,15 +585,13 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed {
-                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                    if !stroke.committed
+                        && let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
                             stroke.render(
                                 compatible_buffer,
                                 &state.edit_state.brushes,
                             );
                         }
-
-                    }
                 }
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
@@ -858,11 +846,10 @@ fn modifier_stack_ui(
         stack.remove(delete);
     }
 
-    if let Some(swap) = swap {
-        if swap.1 < stack.len() {
+    if let Some(swap) = swap
+        && swap.1 < stack.len() {
             stack.swap(swap.0, swap.1);
         }
-    }
 }
 
 /// A ui for lossless JPEG editing
@@ -948,8 +935,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                         .on_hover_text("Crop according to values defined in the operator stack above")
                         .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
                         .clicked()
-                    {
-                        if let ImageOperation::Crop(amt) = crop {
+                        && let ImageOperation::Crop(amt) = crop {
                                 debug!("CROP {:?}", amt);
 
                                 let dim = state
@@ -975,8 +961,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                                     Ok(_) => reload = true,
                                     Err(e) => log::warn!("{e}"),
                                 };
-                            }
-                        };
+                            };
                     });
                 });
 

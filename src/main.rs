@@ -114,8 +114,8 @@ fn main() -> eframe::Result<()> {
     if matches.contains_id("stdin") {
         use std::io::Read;
         let mut input = vec![];
-        if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input) {
-            if bytes_read > 0 {
+        if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input)
+            && bytes_read > 0 {
                 match image::load_from_memory(&input) {
                     Ok(i) => {
                         let _ = state.texture_channel.0.send(Frame::new_reset(i));
@@ -123,17 +123,15 @@ fn main() -> eframe::Result<()> {
                     Err(e) => error!("Error loading from stdin: {e}"),
                 }
             }
-        }
     }
 
-    if let Some(port) = matches.value_of("l") {
-        if let Ok(p) = port.parse::<i32>() {
+    if let Some(port) = matches.value_of("l")
+        && let Ok(p) = port.parse::<i32>() {
             state.send_message_info(&format!("Listening on {p}"));
             oculante::net::recv(p, state.texture_channel.0.clone());
             state.current_path = Some(PathBuf::from(format!("network port {p}")));
             state.network_mode = true;
         }
-    }
 
     #[cfg(target_os = "macos")]
     {

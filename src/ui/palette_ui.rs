@@ -167,8 +167,8 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                 } else {
                     ui.label("Right click to sample color");
                 }
-                if let Some(img) = &state.current_image {
-                    if ui.button("From image").clicked() {
+                if let Some(img) = &state.current_image
+                    && ui.button("From image").clicked() {
                         ui.ctx()
                             .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
@@ -191,7 +191,6 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                             }
                         }
                     }
-                }
                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) && !state.pointer_over_ui {
                     ui.ctx().memory_mut(|w| {
                         let cols = w

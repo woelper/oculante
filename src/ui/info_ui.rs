@@ -35,15 +35,14 @@ pub fn info_ui(
         };
 
         // don't do this every frame for performance reasons
-        if ctx.cumulative_pass_nr() % 5 == 0 {
-            if let Some(p) = get_pixel_checked(
+        if ctx.cumulative_pass_nr().is_multiple_of(5)
+            && let Some(p) = get_pixel_checked(
                 img,
                 state.cursor_relative.x as u32,
                 state.cursor_relative.y as u32,
             ) {
                 state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
             }
-        }
     }
 
     egui::Panel::left("info")
@@ -186,12 +185,11 @@ pub fn info_ui(
                             }
 
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
-                                && state.is_loaded && !state.reset_image {
-                                    if let Some(path) = &state.current_path {
+                                && state.is_loaded && !state.reset_image
+                                    && let Some(path) = &state.current_path {
                                         state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
-                                }
 
                             let mut to_remove = None;
                             for CompareItem {path, geometry} in state.compare_list.iter() {

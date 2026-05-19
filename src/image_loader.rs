@@ -30,7 +30,7 @@ use zune_png::zune_core::result::DecodingResult;
 pub fn open_image(
     img_location: &Path,
     message_sender: Option<Sender<Message>>,
-    decoder_opts: Option<DecoderSettings>,
+    _decoder_opts: Option<DecoderSettings>,
 ) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();

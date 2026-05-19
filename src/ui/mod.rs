@@ -504,18 +504,16 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
     }
 
     // 1) Check for icon at the front
-    if let Some((candidate, remainder)) = trimmed.split_once(' ') {
-        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
+    if let Some((candidate, remainder)) = trimmed.split_once(' ')
+        && candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
-    }
 
     // 2) Check for icon at the end
-    if let Some((remainder, candidate)) = trimmed.rsplit_once(' ') {
-        if candidate.graphemes(true).count() == 1 && is_icon(candidate) {
+    if let Some((remainder, candidate)) = trimmed.rsplit_once(' ')
+        && candidate.graphemes(true).count() == 1 && is_icon(candidate) {
             return (Some(candidate.to_owned()), remainder.to_owned());
         }
-    }
 
     // 3) No icon found
     (None, trimmed.to_owned())
