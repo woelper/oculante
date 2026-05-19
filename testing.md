@@ -57,6 +57,7 @@
 - [ ] Update macOS plist
 - [ ] See if we can replace or drop fruitbasket
 - [x] Move test files to res/tests
+- [x] Update to Rust 2024
 
 
 
