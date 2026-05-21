@@ -122,7 +122,7 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    if let Some(port) = matches.get_one::<String>("l").map(|s| s.as_str())
+    if let Some(port) = matches.get_one::<&str>("l")
         && let Ok(p) = port.parse::<i32>()
     {
         state.send_message_info(&format!("Listening on {p}"));
