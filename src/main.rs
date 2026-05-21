@@ -31,25 +31,25 @@ fn main() -> eframe::Result<()> {
         .arg(
             Arg::new("INPUT")
                 .help("Display this image")
-                .multiple_values(true),
+                .num_args(1..),
         )
         .arg(
             Arg::new("l")
                 .short('l')
                 .help("Listen on port")
-                .takes_value(true),
+                .num_args(1..),
         )
         .arg(
             Arg::new("stdin")
                 .short('s')
                 .id("stdin")
-                .takes_value(false)
+                .action(clap::ArgAction::SetTrue)
                 .help("Load data from STDIN"),
         )
         .arg(
             Arg::new("chainload")
                 .required(false)
-                .takes_value(false)
+                .action(clap::ArgAction::SetTrue)
                 .short('c')
                 .help("Chainload on Mac"),
         )
@@ -111,7 +111,7 @@ fn main() -> eframe::Result<()> {
         state.scrubber.wrap = state.persistent_settings.wrap_folder;
     }
 
-    if matches.contains_id("stdin") {
+    if matches.get_flag("stdin") {
         use std::io::Read;
         let mut input = vec![];
         if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input)
@@ -125,7 +125,7 @@ fn main() -> eframe::Result<()> {
             }
     }
 
-    if let Some(port) = matches.value_of("l")
+    if let Some(port) = matches.get_one::<String>("l").map(|s| s.as_str())
         && let Ok(p) = port.parse::<i32>() {
             state.send_message_info(&format!("Listening on {p}"));
             oculante::net::recv(p, state.texture_channel.0.clone());

@@ -33,7 +33,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
         .arg(
             Arg::new("chainload")
                 .required(false)
-                .takes_value(false)
+                .action(clap::ArgAction::SetTrue)
                 .short('c')
                 .help("Chainload on Mac"),
         )
@@ -42,7 +42,7 @@ pub fn launch() -> Result<(), Box<dyn Error>> {
     debug!("Completed argument parsing.");
     let maybe_img_location = matches.get_one::<String>("INPUT").map(PathBuf::from);
 
-    if !matches.is_present("chainload") && maybe_img_location.is_none() {
+    if !matches.get_flag("chainload") && maybe_img_location.is_none() {
         info!("Chainload not specified, and no input file present. Invoking mac hack.");
     } else {
         return Ok(());
