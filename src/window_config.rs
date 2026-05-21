@@ -58,10 +58,11 @@ pub fn build_window_settings() -> WindowSettings {
 
     // Apply saved window geometry
     if let Ok(volatile_settings) = crate::settings::VolatileSettings::load()
-        && volatile_settings.window_geometry != Default::default() {
-            ws.width = volatile_settings.window_geometry.1.0;
-            ws.height = volatile_settings.window_geometry.1.1;
-        }
+        && volatile_settings.window_geometry != Default::default()
+    {
+        ws.width = volatile_settings.window_geometry.1.0;
+        ws.height = volatile_settings.window_geometry.1.1;
+    }
 
     // Apply persistent settings
     if let Ok(settings) = crate::settings::PersistentSettings::load() {

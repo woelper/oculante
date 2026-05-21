@@ -373,10 +373,10 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
                     || copy_pressed)
-                {
-                    clipboard_copy(img);
-                    ui.close();
-                }
+            {
+                clipboard_copy(img);
+                ui.close();
+            }
 
             if ui
                 .styled_button(format!("{CLIPBOARD} Paste"))

@@ -847,9 +847,10 @@ fn modifier_stack_ui(
     }
 
     if let Some(swap) = swap
-        && swap.1 < stack.len() {
-            stack.swap(swap.0, swap.1);
-        }
+        && swap.1 < stack.len()
+    {
+        stack.swap(swap.0, swap.1);
+    }
 }
 
 /// A ui for lossless JPEG editing

@@ -437,17 +437,17 @@ impl OculanteApp {
                 // Update recent images
                 if let Some(path) = &self.state.current_path
                     && self.state.persistent_settings.max_recents > 0
-                        && !self.state.volatile_settings.recent_images.contains(path)
-                    {
-                        self.state
-                            .volatile_settings
-                            .recent_images
-                            .push_front(path.clone());
-                        self.state
-                            .volatile_settings
-                            .recent_images
-                            .truncate(self.state.persistent_settings.max_recents.into());
-                    }
+                    && !self.state.volatile_settings.recent_images.contains(path)
+                {
+                    self.state
+                        .volatile_settings
+                        .recent_images
+                        .push_front(path.clone());
+                    self.state
+                        .volatile_settings
+                        .recent_images
+                        .truncate(self.state.persistent_settings.max_recents.into());
+                }
             }
 
             // Clear metadata and edit state for non-animation frames
@@ -473,9 +473,10 @@ impl OculanteApp {
 
                     // Insert into cache for fast back/forth navigation
                     if self.state.persistent_settings.max_cache != 0
-                        && let Some(p) = self.state.current_path.clone() {
-                            self.state.player.cache.insert(&p, img.clone());
-                        }
+                        && let Some(p) = self.state.current_path.clone()
+                    {
+                        self.state.player.cache.insert(&p, img.clone());
+                    }
 
                     self.state.current_image = Some(img);
                     self.state.new_image_loaded = true;
@@ -673,14 +674,13 @@ impl eframe::App for OculanteApp {
             for file in &i.raw.dropped_files {
                 if let Some(path) = &file.path
                     && let Some(ext) = path.extension()
-                        && SUPPORTED_EXTENSIONS
-                            .contains(&ext.to_string_lossy().to_lowercase().as_str())
-                        {
-                            self.state.is_loaded = false;
-                            self.state.current_image = None;
-                            self.state.player.load(path);
-                            self.state.current_path = Some(path.clone());
-                        }
+                    && SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_lowercase().as_str())
+                {
+                    self.state.is_loaded = false;
+                    self.state.current_image = None;
+                    self.state.player.load(path);
+                    self.state.current_path = Some(path.clone());
+                }
             }
         });
 
@@ -803,23 +803,24 @@ impl eframe::App for OculanteApp {
 
         // Reset image to fit window
         if state.reset_image
-            && let Some(current_image) = &state.current_image {
-                let draw_area = ctx.content_rect();
-                let window_size = Vector2::new(draw_area.width(), draw_area.height());
-                let img_size = current_image.size_vec();
-                let scaled_to_fit = window_size.component_div(&img_size).amin();
-                state.image_geometry.scale = if state.persistent_settings.auto_scale {
-                    scaled_to_fit
-                } else {
-                    scaled_to_fit.min(1.0)
-                };
-                state.image_geometry.offset =
-                    window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
-                state.image_geometry.offset.x += draw_area.left();
-                state.image_geometry.offset.y += draw_area.top();
-                state.reset_image = false;
-                ctx.request_repaint();
-            }
+            && let Some(current_image) = &state.current_image
+        {
+            let draw_area = ctx.content_rect();
+            let window_size = Vector2::new(draw_area.width(), draw_area.height());
+            let img_size = current_image.size_vec();
+            let scaled_to_fit = window_size.component_div(&img_size).amin();
+            state.image_geometry.scale = if state.persistent_settings.auto_scale {
+                scaled_to_fit
+            } else {
+                scaled_to_fit.min(1.0)
+            };
+            state.image_geometry.offset =
+                window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
+            state.image_geometry.offset.x += draw_area.left();
+            state.image_geometry.offset.y += draw_area.top();
+            state.reset_image = false;
+            ctx.request_repaint();
+        }
 
         // Settings (last — blocks keyboard for hotkey assignment)
         settings_ui(ctx, state);
@@ -925,10 +926,11 @@ impl eframe::App for OculanteApp {
                 state.image_geometry.offset.y -= pan_delta;
             }
             if key_pressed(ctx, state, Copy)
-                && let Some(img) = &state.current_image {
-                    clipboard_copy(img);
-                    state.send_message_info("Image copied");
-                }
+                && let Some(img) = &state.current_image
+            {
+                clipboard_copy(img);
+                state.send_message_info("Image copied");
+            }
             if key_pressed(ctx, state, Paste) {
                 match clipboard_to_image() {
                     Ok(img) => {
@@ -966,23 +968,21 @@ impl eframe::App for OculanteApp {
             #[cfg(feature = "turbo")]
             if key_pressed(ctx, state, LosslessRotateRight)
                 && let Some(p) = &state.current_path
-                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90))
-                        .is_ok()
-                    {
-                        state.is_loaded = false;
-                        state.player.cache.clear();
-                        state.player.load(p);
-                    }
+                && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)).is_ok()
+            {
+                state.is_loaded = false;
+                state.player.cache.clear();
+                state.player.load(p);
+            }
             #[cfg(feature = "turbo")]
             if key_pressed(ctx, state, LosslessRotateLeft)
                 && let Some(p) = &state.current_path
-                    && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270))
-                        .is_ok()
-                    {
-                        state.is_loaded = false;
-                        state.player.cache.clear();
-                        state.player.load(p);
-                    }
+                && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)).is_ok()
+            {
+                state.is_loaded = false;
+                state.player.cache.clear();
+                state.player.load(p);
+            }
         }
 
         // ===== IMAGE RENDERING =====
@@ -1001,35 +1001,36 @@ impl eframe::App for OculanteApp {
 
                     // Draw checker background for transparency (single textured quad per tile)
                     if self.state.persistent_settings.show_checker_background
-                        && let Some(checker) = &self.checker_texture {
-                            // The checker texture tiles via wrap_mode = Repeat.
-                            // UV is scaled so the pattern stays a fixed screen size.
-                            let checker_px = checker.size()[0] as f32;
+                        && let Some(checker) = &self.checker_texture
+                    {
+                        // The checker texture tiles via wrap_mode = Repeat.
+                        // UV is scaled so the pattern stays a fixed screen size.
+                        let checker_px = checker.size()[0] as f32;
 
-                            for rep_y in 0..tiling {
-                                for rep_x in 0..tiling {
-                                    let base_x = offset.x + rep_x as f32 * img_w * scale;
-                                    let base_y = offset.y + rep_y as f32 * img_h * scale;
-                                    let img_rect = egui::Rect::from_min_size(
-                                        egui::pos2(base_x, base_y),
-                                        egui::vec2(img_w * scale, img_h * scale),
-                                    );
-                                    // UV repeats = image screen size / checker texture size
-                                    let repeats_x = (img_w * scale) / checker_px;
-                                    let repeats_y = (img_h * scale) / checker_px;
-                                    let checker_uv = egui::Rect::from_min_max(
-                                        egui::pos2(0.0, 0.0),
-                                        egui::pos2(repeats_x, repeats_y),
-                                    );
-                                    ui.painter().image(
-                                        checker.id(),
-                                        img_rect,
-                                        checker_uv,
-                                        egui::Color32::WHITE,
-                                    );
-                                }
+                        for rep_y in 0..tiling {
+                            for rep_x in 0..tiling {
+                                let base_x = offset.x + rep_x as f32 * img_w * scale;
+                                let base_y = offset.y + rep_y as f32 * img_h * scale;
+                                let img_rect = egui::Rect::from_min_size(
+                                    egui::pos2(base_x, base_y),
+                                    egui::vec2(img_w * scale, img_h * scale),
+                                );
+                                // UV repeats = image screen size / checker texture size
+                                let repeats_x = (img_w * scale) / checker_px;
+                                let repeats_y = (img_h * scale) / checker_px;
+                                let checker_uv = egui::Rect::from_min_max(
+                                    egui::pos2(0.0, 0.0),
+                                    egui::pos2(repeats_x, repeats_y),
+                                );
+                                ui.painter().image(
+                                    checker.id(),
+                                    img_rect,
+                                    checker_uv,
+                                    egui::Color32::WHITE,
+                                );
                             }
                         }
+                    }
 
                     for rep_y in 0..tiling {
                         for rep_x in 0..tiling {

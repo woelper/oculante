@@ -1241,23 +1241,22 @@ impl ImageOperation {
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
-                    Self::Blur(amt)
-                        if *amt != 0 => {
-                            let i = img.clone();
-                            let mut data = i.into_raw();
-                            libblur::stack_blur(
-                                data.as_mut_slice(),
-                                img.width() * 4,
-                                img.width(),
-                                img.height(),
-                                (*amt as u32).clamp(2, 254),
-                                libblur::FastBlurChannels::Channels4,
-                                libblur::ThreadingPolicy::Adaptive,
-                            );
-                            use anyhow::Context;
-                            *img = RgbaImage::from_raw(img.width(), img.height(), data)
-                                .context("Can't construct image from blur result")?;
-                        }
+                    Self::Blur(amt) if *amt != 0 => {
+                        let i = img.clone();
+                        let mut data = i.into_raw();
+                        libblur::stack_blur(
+                            data.as_mut_slice(),
+                            img.width() * 4,
+                            img.width(),
+                            img.height(),
+                            (*amt as u32).clamp(2, 254),
+                            libblur::FastBlurChannels::Channels4,
+                            libblur::ThreadingPolicy::Adaptive,
+                        );
+                        use anyhow::Context;
+                        *img = RgbaImage::from_raw(img.width(), img.height(), data)
+                            .context("Can't construct image from blur result")?;
+                    }
                     Self::Filter3x3(amt) => {
                         let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
                         *img = imageops::filter3x3(img, &kernel);
@@ -1275,14 +1274,13 @@ impl ImageOperation {
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
-                    Self::Crop(dim)
-                        if *dim != [0, 0, 0, 0] => {
-                            let window = cropped_range(dim, &(img.width(), img.height()));
-                            let sub_img = image::imageops::crop_imm(
-                                img, window[0], window[1], window[2], window[3],
-                            );
-                            *img = sub_img.to_image();
-                        }
+                    Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
+                        let window = cropped_range(dim, &(img.width(), img.height()));
+                        let sub_img = image::imageops::crop_imm(
+                            img, window[0], window[1], window[2], window[3],
+                        );
+                        *img = sub_img.to_image();
+                    }
                     Self::CropPerspective { points, .. } => {
                         let img_dim = img.dimensions();
 
@@ -1328,52 +1326,50 @@ impl ImageOperation {
                     }
                     Self::Resize {
                         dimensions, filter, ..
-                    }
-                        if *dimensions != Default::default() => {
-                            let filter = match filter {
-                                ScaleFilter::Box => fr::FilterType::Box,
-                                ScaleFilter::Bilinear => fr::FilterType::Bilinear,
-                                ScaleFilter::Hamming => fr::FilterType::Hamming,
-                                ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
-                                ScaleFilter::Mitchell => fr::FilterType::Mitchell,
-                                ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
-                            };
+                    } if *dimensions != Default::default() => {
+                        let filter = match filter {
+                            ScaleFilter::Box => fr::FilterType::Box,
+                            ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                            ScaleFilter::Hamming => fr::FilterType::Hamming,
+                            ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                            ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                            ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
+                        };
 
-                            let src_image = fr::images::Image::from_vec_u8(
-                                img.width(),
-                                img.height(),
-                                img.clone().into_raw(),
-                                fr::PixelType::U8x4,
-                            )?;
+                        let src_image = fr::images::Image::from_vec_u8(
+                            img.width(),
+                            img.height(),
+                            img.clone().into_raw(),
+                            fr::PixelType::U8x4,
+                        )?;
 
-                            // Create container for data of destination image
-                            let mut dst_image = fr::images::Image::new(
+                        // Create container for data of destination image
+                        let mut dst_image = fr::images::Image::new(
+                            dimensions.0,
+                            dimensions.1,
+                            src_image.pixel_type(),
+                        );
+
+                        let mut resizer = fr::Resizer::new();
+
+                        resizer.resize(
+                            &src_image,
+                            &mut dst_image,
+                            Some(
+                                &ResizeOptions::new()
+                                    .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                            ),
+                        )?;
+
+                        *img = anyhow::Context::context(
+                            image::RgbaImage::from_raw(
                                 dimensions.0,
                                 dimensions.1,
-                                src_image.pixel_type(),
-                            );
-
-                            let mut resizer = fr::Resizer::new();
-
-                            resizer.resize(
-                                &src_image,
-                                &mut dst_image,
-                                Some(
-                                    &ResizeOptions::new().resize_alg(
-                                        fast_image_resize::ResizeAlg::Convolution(filter),
-                                    ),
-                                ),
-                            )?;
-
-                            *img = anyhow::Context::context(
-                                image::RgbaImage::from_raw(
-                                    dimensions.0,
-                                    dimensions.1,
-                                    dst_image.into_vec(),
-                                ),
-                                "Can't create RgbaImage",
-                            )?;
-                        }
+                                dst_image.into_vec(),
+                            ),
+                            "Can't create RgbaImage",
+                        )?;
+                    }
                     Self::Rotate(angle) => match angle {
                         90 => *img = image::imageops::rotate90(img),
                         -90 => *img = image::imageops::rotate270(img),
@@ -1579,21 +1575,25 @@ impl ImageOperation {
 
                 if eval_empty_with_context_mut(expr, &mut context).is_ok() {
                     if let Some(r) = context.get_value("r")
-                        && let Ok(r) = r.as_float() {
-                            p[0] = r as f32
-                        }
+                        && let Ok(r) = r.as_float()
+                    {
+                        p[0] = r as f32
+                    }
                     if let Some(g) = context.get_value("g")
-                        && let Ok(g) = g.as_float() {
-                            p[1] = g as f32
-                        }
+                        && let Ok(g) = g.as_float()
+                    {
+                        p[1] = g as f32
+                    }
                     if let Some(b) = context.get_value("b")
-                        && let Ok(b) = b.as_float() {
-                            p[2] = b as f32
-                        }
+                        && let Ok(b) = b.as_float()
+                    {
+                        p[2] = b as f32
+                    }
                     if let Some(a) = context.get_value("a")
-                        && let Ok(a) = a.as_float() {
-                            p[3] = a as f32
-                        }
+                        && let Ok(a) = a.as_float()
+                    {
+                        p[3] = a as f32
+                    }
                 }
             }
             Self::Posterize(levels) => {

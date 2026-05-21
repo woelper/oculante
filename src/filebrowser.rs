@@ -269,10 +269,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
-            && let Some(d) = path.parent() {
-                let p = d.to_path_buf();
-                *path = p;
-            }
+            && let Some(d) = path.parent()
+        {
+            let p = d.to_path_buf();
+            *path = p;
+        }
 
         let path_icon = if state.path_active { FOLDER } else { TERMINAL };
 
@@ -371,9 +372,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Layout::top_down_justified(Align::LEFT),
             |ui| {
                 if let Some(d) = dirs::home_dir()
-                    && ui.styled_button(format!("{FOLDER} Home")).clicked() {
-                        *path = d;
-                    }
+                    && ui.styled_button(format!("{FOLDER} Home")).clicked()
+                {
+                    *path = d;
+                }
                 if let Some(drives) = state.drives.as_ref() {
                     for drive in drives {
                         if ui
@@ -388,30 +390,30 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     && ui
                         .styled_button(format!("{FOLDERDESKTOP} Desktop"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
+                }
                 if let Some(d) = dirs::document_dir()
                     && ui
                         .styled_button(format!("{FOLDERDOCUMENT} Documents"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
+                }
                 if let Some(d) = dirs::download_dir()
                     && ui
                         .styled_button(format!("{FOLDERDOWNLOAD} Downloads"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
+                }
                 if let Some(d) = dirs::picture_dir()
                     && ui
                         .styled_button(format!("{FOLDERIMAGE} Pictures"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
+                }
 
                 for folder in &settings.folder_bookmarks.clone() {
                     let res = ui.styled_button(format!(
@@ -503,9 +505,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                             let r = ui.label("Empty directory");
                                             let r = r.interact(Sense::click());
                                             if r.clicked()
-                                                && let Some(parent) = path.parent() {
-                                                    *path = parent.to_path_buf();
-                                                }
+                                                && let Some(parent) = path.parent()
+                                            {
+                                                *path = parent.to_path_buf();
+                                            }
                                         } else {
                                             // render directories
                                             for de in visible_entries.iter().filter(|e| e.is_dir())

@@ -40,9 +40,10 @@ pub fn info_ui(
                 img,
                 state.cursor_relative.x as u32,
                 state.cursor_relative.y as u32,
-            ) {
-                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-            }
+            )
+        {
+            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
+        }
     }
 
     egui::Panel::left("info")

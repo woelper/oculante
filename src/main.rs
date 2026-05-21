@@ -28,11 +28,7 @@ fn main() -> eframe::Result<()> {
 
     let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
     let mut matches = Command::new("Oculante")
-        .arg(
-            Arg::new("INPUT")
-                .help("Display this image")
-                .num_args(1..),
-        )
+        .arg(Arg::new("INPUT").help("Display this image").num_args(1..))
         .arg(
             Arg::new("l")
                 .short('l')
@@ -115,23 +111,25 @@ fn main() -> eframe::Result<()> {
         use std::io::Read;
         let mut input = vec![];
         if let Ok(bytes_read) = std::io::stdin().read_to_end(&mut input)
-            && bytes_read > 0 {
-                match image::load_from_memory(&input) {
-                    Ok(i) => {
-                        let _ = state.texture_channel.0.send(Frame::new_reset(i));
-                    }
-                    Err(e) => error!("Error loading from stdin: {e}"),
+            && bytes_read > 0
+        {
+            match image::load_from_memory(&input) {
+                Ok(i) => {
+                    let _ = state.texture_channel.0.send(Frame::new_reset(i));
                 }
+                Err(e) => error!("Error loading from stdin: {e}"),
             }
+        }
     }
 
     if let Some(port) = matches.get_one::<String>("l").map(|s| s.as_str())
-        && let Ok(p) = port.parse::<i32>() {
-            state.send_message_info(&format!("Listening on {p}"));
-            oculante::net::recv(p, state.texture_channel.0.clone());
-            state.current_path = Some(PathBuf::from(format!("network port {p}")));
-            state.network_mode = true;
-        }
+        && let Ok(p) = port.parse::<i32>()
+    {
+        state.send_message_info(&format!("Listening on {p}"));
+        oculante::net::recv(p, state.texture_channel.0.clone());
+        state.current_path = Some(PathBuf::from(format!("network port {p}")));
+        state.network_mode = true;
+    }
 
     #[cfg(target_os = "macos")]
     {

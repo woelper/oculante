@@ -168,29 +168,28 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     ui.label("Right click to sample color");
                 }
                 if let Some(img) = &state.current_image
-                    && ui.button("From image").clicked() {
-                        ui.ctx()
-                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+                    && ui.button("From image").clicked()
+                {
+                    ui.ctx()
+                        .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
-                        if let Ok(mut pipeline) =
-                            PalettePipeline::try_from(&img.clone().into_rgb8())
-                        {
-                            let palette = pipeline
-                                .palette_size(32)
-                                .colorspace(ColorSpace::Oklab)
-                                .quantize_method(quantette::KmeansOptions::new())
-                                .palette_par();
+                    if let Ok(mut pipeline) = PalettePipeline::try_from(&img.clone().into_rgb8()) {
+                        let palette = pipeline
+                            .palette_size(32)
+                            .colorspace(ColorSpace::Oklab)
+                            .quantize_method(quantette::KmeansOptions::new())
+                            .palette_par();
 
-                            for col in palette {
-                                ui.ctx().memory_mut(|w| {
-                                    let cols = w
-                                        .data
-                                        .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
-                                    cols.push([col.red, col.green, col.blue, 255]);
-                                });
-                            }
+                        for col in palette {
+                            ui.ctx().memory_mut(|w| {
+                                let cols = w
+                                    .data
+                                    .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                cols.push([col.red, col.green, col.blue, 255]);
+                            });
                         }
                     }
+                }
                 if ui.ctx().input(|r| r.pointer.secondary_clicked()) && !state.pointer_over_ui {
                     ui.ctx().memory_mut(|w| {
                         let cols = w

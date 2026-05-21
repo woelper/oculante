@@ -179,10 +179,11 @@ impl ExtendedImageInfo {
                 "PixelSpacing",
             ] {
                 if let Ok(e) = obj.element_by_name(name)
-                    && let Ok(s) = e.to_str() {
-                        info!("{name}: {s}");
-                        dicom_data.insert(name.to_string(), s.to_string());
-                    }
+                    && let Ok(s) = e.to_str()
+                {
+                    info!("{name}: {s}");
+                    dicom_data.insert(name.to_string(), s.to_string());
+                }
             }
             self.dicom = Some(DicomData {
                 physical_size: (0.0, 0.0),
@@ -297,16 +298,17 @@ impl Player {
     pub fn check_modified(&mut self, path: &Path) {
         if let Some(watched_mod) = self.watcher.get(path)
             && let Ok(meta) = std::fs::metadata(path)
-                && let Ok(modified) = meta.modified()
-                    && watched_mod != &modified {
-                        debug!(
-                            "Modified! read from meta {:?} stored: {:?}",
-                            modified, watched_mod
-                        );
+            && let Ok(modified) = meta.modified()
+            && watched_mod != &modified
+        {
+            debug!(
+                "Modified! read from meta {:?} stored: {:?}",
+                modified, watched_mod
+            );
 
-                        self.cache.data.remove(path);
-                        self.load(path);
-                    }
+            self.cache.data.remove(path);
+            self.load(path);
+        }
     }
 
     /// The main loading function of the player
@@ -341,9 +343,10 @@ impl Player {
         );
 
         if let Ok(meta) = std::fs::metadata(img_location)
-            && let Ok(modified) = meta.modified() {
-                self.watcher.insert(img_location.into(), modified);
-            }
+            && let Ok(modified) = meta.modified()
+        {
+            self.watcher.insert(img_location.into(), modified);
+        }
     }
 
     pub fn load(&mut self, img_location: &Path) {
