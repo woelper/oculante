@@ -99,14 +99,14 @@ img-parts = "0.4"                                                               
 dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
 trash = "5.2"
 flate2 = "1.1"                                                                                                           # for KTX
-bitflags = "2.11"                                                                                                         # for KTX
+bitflags = "2.13"                                                                                                         # for KTX
 wgpu = "29"                                                                                                              # for KTX
 ruzstd = "0.8"                                                                                                           # for KTX
 mouse_position = "0.1.4"
 file-format = "0.29"
 zip = "8.6"
 sysinfo = "0.39"
-unicode-segmentation = "1.13.2"
+unicode-segmentation = "1.13.3"
 font-kit = "0.14"
 open = "5.3"
 kamadak-exif = "0.6"
@@ -155,15 +155,15 @@ windres = "0.2"
 
 [build-dependencies]
 env_logger = "0.11"
-log = "0.4.29"
+log = "0.4.33"
 winres = "0.1"
-cc = "1.2.62"
+cc = "1.2.65"
 cmake = "0.1"
 
 [dev-dependencies]
 cmd_lib = "2"
 xmltree = "0.12"
-chrono = "0.4.44"
+chrono = "0.4.45"
 criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
 
 [profile.release]

@@ -333,11 +333,13 @@ impl HeifLimits {
                 .as_deref()
                 .map(|var| var.eq_ignore_ascii_case("on"))
                 .unwrap_or(self.override_all);
-            std::env::set_var(
-                "LIBHEIF_SECURITY_LIMITS",
-                if override_all { "off" } else { "on" },
-            );
 
+            unsafe {
+                std::env::set_var(
+                    "LIBHEIF_SECURITY_LIMITS",
+                    if override_all { "off" } else { "on" },
+                );
+            }
             override_all
         }))
         .then(|| self.into())
