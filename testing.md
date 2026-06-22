@@ -43,7 +43,7 @@
 - [ ] Modifier keys don't work correctly in keybinds part of preferences
 - [ ] Scrolling on menu items can change window zoom
 - [ ] Animated images are broken (as of 2026-05-19)
-- [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.1
+- [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
 
 
 # Performance
