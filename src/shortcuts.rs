@@ -39,6 +39,7 @@ pub enum InputEvent {
     LosslessRotateRight,
     LosslessRotateLeft,
     Copy,
+    CopyFilePath,
     Paste,
     Browse,
     Quit,
@@ -138,7 +139,8 @@ impl ShortcutExt for Shortcuts {
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])
             .add_keys(InputEvent::PanUp, &["LShift", "Up"])
             .add_keys(InputEvent::Paste, &["LControl", "V"])
-            .add_keys(InputEvent::Copy, &["LControl", "C"]);
+            .add_keys(InputEvent::Copy, &["LControl", "C"])
+            .add_keys(InputEvent::CopyFilePath, &["LControl", "LShift", "C"]);
         #[cfg(target_os = "macos")]
         {
             for (_, keys) in s.iter_mut() {

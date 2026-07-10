@@ -839,6 +839,12 @@ pub fn clipboard_copy(img: &DynamicImage) {
     }
 }
 
+pub fn clipboard_copy_text(text: &str) {
+    if let Ok(clipboard) = &mut Clipboard::new() {
+        let _ = clipboard.set_text(text);
+    }
+}
+
 pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
     state.is_loaded = false;
     state.player.load(p);

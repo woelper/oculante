@@ -458,6 +458,15 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
             }
 
+            if key_pressed(app, state, CopyFilePath) {
+                if let Some(p) = &state.current_path {
+                    clipboard_copy_text(&p.to_string_lossy());
+                    state.send_message_info("File path copied");
+                } else {
+                    state.send_message_warn("This image has no file path");
+                }
+            }
+
             if key_pressed(app, state, Paste) {
                 match clipboard_to_image() {
                     Ok(img) => {
@@ -1068,6 +1077,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         {
             toggle_fullscreen(app, state);
         }
+
+        image_context_menu(ctx, state);
 
         if state.new_image_loaded {
             ctx.memory_mut(|m| m.data.remove::<f64>(Id::new("resize_aspect_ratio")));

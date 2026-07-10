@@ -354,6 +354,20 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App
                 }
             }
 
+            let copy_path_pressed = key_pressed(app, state, CopyFilePath);
+            if let Some(path) = &state.current_path {
+                if ui
+                    .styled_button(format!("{FILE} Copy path"))
+                    .on_hover_text("Copy file path to clipboard")
+                    .clicked()
+                    || copy_path_pressed
+                {
+                    clipboard_copy_text(&path.to_string_lossy());
+                    state.send_message_info("File path copied");
+                    ui.close_menu();
+                }
+            }
+
             if ui
                 .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")

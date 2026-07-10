@@ -946,3 +946,81 @@ impl Modal {
             .memory_mut(|w| w.open_popup(self.id.clone().into()));
     }
 }
+
+/// Context menu shown when right-clicking the image area
+pub fn image_context_menu(ctx: &Context, state: &mut OculanteState) {
+    use crate::shortcuts::InputEvent;
+
+    let pos_id = Id::new("image_context_menu_pos");
+
+    // Open (or re-position) the menu on right click over the image area
+    if !state.pointer_over_ui
+        && !state.mouse_grab
+        && state.current_image.is_some()
+        && ctx.input(|r| r.pointer.secondary_clicked())
+    {
+        if let Some(pos) = ctx.input(|r| r.pointer.interact_pos()) {
+            ctx.data_mut(|d| d.insert_temp(pos_id, pos));
+        }
+    }
+
+    let Some(menu_pos) = ctx.data(|d| d.get_temp::<Pos2>(pos_id)) else {
+        return;
+    };
+
+    let mut close_menu = false;
+
+    let area = egui::Area::new(Id::new("image_context_menu"))
+        .order(Order::Foreground)
+        .constrain(true)
+        .fixed_pos(menu_pos)
+        .show(ctx, |ui| {
+            egui::Frame::menu(ui.style()).show(ui, |ui| {
+                ui.vertical(|ui| {
+                    if let Some(img) = &state.current_image {
+                        if ui
+                            .styled_button(format!("{COPY} Copy image"))
+                            .on_hover_text(format!(
+                                "Copy image to clipboard ({})",
+                                lookup(&state.persistent_settings.shortcuts, &InputEvent::Copy)
+                            ))
+                            .clicked()
+                        {
+                            clipboard_copy(img);
+                            state.send_message_info("Image copied");
+                            close_menu = true;
+                        }
+                    }
+
+                    if let Some(path) = &state.current_path {
+                        if ui
+                            .styled_button(format!("{FILE} Copy file path"))
+                            .on_hover_text(format!(
+                                "Copy file path to clipboard ({})",
+                                lookup(
+                                    &state.persistent_settings.shortcuts,
+                                    &InputEvent::CopyFilePath
+                                )
+                            ))
+                            .clicked()
+                        {
+                            clipboard_copy_text(&path.to_string_lossy());
+                            state.send_message_info("File path copied");
+                            close_menu = true;
+                        }
+                    }
+                });
+            });
+        });
+
+    // Close on action, click outside or escape
+    let clicked_outside = ctx.input(|r| r.pointer.any_pressed())
+        && !area
+            .response
+            .rect
+            .contains(ctx.input(|r| r.pointer.interact_pos()).unwrap_or_default());
+
+    if close_menu || clicked_outside || ctx.input(|r| r.key_pressed(Key::Escape)) {
+        ctx.data_mut(|d| d.remove::<Pos2>(pos_id));
+    }
+}
