@@ -1070,6 +1070,18 @@ impl eframe::App for OculanteApp {
                 }
             });
 
+        // Automatically hide cursor after a period of inactivity in zen mode
+        let hide_delay = self.state.persistent_settings.zen_mode_cursor_timeout;
+        if self.state.persistent_settings.zen_mode && !self.state.settings_enabled && hide_delay > 0.0
+        {
+            let idle_time = ctx.input(|i| i.pointer.time_since_last_movement());
+            if idle_time >= hide_delay && !ctx.is_pointer_over_area() {
+                ctx.set_cursor_icon(egui::CursorIcon::None);
+            } else if idle_time < hide_delay {
+                ctx.request_repaint_after(Duration::from_secs_f32(hide_delay - idle_time));
+            }
+        }
+
         // Repaint if needed
         if self.state.network_mode || self.animation_playing {
             ctx.request_repaint();

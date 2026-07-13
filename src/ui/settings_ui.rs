@@ -302,6 +302,10 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         }
                                     }, ui);
 
+                                    configuration_item_ui("Zen mode cursor timeout", "Hides the mouse cursor after this many seconds of inactivity while in zen mode. Set to 0 to disable.", |ui| {
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zen_mode_cursor_timeout).range(0.0..=15.0).speed(0.1));
+                                    }, ui);
+
 
                                     // TODO: add more options here
                                     ui.horizontal(|ui| {
