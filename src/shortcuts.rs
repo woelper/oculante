@@ -43,6 +43,7 @@ pub enum InputEvent {
     Browse,
     Quit,
     ZenMode,
+    ScrubBar,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -152,6 +153,7 @@ pub fn default_shortcuts() -> Shortcuts {
     s.insert(InputEvent::LosslessRotateLeft, Shortcut::key(OpenBracket));
     s.insert(InputEvent::LosslessRotateRight, Shortcut::key(CloseBracket));
     s.insert(InputEvent::ZenMode, Shortcut::key(Z));
+    s.insert(InputEvent::ScrubBar, Shortcut::key(S));
     s.insert(InputEvent::DeleteFile, Shortcut::key(Delete));
     s.insert(InputEvent::ClearImage, Shortcut::shift_key(Delete));
     s.insert(InputEvent::Browse, Shortcut::ctrl_key(O));

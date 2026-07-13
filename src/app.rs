@@ -849,6 +849,9 @@ impl eframe::App for OculanteApp {
             if key_pressed(ctx, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
+            if key_pressed(ctx, state, ScrubBar) {
+                state.persistent_settings.show_scrub_bar = !state.persistent_settings.show_scrub_bar;
+            }
             if key_pressed(ctx, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
                 ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(if state.always_on_top {

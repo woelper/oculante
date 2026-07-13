@@ -379,6 +379,8 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 
 <kbd>LControl</kbd> + <kbd>O</kbd> = Browse
 
+<kbd>S</kbd> = ScrubBar
+
 <kbd>Q</kbd> = Quit
 
 <kbd>Z</kbd> = ZenMode
