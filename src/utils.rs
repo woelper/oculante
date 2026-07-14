@@ -853,6 +853,24 @@ pub fn prev_image(state: &mut OculanteState) {
     }
 }
 
+// Oculante's version, in release builds it shows as a version number, in debug builds it shows dev hash
+pub fn app_version() -> String {
+    if cfg!(debug_assertions) {
+        format!("dev ({})", env!("GIT_HASH"))
+    } else {
+        env!("CARGO_PKG_VERSION").into()
+    }
+}
+
+// For debug section in preferences.
+pub fn detailed_version() -> String {
+    if cfg!(debug_assertions) {
+        app_version()
+    } else {
+        format!("{} ({})", env!("CARGO_PKG_VERSION"), env!("GIT_HASH"))
+    }
+}
+
 /// Set the window title
 pub fn set_title(ctx: &egui::Context, state: &mut OculanteState) {
     let p = state.current_path.clone().unwrap_or_default();
@@ -861,7 +879,7 @@ pub fn set_title(ctx: &egui::Context, state: &mut OculanteState) {
         .persistent_settings
         .title_format
         .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
-        .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
+        .replacen("{VERSION}", &app_version(), 10)
         .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
         .replacen(
             "{NUM}",

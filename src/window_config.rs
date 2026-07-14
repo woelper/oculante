@@ -23,7 +23,7 @@ pub struct WindowSettings {
 impl Default for WindowSettings {
     fn default() -> Self {
         Self {
-            title: format!("Oculante | {}", env!("CARGO_PKG_VERSION")),
+            title: format!("Oculante | {}", crate::utils::app_version()),
             width: 1026,
             height: 600,
             resizable: true,

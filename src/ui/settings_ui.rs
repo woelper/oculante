@@ -663,6 +663,10 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         }
 
                                     }, ui);
+
+                                    configuration_item_ui("Version", "Build version and commit hash. This is useful when reporting bugs.", |ui| {
+                                        ui.label(detailed_version());
+                                    }, ui);
                                 });
                             });
                         });

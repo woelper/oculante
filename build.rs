@@ -73,8 +73,30 @@ fn setup_heif() {
     }
 }
 
+fn git_hash() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|hash| hash.trim().to_string())
+        .filter(|hash| !hash.is_empty())
+        .unwrap_or_else(|| "unknown".into())
+}
+
 fn main() {
     println!("Build script");
+
+    // Make the current git commit available to the app, reruns whenever HEAD changes so it stays up to date.
+    println!("cargo:rustc-env=GIT_HASH={}", git_hash());
+    println!("cargo:rerun-if-changed=.git/HEAD");
+    if let Ok(head) = read_to_string(".git/HEAD")
+        && let Some(ref_path) = head.trim().strip_prefix("ref: ")
+    {
+        println!("cargo:rerun-if-changed=.git/{ref_path}");
+    }
+
     // #[cfg(windows)]
     match std::process::Command::new("convert")
         .args(vec![
