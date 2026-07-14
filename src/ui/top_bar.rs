@@ -366,8 +366,21 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                 ui.close();
             }
 
+            let shift_held = ui.input(|i| i.modifiers.shift);
             let copy_pressed = key_pressed(&ctx, state, Copy);
-            if let Some(img) = &state.current_image
+
+            if shift_held {
+                if let Some(path) = &state.current_path
+                    && ui
+                        .styled_button(format!("{FILE} Copy Path"))
+                        .on_hover_text("Copy file path to clipboard")
+                        .clicked()
+                {
+                    clipboard_copy_path(path);
+                    state.send_message_info("Path copied");
+                    ui.close();
+                }
+            } else if let Some(img) = &state.current_image
                 && (ui
                     .styled_button(format!("{COPY} Copy"))
                     .on_hover_text("Copy image to clipboard")
