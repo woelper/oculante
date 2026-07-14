@@ -44,6 +44,7 @@ pub enum InputEvent {
     Quit,
     ZenMode,
     ScrubBar,
+    CopyPath,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -68,6 +69,20 @@ impl Shortcut {
         Self {
             keys: BTreeSet::from([k]),
             modifiers,
+        }
+    }
+
+    fn ctrl_shift_key(k: Key) -> Self {
+        #[cfg(not(target_os = "macos"))]
+        let modifiers = Modifiers::CTRL;
+        #[cfg(target_os = "macos")]
+        let modifiers = Modifiers::MAC_CMD;
+        Self {
+            keys: BTreeSet::from([k]),
+            modifiers: Modifiers {
+                shift: true,
+                ..modifiers
+            },
         }
     }
 
@@ -163,6 +178,7 @@ pub fn default_shortcuts() -> Shortcuts {
     s.insert(InputEvent::PanUp, Shortcut::shift_key(ArrowUp));
     s.insert(InputEvent::Paste, Shortcut::ctrl_key(V));
     s.insert(InputEvent::Copy, Shortcut::ctrl_key(C));
+    s.insert(InputEvent::CopyPath, Shortcut::ctrl_shift_key(C));
     s
 }
 

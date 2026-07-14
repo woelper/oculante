@@ -934,6 +934,12 @@ impl eframe::App for OculanteApp {
                 clipboard_copy(img);
                 state.send_message_info("Image copied");
             }
+            if key_pressed(ctx, state, CopyPath)
+                && let Some(path) = &state.current_path
+            {
+                clipboard_copy_path(path);
+                state.send_message_info("Path copied");
+            }
             if key_pressed(ctx, state, Paste) {
                 match clipboard_to_image() {
                     Ok(img) => {

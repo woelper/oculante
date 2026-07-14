@@ -375,6 +375,8 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 
 <kbd>LControl</kbd> + <kbd>C</kbd> = Copy
 
+<kbd>LControl</kbd> + <kbd>LShift</kbd> + <kbd>C</kbd> = CopyPath
+
 <kbd>LControl</kbd> + <kbd>V</kbd> = Paste
 
 <kbd>LControl</kbd> + <kbd>O</kbd> = Browse
