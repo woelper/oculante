@@ -930,7 +930,7 @@ impl eframe::App for OculanteApp {
                 state.image_geometry.offset.y -= pan_delta;
             }
             if key_pressed(ctx, state, Copy)
-                && let Some(img) = &state.current_image
+                && let Some(img) = effective_image(state)
             {
                 clipboard_copy(img);
                 state.send_message_info("Image copied");

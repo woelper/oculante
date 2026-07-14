@@ -768,6 +768,15 @@ impl ImageExt for (u32, u32) {
     }
 }
 
+// Have user facing copy functions use this, effective_image includes image edits
+pub fn effective_image(state: &OculanteState) -> Option<&DynamicImage> {
+    if state.edit_state.result_pixel_op.width() > 0 {
+        Some(&state.edit_state.result_pixel_op)
+    } else {
+        state.current_image.as_ref()
+    }
+}
+
 pub fn clipboard_copy(img: &DynamicImage) {
     if let Ok(clipboard) = &mut Clipboard::new() {
         let _ = clipboard.set_image(arboard::ImageData {

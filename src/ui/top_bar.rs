@@ -380,7 +380,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     state.send_message_info("Path copied");
                     ui.close();
                 }
-            } else if let Some(img) = &state.current_image
+            } else if let Some(img) = effective_image(state)
                 && (ui
                     .styled_button(format!("{COPY} Copy"))
                     .on_hover_text("Copy image to clipboard")
