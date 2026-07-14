@@ -850,7 +850,8 @@ impl eframe::App for OculanteApp {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
             if key_pressed(ctx, state, ScrubBar) {
-                state.persistent_settings.show_scrub_bar = !state.persistent_settings.show_scrub_bar;
+                state.persistent_settings.show_scrub_bar =
+                    !state.persistent_settings.show_scrub_bar;
             }
             if key_pressed(ctx, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
@@ -1081,7 +1082,9 @@ impl eframe::App for OculanteApp {
 
         // Automatically hide cursor after a period of inactivity in zen mode
         let hide_delay = self.state.persistent_settings.zen_mode_cursor_timeout;
-        if self.state.persistent_settings.zen_mode && !self.state.settings_enabled && hide_delay > 0.0
+        if self.state.persistent_settings.zen_mode
+            && !self.state.settings_enabled
+            && hide_delay > 0.0
         {
             let idle_time = ctx.input(|i| i.pointer.time_since_last_movement());
             if idle_time >= hide_delay && !ctx.is_pointer_over_area() {
