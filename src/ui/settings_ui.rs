@@ -306,6 +306,10 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         ui.add(egui::DragValue::new(&mut state.persistent_settings.zen_mode_cursor_timeout).range(0.0..=15.0).speed(0.1));
                                     }, ui);
 
+                                    configuration_item_ui("Zen mode enabled notification", "Shows a notification when zen mode is turned on.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_zen_mode_notification, "");
+                                    }, ui);
+
 
                                     // TODO: add more options here
                                     ui.horizontal(|ui| {

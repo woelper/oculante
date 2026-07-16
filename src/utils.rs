@@ -931,7 +931,7 @@ pub fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) ->
 
 pub fn toggle_zen_mode(state: &mut OculanteState, ctx: &egui::Context) {
     state.persistent_settings.zen_mode = !state.persistent_settings.zen_mode;
-    if state.persistent_settings.zen_mode {
+    if state.persistent_settings.zen_mode && state.persistent_settings.show_zen_mode_notification {
         _ = state.message_channel.0.send(Message::Info(format!(
             "Zen mode on. Press '{}' to toggle.",
             lookup(&state.persistent_settings.shortcuts, &InputEvent::ZenMode)
