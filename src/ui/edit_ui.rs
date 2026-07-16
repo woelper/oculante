@@ -121,6 +121,11 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
             let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
 
+            let mut filter_search_term = ui
+                .ctx()
+                .data(|r| r.get_temp::<String>(Id::new("filter_search_term")))
+                .unwrap_or_default();
+
             ui.scope(|ui| {
                 ui.style_mut().visuals.collapsing_header_frame = true;
                 ui.style_mut().visuals.indent_has_left_vline = false;
@@ -129,11 +134,28 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                     .open(open)
                     .show_unindented(ui, |ui| {
                         dark_panel(ui, |ui| {
+
+                            ui.add(
+                                TextEdit::singleline(&mut filter_search_term)
+                                    .hint_text(format!("{SEARCH} Search filters"))
+                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL))
+                                    .desired_width(ui.available_width())
+                                    .vertical_align(Align::Center),
+                            );
+                            ui.add_space(4.);
+
                             egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
 
                                 ui.vertical_centered_justified(|ui|{
                                     for op in &mut ops {
-                                        if ui.button( format!("{op}")).clicked() {
+                                        let name = format!("{op}");
+                                        if !name
+                                            .to_lowercase()
+                                            .contains(&filter_search_term.to_lowercase())
+                                        {
+                                            continue;
+                                        }
+                                        if ui.button(name).clicked() {
                                             if op.operation.is_per_pixel() {
                                                 state.edit_state.pixel_op_stack.push(op.clone());
                                             } else {
@@ -148,6 +170,8 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                         });
                     });
             });
+
+            ui.ctx().data_mut(|w| w.insert_temp(Id::new("filter_search_term"), filter_search_term));
 
             if open.is_some() {
                 ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
