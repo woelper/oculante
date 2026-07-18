@@ -66,7 +66,6 @@ jpeg2k = { version = "0.10", optional = true, default-features = false, features
     "openjpeg-sys",
 ] }
 icns = "0.4"
-webp-animation = { version = "0.10.0", features = ["static"] }
 # dicom needs to be the same version
 dicom-pixeldata = { version = "0.9", features = ["image"] }
 dicom-object = "0.9"

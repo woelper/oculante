@@ -10,8 +10,7 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, RgbImage,
-    RgbaImage,
+    AnimationDecoder, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::Export;
@@ -22,7 +21,6 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use tiff::decoder::Limits;
-use webp_animation::prelude::*;
 use zune_png::zune_core::options::DecoderOptions;
 use zune_png::zune_core::result::DecodingResult;
 
@@ -458,23 +456,17 @@ pub fn open_image(
                 return Ok(receiver);
             }
 
-            let buffer = std::fs::read(img_location)?;
-            let decoder = Decoder::new(&buffer)?.into_iter();
-            let mut last_timestamp = 0;
-
-            for frame in decoder {
-                let buf = image::ImageBuffer::from_raw(
-                    frame.dimensions().0,
-                    frame.dimensions().1,
-                    frame.data().to_vec(),
-                )
-                .context("Can't create imagebuffer from webp")?;
-                let t = frame.timestamp();
-                let delay = t - last_timestamp;
-                debug!("time {t} {delay}");
-                last_timestamp = t;
-                let i = DynamicImage::ImageRgba8(buf);
-                let frame = Frame::new_animation(i, delay as u16);
+            for frame in decoder.into_frames() {
+                let frame = frame.context("Can't decode animated webp frame")?;
+                let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
+                let delay_ms = if delay_denom == 0 {
+                    0
+                } else {
+                    delay_numer / delay_denom
+                };
+                debug!("webp frame delay {delay_ms}ms");
+                let i = DynamicImage::ImageRgba8(frame.into_buffer());
+                let frame = Frame::new_animation(i, delay_ms as u16);
                 _ = sender.send(frame);
             }
 
