@@ -1,6 +1,6 @@
 use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
 use anyhow::{Result, anyhow};
-use egui::{Context, Visuals};
+use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
 use serde::{Deserialize, Serialize};
 
@@ -220,12 +220,10 @@ impl VolatileSettings {
 }
 
 pub fn set_system_theme(ctx: &Context) {
-    if let Ok(mode) = dark_light::detect() {
-        match mode {
-            dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
-            dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
-            dark_light::Mode::Unspecified => ctx.set_visuals(Visuals::dark()),
-        }
+    match ctx.system_theme() {
+        Some(Theme::Dark) => ctx.set_visuals(Visuals::dark()),
+        Some(Theme::Light) => ctx.set_visuals(Visuals::light()),
+        None => ctx.set_visuals(Visuals::dark()),
     }
 }
 

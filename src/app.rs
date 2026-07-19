@@ -12,6 +12,7 @@ use nalgebra::Vector2;
 use crate::appstate::*;
 use crate::filebrowser::BrowserDir;
 use crate::glow_renderer;
+use crate::settings::ColorTheme;
 use crate::shortcuts::{self, key_pressed};
 use crate::ui::*;
 use crate::utils::*;
@@ -169,6 +170,8 @@ pub struct OculanteApp {
     /// True if egui owned the pointer when the current press started.
     /// Prevents image drag for the entire press duration.
     egui_started_press: bool,
+    /// Updates system theme during runtime
+    last_system_theme: Option<egui::Theme>,
 }
 
 impl OculanteApp {
@@ -185,6 +188,7 @@ impl OculanteApp {
             checker_texture: None,
             reset_after_upload: false,
             egui_started_press: false,
+            last_system_theme: None,
         }
     }
 
@@ -353,6 +357,7 @@ impl OculanteApp {
         let fonts = load_system_fonts(fonts);
 
         apply_theme(&mut self.state, ctx);
+        self.last_system_theme = ctx.system_theme();
         ctx.set_fonts(fonts);
 
         // Load checker texture for transparency grid (once)
@@ -567,6 +572,12 @@ impl eframe::App for OculanteApp {
                     glow::HasContext::get_parameter_i32(gl.as_ref(), glow::MAX_TEXTURE_SIZE) as u32
                 };
                 debug!("Max texture size: {}", self.max_texture_size);
+            }
+        } else if self.state.persistent_settings.theme == ColorTheme::System {
+            let current_system_theme = ctx.system_theme();
+            if current_system_theme != self.last_system_theme {
+                self.last_system_theme = current_system_theme;
+                apply_theme(&mut self.state, ctx);
             }
         }
 
