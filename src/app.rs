@@ -776,6 +776,8 @@ impl eframe::App for OculanteApp {
                 });
         }
 
+        show_delete_confirmation_modal(ctx, state);
+
         // Scrub bar
         if state.persistent_settings.show_scrub_bar {
             egui::TopBottomPanel::bottom("scrubber")
@@ -967,7 +969,8 @@ impl eframe::App for OculanteApp {
                 }
             }
             if key_pressed(ctx, state, DeleteFile) {
-                delete_file(state);
+                // Shared with trash button in top bar. Both trigger the same confirmation modal.
+                request_delete_current_file(ctx, state);
             }
             if key_pressed(ctx, state, ClearImage) {
                 clear_image(state);

@@ -1,4 +1,3 @@
-use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::filebrowser::BrowserDir;
@@ -196,33 +195,17 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             }));
         }
 
-        if state.current_path.is_some() && window_x > ui.cursor().left() + 80. {
-            let delete_text = format!(
-                "Are you sure you want to move {} to the trash?",
-                state
-                    .current_path
-                    .clone()
-                    .unwrap_or_default()
-                    .file_name()
-                    .map(|s| s.to_string_lossy())
-                    .unwrap_or_default()
-            );
-
-            let modal = Modal::new("delete", ui.ctx());
-            modal.show(delete_text, |_| {
-                delete_file(state);
-            });
-
-            if tooltip(
+        if state.current_path.is_some()
+            && window_x > ui.cursor().left() + 80.
+            && tooltip(
                 unframed_button(TRASH, ui),
                 "Move file to trash",
                 &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
                 ui,
             )
             .clicked()
-            {
-                modal.open();
-            }
+        {
+            request_delete_current_file(ui.ctx(), state);
         }
 
         if state.current_image.is_some()

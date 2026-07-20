@@ -890,33 +890,33 @@ impl Modal {
         egui::Modal::new(self.id.clone().into()).show(&self.ctx, |ui| {
             ui.set_width(MODAL_WIDTH);
             ui.set_min_height(MODAL_MIN_HEIGHT);
-            ui.horizontal(|ui| {
-                ui.vertical_centered_justified(|ui| {
-                    ui.add_space(10.);
-                    ui.label(
-                        RichText::new(WARNING_CIRCLE)
-                            .size(100.)
-                            .color(ui.style().visuals.warn_fg_color),
-                    );
-                    ui.add_space(20.);
+            ui.vertical_centered_justified(|ui| {
+                ui.add_space(10.);
+                ui.label(
+                    RichText::new(WARNING_CIRCLE)
+                        .size(100.)
+                        .color(ui.style().visuals.warn_fg_color),
+                );
+                ui.add_space(20.);
+                ui.vertical_centered(|ui| {
                     ui.add(Label::new(warning_text).wrap().halign(Align::Center));
-                    ui.add_space(20.);
-                    ui.scope(|ui| {
-                        let warn_color = Color32::from_rgb(255, 77, 77);
-                        ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
-                        ui.style_mut().visuals.widgets.inactive.fg_stroke =
-                            Stroke::new(1., Color32::WHITE);
-                        ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
-                            warn_color.linear_multiply(0.8);
-                        if ui.styled_button("Yes").clicked() {
-                            ui.scope(add_contents);
-                            self.close();
-                        }
-                    });
-                    if ui.styled_button("Cancel").clicked() {
+                });
+                ui.add_space(20.);
+                ui.scope(|ui| {
+                    let warn_color = Color32::from_rgb(255, 77, 77);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
+                    ui.style_mut().visuals.widgets.inactive.fg_stroke =
+                        Stroke::new(1., Color32::WHITE);
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                        warn_color.linear_multiply(0.8);
+                    if ui.styled_button("Yes").clicked() {
+                        ui.scope(add_contents);
                         self.close();
                     }
                 });
+                if ui.styled_button("Cancel").clicked() {
+                    self.close();
+                }
             });
         });
     }
@@ -928,5 +928,30 @@ impl Modal {
     pub fn close(&self) {
         self.ctx
             .memory_mut(|w| w.close_popup(self.id.clone().into()));
+    }
+}
+
+const DELETE_MODAL_ID: &str = "delete";
+
+pub fn show_delete_confirmation_modal(ctx: &egui::Context, state: &mut OculanteState) {
+    let Some(name) = state
+        .current_path
+        .as_ref()
+        .and_then(|p| p.file_name())
+        .map(|s| s.to_string_lossy().into_owned())
+    else {
+        return;
+    };
+
+    Modal::new(DELETE_MODAL_ID, ctx).show(format!("Move \"{name}\" to the trash?"), |_| {
+        delete_file(state);
+    });
+}
+
+pub fn request_delete_current_file(ctx: &egui::Context, state: &mut OculanteState) {
+    if state.current_path.is_some() {
+        Modal::new(DELETE_MODAL_ID, ctx).open();
+    } else {
+        delete_file(state);
     }
 }
