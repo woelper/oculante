@@ -1872,13 +1872,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "egui-modal"
-version = "0.6.0"
-dependencies = [
- "egui",
-]
-
-[[package]]
 name = "egui-notify"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5088,7 +5081,6 @@ dependencies = [
  "dirs 6.0.0",
  "eframe",
  "egui",
- "egui-modal",
  "egui-notify",
  "egui_extras",
  "egui_glow",

@@ -1,3 +1,4 @@
+use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
@@ -499,9 +500,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
-                    let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
+                    let modal = Modal::new("overwrite", ui.ctx());
+                    modal.show("Overwrite?", |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
-                    }, "overwrite");
+                    });
 
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
