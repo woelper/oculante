@@ -899,9 +899,7 @@ impl Modal {
                             .color(ui.style().visuals.warn_fg_color),
                     );
                     ui.add_space(20.);
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(warning_text);
-                    });
+                    ui.add(Label::new(warning_text).wrap().halign(Align::Center));
                     ui.add_space(20.);
                     ui.scope(|ui| {
                         let warn_color = Color32::from_rgb(255, 77, 77);
