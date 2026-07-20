@@ -171,7 +171,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - jxl (JPEG XL, via `jxl-oxide`)
 - avif
 - tiff (via `tiff` with additional float/half support)
-- webp (via `libwebp-sys` - `image` had _very_ limited format support)
+- webp
 - farbfeld
 - DDS (DXT1-5, via `dds-rs`)
 - DICOM (via dicom-rs) - Some metadata supported, too.
