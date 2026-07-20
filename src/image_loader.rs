@@ -10,7 +10,8 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    AnimationDecoder, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, RgbImage, RgbaImage,
+    AnimationDecoder, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder,
+    ImageReader, RgbImage, RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::Export;
