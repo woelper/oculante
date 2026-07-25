@@ -46,7 +46,6 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.8"
-zune-png = "0.5.2"                                 # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
 resvg = "0.47"
 usvg = "0.47"
@@ -80,7 +79,7 @@ ase-swatch = "0.1.0"
 libblur = "0.14"
 imageproc = { version = "0.26", features = ["rayon"] }
 evalexpr = "13"
-fast_image_resize = { version = "6.0", features = ["rayon"] }
+fast_image_resize = { version = "6.1", features = ["rayon"] }
 
 # APP FUNCTIONALITY CRATES
 rand = "0.10"
@@ -106,7 +105,7 @@ zip = "8.6"
 sysinfo = "0.39"
 unicode-segmentation = "1.13.3"
 font-kit = "0.14"
-open = "5.3"
+open = "5.4"
 kamadak-exif = "0.6"
 lexical-sort = "0.3"
 log = "0.4"
@@ -154,7 +153,7 @@ windres = "0.2"
 env_logger = "0.11"
 log = "0.4.33"
 winres = "0.1"
-cc = "1.2.65"
+cc = "1.4.0"
 cmake = "0.1"
 
 [dev-dependencies]

@@ -22,8 +22,6 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use tiff::decoder::Limits;
-use zune_png::zune_core::options::DecoderOptions;
-use zune_png::zune_core::result::DecodingResult;
 
 /// Open an image from disk and send it somewhere
 pub fn open_image(
@@ -475,164 +473,33 @@ pub fn open_image(
             return Ok(receiver);
         }
         "png" | "apng" => {
-            use zune_png::PngDecoder;
-            use zune_png::zune_core::bytestream::ZCursor;
-            use zune_png::zune_core::options::EncoderOptions;
-
             let contents = std::fs::read(&img_location)?;
-            let mut decoder = PngDecoder::new(ZCursor::new(contents));
-            decoder.set_options(
-                DecoderOptions::new_fast()
-                    .set_max_height(128000)
-                    .set_max_width(128000),
-            );
 
-            //animation
-            decoder.decode_headers()?;
-            if decoder.is_animated() {
-                info!("Image is animated");
-                decoder.decode_headers()?;
+            let decoder = image::codecs::png::PngDecoder::new(std::io::Cursor::new(contents))?;
 
-                let colorspace = decoder.colorspace().context("Can't get color space")?;
-                let depth = decoder.depth().context("Can't get decoder depth")?;
-                //  get decoder information,we clone this because we need a standalone
-                // info since we mutably modify decoder struct below
-                let info = decoder.info().context("Can't get decoder info")?.clone();
-                // set up our background variable. Soon it will contain the data for the previous
-                // frame, the first frame has no background hence why this is None
-                let mut background: Option<Vec<u8>> = None;
-                // the output, since we know that no frame will be bigger than the width and height, we can
-                // set this up outside of the loop.
-                let mut output = vec![
-                    0;
-                    info.width
-                        * info.height
-                        * decoder
-                            .colorspace()
-                            .context("Can't get decoder color depth")?
-                            .num_components()
-                ];
+            if decoder.is_apng()? {
+                info!("Image is animated (APNG)");
 
-                while decoder.more_frames() {
-                    // decode the header, in case we haven't processed a frame header
-                    decoder.decode_headers()?;
-                    // then decode the current frame information,
-                    // NB: Frame information is for current frame hence should be accessed before decoding the frame
-                    // as it will change on subsequent frames
-                    let frame = decoder.frame_info().context("Can't get frame info")?;
-                    debug!("Frame: {:?}", frame);
-
-                    // decode the raw pixels, even on smaller frames, we only allocate frame_info.width*frame_info.height
-                    let pix = decoder.decode_raw()?;
-                    // call post process
-                    zune_png::post_process_image(
-                        &info,
-                        colorspace,
-                        &frame,
-                        &pix,
-                        background.as_deref(),
-                        &mut output,
-                        None,
-                    )?;
-                    // create encoder parameters
-                    let encoder_opts =
-                        EncoderOptions::new(info.width, info.height, colorspace, depth);
-
-                    let mut out = vec![];
-                    _ = zune_png::PngEncoder::new(&output, encoder_opts).encode(&mut out);
-                    let img = image::load_from_memory(&out)?;
-
-                    let delay = frame.delay_num as f32 / frame.delay_denom as f32 * 1000.;
-
-                    _ = sender.send(Frame::new_animation(img, delay as u16));
-                    background = Some(output.clone());
+                for frame in decoder.apng()?.into_frames() {
+                    let frame = frame.context("Can't decode APNG frame")?;
+                    let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
+                    let delay_ms = if delay_denom == 0 {
+                        0
+                    } else {
+                        delay_numer / delay_denom
+                    };
+                    debug!("apng frame delay {delay_ms}ms");
+                    let i = DynamicImage::ImageRgba8(frame.into_buffer());
+                    _ = sender.send(Frame::new_animation(i, delay_ms as u16));
                 }
+
                 return Ok(receiver);
             }
 
             debug!("Image is not animated");
-            match decoder.decode().map_err(|e| anyhow!("{:?}", e))? {
-                // 16 bpp data
-                DecodingResult::U16(imgdata) => {
-                    //convert to 8bpp
-                    let imgdata_8bpp = imgdata
-                        .par_iter()
-                        .map(|x| *x as f32 / u16::MAX as f32)
-                        .map(|p| p.powf(2.2))
-                        .map(tonemap_f32)
-                        // .map(|x| x as u8)
-                        .collect::<Vec<_>>();
-
-                    let (width, height) =
-                        decoder.dimensions().context("Can't get png dimensions")?;
-                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
-
-                    if colorspace.is_grayscale() {
-                        let buf: GrayImage =
-                            image::ImageBuffer::from_raw(width as u32, height as u32, imgdata_8bpp)
-                                .context("Can't interpret image as grayscale")?;
-                        let image_result = DynamicImage::ImageLuma8(buf);
-                        _ = sender.send(Frame::new_still(image_result));
-                        return Ok(receiver);
-                    }
-
-                    if colorspace.has_alpha() {
-                        let float_image =
-                            RgbaImage::from_raw(width as u32, height as u32, imgdata_8bpp)
-                                .context("Can't decode rgba buffer")?;
-                        _ = sender.send(Frame::new_still(DynamicImage::ImageRgba8(float_image)));
-                        return Ok(receiver);
-                    } else {
-                        let float_image =
-                            RgbImage::from_raw(width as u32, height as u32, imgdata_8bpp)
-                                .context("Can't decode rgba buffer")?;
-                        _ = sender.send(Frame::new_still(DynamicImage::ImageRgb8(float_image)));
-                        return Ok(receiver);
-                    }
-                }
-                // 8bpp
-                DecodingResult::U8(value) => {
-                    let (width, height) =
-                        decoder.dimensions().context("Can't get png dimensions")?;
-
-                    let colorspace = decoder.colorspace().context("Can't get colorspace")?;
-                    if colorspace.is_grayscale() && !colorspace.has_alpha() {
-                        let buf: GrayImage =
-                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
-                                .context("Can't interpret image as grayscale")?;
-                        let image_result = DynamicImage::ImageLuma8(buf);
-                        _ = sender.send(Frame::new_still(image_result));
-                        return Ok(receiver);
-                    }
-
-                    if colorspace.is_grayscale() && colorspace.has_alpha() {
-                        let buf: GrayAlphaImage =
-                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
-                                .context("Can't interpret image as grayscale")?;
-                        let image_result = DynamicImage::ImageLumaA8(buf);
-                        _ = sender.send(Frame::new_still(image_result));
-                        return Ok(receiver);
-                    }
-
-                    if colorspace.has_alpha() && !colorspace.is_grayscale() {
-                        let buf: RgbaImage =
-                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
-                                .context("Can't interpret image as rgba")?;
-                        let i = DynamicImage::ImageRgba8(buf);
-
-                        _ = sender.send(Frame::new_still(i));
-                        return Ok(receiver);
-                    } else {
-                        let buf: RgbImage =
-                            image::ImageBuffer::from_raw(width as u32, height as u32, value)
-                                .context("Can't interpret image as rgb")?;
-                        let image_result = DynamicImage::ImageRgb8(buf);
-                        _ = sender.send(Frame::new_still(image_result));
-                        return Ok(receiver);
-                    }
-                }
-                _ => {}
-            }
+            let img = DynamicImage::from_decoder(decoder)?;
+            _ = sender.send(Frame::new_still(img));
+            return Ok(receiver);
         }
         "gif" => {
             let file = File::open(img_location)?;
