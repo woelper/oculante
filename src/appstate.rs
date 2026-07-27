@@ -129,6 +129,9 @@ impl Default for OculanteState {
     fn default() -> OculanteState {
         let persistent_settings = PersistentSettings::load().unwrap_or_default();
 
+        let mut volatile_settings = VolatileSettings::load().unwrap_or_default();
+        volatile_settings.remove_missing_recents();
+
         let tx_channel = mpsc::channel();
         let msg_channel = mpsc::channel();
         let meta_channel = mpsc::channel();
@@ -166,7 +169,7 @@ impl Default for OculanteState {
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: PersistentSettings::load().unwrap_or_default(),
-            volatile_settings: VolatileSettings::load().unwrap_or_default(),
+            volatile_settings,
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),

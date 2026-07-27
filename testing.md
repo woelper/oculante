@@ -71,7 +71,7 @@
 - [ ] Update dependencies: egui and helper libraries
 - [ ] Update image libraries step by step
 - [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
-- [ ] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
+- [x] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
 - [x] Remove update functionality
 
 

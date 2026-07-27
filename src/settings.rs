@@ -206,6 +206,16 @@ impl VolatileSettings {
         Ok(s)
     }
 
+    // Remove any entries from recent images that no longer exist on startup
+    pub fn remove_missing_recents(&mut self) {
+        let before = self.recent_images.len();
+        self.recent_images.retain(|p| p.exists());
+        let removed = before - self.recent_images.len();
+        if removed > 0 {
+            debug!("Removed {removed} recent image(s) that can no longer be found");
+        }
+    }
+
     pub fn save_blocking(&self) -> Result<()> {
         let local_dir = get_config_dir()?;
         if !local_dir.exists() {
