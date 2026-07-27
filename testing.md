@@ -38,11 +38,11 @@
 - [x] recent images are not added to list (seems to work on mac, test on linux)
 - [x] When loading an animated image (at least png) the view does not reset
 - [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier.
-- [ ] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
+- [x] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 - [ ] Fit image on window resize is broken
 - [ ] Modifier keys don't work correctly in keybinds part of preferences
 - [ ] Scrolling on menu items can change window zoom
-- [ ] Animated images are broken (as of 2026-05-19)
+- [x] Animated images are broken (as of 2026-05-19)
 - [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
 
 
