@@ -342,6 +342,34 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                 }
                                 light_panel(ui, |ui| {
                                     configuration_item_ui(
+                                        "SVG scale",
+                                        "Adjusts resolution that SVGs are displayed at.",
+                                        |ui| {
+                                            let changed = ui
+                                                .add(
+                                                    egui::DragValue::new(&mut state.persistent_settings.decoders.svg_scale)
+                                                        .range(0.01..=100.0)
+                                                        .speed(0.01),
+                                                )
+                                                .changed();
+                                            if changed {
+                                                state.player.set_decoder_opts(state.persistent_settings.decoders);
+                                                state.player.cache.clear();
+                                                if let Some(path) = state.current_path.clone()
+                                                    && path
+                                                        .extension()
+                                                        .and_then(|e| e.to_str())
+                                                        .is_some_and(|e| e.eq_ignore_ascii_case("svg"))
+                                                {
+                                                    state.is_loaded = false;
+                                                    state.player.load(&path);
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
+                                    configuration_item_ui(
                                         "HEIF security override",
                                         "Disable all HEIF security limits. A restart is required to take effect.",
                                         |ui| {

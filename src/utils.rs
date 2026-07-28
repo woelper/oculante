@@ -295,6 +295,11 @@ impl Player {
         }
     }
 
+    // Updates decoder settings for subsequently loaded images. To apply to images that are already loaded, clear cache and reload.
+    pub fn set_decoder_opts(&mut self, decoder_opts: DecoderSettings) {
+        self.decoder_opts = decoder_opts;
+    }
+
     pub fn check_modified(&mut self, path: &Path) {
         if let Some(watched_mod) = self.watcher.get(path)
             && let Ok(meta) = std::fs::metadata(path)

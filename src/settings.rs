@@ -65,8 +65,6 @@ pub struct PersistentSettings {
     pub show_frame: bool,
     #[serde(skip)]
     pub current_channel: ColorChannel,
-    /// How much to scale SVG images when rendering
-    pub svg_scale: f32,
     pub zen_mode: bool,
     pub zen_mode_cursor_timeout: f32,
     pub show_zen_mode_notification: bool,
@@ -107,7 +105,6 @@ impl Default for PersistentSettings {
             show_minimap: Default::default(),
             show_frame: Default::default(),
             current_channel: ColorChannel::Rgba,
-            svg_scale: 1.0,
             zen_mode: false,
             zen_mode_cursor_timeout: 1.5,
             show_zen_mode_notification: true,
@@ -237,10 +234,20 @@ pub fn set_system_theme(ctx: &Context) {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DecoderSettings {
-    /// Settings for libheif
     pub heif: HeifLimits,
+    pub svg_scale: f32,
+}
+
+impl Default for DecoderSettings {
+    fn default() -> Self {
+        Self {
+            heif: Default::default(),
+            svg_scale: 1.0,
+        }
+    }
 }
 
 /// Security limits for HEIF via libheif.

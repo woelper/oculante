@@ -268,10 +268,13 @@ pub fn open_image(
             }
         }
         "svg" => {
-            // TODO: Should the svg be scaled? if so by what number?
-            // This should be specified in a smarter way, maybe resolution * x?
+            let svg_scale = decoder_opts
+                .map(|d| d.svg_scale)
+                .filter(|s| *s > 0.0)
+                .unwrap_or(1.0);
 
-            let render_scale = 2.;
+            let render_scale = svg_scale.clamp(0.01, 100.0);
+
             let mut opt = usvg::Options::default();
 
             let fontdb = opt.fontdb_mut();
@@ -290,31 +293,30 @@ pub fn open_image(
                     .size()
                     .to_int_size()
                     .scale_by(render_scale)
-                    .context("Can't get SVG size")?;
+                    .context("Can't get SVG size at the requested SVG scale")?;
 
-                if let Some(mut pixmap) =
-                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
-                {
-                    let mut fontdb = usvg::fontdb::Database::new();
-                    fontdb.load_system_fonts();
-                    fontdb.load_font_data(FONT.to_vec());
-                    fontdb.set_cursive_family("Inter");
-                    fontdb.set_sans_serif_family("Inter");
-                    fontdb.set_serif_family("Inter");
+                let mut pixmap =
+                    tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height()).context("Can't allocate a canvas for this SVG at the requested SVG scale. Try lowering the SVG scale.")?;
 
-                    let render_ts = tiny_skia::Transform::from_scale(render_scale, render_scale);
-                    resvg::render(&tree, render_ts, &mut pixmap.as_mut());
-                    let buf: RgbaImage = image::ImageBuffer::from_raw(
-                        pixmap_size.width(),
-                        pixmap_size.height(),
-                        pixmap.data().to_vec(),
-                    )
-                    .context("Can't create image buffer from SVG render")?;
-                    let i = DynamicImage::ImageRgba8(buf);
+                let mut fontdb = usvg::fontdb::Database::new();
+                fontdb.load_system_fonts();
+                fontdb.load_font_data(FONT.to_vec());
+                fontdb.set_cursive_family("Inter");
+                fontdb.set_sans_serif_family("Inter");
+                fontdb.set_serif_family("Inter");
 
-                    _ = sender.send(Frame::new_still(i));
-                    return Ok(receiver);
-                }
+                let render_ts = tiny_skia::Transform::from_scale(render_scale, render_scale);
+                resvg::render(&tree, render_ts, &mut pixmap.as_mut());
+                let buf: RgbaImage = image::ImageBuffer::from_raw(
+                    pixmap_size.width(),
+                    pixmap_size.height(),
+                    pixmap.data().to_vec(),
+                )
+                .context("Can't create image buffer from SVG render")?;
+                let i = DynamicImage::ImageRgba8(buf);
+
+                _ = sender.send(Frame::new_still(i));
+                return Ok(receiver);
             }
         }
         "exr" => {
