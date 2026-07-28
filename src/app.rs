@@ -167,6 +167,8 @@ pub struct OculanteApp {
     checker_texture: Option<egui::TextureHandle>,
     /// Set when a new image arrives; cleared after upload resets the view
     reset_after_upload: bool,
+    /// True if the most recent frame is from an image in the compare menu
+    last_frame_was_compared_image: bool,
     /// True if egui owned the pointer when the current press started.
     /// Prevents image drag for the entire press duration.
     egui_started_press: bool,
@@ -187,6 +189,7 @@ impl OculanteApp {
             animation_playing: false,
             checker_texture: None,
             reset_after_upload: false,
+            last_frame_was_compared_image: false,
             egui_started_press: false,
             last_system_theme: None,
         }
@@ -286,7 +289,12 @@ impl OculanteApp {
 
         // Now that the texture is ready, update geometry and reset view
         self.state.image_geometry.dimensions = (w, h);
-        if !self.state.persistent_settings.keep_view && self.reset_after_upload {
+        let keep_view = if self.last_frame_was_compared_image {
+            self.state.persistent_settings.compare_keep_view
+        } else {
+            self.state.persistent_settings.keep_view
+        };
+        if !keep_view && self.reset_after_upload {
             self.state.reset_image = true;
         }
         self.reset_after_upload = false;
@@ -411,6 +419,7 @@ impl OculanteApp {
 
         if let Some(frame) = latest_frame {
             self.state.is_loaded = true;
+            self.last_frame_was_compared_image = matches!(frame, Frame::CompareResult(_, _));
 
             // Update scrubber on new images
             // Also match Animation if an AnimationStart was drained

@@ -151,6 +151,8 @@ pub fn info_ui(
                     if state.persistent_settings.max_cache == 0 {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
+                    ui.styled_checkbox(&mut state.persistent_settings.compare_keep_view, "Persistent zoom")
+                        .on_hover_text("Keep the current zoom and pan when switching between images in this list.");
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
                             let browser_button = ui.button(format!("{FOLDER} Open another image..."));
