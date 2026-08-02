@@ -182,11 +182,7 @@ impl Toasts {
                     ui.set_width(WIDTH);
                     let close_clicked = draw_toast(ui, toast, &style);
                     let card = ui.min_rect();
-                    (
-                        close_clicked,
-                        ui.rect_contains_pointer(card),
-                        card.height(),
-                    )
+                    (close_clicked, ui.rect_contains_pointer(card), card.height())
                 })
                 .inner;
 
@@ -280,11 +276,8 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                 Sense::click(),
             );
             if close.hovered() {
-                ui.painter().rect_filled(
-                    close_box,
-                    CornerRadius::same(4),
-                    fg.gamma_multiply(0.08),
-                );
+                ui.painter()
+                    .rect_filled(close_box, CornerRadius::same(4), fg.gamma_multiply(0.08));
             }
             ui.painter().text(
                 close_box.center(),
@@ -303,7 +296,8 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                         ui.allocate_exact_size(vec2(ui.available_width(), 3.0), Sense::hover());
                     ui.painter()
                         .rect_filled(rect, 1.5, accent.gamma_multiply(0.25));
-                    let filled = Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
+                    let filled =
+                        Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
                     ui.painter().rect_filled(filled, 1.5, accent);
                 }
             }
