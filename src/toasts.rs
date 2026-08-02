@@ -194,14 +194,13 @@ impl Toasts {
                 toast.shown -= dt / DISAPPEAR_SECS;
             } else {
                 toast.shown = (toast.shown + dt / APPEAR_SECS).min(1.0);
-                if let Some(remaining) = toast.remaining.as_mut() {
-                    if !hovered {
+                if let Some(remaining) = toast.remaining.as_mut()
+                    && !hovered {
                         *remaining -= dt;
                         if *remaining <= 0.0 {
                             toast.closing = true;
                         }
                     }
-                }
             }
 
             toast.last_height = height.max(1.0);
@@ -288,8 +287,8 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
             );
             close_clicked = close.clicked();
 
-            if let (Some(total), Some(remaining)) = (toast.total, toast.remaining) {
-                if total > 0.0 {
+            if let (Some(total), Some(remaining)) = (toast.total, toast.remaining)
+                && total > 0.0 {
                     ui.add_space(8.0);
                     let frac = (remaining / total).clamp(0.0, 1.0);
                     let (rect, _) =
@@ -300,7 +299,6 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                         Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
                     ui.painter().rect_filled(filled, 1.5, accent);
                 }
-            }
         });
 
     close_clicked

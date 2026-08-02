@@ -817,7 +817,7 @@ impl eframe::App for OculanteApp {
             .and_then(|p| ctx.layer_id_at(p))
             .is_some_and(|layer| layer.order != egui::Order::Background);
         state.pointer_over_ui =
-            over_floating_layer || pointer_pos.map_or(true, |p| !canvas_rect.contains(p));
+            over_floating_layer || pointer_pos.is_none_or(|p| !canvas_rect.contains(p));
         state.mouse_grab = ctx.egui_is_using_pointer()
             || state.edit_state.painting
             || state.pointer_over_ui
