@@ -91,7 +91,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
                         #[cfg(not(feature = "file_open"))]
                         if ui.button("Save ASE").clicked() {
-                            ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                            crate::ui::open_popup(ui.ctx(), Id::new("SAVEASE"));
                         }
 
                         #[cfg(feature = "file_open")]
@@ -129,10 +129,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
 
                         #[cfg(not(feature = "file_open"))]
-                        if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
-                            ui.ctx().memory_mut(|w| {
-                                w.keep_popup_open(Id::new("SAVEASE"));
-                            });
+                        if crate::ui::is_popup_open(ui.ctx(), Id::new("SAVEASE")) {
                             filebrowser::browse_modal(
                                 true,
                                 &["ase"],
@@ -161,6 +158,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     }
                                 },
                                 ui.ctx(),
+                                Id::new("SAVEASE"),
                             );
                         }
                     }

@@ -109,7 +109,12 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
                     dark_panel(ui, |ui| {
                         // ui.add_space(ui.available_width());
-                        egui::ScrollArea::vertical().auto_shrink([false,false]).min_scrolled_height(400.).min_scrolled_width(400.).show(ui, |ui| {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false,false])
+                            .min_scrolled_height(400.)
+                            .min_scrolled_width(400.)
+                            .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                            .show(ui, |ui| {
 
                             ui.vertical(|ui| {
 

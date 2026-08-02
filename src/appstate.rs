@@ -5,10 +5,10 @@ use crate::{
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
     thumbnails::Thumbnails,
+    toasts::{Anchor, Toasts},
     utils::{ExtendedImageInfo, Frame, Player},
 };
 
-use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
 use std::{
@@ -177,7 +177,7 @@ impl Default for OculanteState {
             scrubber: Default::default(),
             redraw: Default::default(),
             first_start: true,
-            toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
+            toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             filebrowser_id: None,
             filebrowser_last_dir: Default::default(),
             thumbnails: Default::default(),

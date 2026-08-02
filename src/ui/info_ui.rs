@@ -15,10 +15,12 @@ use super::*;
 use std::time::Duration;
 
 pub fn info_ui(
-    ctx: &Context,
+    ui: &mut egui::Ui,
     state: &mut OculanteState,
     image_tiles: &[crate::app::ImageTile],
 ) -> (Pos2, Pos2) {
+    let ctx_owned = ui.ctx().clone();
+    let ctx = &ctx_owned;
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
@@ -50,8 +52,10 @@ pub fn info_ui(
     .show_separator_line(true)
     .default_size(PANEL_WIDTH)
     .resizable(true)
-    .show(ctx, |ui| {
-        egui::ScrollArea::vertical().show(ui, |ui| {
+    .show(ui, |ui| {
+        egui::ScrollArea::vertical()
+            .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+            .show(ui, |ui| {
 
             // SECTION 1: Info grid
             if state.current_image.is_some() {
@@ -179,7 +183,7 @@ pub fn info_ui(
                                     );
                                     ui.ctx()
                                         .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
-                                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                    crate::ui::open_popup(ui.ctx(), Id::new("OPEN"));
                                 }
 
                                 state.is_loaded = false;

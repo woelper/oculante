@@ -26,7 +26,9 @@ fn load_brush_texture(ctx: &egui::Context, img: &RgbaImage, id: &str) -> Texture
 
 /// Everything related to image editing
 #[allow(unused_variables)]
-pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
+pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
+    let ctx_owned = ui.ctx().clone();
+    let ctx = &ctx_owned;
     // A flag to indicate that the image needs to be rebuilt
     let mut image_changed = false;
     let mut pixels_changed = false;
@@ -117,7 +119,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
         .min_size(100.)
         .max_size(500.)
         .show_separator_line(true)
-        .show(ctx, |ui| {
+        .show(ui, |ui| {
 
 
             let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
@@ -145,7 +147,10 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                             );
                             ui.add_space(4.);
 
-                            egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height(300.)
+                                .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                                .show(ui, |ui| {
 
                                 ui.vertical_centered_justified(|ui|{
                                     for op in &mut ops {
@@ -179,7 +184,9 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
             }
 
 
-            egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                .show(ui, |ui| {
 
                 ui.vertical_centered_justified(|ui| {
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
@@ -271,6 +278,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
 
                     egui::ScrollArea::vertical()
                         .min_scrolled_height(64.)
+                        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
                         .show(ui, |ui| {
                             let mut stroke_lost_highlight = false;
                             if ui
@@ -474,13 +482,12 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
-                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
+                        crate::ui::open_popup(ui.ctx(), Id::new("SAVE"));
                     }
 
                     let encoding_options = state.volatile_settings.encoding_options.clone();
 
-                    if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
-                        ctx.memory_mut(|w| { w.keep_popup_open(Id::new("SAVE")); });
+                    if crate::ui::is_popup_open(ctx, Id::new("SAVE")) {
                         let msg_sender = state.message_channel.0.clone();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
@@ -493,6 +500,7 @@ pub fn edit_ui(ctx: &Context, state: &mut OculanteState) {
                                 _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &encoders);
                             },
                             ctx,
+                            Id::new("SAVE"),
                         );
                     }
                 }

@@ -860,6 +860,18 @@ fn save_with_encoding(
     Ok(())
 }
 
+pub fn open_popup(ctx: &egui::Context, id: Id) {
+    ctx.data_mut(|d| d.insert_temp(id, true));
+}
+
+pub fn close_popup(ctx: &egui::Context, id: Id) {
+    ctx.data_mut(|d| d.insert_temp(id, false));
+}
+
+pub fn is_popup_open(ctx: &egui::Context, id: Id) -> bool {
+    ctx.data(|d| d.get_temp::<bool>(id).unwrap_or(false))
+}
+
 pub struct Modal {
     id: String,
     ctx: egui::Context,
@@ -881,12 +893,9 @@ impl Modal {
         warning_text: impl Into<WidgetText>,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) {
-        if !self.ctx.memory(|w| w.is_popup_open(self.id.clone().into())) {
+        if !is_popup_open(&self.ctx, self.id.clone().into()) {
             return;
         }
-        self.ctx.memory_mut(|w| {
-            w.keep_popup_open(self.id.clone().into());
-        });
         egui::Modal::new(self.id.clone().into()).show(&self.ctx, |ui| {
             ui.set_width(MODAL_WIDTH);
             ui.set_min_height(MODAL_MIN_HEIGHT);
@@ -921,13 +930,11 @@ impl Modal {
         });
     }
     pub fn open(&self) {
-        self.ctx
-            .memory_mut(|w| w.open_popup(self.id.clone().into()));
+        open_popup(&self.ctx, self.id.clone().into());
     }
 
     pub fn close(&self) {
-        self.ctx
-            .memory_mut(|w| w.close_popup(self.id.clone().into()));
+        close_popup(&self.ctx, self.id.clone().into());
     }
 }
 

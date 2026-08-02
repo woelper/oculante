@@ -568,10 +568,10 @@ impl OculanteApp {
 }
 
 impl eframe::App for OculanteApp {
-    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {}
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let ctx_owned = ui.ctx().clone();
+        let ctx = &ctx_owned;
 
-    #[allow(deprecated)]
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Initialize on first frame
         if self.first_frame {
             self.first_frame_setup(ctx);
@@ -644,7 +644,7 @@ impl eframe::App for OculanteApp {
             self.state.drag_enabled = false;
         } else if !self.state.drag_enabled && !self.egui_started_press {
             // Button just went down — check who owns it
-            if ctx.is_using_pointer() || self.state.pointer_over_ui || self.state.mouse_grab {
+            if ctx.egui_is_using_pointer() || self.state.pointer_over_ui || self.state.mouse_grab {
                 self.egui_started_press = true;
             }
         }
@@ -723,7 +723,7 @@ impl eframe::App for OculanteApp {
         state.toasts.show(ctx);
 
         if let Some(id) = state.filebrowser_id.take() {
-            ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
+            crate::ui::open_popup(ctx, Id::new(&id));
         }
 
         // Double-click fullscreen
@@ -744,39 +744,36 @@ impl eframe::App for OculanteApp {
         // File browser
         #[cfg(not(feature = "file_open"))]
         {
-            if ctx.memory(|w| w.is_popup_open(Id::new("OPEN"))) {
-                ctx.memory_mut(|w| {
-                    w.keep_popup_open(Id::new("OPEN"));
-                });
+            if crate::ui::is_popup_open(ctx, Id::new("OPEN")) {
                 crate::filebrowser::browse_modal(
                     false,
                     SUPPORTED_EXTENSIONS,
                     &mut state.volatile_settings,
                     |p| {
                         let _ = state.load_channel.0.clone().send(p.to_path_buf());
-                        ctx.memory_mut(|w| w.close_popup(Id::new("OPEN")));
                     },
                     ctx,
+                    Id::new("OPEN"),
                 );
             }
         }
 
         // Top menu bar
         if !state.persistent_settings.zen_mode {
-            egui::TopBottomPanel::top("menu")
-                .exact_height(36.0)
+            egui::Panel::top("menu")
+                .exact_size(36.0)
                 .show_separator_line(false)
-                .show(ctx, |ui| {
+                .show(ui, |ui| {
                     main_menu(ui, state);
                 });
         }
         if state.persistent_settings.zen_mode && state.persistent_settings.borderless {
-            egui::TopBottomPanel::top("menu_zen")
-                .min_height(40.)
-                .default_height(40.)
+            egui::Panel::top("menu_zen")
+                .min_size(40.)
+                .default_size(40.)
                 .show_separator_line(false)
                 .frame(egui::containers::Frame::NONE)
-                .show(ctx, |ui| {
+                .show(ui, |ui| {
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                         drag_area(ui, state);
                         ui.add_space(15.);
@@ -789,10 +786,9 @@ impl eframe::App for OculanteApp {
 
         // Scrub bar
         if state.persistent_settings.show_scrub_bar {
-            egui::TopBottomPanel::bottom("scrubber")
-                .max_height(22.)
-                .min_height(22.)
-                .show(ctx, |ui| {
+            egui::Panel::bottom("scrubber")
+                .exact_size(22.)
+                .show(ui, |ui| {
                     scrubber_ui(state, ui);
                 });
         }
@@ -803,7 +799,7 @@ impl eframe::App for OculanteApp {
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            edit_ui(ctx, state);
+            edit_ui(ui, state);
         }
 
         // Info panel
@@ -812,14 +808,19 @@ impl eframe::App for OculanteApp {
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            let (_bbox_tl, _bbox_br) = info_ui(ctx, state, &self.image_tiles);
+            let (_bbox_tl, _bbox_br) = info_ui(ui, state, &self.image_tiles);
         }
 
-        // UI state flags (before keyboard shortcuts, after panels)
-        state.pointer_over_ui = ctx.is_pointer_over_area();
-        state.mouse_grab = ctx.is_using_pointer()
+        let canvas_rect = ui.available_rect_before_wrap();
+        let pointer_pos = ctx.input(|i| i.pointer.interact_pos());
+        let over_floating_layer = pointer_pos
+            .and_then(|p| ctx.layer_id_at(p))
+            .is_some_and(|layer| layer.order != egui::Order::Background);
+        state.pointer_over_ui =
+            over_floating_layer || pointer_pos.map_or(true, |p| !canvas_rect.contains(p));
+        state.mouse_grab = ctx.egui_is_using_pointer()
             || state.edit_state.painting
-            || ctx.is_pointer_over_area()
+            || state.pointer_over_ui
             || state.edit_state.block_panning;
         state.key_grab = ctx.egui_wants_keyboard_input();
 
@@ -1023,7 +1024,7 @@ impl eframe::App for OculanteApp {
         let bg = self.state.persistent_settings.background_color;
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(bg[0], bg[1], bg[2])))
-            .show(ctx, |ui| {
+            .show(ui, |ui| {
                 if !self.image_tiles.is_empty() {
                     let offset = self.state.image_geometry.offset;
                     let scale = self.state.image_geometry.scale;
@@ -1110,7 +1111,7 @@ impl eframe::App for OculanteApp {
             && hide_delay > 0.0
         {
             let idle_time = ctx.input(|i| i.pointer.time_since_last_movement());
-            if idle_time >= hide_delay && !ctx.is_pointer_over_area() {
+            if idle_time >= hide_delay && !ctx.is_pointer_over_egui() {
                 ctx.set_cursor_icon(egui::CursorIcon::None);
             } else if idle_time < hide_delay {
                 ctx.request_repaint_after(Duration::from_secs_f32(hide_delay - idle_time));

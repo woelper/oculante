@@ -423,13 +423,10 @@ impl ImageOperation {
                         #[cfg(not(feature = "file_open"))]
                         {
                             if ui.button("Load lut").clicked() {
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("LUT")));
+                                crate::ui::open_popup(ui.ctx(), Id::new("LUT"));
                             }
 
-                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
-                                ui.ctx().memory_mut(|w| {
-                                    w.keep_popup_open(Id::new("LUT"));
-                                });
+                            if crate::ui::is_popup_open(ui.ctx(), Id::new("LUT")) {
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,
@@ -439,6 +436,7 @@ impl ImageOperation {
                                         x.mark_changed();
                                     },
                                     ui.ctx(),
+                                    Id::new("LUT"),
                                 );
                             }
                         }

@@ -21,6 +21,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
     settings: &mut VolatileSettings,
     mut callback: F,
     ctx: &egui::Context,
+    popup_id: Id,
 ) {
     let mut path = ctx
         .data(|r| r.get_temp::<PathBuf>(Id::new("FBPATH")))
@@ -42,18 +43,18 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 save,
                 |p| {
                     callback(p);
-                    ctx.memory_mut(|w| w.close_all_popups());
+                    crate::ui::close_popup(ctx, popup_id);
                 },
                 ui,
             );
 
             if ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
-                ui.ctx().memory_mut(|w| w.close_all_popups());
+                crate::ui::close_popup(ctx, popup_id);
             }
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
         });
     if !open {
-        ctx.memory_mut(|w| w.close_all_popups());
+        crate::ui::close_popup(ctx, popup_id);
     }
 }
 
@@ -485,6 +486,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
                         .auto_shrink([false, false])
+                        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
                         .show_rows(
                             ui,
                             (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,

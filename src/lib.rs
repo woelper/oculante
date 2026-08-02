@@ -20,6 +20,7 @@ pub mod paint;
 pub mod scrubber;
 // texture_wrapper removed — replaced by glow_renderer
 pub mod thumbnails;
+pub mod toasts;
 pub mod ui;
 pub mod window_config;
 

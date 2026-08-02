@@ -29,19 +29,18 @@ name = "oculante"
 
 [dependencies]
 env_logger = "0.11"
-glam = "0.32"
-eframe = { version = "0.34", default-features = false, features = ["glow"] }
-egui_glow = "0.34"
+glam = "0.33"
+eframe = { version = "0.35", default-features = false, features = ["glow"] }
+egui_glow = "0.35"
 glow = "0.17"
 # === EGUI
-egui = { version = "0.34", features = ["serde"] }
-egui_plot = "0.35"
-egui-notify = "0.22"
-egui_extras = { version = "0.34", features = ["image", "file"] }
+egui = { version = "0.35", features = ["serde"] }
+egui_plot = "0.36"
+egui_extras = { version = "0.35", features = ["image", "file"] }
 
 # === IMAGE FORMATS
 avif-decode = { version = "1.0", optional = true }
-turbojpeg = { version = "1.4", optional = true }
+turbojpeg = { version = "1.5", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"

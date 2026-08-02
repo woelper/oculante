@@ -108,7 +108,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         // Channel changes are picked up by the renderer each frame via
         // persistent_settings.current_channel — no GPU state update needed here.
 
-        let label_rect = ui.ctx().available_rect().shrink(50.);
+        let label_rect = ui.ctx().content_rect().shrink(50.);
 
         // TODO Center toast to image viewing area (Shift to the left / Right if the info or edit panel gets opened)
         if state.persistent_settings.current_channel != ColorChannel::Rgba {
@@ -291,7 +291,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
                 ui.ctx()
                     .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
 
-                ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                crate::ui::open_popup(ui.ctx(), Id::new("OPEN"));
             }
         }
 
