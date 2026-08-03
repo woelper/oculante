@@ -2,9 +2,7 @@
 //!
 //! To add more formats, add a variant to the `[FileEncoder]` struct.
 
-use crate::file_encoder::CompressionLevel::Best;
 use crate::ui::EguiExt;
-use CompressionLevel::Fast;
 use anyhow::Result;
 use egui::Ui;
 use image::codecs::jpeg::JpegEncoder;
@@ -111,6 +109,7 @@ impl FileEncoder {
                 ui.styled_slider(quality, 0..=100);
             }
             FileEncoder::Png { compressionlevel } => {
+                ui.label("Compression Level");
                 ui.horizontal_centered(|ui| {
                     let mut level = match *compressionlevel {
                         CompressionLevel::Fast => 0,
@@ -127,13 +126,13 @@ impl FileEncoder {
                         _ => unreachable!(),
                     };
 
-                    ui.label("Compression Level");
-
                     *compressionlevel = match level {
                         0 => CompressionLevel::Fast,
                         1 => CompressionLevel::Default,
                         _ => CompressionLevel::Best,
                     };
+
+                    ui.label(label);
                 });
             }
             FileEncoder::Bmp => {}
