@@ -195,12 +195,13 @@ impl Toasts {
             } else {
                 toast.shown = (toast.shown + dt / APPEAR_SECS).min(1.0);
                 if let Some(remaining) = toast.remaining.as_mut()
-                    && !hovered {
-                        *remaining -= dt;
-                        if *remaining <= 0.0 {
-                            toast.closing = true;
-                        }
+                    && !hovered
+                {
+                    *remaining -= dt;
+                    if *remaining <= 0.0 {
+                        toast.closing = true;
                     }
+                }
             }
 
             toast.last_height = height.max(1.0);
@@ -288,17 +289,18 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
             close_clicked = close.clicked();
 
             if let (Some(total), Some(remaining)) = (toast.total, toast.remaining)
-                && total > 0.0 {
-                    ui.add_space(8.0);
-                    let frac = (remaining / total).clamp(0.0, 1.0);
-                    let (rect, _) =
-                        ui.allocate_exact_size(vec2(ui.available_width(), 3.0), Sense::hover());
-                    ui.painter()
-                        .rect_filled(rect, 1.5, accent.gamma_multiply(0.25));
-                    let filled =
-                        Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
-                    ui.painter().rect_filled(filled, 1.5, accent);
-                }
+                && total > 0.0
+            {
+                ui.add_space(8.0);
+                let frac = (remaining / total).clamp(0.0, 1.0);
+                let (rect, _) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 3.0), Sense::hover());
+                ui.painter()
+                    .rect_filled(rect, 1.5, accent.gamma_multiply(0.25));
+                let filled =
+                    Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
+                ui.painter().rect_filled(filled, 1.5, accent);
+            }
         });
 
     close_clicked

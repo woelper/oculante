@@ -2,7 +2,9 @@
 //!
 //! To add more formats, add a variant to the `[FileEncoder]` struct.
 
+use crate::file_encoder::CompressionLevel::Best;
 use crate::ui::EguiExt;
+use CompressionLevel::Fast;
 use anyhow::Result;
 use egui::Ui;
 use image::codecs::jpeg::JpegEncoder;
@@ -13,8 +15,6 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 use strum::{Display, EnumIter};
-use CompressionLevel::Fast;
-use crate::file_encoder::CompressionLevel::Best;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Display, EnumIter)]
 
@@ -80,7 +80,7 @@ impl FileEncoder {
                     match compressionlevel {
                         CompressionLevel::Best => CompressionType::Best,
                         CompressionLevel::Default => CompressionType::Default,
-                        Fast => CompressionType::Fast,
+                        CompressionLevel::Fast => CompressionType::Fast,
                     },
                     image::codecs::png::FilterType::default(),
                 );
