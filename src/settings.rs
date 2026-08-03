@@ -186,6 +186,7 @@ impl Default for VolatileSettings {
                     compressionlevel: crate::file_encoder::CompressionLevel::Default,
                 },
                 FileEncoder::Bmp,
+                FileEncoder::Avif,
             ]
             .into_iter()
             .collect(),

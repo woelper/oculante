@@ -13,13 +13,15 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 use strum::{Display, EnumIter};
+use CompressionLevel::Fast;
+use crate::file_encoder::CompressionLevel::Best;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Display, EnumIter)]
 
 pub enum CompressionLevel {
-    Best,
     #[default]
     Default,
+    Best,
     Fast,
 }
 
@@ -29,6 +31,7 @@ pub enum FileEncoder {
     Png { compressionlevel: CompressionLevel },
     Bmp,
     WebP,
+    Avif,
 }
 
 impl Default for FileEncoder {
@@ -77,7 +80,7 @@ impl FileEncoder {
                     match compressionlevel {
                         CompressionLevel::Best => CompressionType::Best,
                         CompressionLevel::Default => CompressionType::Default,
-                        CompressionLevel::Fast => CompressionType::Fast,
+                        Fast => CompressionType::Fast,
                     },
                     image::codecs::png::FilterType::default(),
                 );
@@ -94,8 +97,10 @@ impl FileEncoder {
             FileEncoder::WebP => {
                 image.save_with_format(path, image::ImageFormat::WebP)?;
             }
+            FileEncoder::Avif => {
+                image.save_with_format(path, image::ImageFormat::Avif)?;
+            }
         }
-
         Ok(())
     }
 
@@ -105,11 +110,35 @@ impl FileEncoder {
                 ui.label("Quality");
                 ui.styled_slider(quality, 0..=100);
             }
-            FileEncoder::Png {
-                compressionlevel: _,
-            } => {}
+            FileEncoder::Png { compressionlevel } => {
+                ui.horizontal_centered(|ui| {
+                    let mut level = match *compressionlevel {
+                        CompressionLevel::Fast => 0,
+                        CompressionLevel::Default => 1,
+                        CompressionLevel::Best => 2,
+                    };
+
+                    ui.styled_slider(&mut level, 0..=2);
+
+                    let label = match level {
+                        0 => "(Fast)",
+                        1 => "(Default)",
+                        2 => "(Best)",
+                        _ => unreachable!(),
+                    };
+
+                    ui.label("Compression Level");
+
+                    *compressionlevel = match level {
+                        0 => CompressionLevel::Fast,
+                        1 => CompressionLevel::Default,
+                        _ => CompressionLevel::Best,
+                    };
+                });
+            }
             FileEncoder::Bmp => {}
             FileEncoder::WebP => {}
+            FileEncoder::Avif => {}
         }
     }
 }

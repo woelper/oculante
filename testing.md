@@ -41,7 +41,7 @@
 - [x] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 - [ ] Fit image on window resize is broken
 - [ ] Modifier keys don't work correctly in keybinds part of preferences
-- [ ] Scrolling on menu items can change window zoom
+- [x] Scrolling on menu items can change window zoom
 - [x] Animated images are broken (as of 2026-05-19)
 - [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
 - [ ] Having edit menu open freezes animated image, the image has to be reloaded with the edit menu closed to continue animating
