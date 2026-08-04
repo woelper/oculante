@@ -44,7 +44,7 @@ turbojpeg = { version = "1.5", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
-jxl-oxide = "0.8"
+jxl-oxide = "0.12"
 # These 3 need to be updated together
 resvg = "0.47"
 usvg = "0.47"

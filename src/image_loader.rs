@@ -835,7 +835,7 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 
         let frame_duration = render.duration() as u16 * ticks_ms;
         debug!("duration {frame_duration} ms");
-        let framebuffer = render.image();
+        let framebuffer = render.image_all_channels();
         debug!("{:?}", image.pixel_format());
         match image.pixel_format() {
             PixelFormat::Graya => {

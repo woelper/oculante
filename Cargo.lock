@@ -62,9 +62,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "1.1.4"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
+checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
 dependencies = [
  "memchr",
 ]
@@ -91,6 +91,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc890384c8602f339876ded803c97ad529f3842aba97f6392b3dba0dd171769b"
 dependencies = [
  "equator",
+]
+
+[[package]]
+name = "alloc-no-stdlib"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc7bb162ec39d46ab1ca8c77bf72e890535becd1751bb45f64c597edb4c8c6b3"
+
+[[package]]
+name = "alloc-stdlib"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e76a019e91224d279006ff972f1e984179a6e9feb050adba6ce8274aef23195"
+dependencies = [
+ "alloc-no-stdlib",
 ]
 
 [[package]]
@@ -798,6 +813,16 @@ dependencies = [
  "proc-macro2",
  "quote 1.0.47",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "brotli-decompressor"
+version = "5.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a32acac15fe1967bc3986b2a6347dffc965602354ea6f450ad07e8bfd253583"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
 ]
 
 [[package]]
@@ -2869,9 +2894,9 @@ checksum = "f70749695b063ecbf6b62949ccccde2e733ec3ecbbd71d467dca4e5c6c97cca0"
 
 [[package]]
 name = "glam"
-version = "0.33.2"
+version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f22fb22f065b308be0d8724e3706c7fa3fc2a6c7d6899df4cad7860e7a75436"
+checksum = "7360bd2cd76e0cd9032d42cf2922155cecea2685b0cfa4630c3246df030bcfd6"
 
 [[package]]
 name = "glifo"
@@ -3656,15 +3681,6 @@ dependencies = [
 
 [[package]]
 name = "jxl-bitstream"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5855ff16398ffbcf81fee52c41ca65326499c8764b21bb9952c367ace98995fb"
-dependencies = [
- "tracing",
-]
-
-[[package]]
-name = "jxl-bitstream"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "116184a8c915e99b08c7a4abca038b05863980bbf9e433dc2883363853c99afe"
@@ -3673,12 +3689,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "jxl-coding"
-version = "0.4.1"
+name = "jxl-bitstream"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da5b5093904e940bc11ef50e872c7bdf7b6e88653f012b925f8479daf212b5c9"
+checksum = "b480e752277e29eb4054f69546887a9b84656fe78c08f54ba5850ced98a378fe"
 dependencies = [
- "jxl-bitstream 0.4.1",
  "tracing",
 ]
 
@@ -3693,15 +3708,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "jxl-color"
-version = "0.7.1"
+name = "jxl-coding"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cb1c31e10054079df585633fc14fb9e4c96565c58c05b983c502e2472b57fa0"
+checksum = "cd972bcd125e776f1eb241ac50e39f956095a1c2770c64736c968f8946bd9a3c"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-coding 0.4.1",
- "jxl-grid 0.4.2",
- "jxl-threadpool",
+ "jxl-bitstream 1.1.0",
  "tracing",
 ]
 
@@ -3714,24 +3726,23 @@ dependencies = [
  "jxl-bitstream 0.5.1",
  "jxl-coding 0.5.0",
  "jxl-grid 0.5.3",
- "jxl-oxide-common",
- "jxl-threadpool",
+ "jxl-oxide-common 0.1.0",
+ "jxl-threadpool 0.1.2",
  "tracing",
 ]
 
 [[package]]
-name = "jxl-frame"
-version = "0.9.0"
+name = "jxl-color"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e35b289aa0f24044167d83a1c29ae2b99210c5082ab7e3e90dacbcae818aa0a2"
+checksum = "f316b1358c1711755b3ee8e8cb5c4a1dad12e796233088a7a513440782de80b2"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-coding 0.4.1",
- "jxl-grid 0.4.2",
- "jxl-image 0.9.0",
- "jxl-modular 0.7.1",
- "jxl-threadpool",
- "jxl-vardct 0.7.0",
+ "jxl-bitstream 1.1.0",
+ "jxl-coding 1.0.1",
+ "jxl-grid 0.6.2",
+ "jxl-image 0.13.0",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
  "tracing",
 ]
 
@@ -3746,18 +3757,26 @@ dependencies = [
  "jxl-grid 0.5.3",
  "jxl-image 0.11.0",
  "jxl-modular 0.9.1",
- "jxl-oxide-common",
- "jxl-threadpool",
+ "jxl-oxide-common 0.1.0",
+ "jxl-threadpool 0.1.2",
  "jxl-vardct 0.9.0",
  "tracing",
 ]
 
 [[package]]
-name = "jxl-grid"
-version = "0.4.2"
+name = "jxl-frame"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70b96735a85299a6bce8664643fcb759f29ea73ce344a90b6f7de9b92a8e9b2d"
+checksum = "2d967c6fd669c7c01060b5022d8835fa82fd46b06ffc98b549f17600a097c2b3"
 dependencies = [
+ "jxl-bitstream 1.1.0",
+ "jxl-coding 1.0.1",
+ "jxl-grid 0.6.2",
+ "jxl-image 0.13.0",
+ "jxl-modular 0.11.3",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
+ "jxl-vardct 0.11.1",
  "tracing",
 ]
 
@@ -3771,14 +3790,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "jxl-image"
-version = "0.9.0"
+name = "jxl-grid"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b31b17ed3bd0e3b65e7b06628f5930e009dda6cd17638cf5159a20a3feedec6"
+checksum = "01671307879a033bfa52e6e8784b941aca770b3f3a7d33830b455b6844f793fb"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-color 0.7.1",
- "jxl-grid 0.4.2",
  "tracing",
 ]
 
@@ -3791,20 +3807,37 @@ dependencies = [
  "jxl-bitstream 0.5.1",
  "jxl-color 0.9.0",
  "jxl-grid 0.5.3",
- "jxl-oxide-common",
+ "jxl-oxide-common 0.1.0",
  "tracing",
 ]
 
 [[package]]
-name = "jxl-modular"
-version = "0.7.1"
+name = "jxl-image"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da3b9fb8f46e63a14ecedefbd0f873b04162aaf8a09676b630c31bc8dadc4638"
+checksum = "c5f752d62577c702a94dbbce4045caf08cb58639e8a4d56464b40ecf33ffe565"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-coding 0.4.1",
- "jxl-grid 0.4.2",
- "jxl-threadpool",
+ "jxl-bitstream 1.1.0",
+ "jxl-grid 0.6.2",
+ "jxl-oxide-common 1.0.0",
+ "tracing",
+]
+
+[[package]]
+name = "jxl-jbr"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35d032bcec660647828527ff42c6f5776d2fd44b8357f9f6d9ac6dc07218e46"
+dependencies = [
+ "brotli-decompressor",
+ "jxl-bitstream 1.1.0",
+ "jxl-frame 0.13.3",
+ "jxl-grid 0.6.2",
+ "jxl-image 0.13.0",
+ "jxl-modular 0.11.3",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
+ "jxl-vardct 0.11.1",
  "tracing",
 ]
 
@@ -3817,25 +3850,22 @@ dependencies = [
  "jxl-bitstream 0.5.1",
  "jxl-coding 0.5.0",
  "jxl-grid 0.5.3",
- "jxl-oxide-common",
- "jxl-threadpool",
+ "jxl-oxide-common 0.1.0",
+ "jxl-threadpool 0.1.2",
  "tracing",
 ]
 
 [[package]]
-name = "jxl-oxide"
-version = "0.8.1"
+name = "jxl-modular"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ba1ee3895e6c62b131994807b1ee6d179013613a86c01c203369af8d1e8d2f0"
+checksum = "2a2f045b24c738dd91d482be385512b512721ae08a671bd4b27bf1c47f215235"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-color 0.7.1",
- "jxl-frame 0.9.0",
- "jxl-grid 0.4.2",
- "jxl-image 0.9.0",
- "jxl-render 0.8.2",
- "jxl-threadpool",
- "lcms2",
+ "jxl-bitstream 1.1.0",
+ "jxl-coding 1.0.1",
+ "jxl-grid 0.6.2",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
  "tracing",
 ]
 
@@ -3850,9 +3880,30 @@ dependencies = [
  "jxl-frame 0.11.1",
  "jxl-grid 0.5.3",
  "jxl-image 0.11.0",
- "jxl-oxide-common",
+ "jxl-oxide-common 0.1.0",
  "jxl-render 0.10.1",
- "jxl-threadpool",
+ "jxl-threadpool 0.1.2",
+ "tracing",
+]
+
+[[package]]
+name = "jxl-oxide"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d36c662923f47586880211f3bc7c0d83fb3a9b410d278c7bde93450748abeef3"
+dependencies = [
+ "brotli-decompressor",
+ "bytemuck",
+ "jxl-bitstream 1.1.0",
+ "jxl-color 0.11.0",
+ "jxl-frame 0.13.3",
+ "jxl-grid 0.6.2",
+ "jxl-image 0.13.0",
+ "jxl-jbr",
+ "jxl-oxide-common 1.0.0",
+ "jxl-render 0.12.4",
+ "jxl-threadpool 1.0.0",
+ "lcms2",
  "tracing",
 ]
 
@@ -3866,21 +3917,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "jxl-render"
-version = "0.8.2"
+name = "jxl-oxide-common"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "203a79b3025b86f875cc97a6f39e1fcc6314f915b2f6b69f767fca45fd482a11"
+checksum = "b62394c5021b3a9e7e0dbb2d639d555d019090c9946c39f6d3b09d390db4157b"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-coding 0.4.1",
- "jxl-color 0.7.1",
- "jxl-frame 0.9.0",
- "jxl-grid 0.4.2",
- "jxl-image 0.9.0",
- "jxl-modular 0.7.1",
- "jxl-threadpool",
- "jxl-vardct 0.7.0",
- "tracing",
+ "jxl-bitstream 1.1.0",
 ]
 
 [[package]]
@@ -3896,9 +3938,29 @@ dependencies = [
  "jxl-grid 0.5.3",
  "jxl-image 0.11.0",
  "jxl-modular 0.9.1",
- "jxl-oxide-common",
- "jxl-threadpool",
+ "jxl-oxide-common 0.1.0",
+ "jxl-threadpool 0.1.2",
  "jxl-vardct 0.9.0",
+ "tracing",
+]
+
+[[package]]
+name = "jxl-render"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d34386bfdb6a19b5a30cc9beb4d475d537422c31ae8c39bb69640fcce3fcaf19"
+dependencies = [
+ "bytemuck",
+ "jxl-bitstream 1.1.0",
+ "jxl-coding 1.0.1",
+ "jxl-color 0.11.0",
+ "jxl-frame 0.13.3",
+ "jxl-grid 0.6.2",
+ "jxl-image 0.13.0",
+ "jxl-modular 0.11.3",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
+ "jxl-vardct 0.11.1",
  "tracing",
 ]
 
@@ -3914,16 +3976,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "jxl-vardct"
-version = "0.7.0"
+name = "jxl-threadpool"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16af82a1ad770887cad720bfd3cc6a6d023faf377036989a24cf2c6538b649e0"
+checksum = "25f15eb830aa77a7f21148d72e153562a26bfe570139bd4922eab1908dd499d3"
 dependencies = [
- "jxl-bitstream 0.4.1",
- "jxl-coding 0.4.1",
- "jxl-grid 0.4.2",
- "jxl-modular 0.7.1",
- "jxl-threadpool",
+ "rayon",
+ "rayon-core",
  "tracing",
 ]
 
@@ -3937,8 +3996,23 @@ dependencies = [
  "jxl-coding 0.5.0",
  "jxl-grid 0.5.3",
  "jxl-modular 0.9.1",
- "jxl-oxide-common",
- "jxl-threadpool",
+ "jxl-oxide-common 0.1.0",
+ "jxl-threadpool 0.1.2",
+ "tracing",
+]
+
+[[package]]
+name = "jxl-vardct"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce72a18c6d3a47172ab6c479be2bdb56f22066b5d7092663f03b4490820b4511"
+dependencies = [
+ "jxl-bitstream 1.1.0",
+ "jxl-coding 1.0.1",
+ "jxl-grid 0.6.2",
+ "jxl-modular 0.11.3",
+ "jxl-oxide-common 1.0.0",
+ "jxl-threadpool 1.0.0",
  "tracing",
 ]
 
@@ -4200,9 +4274,9 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libredox"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"
+checksum = "2026a5056764a10b2bf5d56488cba40da507f5493a6a429340e2004d9ed085fa"
 dependencies = [
  "bitflags 2.13.1",
  "libc",
@@ -5125,7 +5199,7 @@ dependencies = [
  "fruitbasket",
  "gif 0.13.3",
  "gif-dispose",
- "glam 0.33.2",
+ "glam 0.33.3",
  "glow",
  "icns",
  "image",
@@ -5133,7 +5207,7 @@ dependencies = [
  "imageproc",
  "img-parts",
  "jpeg2k",
- "jxl-oxide 0.8.1",
+ "jxl-oxide 0.12.6",
  "kamadak-exif",
  "ktx2",
  "lexical-sort",
@@ -5333,27 +5407,33 @@ checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
 name = "palette"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cbf71184cc5ecc2e4e1baccdb21026c20e5fc3dcf63028a086131b3ab00b6e6"
+checksum = "ddeed8580d347d2abf3dcf06a5f0b3dc020258338526b277847cd4248a70fc64"
 dependencies = [
  "approx",
- "fast-srgb8",
  "palette_derive",
- "phf 0.11.3",
+ "palette_math",
+ "phf 0.13.1",
 ]
 
 [[package]]
 name = "palette_derive"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5030daf005bface118c096f510ffb781fc28f9ab6a32ab224d8631be6851d30"
+checksum = "88537020289b719d81be994ccf1bbf4990f477e2f69ee52fe3e45f43a02e56be"
 dependencies = [
  "by_address",
  "proc-macro2",
  "quote 1.0.47",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "palette_math"
+version = "0.7.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e6eb142958d64335fb0e345c5b9ead2ecd6fc438c307e9d7d3c4fd428dbaf12"
 
 [[package]]
 name = "parking"
@@ -5486,6 +5566,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
+dependencies = [
+ "phf_shared 0.13.1",
+]
+
+[[package]]
 name = "phf_generator"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5550,6 +5639,15 @@ checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
 dependencies = [
  "siphasher 1.0.3",
  "unicase",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
+dependencies = [
+ "siphasher 1.0.3",
 ]
 
 [[package]]
@@ -8038,9 +8136,9 @@ dependencies = [
 
 [[package]]
 name = "webbrowser"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef62a3d5f7b2411119a11b6f62570dbff91d7105e011a20fb83fbf8f5761c40f"
+checksum = "3d6eb50cc7b133f0c7720a64661fbd8e520b882f8ab9015deea5e00d5cd809c4"
 dependencies = [
  "jni",
  "log",
@@ -9070,9 +9168,9 @@ dependencies = [
 
 [[package]]
 name = "zlib-rs"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b142a20ec14a91d5bc708c1dc21b080c550113d8aa77afa29635673a65dd02c5"
+checksum = "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12"
 
 [[package]]
 name = "zmij"
