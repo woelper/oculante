@@ -46,8 +46,8 @@ quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.12"
 # These 3 need to be updated together
-resvg = "0.47"
-usvg = "0.47"
+resvg = "0.48"
+usvg = "0.48"
 tiny-skia = "0.12"
 libheif-rs = { version = "2", default-features = false, features = [
     "v1_19",
@@ -65,8 +65,8 @@ jpeg2k = { version = "0.10", optional = true, default-features = false, features
 ] }
 icns = "0.4"
 # dicom needs to be the same version
-dicom-pixeldata = { version = "0.9", features = ["image"] }
-dicom-object = "0.9"
+dicom-pixeldata = { version = "0.10", features = ["image"] }
+dicom-object = "0.10"
 libavif-image = { version = "0.14", optional = true }
 gif-dispose = "5.0.1"
 
@@ -96,8 +96,8 @@ img-parts = "0.4"                                                               
 trash = "5.2"
 flate2 = "1.1"                                                                                                           # for KTX
 bitflags = "2.13"                                                                                                         # for KTX
-wgpu = "29"                                                                                                              # for KTX
-ruzstd = "0.8"                                                                                                           # for KTX
+wgpu = "30"                                                                                                              # for KTX
+ruzstd = "0.9"                                                                                                           # for KTX
 mouse_position = "0.1.4"
 file-format = "0.29"
 zip = "8.6"
@@ -159,7 +159,7 @@ cmake = "0.1"
 cmd_lib = "2"
 xmltree = "0.12"
 chrono = "0.4.45"
-criterion = { version = "0.5.1", features = ["html_reports", "stable"] }
+criterion = { version = "0.8", features = ["html_reports", "stable"] }
 
 [profile.release]
 opt-level = 3
