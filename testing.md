@@ -5,6 +5,7 @@
 - [ ] Always on top: Works on Mac, does not work on PopOS/Cosmic (Wayland)
 - [ ] Paint mode
 - [ ] OSX file associations
+- [ ] See if the transparency issue has been fixed (#342)
 
 # Obvious defects
 - [x] The loaded image is always drawn in front on top of the ui
@@ -45,6 +46,7 @@
 - [x] Animated images are broken (as of 2026-05-19)
 - [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
 - [ ] Having edit menu open freezes animated image, the image has to be reloaded with the edit menu closed to continue animating
+- [ ] Floating windows cannot be resized vertically. I believe this possibly has to do with egui::ScrollArea?
 
 
 # Performance
@@ -63,8 +65,6 @@
 - [x] Move test files to res/tests
 - [x] Update to Rust 2024
 
-
-
 # Things to improve not related to removing Notan
 - [ ] I am unhappy with the HEIC / HEIF situation. It is widely used by now and the build has been hard as we have not been using a native library and linking to libheif was hard on all platforms. Investigate if this has changed and if there is more robust heif/heic support that we can use, native rust if possible
 - [ ] Painting should not be a mode but rather a normal operator
@@ -74,7 +74,7 @@
 - [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
 - [x] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
 - [x] Remove update functionality
-
+- [ ] Sign release binaries
 
 Things to keep in mind:
 Oculante has a multi-stage system to keep textures in memory:
