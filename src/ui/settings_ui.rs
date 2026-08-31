@@ -6,9 +6,9 @@ use crate::appstate::OculanteState;
 use crate::thumbnails::get_disk_cache_path;
 use crate::{settings, utils::*};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
 
-pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx: &mut Graphics) {
+pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
     #[derive(Debug, PartialEq)]
     enum SettingsState {
         General,
@@ -109,7 +109,12 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                     dark_panel(ui, |ui| {
                         // ui.add_space(ui.available_width());
-                        egui::ScrollArea::vertical().auto_shrink([false,false]).min_scrolled_height(400.).min_scrolled_width(400.).show(ui, |ui| {
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false,false])
+                            .min_scrolled_height(400.)
+                            .min_scrolled_width(400.)
+                            .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                            .show(ui, |ui| {
 
                             ui.vertical(|ui| {
 
@@ -175,9 +180,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     configuration_item_ui("Redraw every frame", "Turns off optimisations and redraws everything each frame. This will consume more CPU but gives you instant feedback if new images come in or if modifications are made. A restart is required to take effect.", |ui| {
-                                        if ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "").changed(){
-                                            app.window().set_lazy_loop(!state.persistent_settings.force_redraw);
-                                        }
+                                        ui.styled_checkbox(&mut state.persistent_settings.force_redraw, "");
                                     }, ui);
 
                                     configuration_item_ui("Use mipmaps", "When zooming out, less memory will be used. Faster performance, but blurry.", |ui| {
@@ -216,14 +219,6 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     }, ui);
 
-                                    #[cfg(feature = "update")]
-                                    configuration_item_ui("Check for updates", "Check for updates and install the latest update if available. A restart is required to use a newly installed version.", |ui| {
-                                        if ui.button("Check").clicked() {
-                                            state.send_message_info("Checking for updates...");
-                                            crate::update::update(Some(state.message_channel.0.clone()));
-                                            state.settings_enabled = false;
-                                        }
-                                    }, ui);
 
                                     configuration_item_ui("Visit GitHub Repository", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
                                         if ui.link("Check it out!").on_hover_text("https://github.com/woelper/oculante").clicked() {
@@ -311,8 +306,16 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
 
                                     configuration_item_ui("Zen mode", "Hides all UI and fits images to the frame.", |ui| {
                                         if ui.styled_checkbox(&mut state.persistent_settings.zen_mode, "").changed(){
-                                            set_title(app, state);
+                                            set_title(ctx, state);
                                         }
+                                    }, ui);
+
+                                    configuration_item_ui("Zen mode cursor timeout", "Hides the mouse cursor after this many seconds of inactivity while in zen mode. Set to 0 to disable.", |ui| {
+                                        ui.add(egui::DragValue::new(&mut state.persistent_settings.zen_mode_cursor_timeout).range(0.0..=15.0).speed(0.1));
+                                    }, ui);
+
+                                    configuration_item_ui("Zen mode enabled notification", "Shows a notification when zen mode is turned on.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.show_zen_mode_notification, "");
                                     }, ui);
 
 
@@ -326,7 +329,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         )
                                         .changed()
                                         {
-                                            set_title(app, state);
+                                            set_title(ctx, state);
                                         }
                                     });
 
@@ -338,7 +341,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     input.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
-                                    keybinding_ui(app, state, ui);
+                                    keybinding_ui(state, ui);
                                 });
 
                                 let decoders = ui.heading("Decoders");
@@ -346,6 +349,34 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     decoders.scroll_to_me(Some(Align::TOP));
                                 }
                                 light_panel(ui, |ui| {
+                                    configuration_item_ui(
+                                        "SVG scale",
+                                        "Adjusts resolution that SVGs are displayed at.",
+                                        |ui| {
+                                            let changed = ui
+                                                .add(
+                                                    egui::DragValue::new(&mut state.persistent_settings.decoders.svg_scale)
+                                                        .range(0.01..=100.0)
+                                                        .speed(0.01),
+                                                )
+                                                .changed();
+                                            if changed {
+                                                state.player.set_decoder_opts(state.persistent_settings.decoders);
+                                                state.player.cache.clear();
+                                                if let Some(path) = state.current_path.clone()
+                                                    && path
+                                                        .extension()
+                                                        .and_then(|e| e.to_str())
+                                                        .is_some_and(|e| e.eq_ignore_ascii_case("svg"))
+                                                {
+                                                    state.is_loaded = false;
+                                                    state.player.load(&path);
+                                                }
+                                            }
+                                        },
+                                        ui,
+                                    );
+
                                     configuration_item_ui(
                                         "HEIF security override",
                                         "Disable all HEIF security limits. A restart is required to take effect.",
@@ -672,6 +703,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                         }
 
                                     }, ui);
+
+                                    configuration_item_ui("Version", "Build version and commit hash. This is useful when reporting bugs.", |ui| {
+                                        ui.label(detailed_version());
+                                    }, ui);
                                 });
                             });
                         });
@@ -685,28 +720,48 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
     state.settings_enabled = settings_enabled;
 }
 
-fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
-    // Make sure no shortcuts are received by the application
+fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
+    use crate::shortcuts::{Shortcut, keypresses_as_string};
+
     state.key_grab = true;
 
-    let no_keys_pressed = app.keyboard.down.is_empty();
+    // Build shortcut from keys_down + modifiers from the latest key event
+    // (input.modifiers is not populated by notan's egui plugin, but
+    // Event::Key carries correct per-event modifiers)
+    // FIXME: This flickers and is unreliable. After notan is gone, revisit this.
+    let ctx = ui.ctx();
+    let current = ctx.input(|i| {
+        let keys: std::collections::BTreeSet<egui::Key> = i.keys_down.iter().copied().collect();
+        // Get modifiers from the most recent key event
+        // (input.modifiers is not populated by notan's egui plugin)
+        let mods = i
+            .events
+            .iter()
+            .rev()
+            .find_map(|e| {
+                if let egui::Event::Key { modifiers, .. } = e {
+                    Some(*modifiers)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+        Shortcut {
+            keys,
+            modifiers: mods,
+        }
+    });
+    let has_keys = !current.keys.is_empty();
 
     ui.horizontal(|ui| {
         ui.label_unselectable("While this is open, regular shortcuts will not work.");
-        if no_keys_pressed {
+        if !has_keys {
             ui.label_unselectable(
                 egui::RichText::new("Please press & hold a key")
                     .color(ui.style().visuals.selection.bg_fill),
             );
         }
     });
-
-    let k = app
-        .keyboard
-        .down
-        .iter()
-        .map(|k| format!("{:?}", k.0))
-        .collect::<BTreeSet<String>>();
 
     let s = state.persistent_settings.shortcuts.clone();
     let mut ordered_shortcuts = state
@@ -720,20 +775,15 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .num_columns(4)
         .spacing([100.0, 10.0])
         .show(ui, |ui| {
-            for (event, keys) in ordered_shortcuts {
+            for (event, shortcut) in ordered_shortcuts {
                 ui.label_unselectable(format!("{event:?}"));
                 ui.label_unselectable(lookup(&s, event));
-                if !no_keys_pressed {
+                if has_keys {
                     if ui
-                        .button(format!("Assign {}", keypresses_as_string(&k)))
+                        .button(format!("Assign {}", keypresses_as_string(&current)))
                         .clicked()
                     {
-                        *keys = app
-                            .keyboard
-                            .down
-                            .iter()
-                            .map(|(k, _)| format!("{k:?}"))
-                            .collect();
+                        *shortcut = current.clone();
                     }
                 } else {
                     ui.add_enabled(false, egui::Button::new("Press key(s)..."));

@@ -9,25 +9,24 @@ use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
+use egui::epaint::PathShape;
+use egui::{
+    self, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke, StrokeKind,
+    Ui, Vec2, lerp, vec2,
+};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
+use image::{ColorType, DynamicImage, Rgba, RgbaImage, imageops};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
-use notan::egui::epaint::PathShape;
-use notan::egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke,
-    StrokeKind, Vec2,
-};
-use notan::egui::{Response, Ui};
-use palette::{rgb::Rgb, Hsl, IntoColor};
-use rand::{thread_rng, Rng};
+use num_integer::gcd;
+use palette::{Hsl, IntoColor, rgb::Rgb};
+use rand::RngExt;
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -40,6 +39,9 @@ pub struct EditState {
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
+    /// Whether to completely bypass processing the edit stack
+    #[serde(skip)]
+    pub skip_processing: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
@@ -92,6 +94,7 @@ impl Default for EditState {
             brushes: default_brushes(),
             pixel_op_stack: vec![],
             image_op_stack: vec![],
+            skip_processing: false,
             export_extension: "png".into(),
         }
     }
@@ -149,7 +152,7 @@ pub struct ImgOpItem {
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random(),
             active: true,
             operation: op,
         }
@@ -420,10 +423,10 @@ impl ImageOperation {
                         #[cfg(not(feature = "file_open"))]
                         {
                             if ui.button("Load lut").clicked() {
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("LUT")));
+                                crate::ui::open_popup(ui.ctx(), Id::new("LUT"));
                             }
 
-                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
+                            if crate::ui::is_popup_open(ui.ctx(), Id::new("LUT")) {
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,
@@ -433,6 +436,7 @@ impl ImageOperation {
                                         x.mark_changed();
                                     },
                                     ui.ctx(),
+                                    Id::new("LUT"),
                                 );
                             }
                         }
@@ -696,7 +700,7 @@ impl ImageOperation {
 
                     // Make sure points are monotonic ascending by position
 
-                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+                    pts.sort_by_key(|a| a.pos);
 
                     response
                 })
@@ -841,8 +845,11 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // enable this if this is used to draw
-                // let id = Id::new("shapes");
+                // Draw on the middle layer — above the image (CentralPanel) but behind side panels
+                let painter = ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    Id::new("measure_overlay"),
+                ));
 
                 // let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
@@ -871,7 +878,7 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
                             for p in points_transformed.chunks(2) {
-                                ui.painter().line_segment(
+                                painter.line_segment(
                                     [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
@@ -905,22 +912,20 @@ impl ImageOperation {
                                 max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             };
 
-                            ui.painter().rect_stroke(
+                            painter.rect_stroke(
                                 rect,
                                 0.0,
                                 Stroke::new(*width as f32, Color32::BLACK),
                                 StrokeKind::Inside,
                             );
 
-                            ui.painter().rect_filled(
+                            painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::BLACK,
-                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                // StrokeKind::Inside,
+                                Color32::from_rgba_unmultiplied(0, 0, 0, 80),
                             );
 
-                            ui.painter().text(
+                            painter.text(
                                 rect.expand(14.).center_bottom(),
                                 Align2::CENTER_CENTER,
                                 format!(
@@ -932,12 +937,12 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.left_center(), rect.right_center()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.center_top(), rect.center_bottom()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
@@ -1115,26 +1120,33 @@ impl ImageOperation {
 
                 ui.vertical(|ui| {
                     // This handles the initial state when the filter is first added.
-                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                    if *aspect
+                        && ui
+                            .ctx()
+                            .data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none())
+                    {
                         let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
-                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                     }
 
                     // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
-                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
-                        if dimensions.1 > 0 {
-                            dimensions.0 as f64 / dimensions.1 as f64
-                        } else {
-                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
-                        }
-                    });
+                    let aspect_ratio = ui
+                        .ctx()
+                        .data(|d| d.get_temp(aspect_ratio_id))
+                        .unwrap_or_else(|| {
+                            if dimensions.1 > 0 {
+                                dimensions.0 as f64 / dimensions.1 as f64
+                            } else {
+                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                            }
+                        });
 
                     let g = gcd(dimensions.1, dimensions.0);
                     let w = dimensions.0 / g;
                     let h = dimensions.1 / g;
 
                     ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
-
 
                     ui.horizontal(|ui| {
                         let x_response = ui.add(
@@ -1173,7 +1185,8 @@ impl ImageOperation {
                                 } else {
                                     geo.dimensions.0 as f64 / geo.dimensions.1 as f64
                                 };
-                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                                ui.ctx()
+                                    .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                             }
                             r.mark_changed();
                         }
@@ -1198,22 +1211,21 @@ impl ImageOperation {
                         });
 
                     ui.vertical_centered_justified(|ui| {
+                        if ui.button("Reset").clicked() {
+                            // Reset dimensions to original
+                            *dimensions = geo.dimensions;
 
-                    if ui.button("Reset").clicked() {
-                        // Reset dimensions to original
-                        *dimensions = geo.dimensions;
+                            // Reset aspect lock to default (true)
+                            *aspect = true;
 
-                        // Reset aspect lock to default (true)
-                        *aspect = true;
+                            // Remove the stored aspect ratio from egui's memory.
+                            // This will cause it to be recalculated from the original dimensions
+                            // on the next frame, effectively resetting it.
+                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
 
-                        // Remove the stored aspect ratio from egui's memory.
-                        // This will cause it to be recalculated from the original dimensions
-                        // on the next frame, effectively resetting it.
-                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
-
-                        // Mark the UI as changed
-                        r.mark_changed();
-                    }
+                            // Mark the UI as changed
+                            r.mark_changed();
+                        }
                     });
                 });
                 r
@@ -1227,23 +1239,21 @@ impl ImageOperation {
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
-                    Self::Blur(amt) => {
-                        if *amt != 0 {
-                            let i = img.clone();
-                            let mut data = i.into_raw();
-                            libblur::stack_blur(
-                                data.as_mut_slice(),
-                                img.width() * 4,
-                                img.width(),
-                                img.height(),
-                                (*amt as u32).clamp(2, 254),
-                                libblur::FastBlurChannels::Channels4,
-                                libblur::ThreadingPolicy::Adaptive,
-                            );
-                            use anyhow::Context;
-                            *img = RgbaImage::from_raw(img.width(), img.height(), data)
-                                .context("Can't construct image from blur result")?;
-                        }
+                    Self::Blur(amt) if *amt != 0 => {
+                        let i = img.clone();
+                        let mut data = i.into_raw();
+                        libblur::stack_blur(
+                            data.as_mut_slice(),
+                            img.width() * 4,
+                            img.width(),
+                            img.height(),
+                            (*amt as u32).clamp(2, 254),
+                            libblur::FastBlurChannels::Channels4,
+                            libblur::ThreadingPolicy::Adaptive,
+                        );
+                        use anyhow::Context;
+                        *img = RgbaImage::from_raw(img.width(), img.height(), data)
+                            .context("Can't construct image from blur result")?;
                     }
                     Self::Filter3x3(amt) => {
                         let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
@@ -1255,19 +1265,19 @@ impl ImageOperation {
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
                             correct_image(&mut external_image, &lut_img);
-                        } else if let Ok(lut_img) = image::open(lut_name) {
-                            correct_image(&mut external_image, &lut_img.to_rgb8());
+                        } else {
+                            if let Ok(lut_img) = image::open(lut_name) {
+                                correct_image(&mut external_image, &lut_img.to_rgb8());
+                            }
                         }
                         *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
-                    Self::Crop(dim) => {
-                        if *dim != [0, 0, 0, 0] {
-                            let window = cropped_range(dim, &(img.width(), img.height()));
-                            let sub_img = image::imageops::crop_imm(
-                                img, window[0], window[1], window[2], window[3],
-                            );
-                            *img = sub_img.to_image();
-                        }
+                    Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
+                        let window = cropped_range(dim, &(img.width(), img.height()));
+                        let sub_img = image::imageops::crop_imm(
+                            img, window[0], window[1], window[2], window[3],
+                        );
+                        *img = sub_img.to_image();
                     }
                     Self::CropPerspective { points, .. } => {
                         let img_dim = img.dimensions();
@@ -1314,52 +1324,49 @@ impl ImageOperation {
                     }
                     Self::Resize {
                         dimensions, filter, ..
-                    } => {
-                        if *dimensions != Default::default() {
-                            let filter = match filter {
-                                ScaleFilter::Box => fr::FilterType::Box,
-                                ScaleFilter::Bilinear => fr::FilterType::Bilinear,
-                                ScaleFilter::Hamming => fr::FilterType::Hamming,
-                                ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
-                                ScaleFilter::Mitchell => fr::FilterType::Mitchell,
-                                ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
-                            };
+                    } if *dimensions != Default::default() => {
+                        let filter = match filter {
+                            ScaleFilter::Box => fr::FilterType::Box,
+                            ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                            ScaleFilter::Hamming => fr::FilterType::Hamming,
+                            ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                            ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                            ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
+                        };
 
-                            let src_image = fr::images::Image::from_vec_u8(
-                                img.width(),
-                                img.height(),
-                                img.clone().into_raw(),
-                                fr::PixelType::U8x4,
-                            )?;
+                        let src_image = fr::images::Image::from_vec_u8(
+                            img.width(),
+                            img.height(),
+                            img.clone().into_raw(),
+                            fr::PixelType::U8x4,
+                        )?;
 
-                            // Create container for data of destination image
-                            let mut dst_image = fr::images::Image::new(
+                        // Create container for data of destination image
+                        let mut dst_image = fr::images::Image::new(
+                            dimensions.0,
+                            dimensions.1,
+                            src_image.pixel_type(),
+                        );
+
+                        let mut resizer = fr::Resizer::new();
+
+                        resizer.resize(
+                            &src_image,
+                            &mut dst_image,
+                            Some(
+                                &ResizeOptions::new()
+                                    .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                            ),
+                        )?;
+
+                        *img = anyhow::Context::context(
+                            image::RgbaImage::from_raw(
                                 dimensions.0,
                                 dimensions.1,
-                                src_image.pixel_type(),
-                            );
-
-                            let mut resizer = fr::Resizer::new();
-
-                            resizer.resize(
-                                &src_image,
-                                &mut dst_image,
-                                Some(
-                                    &ResizeOptions::new().resize_alg(
-                                        fast_image_resize::ResizeAlg::Convolution(filter),
-                                    ),
-                                ),
-                            )?;
-
-                            *img = anyhow::Context::context(
-                                image::RgbaImage::from_raw(
-                                    dimensions.0,
-                                    dimensions.1,
-                                    dst_image.into_vec(),
-                                ),
-                                "Can't create RgbaImage",
-                            )?;
-                        }
+                                dst_image.into_vec(),
+                            ),
+                            "Can't create RgbaImage",
+                        )?;
                     }
                     Self::Rotate(angle) => match angle {
                         90 => *img = image::imageops::rotate90(img),
@@ -1565,25 +1572,25 @@ impl ImageOperation {
                 }?;
 
                 if eval_empty_with_context_mut(expr, &mut context).is_ok() {
-                    if let Some(r) = context.get_value("r") {
-                        if let Ok(r) = r.as_float() {
-                            p[0] = r as f32
-                        }
+                    if let Some(r) = context.get_value("r")
+                        && let Ok(r) = r.as_float()
+                    {
+                        p[0] = r as f32
                     }
-                    if let Some(g) = context.get_value("g") {
-                        if let Ok(g) = g.as_float() {
-                            p[1] = g as f32
-                        }
+                    if let Some(g) = context.get_value("g")
+                        && let Ok(g) = g.as_float()
+                    {
+                        p[1] = g as f32
                     }
-                    if let Some(b) = context.get_value("b") {
-                        if let Ok(b) = b.as_float() {
-                            p[2] = b as f32
-                        }
+                    if let Some(b) = context.get_value("b")
+                        && let Ok(b) = b.as_float()
+                    {
+                        p[2] = b as f32
                     }
-                    if let Some(a) = context.get_value("a") {
-                        if let Ok(a) = a.as_float() {
-                            p[3] = a as f32
-                        }
+                    if let Some(a) = context.get_value("a")
+                        && let Ok(a) = a.as_float()
+                    {
+                        p[3] = a as f32
                     }
                 }
             }
@@ -1596,10 +1603,10 @@ impl ImageOperation {
             Self::Noise { amt, mono } => {
                 let amt = *amt as f32 / 100.;
 
-                let mut rng = thread_rng();
-                let n_r: f32 = rng.gen();
-                let n_g: f32 = if *mono { n_r } else { rng.gen() };
-                let n_b: f32 = if *mono { n_r } else { rng.gen() };
+                let mut rng = rand::rng();
+                let n_r: f32 = rng.random();
+                let n_g: f32 = if *mono { n_r } else { rng.random() };
+                let n_b: f32 = if *mono { n_r } else { rng.random() };
 
                 p[0] = egui::lerp(p[0]..=n_r, amt);
                 p[1] = egui::lerp(p[1]..=n_g, amt);
@@ -1941,7 +1948,7 @@ impl GradientStop {
 
     pub fn new(pos: u8, rgb: [u8; 3]) -> Self {
         GradientStop {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random::<u64>() as usize,
             pos,
             col: rgb,
         }
@@ -1964,7 +1971,8 @@ fn range_test() {
         GradientStop::new(128, [255, 83, 0]),
         GradientStop::new(255, [224, 255, 0]),
     ];
-    std::env::set_var("RUST_LOG", "debug");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     let _ = env_logger::try_init();
     let res = interpolate_u8(&map, 5);
 

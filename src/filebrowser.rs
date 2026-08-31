@@ -1,13 +1,14 @@
 use super::icons::*;
+#[cfg(feature = "file_open")]
 use crate::appstate::OculanteState;
 use crate::file_encoder::FileEncoder;
 use crate::settings::VolatileSettings;
-use crate::thumbnails::{Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE};
-use crate::ui::{render_file_icon, EguiExt, BUTTON_HEIGHT_LARGE};
+use crate::thumbnails::{THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails};
+use crate::ui::{BUTTON_HEIGHT_LARGE, EguiExt, render_file_icon};
 
 use dirs;
+use egui::{self, *};
 use log::debug;
-use notan::egui::{self, *};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -20,6 +21,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
     settings: &mut VolatileSettings,
     mut callback: F,
     ctx: &egui::Context,
+    popup_id: Id,
 ) {
     let mut path = ctx
         .data(|r| r.get_temp::<PathBuf>(Id::new("FBPATH")))
@@ -41,18 +43,18 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 save,
                 |p| {
                     callback(p);
-                    ctx.memory_mut(|w| w.close_popup());
+                    crate::ui::close_popup(ctx, popup_id);
                 },
                 ui,
             );
 
             if ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
-                ui.ctx().memory_mut(|w| w.close_popup());
+                crate::ui::close_popup(ctx, popup_id);
             }
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
         });
     if !open {
-        ctx.memory_mut(|w| w.close_popup());
+        crate::ui::close_popup(ctx, popup_id);
     }
 }
 
@@ -268,11 +270,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
                 .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
             )
             .clicked()
+            && let Some(d) = path.parent()
         {
-            if let Some(d) = path.parent() {
-                let p = d.to_path_buf();
-                *path = p;
-            }
+            let p = d.to_path_buf();
+            *path = p;
         }
 
         let path_icon = if state.path_active { FOLDER } else { TERMINAL };
@@ -371,10 +372,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
             Vec2::new(120., ui.available_height()),
             Layout::top_down_justified(Align::LEFT),
             |ui| {
-                if let Some(d) = dirs::home_dir() {
-                    if ui.styled_button(format!("{FOLDER} Home")).clicked() {
-                        *path = d;
-                    }
+                if let Some(d) = dirs::home_dir()
+                    && ui.styled_button(format!("{FOLDER} Home")).clicked()
+                {
+                    *path = d;
                 }
                 if let Some(drives) = state.drives.as_ref() {
                     for drive in drives {
@@ -386,37 +387,33 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         }
                     }
                 }
-                if let Some(d) = dirs::desktop_dir() {
-                    if ui
+                if let Some(d) = dirs::desktop_dir()
+                    && ui
                         .styled_button(format!("{FOLDERDESKTOP} Desktop"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
                 }
-                if let Some(d) = dirs::document_dir() {
-                    if ui
+                if let Some(d) = dirs::document_dir()
+                    && ui
                         .styled_button(format!("{FOLDERDOCUMENT} Documents"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
                 }
-                if let Some(d) = dirs::download_dir() {
-                    if ui
+                if let Some(d) = dirs::download_dir()
+                    && ui
                         .styled_button(format!("{FOLDERDOWNLOAD} Downloads"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
                 }
-                if let Some(d) = dirs::picture_dir() {
-                    if ui
+                if let Some(d) = dirs::picture_dir()
+                    && ui
                         .styled_button(format!("{FOLDERIMAGE} Pictures"))
                         .clicked()
-                    {
-                        *path = d;
-                    }
+                {
+                    *path = d;
                 }
 
                 for folder in &settings.folder_bookmarks.clone() {
@@ -433,7 +430,8 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     if res.hovered() {
-                        if ui.input(|r| r.key_released(Key::D)) && !ui.ctx().wants_keyboard_input()
+                        if ui.input(|r| r.key_released(Key::D))
+                            && !ui.ctx().egui_wants_keyboard_input()
                         {
                             settings.folder_bookmarks.remove(folder);
                         }
@@ -488,6 +486,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     egui::ScrollArea::new([false, true])
                         .min_scrolled_height(400.)
                         .auto_shrink([false, false])
+                        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
                         .show_rows(
                             ui,
                             (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
@@ -507,18 +506,24 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                         if visible_entries.is_empty() {
                                             let r = ui.label("Empty directory");
                                             let r = r.interact(Sense::click());
-                                            if r.clicked() {
-                                                if let Some(parent) = path.parent() {
-                                                    *path = parent.to_path_buf();
-                                                }
+                                            if r.clicked()
+                                                && let Some(parent) = path.parent()
+                                            {
+                                                *path = parent.to_path_buf();
                                             }
                                         } else {
+                                            // render directories
                                             for de in visible_entries.iter().filter(|e| e.is_dir())
                                             {
                                                 if render_file_icon(de, ui, &mut state.thumbnails)
                                                     .clicked()
                                                 {
                                                     *path = de.to_path_buf();
+                                                    // If user has a search term active, we want to
+                                                    // clear it when changing dir
+                                                    if state.search_active {
+                                                        state.search_term.clear();
+                                                    }
                                                 }
                                             }
 
@@ -592,7 +597,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                             continue;
                         }
                         let e = f.ext();
-                        if ui.selectable_label(ext == e, &e).clicked() {
+                        if ui.add(egui::Button::new(&e).selected(ext == e)).clicked() {
                             state.filename = Path::new(&state.filename)
                                 .with_extension(&e)
                                 .to_string_lossy()

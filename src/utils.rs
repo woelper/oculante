@@ -2,9 +2,7 @@ use arboard::Clipboard;
 
 use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error, info};
-use nalgebra::{clamp, Vector2};
-use notan::graphics::Texture;
-use notan::prelude::{App, Graphics};
+use nalgebra::{Vector2, clamp};
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use serde::{Deserialize, Serialize};
@@ -28,7 +26,7 @@ use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
 use crate::settings::DecoderSettings;
-use crate::shortcuts::{lookup, InputEvent, Shortcuts};
+use crate::shortcuts::{InputEvent, Shortcuts, lookup};
 
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "bmp",
@@ -180,11 +178,11 @@ impl ExtendedImageInfo {
                 "PatientAge",
                 "PixelSpacing",
             ] {
-                if let Ok(e) = obj.element_by_name(name) {
-                    if let Ok(s) = e.to_str() {
-                        info!("{name}: {s}");
-                        dicom_data.insert(name.to_string(), s.to_string());
-                    }
+                if let Ok(e) = obj.element_by_name(name)
+                    && let Ok(s) = e.to_str()
+                {
+                    info!("{name}: {s}");
+                    dicom_data.insert(name.to_string(), s.to_string());
                 }
             }
             self.dicom = Some(DicomData {
@@ -297,21 +295,24 @@ impl Player {
         }
     }
 
-    pub fn check_modified(&mut self, path: &Path) {
-        if let Some(watched_mod) = self.watcher.get(path) {
-            if let Ok(meta) = std::fs::metadata(path) {
-                if let Ok(modified) = meta.modified() {
-                    if watched_mod != &modified {
-                        debug!(
-                            "Modified! read from meta {:?} stored: {:?}",
-                            modified, watched_mod
-                        );
+    // Updates decoder settings for subsequently loaded images. To apply to images that are already loaded, clear cache and reload.
+    pub fn set_decoder_opts(&mut self, decoder_opts: DecoderSettings) {
+        self.decoder_opts = decoder_opts;
+    }
 
-                        self.cache.data.remove(path);
-                        self.load(path);
-                    }
-                }
-            }
+    pub fn check_modified(&mut self, path: &Path) {
+        if let Some(watched_mod) = self.watcher.get(path)
+            && let Ok(meta) = std::fs::metadata(path)
+            && let Ok(modified) = meta.modified()
+            && watched_mod != &modified
+        {
+            debug!(
+                "Modified! read from meta {:?} stored: {:?}",
+                modified, watched_mod
+            );
+
+            self.cache.data.remove(path);
+            self.load(path);
         }
     }
 
@@ -346,10 +347,10 @@ impl Player {
             self.decoder_opts,
         );
 
-        if let Ok(meta) = std::fs::metadata(img_location) {
-            if let Ok(modified) = meta.modified() {
-                self.watcher.insert(img_location.into(), modified);
-            }
+        if let Ok(meta) = std::fs::metadata(img_location)
+            && let Ok(modified) = meta.modified()
+        {
+            self.watcher.insert(img_location.into(), modified);
         }
     }
 
@@ -608,36 +609,33 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     )
 }
 
-pub fn toggle_fullscreen(app: &mut App, state: &mut OculanteState) {
-    let fullscreen = app.window().is_fullscreen();
+pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
+    let fullscreen = ctx.input(|i| i.viewport().fullscreen).unwrap_or(false);
 
     if !fullscreen {
-        let mut window_pos = app.window().position();
-        window_pos.1 += 40;
+        // Entering fullscreen: offset image by window position so the pixel
+        // under the cursor stays in the same screen location.
+        let window_pos = ctx
+            .input(|i| i.viewport().outer_rect)
+            .map(|r| (r.left(), r.top()))
+            .unwrap_or((0.0, 0.0));
 
-        debug!("Not fullscreen. Storing offset: {:?}", window_pos);
+        // The menu bar offset: in fullscreen the top panel disappears in zen mode,
+        // but the available_rect shift covers that. We just need the window origin.
+        let offset = (window_pos.0 as i32, window_pos.1 as i32);
 
-        let dpi = app.window().dpi();
-        debug!("{:?}", dpi);
-        window_pos.0 = (window_pos.0 as f64 / dpi) as i32;
-        window_pos.1 = (window_pos.1 as f64 / dpi) as i32;
-        #[cfg(target_os = "macos")]
-        {
-            // tweak for osx titlebars
-            window_pos.1 += 8;
-        }
+        debug!("Entering fullscreen. Window pos: {:?}", offset);
 
-        // if going from window to fullscreen, offset by window pos
-        state.image_geometry.offset.x += window_pos.0 as f32;
-        state.image_geometry.offset.y += window_pos.1 as f32;
-
-        // save old window pos
-        state.fullscreen_offset = Some(window_pos);
+        state.image_geometry.offset.x += offset.0 as f32;
+        state.image_geometry.offset.y += offset.1 as f32;
+        state.fullscreen_offset = Some(offset);
     } else if let Some(sf) = state.fullscreen_offset {
+        // Exiting fullscreen: reverse the offset
         state.image_geometry.offset.x -= sf.0 as f32;
         state.image_geometry.offset.y -= sf.1 as f32;
+        state.fullscreen_offset = None;
     }
-    app.window().set_fullscreen(!fullscreen);
+    ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
 }
 
 /// Determine if an enxtension is compatible with oculante
@@ -743,71 +741,17 @@ pub trait ImageExt {
     fn size_vec(&self) -> Vector2<f32> {
         unimplemented!()
     }
-
-    fn to_texture_premult(&self, _: &mut Graphics) -> Option<Texture> {
-        unimplemented!()
-    }
-
-    #[allow(unused)]
-    fn update_texture(&self, _: &mut Graphics, _: &mut Texture) {
-        unimplemented!()
-    }
-
-    #[allow(unused)]
-    fn to_image(&self, _: &mut Graphics) -> Option<RgbaImage> {
-        unimplemented!()
-    }
 }
 
 impl ImageExt for RgbaImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
     }
-
-    fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
-        gfx.clean();
-
-        gfx.create_texture()
-            .from_bytes(self, self.width(), self.height())
-            .with_premultiplied_alpha()
-            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
-            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
-            .build()
-            .ok()
-    }
-
-    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
-        if let Err(e) = gfx.update_texture(texture).with_data(self).update() {
-            error!("{e}");
-        }
-    }
 }
 
 impl ImageExt for DynamicImage {
     fn size_vec(&self) -> Vector2<f32> {
         Vector2::new(self.width() as f32, self.height() as f32)
-    }
-
-    fn to_texture_premult(&self, gfx: &mut Graphics) -> Option<Texture> {
-        gfx.clean();
-
-        gfx.create_texture()
-            .from_bytes(&self.to_rgba8(), self.width(), self.height())
-            .with_premultiplied_alpha()
-            // .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
-            // .with_wrap(TextureWrap::Repeat, TextureWrap::Repeat)
-            .build()
-            .ok()
-    }
-
-    fn update_texture(&self, gfx: &mut Graphics, texture: &mut Texture) {
-        if let Err(e) = gfx
-            .update_texture(texture)
-            .with_data(self.as_bytes())
-            .update()
-        {
-            error!("{e}");
-        }
     }
 }
 
@@ -829,6 +773,15 @@ impl ImageExt for (u32, u32) {
     }
 }
 
+// Have user facing copy functions use this, effective_image includes image edits
+pub fn effective_image(state: &OculanteState) -> Option<&DynamicImage> {
+    if state.edit_state.result_pixel_op.width() > 0 {
+        Some(&state.edit_state.result_pixel_op)
+    } else {
+        state.current_image.as_ref()
+    }
+}
+
 pub fn clipboard_copy(img: &DynamicImage) {
     if let Ok(clipboard) = &mut Clipboard::new() {
         let _ = clipboard.set_image(arboard::ImageData {
@@ -836,6 +789,12 @@ pub fn clipboard_copy(img: &DynamicImage) {
             height: img.height() as usize,
             bytes: std::borrow::Cow::Borrowed(img.to_rgba8().as_bytes()),
         });
+    }
+}
+
+pub fn clipboard_copy_path(path: &Path) {
+    if let Ok(clipboard) = &mut Clipboard::new() {
+        let _ = clipboard.set_text(path.display().to_string());
     }
 }
 
@@ -876,7 +835,6 @@ pub fn clear_image(state: &mut OculanteState) {
     debug!("Clearing image. Next is {}", next_img.display());
     if state.scrubber.entries.is_empty() {
         state.current_image = None;
-        state.current_texture.clear();
         state.current_path = None;
         state.image_metadata = None;
         return;
@@ -909,15 +867,33 @@ pub fn prev_image(state: &mut OculanteState) {
     }
 }
 
+// Oculante's version, in release builds it shows as a version number, in debug builds it shows dev hash
+pub fn app_version() -> String {
+    if cfg!(debug_assertions) {
+        format!("dev ({})", env!("GIT_HASH"))
+    } else {
+        env!("CARGO_PKG_VERSION").into()
+    }
+}
+
+// For debug section in preferences.
+pub fn detailed_version() -> String {
+    if cfg!(debug_assertions) {
+        app_version()
+    } else {
+        format!("{} ({})", env!("CARGO_PKG_VERSION"), env!("GIT_HASH"))
+    }
+}
+
 /// Set the window title
-pub fn set_title(app: &mut App, state: &mut OculanteState) {
+pub fn set_title(ctx: &egui::Context, state: &mut OculanteState) {
     let p = state.current_path.clone().unwrap_or_default();
 
     let mut title_string = state
         .persistent_settings
         .title_format
         .replacen("{APP}", env!("CARGO_PKG_NAME"), 10)
-        .replacen("{VERSION}", env!("CARGO_PKG_VERSION"), 10)
+        .replacen("{VERSION}", &app_version(), 10)
         .replacen("{FULLPATH}", &format!("{}", p.display()), 10)
         .replacen(
             "{NUM}",
@@ -951,22 +927,22 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
         ));
     }
 
-    app.window().set_title(&title_string);
+    ctx.send_viewport_cmd(egui::ViewportCommand::Title(title_string));
 }
 
 pub fn fit(oldvalue: f32, oldmin: f32, oldmax: f32, newmin: f32, newmax: f32) -> f32 {
     (((oldvalue - oldmin) * (newmax - newmin)) / (oldmax - oldmin)) + newmin
 }
 
-pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
+pub fn toggle_zen_mode(state: &mut OculanteState, ctx: &egui::Context) {
     state.persistent_settings.zen_mode = !state.persistent_settings.zen_mode;
-    if state.persistent_settings.zen_mode {
+    if state.persistent_settings.zen_mode && state.persistent_settings.show_zen_mode_notification {
         _ = state.message_channel.0.send(Message::Info(format!(
             "Zen mode on. Press '{}' to toggle.",
             lookup(&state.persistent_settings.shortcuts, &InputEvent::ZenMode)
         )));
     }
-    set_title(app, state);
+    set_title(ctx, state);
 }
 
 /// Fix missing exif by re-applying exif to saved files

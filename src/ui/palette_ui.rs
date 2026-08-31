@@ -2,7 +2,7 @@ use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
 use quantette::{ColorSpace, PalettePipeline};
 
 pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
@@ -54,8 +54,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         });
                                     }
                                     if ui.ctx().input(|r| r.pointer.primary_clicked()) {
-                                        ui.ctx()
-                                            .output_mut(|w| w.copied_text = egui_color.to_hex());
+                                        ui.ctx().copy_text(egui_color.to_hex());
                                         state.send_message_info(&format!(
                                             "Copied color: {}",
                                             egui_color.to_hex()
@@ -92,7 +91,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
                         #[cfg(not(feature = "file_open"))]
                         if ui.button("Save ASE").clicked() {
-                            ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVEASE")));
+                            crate::ui::open_popup(ui.ctx(), Id::new("SAVEASE"));
                         }
 
                         #[cfg(feature = "file_open")]
@@ -130,7 +129,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
 
                         #[cfg(not(feature = "file_open"))]
-                        if ui.ctx().memory(|w| w.is_popup_open(Id::new("SAVEASE"))) {
+                        if crate::ui::is_popup_open(ui.ctx(), Id::new("SAVEASE")) {
                             filebrowser::browse_modal(
                                 true,
                                 &["ase"],
@@ -159,34 +158,33 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     }
                                 },
                                 ui.ctx(),
+                                Id::new("SAVEASE"),
                             );
                         }
                     }
                 } else {
                     ui.label("Right click to sample color");
                 }
-                if let Some(img) = &state.current_image {
-                    if ui.button("From image").clicked() {
-                        ui.ctx()
-                            .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
+                if let Some(img) = &state.current_image
+                    && ui.button("From image").clicked()
+                {
+                    ui.ctx()
+                        .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
-                        if let Ok(mut pipeline) =
-                            PalettePipeline::try_from(&img.clone().into_rgb8())
-                        {
-                            let palette = pipeline
-                                .palette_size(32)
-                                .colorspace(ColorSpace::Oklab)
-                                .quantize_method(quantette::KmeansOptions::new())
-                                .palette_par();
+                    if let Ok(mut pipeline) = PalettePipeline::try_from(&img.clone().into_rgb8()) {
+                        let palette = pipeline
+                            .palette_size(32)
+                            .colorspace(ColorSpace::Oklab)
+                            .quantize_method(quantette::KmeansOptions::new())
+                            .palette_par();
 
-                            for col in palette {
-                                ui.ctx().memory_mut(|w| {
-                                    let cols = w
-                                        .data
-                                        .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
-                                    cols.push([col.red, col.green, col.blue, 255]);
-                                });
-                            }
+                        for col in palette {
+                            ui.ctx().memory_mut(|w| {
+                                let cols = w
+                                    .data
+                                    .get_temp_mut_or_default::<Vec<[u8; 4]>>("picker".into());
+                                cols.push([col.red, col.green, col.blue, 255]);
+                            });
                         }
                     }
                 }

@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use oculante::image_editing::*;
 use oculante::image_loader::*;
 use std::hint::black_box;
@@ -19,7 +19,7 @@ fn process_pixel_ops() {
         },
         ImageOperation::ChromaticAberration(30),
     ];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
+    let f = open_image(&PathBuf::from("res/tests/moss.jpg"), None, None).unwrap();
 
     let mut buffer = f.recv().unwrap().get_image().unwrap();
     _ = process_pixels(&mut buffer, &ops);
@@ -27,7 +27,7 @@ fn process_pixel_ops() {
 
 fn blur() {
     let ops = vec![ImageOperation::Blur(200)];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
+    let f = open_image(&PathBuf::from("res/tests/moss.jpg"), None, None).unwrap();
     let mut buffer = f.recv().unwrap().get_image().unwrap();
     _ = process_pixels(&mut buffer, &ops);
 }
@@ -38,13 +38,13 @@ fn resize() {
         aspect: true,
         filter: ScaleFilter::Bilinear,
     }];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
+    let f = open_image(&PathBuf::from("res/tests/moss.jpg"), None, None).unwrap();
     let mut buffer = f.recv().unwrap().get_image().unwrap();
     process_pixels(&mut buffer, &ops);
 }
 
 fn load_webp() {
-    let f = open_image(&PathBuf::from("tests/mohsen-karimi.webp"), None).unwrap();
+    let f = open_image(&PathBuf::from("res/tests/mohsen-karimi.webp"), None, None).unwrap();
     let _buffer = f.recv().unwrap().get_image().unwrap();
 }
 

@@ -1,7 +1,7 @@
 use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
-use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "heif")]
@@ -13,7 +13,7 @@ use libheif_rs::SecurityLimits;
 use std::{
     collections::{BTreeSet, HashSet, VecDeque},
     fmt::{self, Display, Formatter},
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     path::PathBuf,
 };
 
@@ -53,6 +53,8 @@ pub struct PersistentSettings {
     pub shortcuts: Shortcuts,
     /// Do not reset view when receiving a new image
     pub keep_view: bool,
+    /// Do not reset view when switching between images in the compare list.  Unlike `keep_view`, this only applies to navigation within the compare list (e.g. clicking a compare list entry), not regular image browsing.
+    pub compare_keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
     /// How many recent images to keep track of
@@ -69,9 +71,9 @@ pub struct PersistentSettings {
     pub show_frame: bool,
     #[serde(skip)]
     pub current_channel: ColorChannel,
-    /// How much to scale SVG images when rendering
-    pub svg_scale: f32,
     pub zen_mode: bool,
+    pub zen_mode_cursor_timeout: f32,
+    pub show_zen_mode_notification: bool,
     pub theme: ColorTheme,
     pub linear_mag_filter: bool,
     pub linear_min_filter: bool,
@@ -97,8 +99,9 @@ impl Default for PersistentSettings {
             background_color_is_custom: false,
             vsync: true,
             force_redraw: false,
-            shortcuts: Shortcuts::default_keys(),
+            shortcuts: default_shortcuts(),
             keep_view: Default::default(),
+            compare_keep_view: Default::default(),
             max_cache: 30,
             max_recents: 12,
             show_scrub_bar: Default::default(),
@@ -111,8 +114,9 @@ impl Default for PersistentSettings {
             show_minimap: Default::default(),
             show_frame: Default::default(),
             current_channel: ColorChannel::Rgba,
-            svg_scale: 1.0,
             zen_mode: false,
+            zen_mode_cursor_timeout: 1.5,
+            show_zen_mode_notification: true,
             theme: ColorTheme::Dark,
             linear_mag_filter: false,
             linear_min_filter: true,
@@ -188,6 +192,7 @@ impl Default for VolatileSettings {
                     compressionlevel: crate::file_encoder::CompressionLevel::Default,
                 },
                 FileEncoder::Bmp,
+                FileEncoder::Avif,
             ]
             .into_iter()
             .collect(),
@@ -208,6 +213,16 @@ impl VolatileSettings {
         Ok(s)
     }
 
+    // Remove any entries from recent images that no longer exist on startup
+    pub fn remove_missing_recents(&mut self) {
+        let before = self.recent_images.len();
+        self.recent_images.retain(|p| p.exists());
+        let removed = before - self.recent_images.len();
+        if removed > 0 {
+            debug!("Removed {removed} recent image(s) that can no longer be found");
+        }
+    }
+
     pub fn save_blocking(&self) -> Result<()> {
         let local_dir = get_config_dir()?;
         if !local_dir.exists() {
@@ -222,19 +237,27 @@ impl VolatileSettings {
 }
 
 pub fn set_system_theme(ctx: &Context) {
-    if let Ok(mode) = dark_light::detect() {
-        match mode {
-            dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
-            dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
-            dark_light::Mode::Unspecified => ctx.set_visuals(Visuals::dark()),
-        }
+    match ctx.system_theme() {
+        Some(Theme::Dark) => ctx.set_visuals(Visuals::dark()),
+        Some(Theme::Light) => ctx.set_visuals(Visuals::light()),
+        None => ctx.set_visuals(Visuals::dark()),
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DecoderSettings {
-    /// Settings for libheif
     pub heif: HeifLimits,
+    pub svg_scale: f32,
+}
+
+impl Default for DecoderSettings {
+    fn default() -> Self {
+        Self {
+            heif: Default::default(),
+            svg_scale: 1.0,
+        }
+    }
 }
 
 /// Security limits for HEIF via libheif.
@@ -339,11 +362,13 @@ impl HeifLimits {
                 .as_deref()
                 .map(|var| var.eq_ignore_ascii_case("on"))
                 .unwrap_or(self.override_all);
-            std::env::set_var(
-                "LIBHEIF_SECURITY_LIMITS",
-                if override_all { "off" } else { "on" },
-            );
 
+            unsafe {
+                std::env::set_var(
+                    "LIBHEIF_SECURITY_LIMITS",
+                    if override_all { "off" } else { "on" },
+                );
+            }
             override_all
         }))
         .then(|| self.into())

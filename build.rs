@@ -1,7 +1,7 @@
 use std::env;
+use std::fs::File;
 use std::fs::read_to_string;
 use std::fs::remove_file;
-use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
@@ -73,8 +73,30 @@ fn setup_heif() {
     }
 }
 
+fn git_hash() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|hash| hash.trim().to_string())
+        .filter(|hash| !hash.is_empty())
+        .unwrap_or_else(|| "unknown".into())
+}
+
 fn main() {
     println!("Build script");
+
+    // Make the current git commit available to the app, reruns whenever HEAD changes so it stays up to date.
+    println!("cargo:rustc-env=GIT_HASH={}", git_hash());
+    println!("cargo:rerun-if-changed=.git/HEAD");
+    if let Ok(head) = read_to_string(".git/HEAD")
+        && let Some(ref_path) = head.trim().strip_prefix("ref: ")
+    {
+        println!("cargo:rerun-if-changed=.git/{ref_path}");
+    }
+
     // #[cfg(windows)]
     match std::process::Command::new("convert")
         .args(vec![
@@ -83,7 +105,7 @@ fn main() {
             "none",
             "-define",
             "icon:auto-resize=16,32,48,64,128,256",
-            "icon.ico",
+            "res/icons/icon.ico",
         ])
         .spawn()
     {
@@ -123,7 +145,7 @@ fn main() {
 
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
-        res.set_icon("icon.ico");
+        res.set_icon("res/icons/icon.ico");
         _ = res.compile();
     }
 
@@ -146,7 +168,9 @@ fn main() {
 
         let shortcuts = read_to_string(shortcut_file).unwrap();
         let mouse_keys = "`mouse wheel` = zoom\n\n`left mouse`,`middle mouse` = pan\n\n`ctrl + mouse wheel` = prev/next image in folder\n\n`Right mouse` pick color from image (in paint mode)\n\n";
-        let new_readme = format!("{readme_wo_keys}<summary>Default Shortcuts</summary>\n\n### Shortcuts:\n{mouse_keys}\n{shortcuts}\n</details>");
+        let new_readme = format!(
+            "{readme_wo_keys}<summary>Default Shortcuts</summary>\n\n### Shortcuts:\n{mouse_keys}\n{shortcuts}\n</details>"
+        );
         File::create("README.md")
             .unwrap()
             .write_all(new_readme.as_bytes())
