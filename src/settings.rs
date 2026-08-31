@@ -40,8 +40,12 @@ pub struct PersistentSettings {
     pub ui_scale: f32,
     /// The UI accent color
     pub accent_color: [u8; 3],
+    /// Set once the user picks an accent color, so theme switches stop overriding it
+    pub accent_color_is_custom: bool,
     /// The BG color
     pub background_color: [u8; 3],
+    /// Set once the user picks a background color, so theme switches stop overriding it
+    pub background_color_is_custom: bool,
     /// Should we sync to monitor rate? This makes the app snappier, but also more resource intensive.
     pub vsync: bool,
     pub force_redraw: bool,
@@ -88,7 +92,9 @@ impl Default for PersistentSettings {
         PersistentSettings {
             ui_scale: 1.0,
             accent_color: [255, 0, 75],
+            accent_color_is_custom: false,
             background_color: [30, 30, 30],
+            background_color_is_custom: false,
             vsync: true,
             force_redraw: false,
             shortcuts: Shortcuts::default_keys(),

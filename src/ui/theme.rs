@@ -30,11 +30,15 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         style.visuals.widgets.inactive.fg_stroke.color =
             Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
-        if state.persistent_settings.background_color == [200, 200, 200] {
+        if !state.persistent_settings.background_color_is_custom
+            && state.persistent_settings.background_color == [200, 200, 200]
+        {
             state.persistent_settings.background_color =
                 PersistentSettings::default().background_color;
         }
-        if state.persistent_settings.accent_color == [0, 170, 255] {
+        if !state.persistent_settings.accent_color_is_custom
+            && state.persistent_settings.accent_color == [0, 170, 255]
+        {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
@@ -48,12 +52,15 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
-        if state.persistent_settings.background_color
-            == PersistentSettings::default().background_color
+        if !state.persistent_settings.background_color_is_custom
+            && state.persistent_settings.background_color
+                == PersistentSettings::default().background_color
         {
             state.persistent_settings.background_color = [200, 200, 200];
         }
-        if state.persistent_settings.accent_color == PersistentSettings::default().accent_color {
+        if !state.persistent_settings.accent_color_is_custom
+            && state.persistent_settings.accent_color == PersistentSettings::default().accent_color
+        {
             state.persistent_settings.accent_color = [0, 170, 255];
         }
         style.visuals.widgets.inactive.bg_fill = Color32::WHITE;
