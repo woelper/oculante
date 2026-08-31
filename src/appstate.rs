@@ -4,15 +4,13 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
-    texture_wrapper::TextureWrapperManager,
     thumbnails::Thumbnails,
+    toasts::{Anchor, Toasts},
     utils::{ExtendedImageInfo, Frame, Player},
 };
 
-use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::{prelude::Texture, AppState};
 use std::{
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
@@ -49,7 +47,6 @@ impl Message {
 }
 
 /// The state of the application
-#[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: CompareList,
@@ -69,8 +66,6 @@ pub struct OculanteState {
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
-    //pub current_texture: Option<TexWrap>,
-    pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
     pub current_image: Option<DynamicImage>,
     pub settings_enabled: bool,
@@ -90,7 +85,6 @@ pub struct OculanteState {
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
-    pub checker_texture: Option<Texture>,
     pub redraw: bool,
     pub first_start: bool,
     pub toasts: Toasts,
@@ -135,6 +129,9 @@ impl Default for OculanteState {
     fn default() -> OculanteState {
         let persistent_settings = PersistentSettings::load().unwrap_or_default();
 
+        let mut volatile_settings = VolatileSettings::load().unwrap_or_default();
+        volatile_settings.remove_missing_recents();
+
         let tx_channel = mpsc::channel();
         let msg_channel = mpsc::channel();
         let meta_channel = mpsc::channel();
@@ -162,7 +159,6 @@ impl Default for OculanteState {
             load_channel: mpsc::channel(),
             extended_info_channel: meta_channel,
             mouse_delta: Default::default(),
-            current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
             settings_enabled: Default::default(),
@@ -173,16 +169,15 @@ impl Default for OculanteState {
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: PersistentSettings::load().unwrap_or_default(),
-            volatile_settings: VolatileSettings::load().unwrap_or_default(),
+            volatile_settings,
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
-            checker_texture: Default::default(),
             redraw: Default::default(),
             first_start: true,
-            toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
+            toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             filebrowser_id: None,
             filebrowser_last_dir: Default::default(),
             thumbnails: Default::default(),

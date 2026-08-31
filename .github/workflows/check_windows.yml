@@ -23,7 +23,7 @@ jobs:
         run: choco install ninja
 
       - name: cargo check without default features
-        run: cargo check --no-default-features --features notan/shaderc
+        run: cargo check --no-default-features
 
       - name: cargo build
         run: cargo build

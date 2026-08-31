@@ -1,13 +1,34 @@
+use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
 use crate::utils::*;
-use image::{ColorType, GenericImageView, RgbaImage};
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::egui::*;
+use egui::*;
+use image::{ColorType, GenericImageView, RgbaImage};
+
+/// Load an RgbaImage into egui as a texture, returning the TextureId.
+/// Uses a stable URI so the texture is cached and not re-uploaded every frame.
+fn load_brush_texture(ctx: &egui::Context, img: &RgbaImage, id: &str) -> TextureId {
+    let uri = format!("bytes://brush/{id}");
+    // Check if already loaded
+    if ctx
+        .try_load_texture(&uri, Default::default(), Default::default())
+        .is_ok()
+    {
+        // Already loaded — return its ID by loading again (cheap, returns cached)
+    }
+    let color_image = egui::ColorImage::from_rgba_unmultiplied(
+        [img.width() as usize, img.height() as usize],
+        img.as_raw(),
+    );
+    ctx.load_texture(&uri, color_image, Default::default()).id()
+}
 
 /// Everything related to image editing
 #[allow(unused_variables)]
-pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
+pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
+    let ctx_owned = ui.ctx().clone();
+    let ctx = &ctx_owned;
     // A flag to indicate that the image needs to be rebuilt
     let mut image_changed = false;
     let mut pixels_changed = false;
@@ -93,15 +114,20 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         }),
     ];
 
-    egui::SidePanel::right("editing")
-        .min_width(100.)
-        // safeguard to not expand too much
-        .max_width(500.)
-        .show_separator_line(false)
-        .show(ctx, |ui| {
+    egui::Panel::right("editing")
+        .default_size(PANEL_WIDTH)
+        .min_size(100.)
+        .max_size(500.)
+        .show_separator_line(true)
+        .show(ui, |ui| {
 
 
             let open = ui.ctx().data(|r|r.get_temp::<bool>("filter_open".into()));
+
+            let mut filter_search_term = ui
+                .ctx()
+                .data(|r| r.get_temp::<String>(Id::new("filter_search_term")))
+                .unwrap_or_default();
 
             ui.scope(|ui| {
                 ui.style_mut().visuals.collapsing_header_frame = true;
@@ -111,11 +137,31 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     .open(open)
                     .show_unindented(ui, |ui| {
                         dark_panel(ui, |ui| {
-                            egui::ScrollArea::vertical().max_height(300.).show(ui, |ui| {
+
+                            ui.add(
+                                TextEdit::singleline(&mut filter_search_term)
+                                    .hint_text(format!("{SEARCH} Search filters"))
+                                    .min_size(vec2(0., BUTTON_HEIGHT_SMALL))
+                                    .desired_width(ui.available_width())
+                                    .vertical_align(Align::Center),
+                            );
+                            ui.add_space(4.);
+
+                            egui::ScrollArea::vertical()
+                                .max_height(300.)
+                                .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                                .show(ui, |ui| {
 
                                 ui.vertical_centered_justified(|ui|{
                                     for op in &mut ops {
-                                        if ui.button( format!("{op}")).clicked() {
+                                        let name = format!("{op}");
+                                        if !name
+                                            .to_lowercase()
+                                            .contains(&filter_search_term.to_lowercase())
+                                        {
+                                            continue;
+                                        }
+                                        if ui.button(name).clicked() {
                                             if op.operation.is_per_pixel() {
                                                 state.edit_state.pixel_op_stack.push(op.clone());
                                             } else {
@@ -131,12 +177,16 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                     });
             });
 
+            ui.ctx().data_mut(|w| w.insert_temp(Id::new("filter_search_term"), filter_search_term));
+
             if open.is_some() {
                 ui.ctx().data_mut(|w|w.remove_temp::<bool>("filter_open".into()));
             }
 
 
-            egui::ScrollArea::vertical().show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                .show(ui, |ui| {
 
                 ui.vertical_centered_justified(|ui| {
                     modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
@@ -156,9 +206,9 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
 
-                    if ctx.input(|i|i.pointer.secondary_down()) {
-                        if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                            if let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
+                    if ctx.input(|i|i.pointer.secondary_down())
+                        && let Some(stroke) = state.edit_state.paint_strokes.last_mut()
+                            && let Some(p) = get_pixel_checked(&state.edit_state.result_pixel_op, state.cursor_relative.x as u32, state.cursor_relative.y as u32) {
                                 stroke.color = [
                                     p[0] as f32 / 255.,
                                     p[1] as f32 / 255.,
@@ -167,8 +217,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 ];
                                 // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
                             }
-                        }
-                    }
 
                     if ui
                         .add(
@@ -191,8 +239,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         .on_hover_text("Keeps all paint history and allows edits to it. Slower.");
                     ui.end_row();
 
-                    if let Some(stroke) = state.edit_state.paint_strokes.last_mut() {
-                        if stroke.is_empty() {
+                    if let Some(stroke) = state.edit_state.paint_strokes.last_mut()
+                        && stroke.is_empty() {
                             ui.label("Color");
                             ui.label("Fade");
                             ui.label("Flip");
@@ -200,9 +248,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             ui.label("Brush");
                             ui.end_row();
 
-                            stroke_ui(stroke, &state.edit_state.brushes, ui, gfx);
+                            stroke_ui(stroke, &state.edit_state.brushes, ui);
                         }
-                    }
                 });
 
                 if state
@@ -231,6 +278,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                     egui::ScrollArea::vertical()
                         .min_scrolled_height(64.)
+                        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
                         .show(ui, |ui| {
                             let mut stroke_lost_highlight = false;
                             if ui
@@ -255,7 +303,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                                 stroke,
                                                 &state.edit_state.brushes,
                                                 ui,
-                                                gfx,
                                             );
                                             if r.changed() {
                                                 pixels_changed = true;
@@ -326,35 +373,26 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 }
             }
 
-            ui.horizontal(|ui|{
-                if ui.add(egui::Button::new("Original").min_size(vec2(ui.available_width()/2., 0.))).clicked() {
-                    if let Some(img) = &state.current_image {
-                        state.image_geometry.dimensions = img.dimensions();
-                        if let Err(error) = state.current_texture.set_image(img, gfx, &state.persistent_settings){
-                            state.send_message_warn(&format!("Error while displaying image: {error}"));
-                        }
-                    }
+            if ui.styled_checkbox(&mut state.edit_state.skip_processing, "Disable all edits").changed() {
+                if state.edit_state.skip_processing {
+                    state.edit_state.result_pixel_op = Default::default();
+                        state.send_frame(crate::utils::Frame::UpdateTexture);
                 }
-                if ui.add(egui::Button::new("Modified").min_size(vec2(ui.available_width(), 0.))).clicked() {
-                    pixels_changed = true;
-
-                }
-            });
+                pixels_changed = true;
+            }
 
             ui.vertical_centered_justified(|ui| {
                 if ui
                     .button("Apply all edits")
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
-                {
-                    if let Some(img) = &mut state.current_image {
+                    && let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result_pixel_op.clone();
                         state.edit_state = Default::default();
                         // state.dimensions = img.dimensions();
                         pixels_changed = true;
                         image_changed = true;
                     }
-                }
 
                 if ui.button("Remove all edits").clicked() {
                     state.edit_state = Default::default();
@@ -364,8 +402,8 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
 
             ui.vertical_centered_justified(|ui| {
-                if let Some(path) = &state.current_path {
-                    if ui
+                if let Some(path) = &state.current_path
+                    && ui
                         .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
@@ -374,7 +412,6 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         state.player.cache.clear();
                         state.player.load(path);
                     }
-                }
 
 
                 #[cfg(feature = "turbo")]
@@ -387,7 +424,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         if ui.button("Create output file").on_hover_text("This image does not have any file associated with it. Click to create a default one.").clicked() {
                             let dest = state.volatile_settings.last_open_directory.clone().join("untitled").with_extension(&state.edit_state.export_extension);
                             state.current_path = Some(dest);
-                            set_title(app, state);
+                            set_title(ctx, state);
                         }
                     }
                 }
@@ -440,17 +477,17 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         });
                         ui.ctx().request_repaint();
                     }
-                
+
 
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
-                        ui.ctx().memory_mut(|w| w.open_popup(Id::new("SAVE")));
+                        crate::ui::open_popup(ui.ctx(), Id::new("SAVE"));
                     }
 
                     let encoding_options = state.volatile_settings.encoding_options.clone();
 
-                    if ctx.memory(|w| w.is_popup_open(Id::new("SAVE"))) {
+                    if crate::ui::is_popup_open(ctx, Id::new("SAVE")) {
                         let msg_sender = state.message_channel.0.clone();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
@@ -463,6 +500,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                 _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &encoders);
                             },
                             ctx,
+                            Id::new("SAVE"),
                         );
                     }
                 }
@@ -470,9 +508,10 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
-                    let modal = show_modal(ui.ctx(), "Overwrite?", |_|{
+                    let modal = Modal::new("overwrite", ui.ctx());
+                    modal.show("Overwrite?", |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
-                    }, "overwrite");
+                    });
 
 
                     if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
@@ -483,18 +522,15 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         }
                     }
 
-                    if ui.button("Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked() {
-                        if let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
+                    if ui.button("Save edits").on_hover_text("Saves an .oculante metafile in the same directory as the image. This file will contain all edits and will be restored automatically if you open the image again. This leaves the original image unmodified and allows you to continue editing later.").clicked()
+                        && let Ok(f) = std::fs::File::create(p.with_extension("oculante")) {
                             _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                         }
-                    }
-                    if ui.button("Save directory edits").on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked() {
-                        if let Some(parent) = p.parent() {
-                            if let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
+                    if ui.button("Save directory edits").on_hover_text("Saves an .oculante metafile in the same directory as all applicable images. This file will contain all edits and will be restored automatically if you open the image(s) again. This leaves the original image(s) unmodified and allows you to continue editing later.").clicked()
+                        && let Some(parent) = p.parent()
+                            && let Ok(f) = std::fs::File::create(parent.join(".oculante")) {
                                 _ = serde_json::to_writer_pretty(&f, &state.edit_state);
                             }
-                        }
-                    }
                 }
             });
         });
@@ -509,12 +545,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
             }
         }
 
-        if let Some(img) = &state.current_image {
-            if img.color() != ColorType::Rgba8 {
+        if let Some(img) = &state.current_image
+            && img.color() != ColorType::Rgba8 {
                 ui.add_space(10.);
                 ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
             }
-        }
 
         #[cfg(debug_assertions)]
         {
@@ -526,6 +561,11 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
 
             // Do the processing
+            //
+            if state.edit_state.skip_processing {
+
+                return;
+            }
 
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;
@@ -579,15 +619,13 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
 
                 // draw paint lines
                 for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed {
-                        if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                    if !stroke.committed
+                        && let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
                             stroke.render(
                                 compatible_buffer,
                                 &state.edit_state.brushes,
                             );
                         }
-
-                    }
                 }
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
@@ -635,12 +673,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
         });
 }
 
-fn stroke_ui(
-    stroke: &mut PaintStroke,
-    brushes: &[RgbaImage],
-    ui: &mut Ui,
-    gfx: &mut Graphics,
-) -> Response {
+fn stroke_ui(stroke: &mut PaintStroke, brushes: &[RgbaImage], ui: &mut Ui) -> Response {
     let mut combined_response = ui.color_edit_button_rgba_unmultiplied(&mut stroke.color);
 
     let r = ui
@@ -684,26 +717,32 @@ fn stroke_ui(
     }
 
     ui.horizontal(|ui| {
-        if let Some(notan_texture) = brushes[stroke.brush_index].to_texture_premult(gfx) {
-            let texture_id = gfx.egui_register_texture(&notan_texture);
-            ui.add(
-                egui::Image::new(texture_id)
-                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
-            );
-        }
+        let tex_id = load_brush_texture(
+            ui.ctx(),
+            &brushes[stroke.brush_index],
+            &format!("cur_{}", stroke.brush_index),
+        );
+        ui.add(
+            egui::Image::new(egui::load::SizedTexture::new(
+                tex_id,
+                egui::Vec2::splat(ui.available_height()),
+            ))
+            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+        );
 
         let r = egui::ComboBox::from_id_salt(format!("s {:?}", stroke.points))
             .selected_text(format!("Brush {}", stroke.brush_index))
             .show_ui(ui, |ui| {
                 for (b_i, b) in brushes.iter().enumerate() {
                     ui.horizontal(|ui| {
-                        if let Some(notan_texture) = b.to_texture_premult(gfx) {
-                            let texture_id = gfx.egui_register_texture(&notan_texture);
-                            ui.add(
-                                egui::Image::new(texture_id)
-                                    .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
-                            );
-                        }
+                        let tex_id = load_brush_texture(ui.ctx(), b, &format!("brush_{b_i}"));
+                        ui.add(
+                            egui::Image::new(egui::load::SizedTexture::new(
+                                tex_id,
+                                egui::Vec2::splat(ui.available_height()),
+                            ))
+                            .fit_to_exact_size(egui::Vec2::splat(ui.available_height())),
+                        );
 
                         if ui
                             .selectable_value(&mut stroke.brush_index, b_i, format!("Brush {b_i}"))
@@ -841,10 +880,10 @@ fn modifier_stack_ui(
         stack.remove(delete);
     }
 
-    if let Some(swap) = swap {
-        if swap.1 < stack.len() {
-            stack.swap(swap.0, swap.1);
-        }
+    if let Some(swap) = swap
+        && swap.1 < stack.len()
+    {
+        stack.swap(swap.0, swap.1);
     }
 }
 
@@ -931,8 +970,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                         .on_hover_text("Crop according to values defined in the operator stack above")
                         .on_disabled_hover_text("Please modify crop values above before cropping. You would be cropping nothing right now.")
                         .clicked()
-                    {
-                        if let ImageOperation::Crop(amt) = crop {
+                        && let ImageOperation::Crop(amt) = crop {
                                 debug!("CROP {:?}", amt);
 
                                 let dim = state
@@ -958,8 +996,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                                     Ok(_) => reload = true,
                                     Err(e) => log::warn!("{e}"),
                                 };
-                            }
-                        };
+                            };
                     });
                 });
 

@@ -9,8 +9,6 @@ env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 11
   CMAKE_ARGS: "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-  SHADERC_LIB_DIR: /opt/homebrew/lib
-  
 name: Check OSX
 jobs:
   check:
@@ -24,7 +22,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # - name: Check without default features
-      #   run: cargo check --no-default-features --features notan/shaderc
+      #   run: cargo check --no-default-features
       #   if: matrix.os == 'macos-latest'
 
       - name: intel heif test
@@ -32,7 +30,7 @@ jobs:
           rustc --version --verbose
           brew install libheif
           cargo install cargo-bundle
-          cargo bundle --release --features "notan/shaderc heif"
+          cargo bundle --release --features "heif"
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
           mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
           cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
@@ -78,7 +76,7 @@ jobs:
       #     rustc --version --verbose
       #     brew install libheif
       #     cargo install cargo-bundle
-      #     cargo bundle --release --features "notan/shaderc heif"
+      #     cargo bundle --release --features "heif"
       #     otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
       #     mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
       #     cp /opt/homebrew/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/
@@ -122,8 +120,6 @@ jobs:
       - name: Cargo build on Apple Silicon
         run: |
           rustc --version --verbose
-          # cargo install cargo-bundle
-          brew install shaderc
           cargo build
         if: matrix.os == 'macos-latest'
 

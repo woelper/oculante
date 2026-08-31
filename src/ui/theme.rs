@@ -19,7 +19,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     }
 
     // Switching theme resets accent color, set it again
-    let mut style: egui::Style = (*ctx.style()).clone();
+    let mut style: egui::Style = (*ctx.global_style()).clone();
     style.spacing.scroll = egui::style::ScrollStyle::solid();
 
     if style.visuals.dark_mode {
@@ -30,11 +30,15 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         style.visuals.widgets.inactive.fg_stroke.color =
             Color32::from_hex("#CCCCCC").unwrap_or_default();
         style.visuals.extreme_bg_color = Color32::from_hex("#0D0D0D").unwrap_or_default();
-        if state.persistent_settings.background_color == [200, 200, 200] {
+        if !state.persistent_settings.background_color_is_custom
+            && state.persistent_settings.background_color == [200, 200, 200]
+        {
             state.persistent_settings.background_color =
                 PersistentSettings::default().background_color;
         }
-        if state.persistent_settings.accent_color == [0, 170, 255] {
+        if !state.persistent_settings.accent_color_is_custom
+            && state.persistent_settings.accent_color == [0, 170, 255]
+        {
             state.persistent_settings.accent_color = PersistentSettings::default().accent_color;
         }
     } else {
@@ -48,12 +52,15 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
 
         button_color = Color32::from_gray(255);
         panel_color = Color32::from_gray(230);
-        if state.persistent_settings.background_color
-            == PersistentSettings::default().background_color
+        if !state.persistent_settings.background_color_is_custom
+            && state.persistent_settings.background_color
+                == PersistentSettings::default().background_color
         {
             state.persistent_settings.background_color = [200, 200, 200];
         }
-        if state.persistent_settings.accent_color == PersistentSettings::default().accent_color {
+        if !state.persistent_settings.accent_color_is_custom
+            && state.persistent_settings.accent_color == PersistentSettings::default().accent_color
+        {
             state.persistent_settings.accent_color = [0, 170, 255];
         }
         style.visuals.widgets.inactive.bg_fill = Color32::WHITE;
@@ -104,7 +111,7 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
     // Set text on highlighted elements
     style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
-    ctx.set_style(style);
+    ctx.set_global_style(style);
 }
 
 /// Attempt to load a system font by any of the given `family_names`, returning the first match.
@@ -191,7 +198,10 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
                 .unwrap()
                 .push(region.to_owned());
         } else {
-            warn!("Could not load a font for region {region}. If you experience incorrect file names, try installing one of these fonts: [{}]", font_names.join(", "))
+            warn!(
+                "Could not load a font for region {region}. If you experience incorrect file names, try installing one of these fonts: [{}]",
+                font_names.join(", ")
+            )
         }
     }
     fonts

@@ -41,4 +41,4 @@ jobs:
             ls
             # PATH=$HOME/.cargo/bin:$PATH
             # export PATH
-            # cargo check --features notan_glsl-to-spirv
+            # cargo check

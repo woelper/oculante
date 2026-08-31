@@ -1,5 +1,5 @@
 use crate::utils::is_ext_compatible;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use log::{debug, warn};
 use std::path::{Path, PathBuf};
 

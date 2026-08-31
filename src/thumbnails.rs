@@ -4,15 +4,15 @@ pub const MAX_THREADS: usize = 4;
 
 use std::{
     collections::HashSet,
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
-use image::{imageops, DynamicImage, GenericImageView};
+use anyhow::{Context, Result, anyhow, bail};
+use image::{DynamicImage, GenericImageView, imageops};
 use log::{debug, error, trace, warn};
 
 use crate::image_loader::open_image;
@@ -144,11 +144,12 @@ pub fn from_existing<P: AsRef<Path>>(dest_path: P, image: &DynamicImage) -> Resu
 
 #[test]
 fn test_thumbs() {
-    std::env::set_var("RUST_LOG", "debug");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     let _ = env_logger::try_init();
     let mut thumbs = Thumbnails::default();
-    _ = thumbs.get("tests/rust.png");
-    _ = thumbs.get("tests/ultrahigh.png");
-    _ = thumbs.get("tests/mohsen-karimi.webp");
+    _ = thumbs.get("res/tests/rust.png");
+    _ = thumbs.get("res/tests/ultrahigh.png");
+    _ = thumbs.get("res/tests/mohsen-karimi.webp");
     std::thread::sleep(std::time::Duration::from_millis(1000));
 }
