@@ -272,12 +272,15 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         .color_edit_button_srgb(&mut state.persistent_settings.accent_color)
                                         .changed()
                                         {
+                                            state.persistent_settings.accent_color_is_custom = true;
                                             apply_theme(state, ctx);
                                         }
                                     }, ui);
 
                                     configuration_item_ui("Background color", "The color used as a background for images.", |ui| {
-                                        ui.color_edit_button_srgb(&mut state.persistent_settings.background_color);
+                                        if ui.color_edit_button_srgb(&mut state.persistent_settings.background_color).changed() {
+                                            state.persistent_settings.background_color_is_custom = true;
+                                        }
                                     }, ui);
 
                                     configuration_item_ui("Transparency Grid", "Replaces image transparency with a checker background.", |ui| {
