@@ -43,7 +43,7 @@ pub fn open_image(
         // add aliased extensions here if the same formats have multiple extensions
         .replace("tiff", "tif")
         .replace("jpeg", "jpg")
-        .replace("jpeg", "jpg")
+        .replace("jfif", "jpg")
         .replace("ima", "dcm")
         .replace("heic", "heif")
         .replace("hif", "heic");

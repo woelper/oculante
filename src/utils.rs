@@ -38,6 +38,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "ico",
     "jpeg",
     "jpg",
+    "jfif",
     "png",
     "pnm",
     "psd",
