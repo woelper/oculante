@@ -16,7 +16,7 @@ cargo test shortcuts
 cargo bump patch
 cargo build
 cargo test flathub
-VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
+VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2 | cut -d@ -f2)
 git add README.md
 git add Cargo.toml
 git add Cargo.lock
