@@ -1,3 +1,60 @@
+\# oculante@0.9.3
+
+### :beetle: Bug Fixes
+
+* Shift click for compare uses old directory (385aaf12)
+* **resize**: Reset aspect ratio and lock on filter reset (b51a05a8)
+* **resize**: Introduce new_image_loaded flag for image state management (5ca8ea19)
+* **resize**: Isolate Resize filter state to prevent aspect lock leak (4af5e7ec)
+* **resize**: Clear aspect ratio memory on image change (f2b00383)
+* **resize**: Overhaul resize filter logic for stable aspect ratio locking (70425956)
+* CMake 4.0+ error fixes #708 "Compatibility with CMake < 3.5 has been removed from CMake." (83b9be0a)
+* typo in oculante.desktop MIME types (703fa1dc)
+* Info window scrollbar should not overlap (a7f9f42b)
+* info ui pos rounding (7528fe04)
+* make shaderc default for notan (2a5b4786)
+* Compiler warnings `mismatched_lifetime_syntaxes` & `unused_parens` (b2886880)
+* Correct panning directions https://github.com/woelper/oculante/issues/110#issuecomment-3125654093 (f0b3b68f)
+* **586**: Compare list & scrubber mangles position (0136acc7)
+* **643**: Launching with images in different dirs (8edaa474)
+* Correctly display breadcrumbs with single chars. Fixes #653 (837ccdc0)
+* Prevent flickering metadata when playing animations, color picker has better contrast on bright images (45415b0a)
+* forgotten early exit feat: error reporting if texture generation for image fails (4a513df8)
+* first try to handle errors correctly (74947896)
+* Use 'ok' or a more meaningful message if something fails. (4b247df5)
+* code style (3f56eab3)
+* Color picker renders Alpha without boundary texture (b5c02da5)
+* Thumbails have correct aspect ratio and reload if loaded while being written (61cbce76)
+* make icons unicode-aware (b8d8bb4d)
+* detect heif and heic as heif (c339e248)
+* L16 images render as black (342f38cf)
+
+### :sparkles: Features
+
+* Add `{NUM}` to the `Window title` option closes #413 (347acff5)
+* Double clicking image toggles fullscreen (closes #683) (21c91951)
+* Channel selection via fragment shader instead of image conversion (ac68b5a0)
+* Use system font on mac (67293603)
+* Basic dicom support (ac51e562)
+
+### :green_apple: Chore
+
+* **deps**: bump rustls-webpki from 0.103.9 to 0.103.10 (519256dd)
+* **deps**: bump quinn-proto from 0.11.13 to 0.11.14 (d08d48b0)
+* **deps**: bump bytes from 1.11.0 to 1.11.1 (04587a50)
+* **deps**: bump tracing-subscriber from 0.3.19 to 0.3.20 (7f6dd849)
+* update `dark-light`, `bitflags`, `flate2`, `ruzstd`, `font-kit`, `open` (d4ca26a7)
+* update `zip` (1787f0a6)
+* update `evalexpr` (a18e7de6)
+* remove thiserror, update arboard, dirs, exr, fast_image_resize, image, kamadak-exif, rayon, turbojpeg, trash, lutgen (7bf2c7f9)
+* **deps**: bump crossbeam-channel from 0.5.14 to 0.5.15 (c1a4c0e0)
+* **deps**: bump tokio from 1.43.0 to 1.44.2 (51b3c1da)
+* **deps**: bump zip from 2.2.2 to 2.3.0 (af407627)
+* update test images (b6377cee)
+* cleanup notification and metadata senders (add53270)
+* Separate UI files into modules (a00bf2dc)
+* Re-enable heif build on Apple Silicon (f2854ec7)
+
 \# 0.9.2
 
 ### :beetle: Bug Fixes
