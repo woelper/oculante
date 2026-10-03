@@ -23,6 +23,37 @@ pub struct GlowTexture {
     pub format: TexFormat,
 }
 
+/// How a texture is sampled when it is scaled.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TexFilter {
+    /// Interpolate when zooming out
+    pub linear_min: bool,
+    /// Interpolate when zooming in
+    pub linear_mag: bool,
+    pub mipmaps: bool,
+}
+
+/// The GL handles needed to draw with the image shader. Cheap to copy into
+/// egui paint callbacks, where `&GlowRenderer` is not available.
+#[derive(Debug, Clone, Copy)]
+pub struct ImageShader {
+    program: glow::Program,
+    vao: glow::VertexArray,
+}
+
+/// Target tile edge length. Effective tile size is `min(TILE_TARGET, max_texture_size)`.
+/// 4096 keeps each RGBA8 tile at ~64 MB so allocation is safe on every modern GPU,
+/// and lets typical images (<= 4096 in both dims) collapse to exactly one tile.
+pub const TILE_TARGET: u32 = 4096;
+
+/// One tile of an image. The tile owns its own GL texture and remembers
+/// its position within the parent image in image-pixel coordinates.
+pub struct GlowTile {
+    pub texture: GlowTexture,
+    pub x: u32,
+    pub y: u32,
+}
+
 /// The glow-based renderer. Holds compiled shaders and shared GL state.
 pub struct GlowRenderer {
     /// Shader program for textured quads with swizzle/offset uniforms
@@ -35,8 +66,10 @@ pub struct GlowRenderer {
     pub max_texture_size: u32,
 }
 
+// The `#version` line is prepended in `compile_program`, depending on the GL flavour.
+
 // Vertex shader shared by image and rect programs
-const VERTEX_SHADER: &str = r#"#version 330
+const VERTEX_SHADER: &str = r#"
 uniform vec2 u_offset;
 uniform vec2 u_scale;
 uniform vec2 u_viewport;
@@ -62,21 +95,30 @@ void main() {
 }
 "#;
 
-const IMAGE_FRAGMENT_SHADER: &str = r#"#version 330
-precision mediump float;
+const IMAGE_FRAGMENT_SHADER: &str = r#"
+precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_texture;
 uniform mat4 u_swizzle_mat;
 uniform vec4 u_offset_vec;
+// Sample texel centers of the base level, so the result is unfiltered
+// regardless of the texture's filter settings (used by the zoom preview)
+uniform bool u_snap_texels;
 out vec4 color;
 void main() {
-    vec4 tex_col = texture(u_texture, v_uv);
+    vec4 tex_col;
+    if (u_snap_texels) {
+        vec2 tex_size = vec2(textureSize(u_texture, 0));
+        tex_col = textureLod(u_texture, (floor(v_uv * tex_size) + 0.5) / tex_size, 0.0);
+    } else {
+        tex_col = texture(u_texture, v_uv);
+    }
     color = (u_swizzle_mat * tex_col) + u_offset_vec;
 }
 "#;
 
-const RECT_FRAGMENT_SHADER: &str = r#"#version 330
-precision mediump float;
+const RECT_FRAGMENT_SHADER: &str = r#"
+precision highp float;
 uniform vec4 u_color;
 out vec4 color;
 void main() {
@@ -87,21 +129,26 @@ void main() {
 impl GlowRenderer {
     /// Create a new renderer. Call this once with the GL context.
     pub fn new(gl: &glow::Context) -> Self {
-        unsafe {
-            let image_program = compile_program(gl, VERTEX_SHADER, IMAGE_FRAGMENT_SHADER);
-            let rect_program = compile_program(gl, VERTEX_SHADER, RECT_FRAGMENT_SHADER);
+        let image_program = compile_program(gl, VERTEX_SHADER, IMAGE_FRAGMENT_SHADER);
+        let rect_program = compile_program(gl, VERTEX_SHADER, RECT_FRAGMENT_SHADER);
 
-            // Empty VAO for attribute-less rendering (we compute positions from gl_VertexID)
-            let quad_vao = gl.create_vertex_array().expect("Failed to create VAO");
+        // Empty VAO for attribute-less rendering (we compute positions from gl_VertexID)
+        let quad_vao = unsafe { gl.create_vertex_array().expect("Failed to create VAO") };
+        let max_texture_size = unsafe { gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) } as u32;
 
-            let max_texture_size = gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) as u32;
+        Self {
+            image_program,
+            rect_program,
+            quad_vao,
+            max_texture_size,
+        }
+    }
 
-            Self {
-                image_program,
-                rect_program,
-                quad_vao,
-                max_texture_size,
-            }
+    /// Handles for drawing with `paint_quads`.
+    pub fn image_shader(&self) -> ImageShader {
+        ImageShader {
+            program: self.image_program,
+            vao: self.quad_vao,
         }
     }
 
@@ -113,9 +160,7 @@ impl GlowRenderer {
         width: u32,
         height: u32,
         format: TexFormat,
-        linear_min: bool,
-        linear_mag: bool,
-        mipmaps: bool,
+        filter: TexFilter,
     ) -> GlowTexture {
         unsafe {
             let texture = gl.create_texture().expect("Failed to create texture");
@@ -134,33 +179,6 @@ impl GlowRenderer {
                 glow::PixelUnpackData::Slice(Some(bytes)),
             );
 
-            let min_filter = if mipmaps {
-                if linear_min {
-                    glow::LINEAR_MIPMAP_LINEAR
-                } else {
-                    glow::NEAREST_MIPMAP_NEAREST
-                }
-            } else if linear_min {
-                glow::LINEAR
-            } else {
-                glow::NEAREST
-            };
-            let mag_filter = if linear_mag {
-                glow::LINEAR
-            } else {
-                glow::NEAREST
-            };
-
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MIN_FILTER,
-                min_filter as i32,
-            );
-            gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MAG_FILTER,
-                mag_filter as i32,
-            );
             gl.tex_parameter_i32(
                 glow::TEXTURE_2D,
                 glow::TEXTURE_WRAP_S,
@@ -171,10 +189,7 @@ impl GlowRenderer {
                 glow::TEXTURE_WRAP_T,
                 glow::CLAMP_TO_EDGE as i32,
             );
-
-            if mipmaps {
-                gl.generate_mipmap(glow::TEXTURE_2D);
-            }
+            apply_filter(gl, filter);
 
             gl.bind_texture(glow::TEXTURE_2D, None);
 
@@ -188,6 +203,7 @@ impl GlowRenderer {
     }
 
     /// Update an existing texture's data (must be same dimensions and format).
+    /// Mipmaps are not regenerated, follow up with `set_filter` for that.
     pub fn update_texture(&self, gl: &glow::Context, tex: &GlowTexture, bytes: &[u8]) {
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
@@ -203,6 +219,15 @@ impl GlowRenderer {
                 typ,
                 glow::PixelUnpackData::Slice(Some(bytes)),
             );
+            gl.bind_texture(glow::TEXTURE_2D, None);
+        }
+    }
+
+    /// Change the filtering of an existing texture. Regenerates mipmaps if they are enabled.
+    pub fn set_filter(&self, gl: &glow::Context, tex: &GlowTexture, filter: TexFilter) {
+        unsafe {
+            gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
+            apply_filter(gl, filter);
             gl.bind_texture(glow::TEXTURE_2D, None);
         }
     }
@@ -313,6 +338,279 @@ impl GlowRenderer {
             gl.delete_vertex_array(self.quad_vao);
         }
     }
+
+    /// Effective tile edge length for this renderer (clamped to GPU limit).
+    pub fn tile_size(&self) -> u32 {
+        TILE_TARGET.min(self.max_texture_size).max(1)
+    }
+
+    /// Slice a full-image RGBA buffer into tiles, uploading each as its own GPU texture.
+    /// For images that fit in a single tile this is a single allocation/upload — no per-tile copy.
+    pub fn create_tiles(
+        &self,
+        gl: &glow::Context,
+        bytes: &[u8],
+        width: u32,
+        height: u32,
+        format: TexFormat,
+        filter: TexFilter,
+    ) -> Vec<GlowTile> {
+        if width == 0 || height == 0 {
+            return Vec::new();
+        }
+
+        let cap = self.tile_size();
+        let cols = width.div_ceil(cap);
+        let rows = height.div_ceil(cap);
+        let mut tiles = Vec::with_capacity((cols * rows) as usize);
+
+        // Single-tile fast path: forward the original byte slice with no copy.
+        if cols == 1 && rows == 1 {
+            let texture = self.create_texture(gl, bytes, width, height, format, filter);
+            tiles.push(GlowTile {
+                texture,
+                x: 0,
+                y: 0,
+            });
+            return tiles;
+        }
+
+        let bpp = bytes_per_pixel(format);
+        let stride = width as usize * bpp;
+
+        for row in 0..rows {
+            let ty = row * cap;
+            let th = cap.min(height - ty);
+            for col in 0..cols {
+                let tx = col * cap;
+                let tw = cap.min(width - tx);
+
+                let mut tile_bytes = vec![0u8; tw as usize * th as usize * bpp];
+                for y in 0..th {
+                    let src_off = (ty + y) as usize * stride + tx as usize * bpp;
+                    let dst_off = y as usize * tw as usize * bpp;
+                    let len = tw as usize * bpp;
+                    tile_bytes[dst_off..dst_off + len]
+                        .copy_from_slice(&bytes[src_off..src_off + len]);
+                }
+
+                let texture = self.create_texture(gl, &tile_bytes, tw, th, format, filter);
+                tiles.push(GlowTile {
+                    texture,
+                    x: tx,
+                    y: ty,
+                });
+            }
+        }
+
+        tiles
+    }
+
+    /// Update existing tiles in place when the image dimensions match the current grid.
+    /// Returns `false` if the grid would differ (caller must delete and re-create).
+    pub fn update_tiles(
+        &self,
+        gl: &glow::Context,
+        tiles: &[GlowTile],
+        bytes: &[u8],
+        width: u32,
+        height: u32,
+        filter: TexFilter,
+    ) -> bool {
+        if tiles.is_empty() || width == 0 || height == 0 {
+            return false;
+        }
+
+        let cap = self.tile_size();
+        let cols = width.div_ceil(cap);
+        let rows = height.div_ceil(cap);
+        if tiles.len() != (cols * rows) as usize {
+            return false;
+        }
+
+        // Verify each tile sits where the current grid would place it.
+        for (i, tile) in tiles.iter().enumerate() {
+            let row = i as u32 / cols;
+            let col = i as u32 % cols;
+            let ex = col * cap;
+            let ey = row * cap;
+            let ew = cap.min(width - ex);
+            let eh = cap.min(height - ey);
+            if tile.x != ex || tile.y != ey || tile.texture.width != ew || tile.texture.height != eh
+            {
+                return false;
+            }
+        }
+
+        // Single-tile fast path: no copy.
+        if tiles.len() == 1 {
+            self.update_texture(gl, &tiles[0].texture, bytes);
+            self.set_filter(gl, &tiles[0].texture, filter);
+            return true;
+        }
+
+        let bpp = bytes_per_pixel(tiles[0].texture.format);
+        let stride = width as usize * bpp;
+
+        for tile in tiles {
+            let tw = tile.texture.width;
+            let th = tile.texture.height;
+            let mut sub = vec![0u8; tw as usize * th as usize * bpp];
+            for y in 0..th {
+                let src_off = (tile.y + y) as usize * stride + tile.x as usize * bpp;
+                let dst_off = y as usize * tw as usize * bpp;
+                let len = tw as usize * bpp;
+                sub[dst_off..dst_off + len].copy_from_slice(&bytes[src_off..src_off + len]);
+            }
+            self.update_texture(gl, &tile.texture, &sub);
+            self.set_filter(gl, &tile.texture, filter);
+        }
+
+        true
+    }
+
+    /// Delete all tiles' GPU textures.
+    pub fn delete_tiles(&self, gl: &glow::Context, tiles: Vec<GlowTile>) {
+        for tile in tiles {
+            self.delete_texture(gl, tile.texture);
+        }
+    }
+}
+
+impl GlowTile {
+    /// The quad covering this tile, for an image drawn at `offset` with `scale`.
+    pub fn quad(&self, offset: [f32; 2], scale: f32) -> Quad {
+        Quad {
+            texture: self.texture.texture,
+            pos: [
+                offset[0] + self.x as f32 * scale,
+                offset[1] + self.y as f32 * scale,
+            ],
+            size: [
+                self.texture.width as f32 * scale,
+                self.texture.height as f32 * scale,
+            ],
+            uv_offset: [0.0, 0.0],
+            uv_scale: [1.0, 1.0],
+        }
+    }
+}
+
+/// A textured rectangle on screen: where to draw (in egui points) and which
+/// part of the texture to show.
+#[derive(Debug, Clone, Copy)]
+pub struct Quad {
+    pub texture: glow::Texture,
+    pub pos: [f32; 2],
+    pub size: [f32; 2],
+    pub uv_offset: [f32; 2],
+    pub uv_scale: [f32; 2],
+}
+
+/// Draw textured quads from within an egui paint callback, with one
+/// program/state setup and one draw call per quad.
+///
+/// With `snap_texels` the quads are drawn unfiltered, whatever filter their
+/// textures use.
+pub fn paint_quads(
+    gl: &glow::Context,
+    shader: ImageShader,
+    info: &egui::PaintCallbackInfo,
+    swizzle_mat: &[f32; 16],
+    offset_vec: &[f32; 4],
+    snap_texels: bool,
+    quads: &[Quad],
+) {
+    if quads.is_empty() {
+        return;
+    }
+    let ImageShader { program, vao } = shader;
+    let screen_size_px = info.screen_size_px;
+    // Quads are positioned in egui points, relative to the whole window
+    let viewport = [
+        screen_size_px[0] as f32 / info.pixels_per_point,
+        screen_size_px[1] as f32 / info.pixels_per_point,
+    ];
+    unsafe {
+        gl.viewport(0, 0, screen_size_px[0] as i32, screen_size_px[1] as i32);
+        gl.enable(glow::BLEND);
+        gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+
+        gl.use_program(Some(program));
+        gl.bind_vertex_array(Some(vao));
+
+        set_uniform_2f(gl, program, "u_scale", [1.0, 1.0]);
+        set_uniform_2f(gl, program, "u_viewport", viewport);
+
+        let mat_loc = gl.get_uniform_location(program, "u_swizzle_mat");
+        gl.uniform_matrix_4_f32_slice(mat_loc.as_ref(), false, swizzle_mat);
+        let off_loc = gl.get_uniform_location(program, "u_offset_vec");
+        gl.uniform_4_f32_slice(off_loc.as_ref(), offset_vec);
+        let snap_loc = gl.get_uniform_location(program, "u_snap_texels");
+        gl.uniform_1_i32(snap_loc.as_ref(), snap_texels as i32);
+
+        gl.active_texture(glow::TEXTURE0);
+        let tex_loc = gl.get_uniform_location(program, "u_texture");
+        gl.uniform_1_i32(tex_loc.as_ref(), 0);
+
+        for quad in quads {
+            set_uniform_2f(gl, program, "u_offset", quad.pos);
+            set_uniform_2f(gl, program, "u_size", quad.size);
+            set_uniform_2f(gl, program, "u_uv_offset", quad.uv_offset);
+            set_uniform_2f(gl, program, "u_uv_scale", quad.uv_scale);
+            gl.bind_texture(glow::TEXTURE_2D, Some(quad.texture));
+            gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
+        }
+
+        // `draw_image` shares this program and expects filtered sampling
+        gl.uniform_1_i32(snap_loc.as_ref(), 0);
+        gl.bind_texture(glow::TEXTURE_2D, None);
+        gl.use_program(None);
+        gl.bind_vertex_array(None);
+    }
+}
+
+/// Set min/mag filter of the bound texture and (re)generate mipmaps if enabled.
+unsafe fn apply_filter(gl: &glow::Context, filter: TexFilter) {
+    let min_filter = if filter.mipmaps {
+        if filter.linear_min {
+            glow::LINEAR_MIPMAP_LINEAR
+        } else {
+            glow::NEAREST_MIPMAP_NEAREST
+        }
+    } else if filter.linear_min {
+        glow::LINEAR
+    } else {
+        glow::NEAREST
+    };
+    let mag_filter = if filter.linear_mag {
+        glow::LINEAR
+    } else {
+        glow::NEAREST
+    };
+    unsafe {
+        gl.tex_parameter_i32(
+            glow::TEXTURE_2D,
+            glow::TEXTURE_MIN_FILTER,
+            min_filter as i32,
+        );
+        gl.tex_parameter_i32(
+            glow::TEXTURE_2D,
+            glow::TEXTURE_MAG_FILTER,
+            mag_filter as i32,
+        );
+        if filter.mipmaps {
+            gl.generate_mipmap(glow::TEXTURE_2D);
+        }
+    }
+}
+
+fn bytes_per_pixel(format: TexFormat) -> usize {
+    match format {
+        TexFormat::Rgba8 | TexFormat::SRgba8 => 4,
+        TexFormat::R8 => 1,
+        TexFormat::Rgba32F => 16,
+    }
 }
 
 fn gl_format(format: TexFormat) -> (u32, u32, u32) {
@@ -331,11 +629,15 @@ unsafe fn set_uniform_2f(gl: &glow::Context, program: glow::Program, name: &str,
     }
 }
 
-unsafe fn compile_program(
-    gl: &glow::Context,
-    vertex_src: &str,
-    fragment_src: &str,
-) -> glow::Program {
+fn compile_program(gl: &glow::Context, vertex_src: &str, fragment_src: &str) -> glow::Program {
+    // Desktop GL and GLES need different headers, the shader bodies work for both
+    let header = if gl.version().is_embedded {
+        "#version 300 es"
+    } else {
+        "#version 330"
+    };
+    let vertex_src = &format!("{header}{vertex_src}");
+    let fragment_src = &format!("{header}{fragment_src}");
     unsafe {
         let program = gl.create_program().expect("Failed to create program");
 

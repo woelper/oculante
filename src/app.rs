@@ -11,156 +11,30 @@ use nalgebra::Vector2;
 
 use crate::appstate::*;
 use crate::filebrowser::BrowserDir;
-use crate::glow_renderer;
+use crate::glow_renderer::{self, GlowRenderer, GlowTile, TexFilter, TexFormat};
 use crate::settings::ColorTheme;
 use crate::shortcuts::{self, key_pressed};
 use crate::ui::*;
 use crate::utils::*;
 use crate::{BOLD_FONT, FONT};
 
-/// Convert a DynamicImage to Vec<Color32> in a single pass.
-/// Handles each pixel format directly, avoiding intermediate allocations.
-/// For opaque formats (RGB, Luma), alpha is set to 255.
-/// For alpha formats (RGBA, LumaA), alpha is premultiplied for correct egui blending.
-/// If a channel swizzle is active, it's applied inline.
-fn image_to_color32(img: &image::DynamicImage, channel: ColorChannel) -> Vec<egui::Color32> {
-    let needs_swizzle = channel != ColorChannel::Rgba;
-    let swizzle = if needs_swizzle {
-        let (mat, off) = glow_renderer::get_swizzle_mat_vec(channel, img.color());
-        Some((mat.to_cols_array_2d(), [off.x, off.y, off.z, off.w]))
-    } else {
-        None
-    };
-
-    // Apply swizzle to RGBA floats, returning a Color32
-    let apply = |r: f32, g: f32, b: f32, a: f32| -> egui::Color32 {
-        if let Some((m, o)) = &swizzle {
-            let nr = (m[0][0] * r + m[1][0] * g + m[2][0] * b + m[3][0] * a + o[0]).clamp(0.0, 1.0);
-            let ng = (m[0][1] * r + m[1][1] * g + m[2][1] * b + m[3][1] * a + o[1]).clamp(0.0, 1.0);
-            let nb = (m[0][2] * r + m[1][2] * g + m[2][2] * b + m[3][2] * a + o[2]).clamp(0.0, 1.0);
-            let na = (m[0][3] * r + m[1][3] * g + m[2][3] * b + m[3][3] * a + o[3]).clamp(0.0, 1.0);
-            // Premultiply after swizzle
-            egui::Color32::from_rgba_premultiplied(
-                (nr * na * 255.0) as u8,
-                (ng * na * 255.0) as u8,
-                (nb * na * 255.0) as u8,
-                (na * 255.0) as u8,
-            )
-        } else {
-            // Premultiply
-            egui::Color32::from_rgba_premultiplied(
-                (r * a * 255.0) as u8,
-                (g * a * 255.0) as u8,
-                (b * a * 255.0) as u8,
-                (a * 255.0) as u8,
-            )
-        }
-    };
-
-    match img {
-        image::DynamicImage::ImageRgb8(buf) => {
-            if needs_swizzle {
-                buf.as_raw()
-                    .chunks_exact(3)
-                    .map(|p| {
-                        apply(
-                            p[0] as f32 / 255.0,
-                            p[1] as f32 / 255.0,
-                            p[2] as f32 / 255.0,
-                            1.0,
-                        )
-                    })
-                    .collect()
-            } else {
-                // Fast path: no swizzle, no alpha, no premultiply needed
-                buf.as_raw()
-                    .chunks_exact(3)
-                    .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
-                    .collect()
-            }
-        }
-        image::DynamicImage::ImageRgba8(buf) => buf
-            .as_raw()
-            .chunks_exact(4)
-            .map(|p| {
-                apply(
-                    p[0] as f32 / 255.0,
-                    p[1] as f32 / 255.0,
-                    p[2] as f32 / 255.0,
-                    p[3] as f32 / 255.0,
-                )
-            })
-            .collect(),
-        image::DynamicImage::ImageLuma8(buf) => {
-            if needs_swizzle {
-                buf.as_raw()
-                    .iter()
-                    .map(|&l| apply(l as f32 / 255.0, l as f32 / 255.0, l as f32 / 255.0, 1.0))
-                    .collect()
-            } else {
-                buf.as_raw()
-                    .iter()
-                    .map(|&l| egui::Color32::from_rgb(l, l, l))
-                    .collect()
-            }
-        }
-        image::DynamicImage::ImageLumaA8(buf) => buf
-            .as_raw()
-            .chunks_exact(2)
-            .map(|p| {
-                apply(
-                    p[0] as f32 / 255.0,
-                    p[0] as f32 / 255.0,
-                    p[0] as f32 / 255.0,
-                    p[1] as f32 / 255.0,
-                )
-            })
-            .collect(),
-        // For 16-bit and float formats, convert through to_rgba8 (these are rare and large anyway)
-        _ => {
-            let rgba = img.to_rgba8();
-            rgba.as_raw()
-                .chunks_exact(4)
-                .map(|p| {
-                    apply(
-                        p[0] as f32 / 255.0,
-                        p[1] as f32 / 255.0,
-                        p[2] as f32 / 255.0,
-                        p[3] as f32 / 255.0,
-                    )
-                })
-                .collect()
-        }
-    }
-}
-
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
 
-/// A tile of the displayed image
-/// A tile of the displayed image (public so info_ui can use it for zoom preview)
-pub struct ImageTile {
-    pub texture: egui::TextureHandle,
-    /// Offset in image pixels from top-left
-    pub x: u32,
-    pub y: u32,
-    pub w: u32,
-    pub h: u32,
-}
-
 pub struct OculanteApp {
     pub state: OculanteState,
     first_frame: bool,
-    /// Track if image needs re-upload to egui
+    /// Track if image needs re-upload to the GPU
     texture_dirty: bool,
-    /// The current image as one or more tiles
-    image_tiles: Vec<ImageTile>,
-    /// Last channel setting used for swizzle (to detect changes)
-    last_channel: ColorChannel,
-    /// Max texture size (queried once from GL)
-    max_texture_size: u32,
+    /// Glow renderer for direct GL rendering (created on the first frame)
+    renderer: Option<GlowRenderer>,
+    /// Tiles covering the current image. One tile for images that fit in the
+    /// renderer's tile size; a grid for anything larger.
+    image_tiles: Vec<GlowTile>,
+    /// Color type of the uploaded image (selects the channel swizzle)
+    image_color: image::ColorType,
     /// True while an animation is playing (keeps repainting)
     animation_playing: bool,
     /// Checker texture for transparency grid
@@ -178,14 +52,13 @@ pub struct OculanteApp {
 
 impl OculanteApp {
     pub fn new(state: OculanteState) -> Self {
-        let last_channel = state.persistent_settings.current_channel;
         Self {
             state,
             first_frame: true,
             texture_dirty: false,
+            renderer: None,
             image_tiles: Vec::new(),
-            last_channel,
-            max_texture_size: 8192, // conservative default, updated on first frame
+            image_color: image::ColorType::Rgba8,
             animation_playing: false,
             checker_texture: None,
             reset_after_upload: false,
@@ -195,13 +68,16 @@ impl OculanteApp {
         }
     }
 
-    /// Upload or re-upload the current image as egui texture tile(s).
-    /// Converts each source pixel format directly to Color32 in a single pass.
-    /// egui only supports RGBA textures, so all formats end up as Color32.
-    fn upload_image_to_egui(&mut self, ctx: &egui::Context) {
-        // Prefer the edit result if present, otherwise use the original image
+    /// Upload or re-upload the current image as GL texture tile(s).
+    /// Channel selection happens in the shader, so this is only needed when pixels change.
+    fn upload_image_to_glow(&mut self, gl: &glow::Context) {
+        let Some(renderer) = &self.renderer else {
+            return;
+        };
+
+        // Prefer the edit result if present. Animations show their frames unedited.
         let edit_result = &self.state.edit_state.result_pixel_op;
-        let img = if edit_result.width() > 0 {
+        let img = if edit_result.width() > 0 && !self.animation_playing {
             edit_result
         } else {
             match &self.state.current_image {
@@ -211,81 +87,30 @@ impl OculanteApp {
         };
 
         let (w, h) = (img.width(), img.height());
-        let channel = self.state.persistent_settings.current_channel;
 
-        // Convert source pixels → Vec<Color32> in one pass per format.
-        // This avoids intermediate allocations and redundant passes.
-        let pixels = image_to_color32(img, channel);
-
-        let mag_filter = if self.state.persistent_settings.linear_mag_filter {
-            egui::TextureFilter::Linear
-        } else {
-            egui::TextureFilter::Nearest
-        };
-        let min_filter = if self.state.persistent_settings.linear_min_filter {
-            egui::TextureFilter::Linear
-        } else {
-            egui::TextureFilter::Nearest
-        };
-        let mipmap_mode = if self.state.persistent_settings.use_mipmaps {
-            Some(egui::TextureFilter::Linear)
-        } else {
-            None
-        };
-        let tex_options = egui::TextureOptions {
-            magnification: mag_filter,
-            minification: min_filter,
-            mipmap_mode,
-            ..Default::default()
-        };
-
-        // Clear old tiles
-        self.image_tiles.clear();
-
-        let max = self.max_texture_size;
-        let cols = w.div_ceil(max);
-        let rows = h.div_ceil(max);
-
-        if cols == 1 && rows == 1 {
-            // Single tile: move pixels directly, no copy
-            let color_image = egui::ColorImage::new([w as usize, h as usize], pixels);
-            let texture = ctx.load_texture("tile_0_0", color_image, tex_options);
-            self.image_tiles.push(ImageTile {
-                texture,
-                x: 0,
-                y: 0,
-                w,
-                h,
-            });
-        } else {
-            // Multiple tiles: extract each from the pixel grid
-            for row in 0..rows {
-                let ty = row * max;
-                let th = max.min(h - ty);
-                for col in 0..cols {
-                    let tx = col * max;
-                    let tw = max.min(w - tx);
-
-                    let mut tile = Vec::with_capacity((tw * th) as usize);
-                    for y in 0..th {
-                        let src = ((ty + y) * w + tx) as usize;
-                        tile.extend_from_slice(&pixels[src..src + tw as usize]);
-                    }
-
-                    let color_image = egui::ColorImage::new([tw as usize, th as usize], tile);
-                    let name = format!("tile_{}_{}", col, row);
-                    let texture = ctx.load_texture(&name, color_image, tex_options);
-
-                    self.image_tiles.push(ImageTile {
-                        texture,
-                        x: tx,
-                        y: ty,
-                        w: tw,
-                        h: th,
-                    });
-                }
+        // RGBA8 is uploaded as is, everything else is converted first
+        let converted;
+        let bytes: &[u8] = match img {
+            image::DynamicImage::ImageRgba8(buf) => buf.as_raw(),
+            _ => {
+                converted = img.to_rgba8();
+                converted.as_raw()
             }
+        };
+
+        let filter = TexFilter {
+            linear_min: self.state.persistent_settings.linear_min_filter,
+            linear_mag: self.state.persistent_settings.linear_mag_filter,
+            mipmaps: self.state.persistent_settings.use_mipmaps,
+        };
+
+        // Update in place if the tile layout is unchanged, otherwise start over
+        if !renderer.update_tiles(gl, &self.image_tiles, bytes, w, h, filter) {
+            let old = std::mem::take(&mut self.image_tiles);
+            renderer.delete_tiles(gl, old);
+            self.image_tiles = renderer.create_tiles(gl, bytes, w, h, TexFormat::Rgba8, filter);
         }
+        self.image_color = img.color();
 
         // Now that the texture is ready, update geometry and reset view
         self.state.image_geometry.dimensions = (w, h);
@@ -300,7 +125,6 @@ impl OculanteApp {
         self.reset_after_upload = false;
 
         self.texture_dirty = false;
-        self.last_channel = channel;
     }
 
     fn first_frame_setup(&mut self, ctx: &egui::Context) {
@@ -575,12 +399,10 @@ impl eframe::App for OculanteApp {
         // Initialize on first frame
         if self.first_frame {
             self.first_frame_setup(ctx);
-            // Query max texture size from GL
             if let Some(gl) = frame.gl() {
-                self.max_texture_size = unsafe {
-                    glow::HasContext::get_parameter_i32(gl.as_ref(), glow::MAX_TEXTURE_SIZE) as u32
-                };
-                debug!("Max texture size: {}", self.max_texture_size);
+                let renderer = GlowRenderer::new(gl);
+                debug!("Max texture size: {}", renderer.max_texture_size);
+                self.renderer = Some(renderer);
             }
         } else if self.state.persistent_settings.theme == ColorTheme::System {
             let current_system_theme = ctx.system_theme();
@@ -590,16 +412,12 @@ impl eframe::App for OculanteApp {
             }
         }
 
-        // Upload image to egui texture if needed
-        if self.texture_dirty {
-            debug!("Texture was dirty. uploading");
-            self.upload_image_to_egui(ctx);
-        }
-        // Re-upload if channel changed
-        if self.state.persistent_settings.current_channel != self.last_channel
-            && self.state.current_image.is_some()
+        // Upload image to the GPU if needed
+        if self.texture_dirty
+            && let Some(gl) = frame.gl()
         {
-            self.upload_image_to_egui(ctx);
+            debug!("Texture was dirty. uploading");
+            self.upload_image_to_glow(gl);
         }
 
         // Update window size
@@ -808,7 +626,13 @@ impl eframe::App for OculanteApp {
             && !state.persistent_settings.zen_mode
             && state.current_image.is_some()
         {
-            let (_bbox_tl, _bbox_br) = info_ui(ui, state, &self.image_tiles);
+            let (_bbox_tl, _bbox_br) = info_ui(
+                ui,
+                state,
+                self.renderer.as_ref(),
+                &self.image_tiles,
+                self.image_color,
+            );
         }
 
         let canvas_rect = ui.available_rect_before_wrap();
@@ -1020,18 +844,19 @@ impl eframe::App for OculanteApp {
         }
 
         // ===== IMAGE RENDERING =====
-        // Render image via egui's CentralPanel (behind side panels, below UI)
+        // Render image in egui's CentralPanel (behind side panels, below UI)
         let bg = self.state.persistent_settings.background_color;
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(bg[0], bg[1], bg[2])))
             .show(ui, |ui| {
-                if !self.image_tiles.is_empty() {
+                if let Some(renderer) = &self.renderer
+                    && !self.image_tiles.is_empty()
+                {
                     let offset = self.state.image_geometry.offset;
                     let scale = self.state.image_geometry.scale;
                     let img_w = self.state.image_geometry.dimensions.0 as f32;
                     let img_h = self.state.image_geometry.dimensions.1 as f32;
                     let tiling = self.state.tiling.max(1);
-                    let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
 
                     // Draw checker background for transparency (single textured quad per tile)
                     if self.state.persistent_settings.show_checker_background
@@ -1066,30 +891,50 @@ impl eframe::App for OculanteApp {
                         }
                     }
 
+                    // The image itself: all tiles are drawn directly with GL in a paint
+                    // callback, the channel selection is done by the shader.
+                    let mut quads = Vec::with_capacity(self.image_tiles.len() * tiling * tiling);
                     for rep_y in 0..tiling {
                         for rep_x in 0..tiling {
-                            let base_x = offset.x + rep_x as f32 * img_w * scale;
-                            let base_y = offset.y + rep_y as f32 * img_h * scale;
+                            let base = [
+                                offset.x + rep_x as f32 * img_w * scale,
+                                offset.y + rep_y as f32 * img_h * scale,
+                            ];
+                            quads.extend(self.image_tiles.iter().map(|t| t.quad(base, scale)));
+                        }
+                    }
+                    let shader = renderer.image_shader();
+                    let (swizzle_mat, color_offset) = glow_renderer::get_swizzle_mat_vec(
+                        self.state.persistent_settings.current_channel,
+                        self.image_color,
+                    );
+                    let swizzle_mat = swizzle_mat.to_cols_array();
+                    let color_offset = color_offset.to_array();
+                    let cb = egui_glow::CallbackFn::new(move |info, painter| {
+                        glow_renderer::paint_quads(
+                            painter.gl(),
+                            shader,
+                            &info,
+                            &swizzle_mat,
+                            &color_offset,
+                            false,
+                            &quads,
+                        );
+                    });
+                    ui.painter().add(egui::PaintCallback {
+                        rect: ui.max_rect(),
+                        callback: Arc::new(cb),
+                    });
 
-                            for tile in &self.image_tiles {
-                                let pos = egui::pos2(
-                                    base_x + tile.x as f32 * scale,
-                                    base_y + tile.y as f32 * scale,
-                                );
-                                let size = egui::vec2(tile.w as f32 * scale, tile.h as f32 * scale);
-                                let rect = egui::Rect::from_min_size(pos, size);
-                                ui.painter().image(
-                                    tile.texture.id(),
-                                    rect,
-                                    uv,
-                                    egui::Color32::WHITE,
-                                );
-                            }
-
-                            // Draw frame around image if enabled
-                            if self.state.persistent_settings.show_frame {
+                    // Draw frame around image if enabled
+                    if self.state.persistent_settings.show_frame {
+                        for rep_y in 0..tiling {
+                            for rep_x in 0..tiling {
                                 let frame_rect = egui::Rect::from_min_size(
-                                    egui::pos2(base_x, base_y),
+                                    egui::pos2(
+                                        offset.x + rep_x as f32 * img_w * scale,
+                                        offset.y + rep_y as f32 * img_h * scale,
+                                    ),
                                     egui::vec2(img_w * scale, img_h * scale),
                                 );
                                 ui.painter().rect_stroke(
@@ -1135,7 +980,12 @@ impl eframe::App for OculanteApp {
         }
     }
 
-    fn on_exit(&mut self, _gl: Option<&glow::Context>) {
+    fn on_exit(&mut self, gl: Option<&glow::Context>) {
+        if let (Some(gl), Some(renderer)) = (gl, self.renderer.take()) {
+            let tiles = std::mem::take(&mut self.image_tiles);
+            renderer.delete_tiles(gl, tiles);
+            renderer.destroy(gl);
+        }
         info!("Saving settings on exit");
         _ = self.state.persistent_settings.save_blocking();
         _ = self.state.volatile_settings.save_blocking();

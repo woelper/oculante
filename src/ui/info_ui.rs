@@ -3,6 +3,7 @@ use crate::comparelist::CompareItem;
 use crate::filebrowser::BrowserDir;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
+use crate::glow_renderer::{self, GlowRenderer, GlowTile, Quad};
 use crate::icons::*;
 use crate::utils::*;
 use egui_plot::{Line, Plot, PlotPoints};
@@ -12,12 +13,15 @@ use image::ColorType;
 use egui::{self, *};
 
 use super::*;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub fn info_ui(
     ui: &mut egui::Ui,
     state: &mut OculanteState,
-    image_tiles: &[crate::app::ImageTile],
+    renderer: Option<&GlowRenderer>,
+    image_tiles: &[GlowTile],
+    image_color: ColorType,
 ) -> (Pos2, Pos2) {
     let ctx_owned = ui.ctx().clone();
     let ctx = &ctx_owned;
@@ -142,7 +146,9 @@ pub fn info_ui(
                 bbox_br = preview_rect.right_bottom();
 
                 // Draw magnified pixel preview
-                zoom_preview(ui, state, preview_rect, image_tiles);
+                if let Some(renderer) = renderer {
+                    zoom_preview(ui, state, preview_rect, renderer, image_tiles, image_color);
+                }
 
                 ui.advance_cursor_after_rect(preview_rect);
             } // end if current_image
@@ -409,7 +415,9 @@ fn zoom_preview(
     ui: &mut Ui,
     state: &OculanteState,
     rect: egui::Rect,
-    tiles: &[crate::app::ImageTile],
+    renderer: &GlowRenderer,
+    tiles: &[GlowTile],
+    image_color: ColorType,
 ) {
     if tiles.is_empty() {
         return;
@@ -441,15 +449,13 @@ fn zoom_preview(
     // Fill background for out-of-bounds areas
     ui.painter().rect_filled(rect, 0.0, Color32::from_gray(30));
 
-    // Clip to the preview rect
-    let clip = rect;
-
-    // Draw each tile that overlaps the source region
+    // Collect the part of each tile that overlaps the source region
+    let mut quads = Vec::new();
     for tile in tiles {
         let tx = tile.x as f32;
         let ty = tile.y as f32;
-        let tw = tile.w as f32;
-        let th = tile.h as f32;
+        let tw = tile.texture.width as f32;
+        let th = tile.texture.height as f32;
         let tile_right = tx + tw;
         let tile_bottom = ty + th;
 
@@ -468,23 +474,44 @@ fn zoom_preview(
         let uv_top = (overlap_top - ty) / th;
         let uv_right = (overlap_right - tx) / tw;
         let uv_bottom = (overlap_bottom - ty) / th;
-        let uv =
-            egui::Rect::from_min_max(egui::pos2(uv_left, uv_top), egui::pos2(uv_right, uv_bottom));
 
         // Screen position for this overlap region within the preview rect
         let screen_left = rect.left() + (overlap_left - src_left) * px_per_src;
         let screen_top = rect.top() + (overlap_top - src_top) * px_per_src;
         let screen_right = rect.left() + (overlap_right - src_left) * px_per_src;
         let screen_bottom = rect.top() + (overlap_bottom - src_top) * px_per_src;
-        let draw_rect = egui::Rect::from_min_max(
-            egui::pos2(screen_left, screen_top),
-            egui::pos2(screen_right, screen_bottom),
-        );
 
-        ui.painter()
-            .with_clip_rect(clip)
-            .image(tile.texture.id(), draw_rect, uv, Color32::WHITE);
+        quads.push(Quad {
+            texture: tile.texture.texture,
+            pos: [screen_left, screen_top],
+            size: [screen_right - screen_left, screen_bottom - screen_top],
+            uv_offset: [uv_left, uv_top],
+            uv_scale: [uv_right - uv_left, uv_bottom - uv_top],
+        });
     }
+
+    // Draw them with GL, clipped to the preview rect. Texels are snapped so the
+    // preview stays crisp even if the image is displayed interpolated.
+    let shader = renderer.image_shader();
+    let (swizzle_mat, color_offset) =
+        glow_renderer::get_swizzle_mat_vec(state.persistent_settings.current_channel, image_color);
+    let swizzle_mat = swizzle_mat.to_cols_array();
+    let color_offset = color_offset.to_array();
+    let cb = egui_glow::CallbackFn::new(move |info, painter| {
+        glow_renderer::paint_quads(
+            painter.gl(),
+            shader,
+            &info,
+            &swizzle_mat,
+            &color_offset,
+            true,
+            &quads,
+        );
+    });
+    ui.painter().with_clip_rect(rect).add(egui::PaintCallback {
+        rect,
+        callback: Arc::new(cb),
+    });
 
     // Crosshair
     let center_x = rect.left() + radius * px_per_src;
