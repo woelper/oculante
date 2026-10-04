@@ -154,14 +154,22 @@ mod tests {
 
     #[test]
     fn next_cycles_through_the_list() {
+        // The list only keeps the paths, the files do not have to exist
         let mut list = CompareList::default();
         assert!(list.next().is_none());
-        list.insert(CompareItem::new("a.png", geometry(1.0)));
-        list.insert(CompareItem::new("b.png", geometry(1.0)));
-        let first = list.next().map(|item| item.path.clone());
-        let second = list.next().map(|item| item.path.clone());
-        let third = list.next().map(|item| item.path.clone());
-        assert_ne!(first, second);
-        assert_eq!(first, third);
+        for name in ["a.png", "b.png", "c.png"] {
+            list.insert(CompareItem::new(name, geometry(1.0)));
+        }
+        let mut visited = (0..4)
+            .map(|_| list.next().map(|item| item.path.clone()))
+            .collect::<Vec<_>>();
+        // after all three, the first one comes around again
+        assert_eq!(visited[0], visited[3]);
+        visited.truncate(3);
+        visited.sort();
+        assert_eq!(
+            visited,
+            ["a.png", "b.png", "c.png"].map(|name| Some(PathBuf::from(name)))
+        );
     }
 }
