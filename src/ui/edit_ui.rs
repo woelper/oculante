@@ -471,6 +471,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                                 _ = err_sender.send(crate::appstate::Message::err(&format!("Error: Could not save: {e}")));
                                             }
                                         }
+                                        crate::utils::request_repaint();
                                         // state.toast_cooldown = 0.0;
                                 }
 

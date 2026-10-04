@@ -135,6 +135,7 @@ impl OculanteApp {
     }
 
     fn first_frame_setup(&mut self, ctx: &egui::Context) {
+        set_repaint_context(ctx);
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 

@@ -17,6 +17,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::{Context, Result};
 use image::{self, DynamicImage, GenericImageView};
 use image::{EncodableLayout, Rgba, RgbaImage};
+use std::sync::OnceLock;
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
@@ -364,6 +365,22 @@ impl Player {
     }
 }
 
+/// The egui context, for threads that have something new to show.
+static REPAINT_CONTEXT: OnceLock<egui::Context> = OnceLock::new();
+
+/// Remember the context, so background threads can ask for a repaint.
+pub fn set_repaint_context(ctx: &egui::Context) {
+    _ = REPAINT_CONTEXT.set(ctx.clone());
+}
+
+/// Ask the UI to draw a frame. The UI only draws on input, so without this the
+/// result of background work would not show up before the next input event.
+pub fn request_repaint() {
+    if let Some(ctx) = REPAINT_CONTEXT.get() {
+        ctx.request_repaint();
+    }
+}
+
 pub fn send_image_threaded(
     img_location: &Path,
     texture_sender: Sender<Frame>,
@@ -400,6 +417,7 @@ pub fn send_image_threaded(
                             } else {
                                 let _ = texture_sender.send(f.clone());
                             }
+                            request_repaint();
                             let elapsed = timer.elapsed().as_millis();
                             let wait_time_after_loading = delay.saturating_sub(elapsed as u16);
                             debug!("elapsed {elapsed}, wait {wait_time_after_loading}");
@@ -419,6 +437,7 @@ pub fn send_image_threaded(
                             } else {
                                 let _ = texture_sender.send(f);
                             }
+                            request_repaint();
                             return;
                         }
                         _ => (),
@@ -437,6 +456,7 @@ pub fn send_image_threaded(
 
                         if let Frame::Animation(_, delay) = frame {
                             let _ = texture_sender.send(frame.clone());
+                            request_repaint();
                             if *delay > 0 {
                                 //                                      cap at 60fps
                                 thread::sleep(Duration::from_millis(*delay.max(&17) as u64));
@@ -454,6 +474,7 @@ pub fn send_image_threaded(
                     "Failed to load {}",
                     path.display()
                 )));
+                request_repaint();
             }
         }
     });
@@ -734,6 +755,7 @@ pub fn send_extended_info(
             }
             debug!("Sending extended info");
             _ = sender.send(e_info);
+            request_repaint();
         });
     }
 }
