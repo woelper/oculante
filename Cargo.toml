@@ -50,6 +50,9 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.8"
+# Always build lcms2 (used by jxl-oxide) from source. Otherwise it links to the
+# system library where there is one, which is then missing in our bundles (#810).
+lcms2-sys = { version = "4", features = ["static"], optional = true }
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
 resvg = "0.46"
@@ -142,7 +145,7 @@ file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
 j2k = ["jpeg2k"]
-jxlcms = ["jxl-oxide/lcms2"]
+jxlcms = ["jxl-oxide/lcms2", "dep:lcms2-sys"]
 hdr = []
 lang_support = []
 notan_glsl-to-spirv = ["notan/glsl-to-spirv"]

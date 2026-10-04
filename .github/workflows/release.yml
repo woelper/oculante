@@ -160,6 +160,9 @@ jobs:
           codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/$X265
           codesign -s "-" -fv target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
           otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
+          # The app must not depend on anything from Homebrew that is not in the bundle (#810)
+          if otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante | grep /usr/local/; then echo "The app still links a Homebrew library that is not bundled"; exit 1; fi
+          if otool -L target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib | tail -n +3 | grep /usr/local/; then echo "libheif still links a Homebrew library that is not bundled"; exit 1; fi
           cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
       if: matrix.os == 'macos-15-intel'
 
