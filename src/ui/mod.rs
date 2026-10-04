@@ -51,7 +51,7 @@ use crate::{
     },
     paint::PaintStroke,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    shortcuts::{key_name, key_pressed, keypresses_as_string, lookup},
     thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
 };
 

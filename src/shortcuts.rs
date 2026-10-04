@@ -2,7 +2,7 @@ use log::{debug, error, info, trace, warn};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::appstate::OculanteState;
-use notan::prelude::App;
+use notan::prelude::{App, KeyCode};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
@@ -216,7 +216,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
             // Workaround macos fullscreen double press bug
             if command == InputEvent::Fullscreen {
                 for pressed in &app.keyboard.released {
-                    if format!("{:?}", pressed) == key {
+                    if key_matches(pressed, &key) {
                         debug!("Fullscreen received");
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;
@@ -237,7 +237,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 .contains(&command)
                 {
                     for (dn, _) in &app.keyboard.down {
-                        if format!("{:?}", dn) == key {
+                        if key_matches(dn, &key) {
                             debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
                             debug!("Matched {:?} / {:?}", command, key);
                             return true;
@@ -247,7 +247,7 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
 
                 for pressed in &app.keyboard.pressed {
                     // debug!("{:?}", pressed);
-                    if format!("{:?}", pressed) == key {
+                    if key_matches(pressed, &key) {
                         debug!("Number of keys pressed: {}", app.keyboard.down.len());
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;
@@ -269,6 +269,67 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
         }
     }
     false
+}
+
+/// The name of a key as it is stored in the shortcut settings.
+///
+/// Shortcuts are saved as key names. Notan 0.14 renamed its key codes (`F`
+/// became `KeyF`, `LShift` became `ShiftLeft`), which made every saved and
+/// default shortcut stop matching. The names from before that change are kept
+/// here, so existing settings files continue to work.
+pub fn key_name(key: &KeyCode) -> String {
+    let name = format!("{key:?}");
+    let legacy = match name.as_str() {
+        "ArrowLeft" => "Left",
+        "ArrowRight" => "Right",
+        "ArrowUp" => "Up",
+        "ArrowDown" => "Down",
+        "ShiftLeft" => "LShift",
+        "ShiftRight" => "RShift",
+        "ControlLeft" => "LControl",
+        "ControlRight" => "RControl",
+        "AltLeft" => "LAlt",
+        "AltRight" => "RAlt",
+        "SuperLeft" => "LWin",
+        "SuperRight" => "RWin",
+        "Equal" => "Equals",
+        "BracketLeft" => "LBracket",
+        "BracketRight" => "RBracket",
+        "Enter" => "Return",
+        "Backspace" => "Back",
+        "Backquote" => "Grave",
+        "Quote" => "Apostrophe",
+        "CapsLock" => "Capital",
+        "ContextMenu" => "Apps",
+        "PrintScreen" => "Snapshot",
+        "ScrollLock" => "Scroll",
+        "NumLock" => "Numlock",
+        "NumpadAdd" => "Add",
+        "NumpadSubtract" => "Subtract",
+        "NumpadMultiply" => "Multiply",
+        "NumpadDivide" => "Divide",
+        "NumpadDecimal" => "Decimal",
+        "NumpadEqual" => "NumpadEquals",
+        _ => {
+            // KeyA..KeyZ were A..Z, Digit0..Digit9 were Key0..Key9
+            if let Some(letter) = name.strip_prefix("Key") {
+                if letter.len() == 1 {
+                    return letter.to_string();
+                }
+            }
+            if let Some(digit) = name.strip_prefix("Digit") {
+                return format!("Key{digit}");
+            }
+            return name;
+        }
+    };
+    legacy.to_string()
+}
+
+/// Whether `key` is the key stored as `name` in a shortcut. Names written by
+/// the 0.9.3 and 0.9.4 pre-releases use notan's new naming and match as well.
+fn key_matches(key: &KeyCode, name: &str) -> bool {
+    key_name(key) == name || format!("{key:?}") == name
 }
 
 pub fn lookup(shortcuts: &Shortcuts, command: &InputEvent) -> String {
@@ -305,4 +366,144 @@ fn is_key_modifier(key: &str) -> bool {
         key,
         "LShift" | "LControl" | "LAlt" | "RAlt" | "RControl" | "RShift" | "LWin" | "Rwin"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every key notan can report for the keys we use in shortcuts.
+    fn keys() -> Vec<KeyCode> {
+        use KeyCode::*;
+        vec![
+            KeyA,
+            KeyB,
+            KeyC,
+            KeyD,
+            KeyE,
+            KeyF,
+            KeyG,
+            KeyH,
+            KeyI,
+            KeyJ,
+            KeyK,
+            KeyL,
+            KeyM,
+            KeyN,
+            KeyO,
+            KeyP,
+            KeyQ,
+            KeyR,
+            KeyS,
+            KeyT,
+            KeyU,
+            KeyV,
+            KeyW,
+            KeyX,
+            KeyY,
+            KeyZ,
+            Digit0,
+            Digit1,
+            Digit2,
+            Digit3,
+            Digit4,
+            Digit5,
+            Digit6,
+            Digit7,
+            Digit8,
+            Digit9,
+            ArrowLeft,
+            ArrowRight,
+            ArrowUp,
+            ArrowDown,
+            ShiftLeft,
+            ShiftRight,
+            ControlLeft,
+            ControlRight,
+            AltLeft,
+            AltRight,
+            SuperLeft,
+            SuperRight,
+            Equal,
+            Minus,
+            BracketLeft,
+            BracketRight,
+            Delete,
+            Home,
+            End,
+            PageUp,
+            PageDown,
+            Enter,
+            Backspace,
+            Space,
+            Tab,
+            Escape,
+            F1,
+            F11,
+            F12,
+        ]
+    }
+
+    #[test]
+    fn key_names_match_the_names_used_before_notan_014() {
+        let expected = [
+            (KeyCode::KeyF, "F"),
+            (KeyCode::KeyZ, "Z"),
+            (KeyCode::Digit1, "Key1"),
+            (KeyCode::Digit0, "Key0"),
+            (KeyCode::ArrowLeft, "Left"),
+            (KeyCode::ArrowDown, "Down"),
+            (KeyCode::ShiftLeft, "LShift"),
+            (KeyCode::ControlLeft, "LControl"),
+            (KeyCode::ControlRight, "RControl"),
+            (KeyCode::AltRight, "RAlt"),
+            (KeyCode::SuperLeft, "LWin"),
+            (KeyCode::Equal, "Equals"),
+            (KeyCode::Minus, "Minus"),
+            (KeyCode::BracketLeft, "LBracket"),
+            (KeyCode::BracketRight, "RBracket"),
+            (KeyCode::Delete, "Delete"),
+            (KeyCode::Home, "Home"),
+            (KeyCode::End, "End"),
+            (KeyCode::Enter, "Return"),
+            (KeyCode::Backspace, "Back"),
+            (KeyCode::F11, "F11"),
+        ];
+        for (key, name) in expected {
+            assert_eq!(key_name(&key), name);
+        }
+    }
+
+    /// The regression in 0.9.3 and 0.9.4: no default shortcut could be triggered,
+    /// because none of its key names was ever produced by a key press.
+    #[test]
+    fn every_default_shortcut_can_be_triggered() {
+        let producible: BTreeSet<String> = keys().iter().map(key_name).collect();
+        for (command, shortcut) in Shortcuts::default_keys() {
+            for key in shortcut {
+                // on mac, control is replaced by the command key
+                assert!(
+                    producible.contains(&key),
+                    "{command:?} uses the key {key:?}, which no key press produces"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn default_modifiers_are_recognized() {
+        for name in [
+            "LShift", "RShift", "LControl", "RControl", "LAlt", "RAlt", "LWin",
+        ] {
+            assert!(is_key_modifier(name), "{name} should be a modifier");
+        }
+        assert!(!is_key_modifier("F"));
+    }
+
+    #[test]
+    fn shortcuts_saved_by_the_prereleases_still_match() {
+        assert!(key_matches(&KeyCode::KeyF, "F"));
+        assert!(key_matches(&KeyCode::KeyF, "KeyF"));
+        assert!(!key_matches(&KeyCode::KeyF, "G"));
+    }
 }

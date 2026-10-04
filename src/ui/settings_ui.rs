@@ -702,7 +702,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
         .keyboard
         .down
         .iter()
-        .map(|k| format!("{:?}", k.0))
+        .map(|k| key_name(k.0))
         .collect::<BTreeSet<String>>();
 
     let s = state.persistent_settings.shortcuts.clone();
@@ -729,7 +729,7 @@ fn keybinding_ui(app: &mut App, state: &mut OculanteState, ui: &mut Ui) {
                             .keyboard
                             .down
                             .iter()
-                            .map(|(k, _)| format!("{k:?}"))
+                            .map(|(k, _)| key_name(k))
                             .collect();
                     }
                 } else {
