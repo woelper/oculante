@@ -284,6 +284,16 @@ impl fmt::Display for ImageOperation {
     }
 }
 
+/// Name under which the app stores the area of the window that shows the image,
+/// the part that no panel covers.
+pub const CANVAS_RECT: &str = "canvas_rect";
+
+/// The area of the window that shows the image, as of the last frame.
+fn canvas_rect(ctx: &egui::Context) -> Rect {
+    ctx.data(|data| data.get_temp::<Rect>(Id::new(CANVAS_RECT)))
+        .unwrap_or(Rect::EVERYTHING)
+}
+
 impl ImageOperation {
     pub fn is_per_pixel(&self) -> bool {
         !matches!(
@@ -734,7 +744,10 @@ impl ImageOperation {
                 points,
                 original_size,
             } => {
-                let id = Id::new("crop");
+                // Whether the crop was applied and which corner is dragged belongs to this
+                // operation. A crop that is added later starts fresh.
+                let id = Id::new("crop").with(item_id);
+                let dragged_point_id = Id::new("crop_point").with(item_id);
                 let points_transformed = points
                     .iter()
                     .map(|p| {
@@ -746,6 +759,14 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The crop is drawn over the image, not into the panel this ui belongs to,
+                // whose painter would clip it away. The darkening stays on the image area,
+                // the handles and the outline go on top of the panels as well, so they can
+                // always be seen and grabbed.
+                let layer =
+                    egui::LayerId::new(egui::Order::Middle, Id::new("crop_overlay").with(item_id));
+                let handle_painter = ui.ctx().layer_painter(layer);
+                let painter = handle_painter.with_clip_rect(canvas_rect(ui.ctx()));
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
@@ -768,6 +789,7 @@ impl ImageOperation {
                         geo.scale,
                     );
 
+                    let mut handles = vec![];
                     for (i, pt) in points_transformed.iter().enumerate() {
                         let maxdist = 20.;
                         let d = Pos2::new(pt.0, pt.1).distance(cursor_abs);
@@ -775,11 +797,12 @@ impl ImageOperation {
                         if d < maxdist {
                             if ui.input(|i| i.pointer.any_down()) {
                                 *block_panning = true;
-                                ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                                ui.ctx().data_mut(|w| w.insert_temp(dragged_point_id, i));
                             }
                             if ui.input(|r| r.pointer.any_released()) {
                                 *block_panning = false;
-                                ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
+                                ui.ctx()
+                                    .data_mut(|w| w.remove_temp::<usize>(dragged_point_id));
                             }
                         }
 
@@ -796,11 +819,7 @@ impl ImageOperation {
                         //     format!("X"),
                         // );
 
-                        ui.painter().rect_filled(
-                            Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
-                            2.,
-                            col,
-                        );
+                        handles.push((Pos2::new(pt.0, pt.1), col));
                     }
 
                     // egui shape needs these in a different order
@@ -811,8 +830,8 @@ impl ImageOperation {
                         Pos2::new(points_transformed[2].0, points_transformed[2].1),
                     ];
 
-                    // make a black background covering everything
-                    ui.painter().rect_filled(
+                    // make a black background covering the image area
+                    painter.rect_filled(
                         Rect::EVERYTHING,
                         0.,
                         Color32::from_rgba_premultiplied(0, 0, 0, 70),
@@ -823,9 +842,16 @@ impl ImageOperation {
                         Color32::from_rgba_unmultiplied(255, 255, 255, 10),
                         Stroke::new(1., Color32::GOLD),
                     );
-                    ui.painter().add(shape);
+                    handle_painter.add(shape);
+                    for (center, color) in handles {
+                        handle_painter.rect_filled(
+                            Rect::from_center_size(center, Vec2::splat(15.)),
+                            2.,
+                            color,
+                        );
+                    }
 
-                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>(dragged_point_id)) {
                         points[pt].0 = cursor_relative.x as u32;
                         points[pt].1 = cursor_relative.y as u32;
                     }
@@ -845,11 +871,15 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // Draw on the middle layer — above the image (CentralPanel) but behind side panels
-                let painter = ui.ctx().layer_painter(egui::LayerId::new(
-                    egui::Order::Middle,
-                    Id::new("measure_overlay"),
-                ));
+                // Draw on the middle layer, above the image (CentralPanel), and keep it
+                // off the side panels
+                let painter = ui
+                    .ctx()
+                    .layer_painter(egui::LayerId::new(
+                        egui::Order::Middle,
+                        Id::new("measure_overlay"),
+                    ))
+                    .with_clip_rect(canvas_rect(ui.ctx()));
 
                 // let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
@@ -892,6 +922,10 @@ impl ImageOperation {
                             color,
                             width,
                         } => {
+                            // nothing was measured yet
+                            if points[0] == points[1] {
+                                continue;
+                            }
                             let points_transformed = points
                                 .iter()
                                 .map(|p| {
@@ -902,15 +936,16 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
 
-                            let rect = Rect {
-                                min: Pos2::new(points_transformed[0].0, points_transformed[0].1),
-                                max: Pos2::new(points_transformed[1].0, points_transformed[1].1),
-                            };
+                            // the drag can go in any direction
+                            let rect = Rect::from_two_pos(
+                                Pos2::new(points_transformed[0].0, points_transformed[0].1),
+                                Pos2::new(points_transformed[1].0, points_transformed[1].1),
+                            );
 
-                            let rect_orig = Rect {
-                                min: Pos2::new(points[0].0 as f32, points[0].1 as f32),
-                                max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
-                            };
+                            let rect_orig = Rect::from_two_pos(
+                                Pos2::new(points[0].0 as f32, points[0].1 as f32),
+                                Pos2::new(points[1].0 as f32, points[1].1 as f32),
+                            );
 
                             painter.rect_stroke(
                                 rect,

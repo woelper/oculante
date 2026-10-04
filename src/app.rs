@@ -635,6 +635,10 @@ impl eframe::App for OculanteApp {
         }
 
         let canvas_rect = ui.available_rect_before_wrap();
+        // Tools that draw over the image from inside a panel clip to this
+        ctx.data_mut(|data| {
+            data.insert_temp(Id::new(crate::image_editing::CANVAS_RECT), canvas_rect)
+        });
         let pointer_pos = ctx.input(|i| i.pointer.interact_pos());
         let over_floating_layer = pointer_pos
             .and_then(|p| ctx.layer_id_at(p))

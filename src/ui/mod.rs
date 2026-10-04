@@ -646,7 +646,13 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         });
 
+        ui.label("Drag over the image with the right mouse button.");
+
+        // only the measurement itself, the other operations have their place in the edit panel
         for op in &mut state.edit_state.image_op_stack {
+            if !matches!(op.operation, ImageOperation::Measure { .. }) {
+                continue;
+            }
             op.operation.ui(
                 ui,
                 &state.image_geometry,
