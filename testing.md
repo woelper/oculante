@@ -10,6 +10,7 @@
 - [ ] See if the transparency issue has been fixed (#342) (Blending leaves the window alpha untouched now, needs a check on Wayland.)
 
 # Obvious defects
+- [ ] The > icons (carets) are off since the update to egui 0.36
 - [x] The loaded image is always drawn in front on top of the ui
 - [x] Background color does not work
 - [x] Some or all settings don't seem to be saved / restored
