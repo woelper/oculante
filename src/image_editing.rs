@@ -742,6 +742,9 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The handles and the outline are drawn over the whole window, like the
+                // image they belong to. The ui's own painter would clip them to the panel.
+                let painter = ui.ctx().layer_painter(egui::LayerId::background());
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
@@ -792,7 +795,7 @@ impl ImageOperation {
                         //     format!("X"),
                         // );
 
-                        ui.painter().rect_filled(
+                        painter.rect_filled(
                             Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
                             2.,
                             col,
@@ -808,7 +811,7 @@ impl ImageOperation {
                     ];
 
                     // make a black background covering everything
-                    ui.painter().rect_filled(
+                    painter.rect_filled(
                         Rect::EVERYTHING,
                         0.,
                         Color32::from_rgba_premultiplied(0, 0, 0, 70),
@@ -819,7 +822,7 @@ impl ImageOperation {
                         Color32::from_rgba_unmultiplied(255, 255, 255, 10),
                         Stroke::new(1., Color32::GOLD),
                     );
-                    ui.painter().add(shape);
+                    painter.add(shape);
 
                     if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
                         points[pt].0 = cursor_relative.x as u32;
