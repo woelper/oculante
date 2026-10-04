@@ -17,9 +17,9 @@ use std::time::{Duration, SystemTime};
 use anyhow::{Context, Result};
 use image::{self, DynamicImage, GenericImageView};
 use image::{EncodableLayout, Rgba, RgbaImage};
-use std::sync::OnceLock;
 use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, OnceLock};
 use strum::Display;
 use strum_macros::EnumIter;
 
@@ -97,10 +97,6 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     #[cfg(feature = "heif")]
     "hif",
 ];
-
-fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
-    p.0 == [0, 0, 0, 0]
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct DicomData {
@@ -198,11 +194,39 @@ impl ExtendedImageInfo {
     }
 
     pub fn from_image(img: &RgbaImage) -> Self {
+        Self::from_pixels(
+            img.as_raw()
+                .chunks_exact(4)
+                .map(|p| [p[0], p[1], p[2], p[3]]),
+        )
+    }
+
+    /// Like `from_image`, but reads 8 bit images in the layout they have instead of
+    /// converting the whole image to RGBA first.
+    pub fn from_dynamic_image(img: &DynamicImage) -> Self {
+        match img {
+            DynamicImage::ImageRgba8(i) => Self::from_image(i),
+            DynamicImage::ImageRgb8(i) => Self::from_pixels(
+                i.as_raw()
+                    .chunks_exact(3)
+                    .map(|p| [p[0], p[1], p[2], u8::MAX]),
+            ),
+            DynamicImage::ImageLuma8(i) => {
+                Self::from_pixels(i.as_raw().iter().map(|l| [*l, *l, *l, u8::MAX]))
+            }
+            DynamicImage::ImageLumaA8(i) => {
+                Self::from_pixels(i.as_raw().chunks_exact(2).map(|p| [p[0], p[0], p[0], p[1]]))
+            }
+            _ => Self::from_image(&img.to_rgba8()),
+        }
+    }
+
+    fn from_pixels(pixels: impl Iterator<Item = [u8; 4]>) -> Self {
         let mut hist_r: [u64; 256] = [0; 256];
         let mut hist_g: [u64; 256] = [0; 256];
         let mut hist_b: [u64; 256] = [0; 256];
 
-        let num_pixels = img.width() as usize * img.height() as usize;
+        let mut num_pixels = 0;
         let mut num_transparent_pixels = 0;
 
         //Colors counting
@@ -211,18 +235,19 @@ impl ExtendedImageInfo {
         const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
         let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
 
-        for p in img.pixels() {
-            if is_pixel_fully_transparent(p) {
+        for p in pixels {
+            num_pixels += 1;
+            if p == [0, 0, 0, 0] {
                 num_transparent_pixels += 1;
             }
 
-            hist_r[p.0[0] as usize] += 1;
-            hist_g[p.0[1] as usize] += 1;
-            hist_b[p.0[2] as usize] += 1;
+            hist_r[p[0] as usize] += 1;
+            hist_g[p[1] as usize] += 1;
+            hist_b[p[2] as usize] += 1;
 
             //Store every existing color combination in a bit
             //Therefore we use a 24 bit index, splitted into a main and a sub index.
-            let pos = u32::from_le_bytes([p.0[0], p.0[1], p.0[2], 0]);
+            let pos = u32::from_le_bytes([p[0], p[1], p[2], 0]);
             let pos_main = pos >> SUB_INDEX_SIZE;
             let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
             color_map[pos_main as usize] |= 1 << pos_sub;
@@ -429,7 +454,8 @@ pub fn send_image_threaded(
                         }
                         Frame::Still(ref mut buffer) => {
                             debug!("Received image in {:?}", timer.elapsed());
-                            _ = rotate_dynimage(buffer, &path);
+                            // nobody else holds the image yet, so this does not copy it
+                            _ = rotate_dynimage(Arc::make_mut(buffer), &path);
 
                             // TODO force frame sournce
                             if let Some(new_frame) = forced_frame_source {
@@ -486,19 +512,19 @@ pub fn send_image_threaded(
 #[derive(Debug, Clone, PartialEq, Display)]
 pub enum Frame {
     /// A regular still frame (most common)
-    Still(DynamicImage),
+    Still(Arc<DynamicImage>),
     /// Part of an animation. Delay in ms
-    Animation(DynamicImage, u16),
+    Animation(Arc<DynamicImage>, u16),
     /// First frame of animation. This is necessary to reset the image and stop the player.
-    AnimationStart(DynamicImage),
+    AnimationStart(Arc<DynamicImage>),
     /// Result of an edit operation with image
-    EditResult(DynamicImage),
+    EditResult(Arc<DynamicImage>),
     /// Only update the current texture.
     UpdateTexture,
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
-    CompareResult(DynamicImage, ImageGeometry),
+    CompareResult(Arc<DynamicImage>, ImageGeometry),
     /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
-    ImageCollectionMember(DynamicImage),
+    ImageCollectionMember(Arc<DynamicImage>),
 }
 
 impl Frame {
@@ -506,17 +532,17 @@ impl Frame {
         source
     }
 
-    pub fn new_reset(buffer: DynamicImage) -> Frame {
-        Frame::AnimationStart(buffer)
+    pub fn new_reset(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
+        Frame::AnimationStart(buffer.into())
     }
 
-    pub fn new_animation(buffer: DynamicImage, delay_ms: u16) -> Frame {
-        Frame::Animation(buffer, delay_ms)
+    pub fn new_animation(buffer: impl Into<Arc<DynamicImage>>, delay_ms: u16) -> Frame {
+        Frame::Animation(buffer.into(), delay_ms)
     }
 
     #[allow(dead_code)]
-    pub fn new_edit(buffer: DynamicImage) -> Frame {
-        Frame::EditResult(buffer)
+    pub fn new_edit(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
+        Frame::EditResult(buffer.into())
     }
 
     #[allow(dead_code)]
@@ -524,8 +550,8 @@ impl Frame {
         Frame::UpdateTexture
     }
 
-    pub fn new_still(buffer: DynamicImage) -> Frame {
-        Frame::Still(buffer)
+    pub fn new_still(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
+        Frame::Still(buffer.into())
     }
 
     // Convert one `Frame` variant to something else, replacing its buffer.
@@ -560,7 +586,7 @@ impl Frame {
             | Frame::EditResult(img)
             | Frame::CompareResult(img, _)
             | Frame::Animation(img, _)
-            | Frame::ImageCollectionMember(img) => Some(img.clone()),
+            | Frame::ImageCollectionMember(img) => Some(DynamicImage::clone(img)),
             _ => None,
         }
     }
@@ -740,16 +766,17 @@ pub fn pos_from_coord(
 }
 
 pub fn send_extended_info(
-    current_image: &Option<DynamicImage>,
+    current_image: &Option<Arc<DynamicImage>>,
     current_path: &Option<PathBuf>,
     channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
 ) {
     if let Some(img) = current_image {
-        let copied_img = img.to_rgba8();
+        // The image is shared with the thread, not copied
+        let img = img.clone();
         let sender = channel.0.clone();
         let current_path = current_path.clone();
         thread::spawn(move || {
-            let mut e_info = ExtendedImageInfo::from_image(&copied_img);
+            let mut e_info = ExtendedImageInfo::from_dynamic_image(&img);
             if let Some(p) = current_path {
                 _ = e_info.with_exif(&p);
                 _ = e_info.with_dicom(&p);
@@ -802,7 +829,7 @@ pub fn effective_image(state: &OculanteState) -> Option<&DynamicImage> {
     if state.edit_state.result_pixel_op.width() > 0 {
         Some(&state.edit_state.result_pixel_op)
     } else {
-        state.current_image.as_ref()
+        state.current_image.as_deref()
     }
 }
 
@@ -1066,4 +1093,41 @@ pub fn get_pixel_checked(img: &DynamicImage, x: u32, y: u32) -> Option<Rgba<u8>>
         return Some(img.get_pixel(x, y));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Something with many different values, in every channel
+    fn pattern(bytes_per_pixel: usize) -> Vec<u8> {
+        (0..37 * 23 * bytes_per_pixel)
+            .map(|i| (i * 7 % 256) as u8)
+            .collect()
+    }
+
+    #[test]
+    fn image_info_does_not_depend_on_the_layout() {
+        let images = [
+            DynamicImage::ImageLuma8(image::GrayImage::from_raw(37, 23, pattern(1)).unwrap()),
+            DynamicImage::ImageLumaA8(image::GrayAlphaImage::from_raw(37, 23, pattern(2)).unwrap()),
+            DynamicImage::ImageRgb8(image::RgbImage::from_raw(37, 23, pattern(3)).unwrap()),
+            DynamicImage::ImageRgba8(RgbaImage::from_raw(37, 23, pattern(4)).unwrap()),
+            DynamicImage::ImageRgb16(
+                image::ImageBuffer::from_raw(37, 23, vec![40000u16; 37 * 23 * 3]).unwrap(),
+            ),
+        ];
+        for img in images {
+            // what the info was computed from before: the image converted to RGBA
+            let expected = ExtendedImageInfo::from_image(&img.to_rgba8());
+            let info = ExtendedImageInfo::from_dynamic_image(&img);
+            assert_eq!(info.num_pixels, 37 * 23, "{:?}", img.color());
+            assert_eq!(info.num_pixels, expected.num_pixels);
+            assert_eq!(info.num_colors, expected.num_colors, "{:?}", img.color());
+            assert_eq!(info.num_transparent_pixels, expected.num_transparent_pixels);
+            assert_eq!(info.red_histogram, expected.red_histogram);
+            assert_eq!(info.green_histogram, expected.green_histogram);
+            assert_eq!(info.blue_histogram, expected.blue_histogram);
+        }
+    }
 }

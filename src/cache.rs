@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Instant,
 };
 
@@ -15,12 +16,13 @@ pub struct Cache {
 
 #[derive(Debug)]
 pub struct CachedImage {
-    data: DynamicImage,
+    /// Shared with whoever shows the image, so caching it does not copy it
+    data: Arc<DynamicImage>,
     created: Instant,
 }
 
 impl Cache {
-    pub fn get(&self, path: &Path) -> Option<DynamicImage> {
+    pub fn get(&self, path: &Path) -> Option<Arc<DynamicImage>> {
         self.data.get(path).map(|c| c.data.clone())
     }
 
@@ -28,7 +30,7 @@ impl Cache {
         self.data.clear()
     }
 
-    pub fn insert(&mut self, path: &Path, img: DynamicImage) {
+    pub fn insert(&mut self, path: &Path, img: Arc<DynamicImage>) {
         self.data.insert(
             path.into(),
             CachedImage {

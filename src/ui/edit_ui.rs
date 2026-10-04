@@ -38,13 +38,13 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
         if state.edit_state.result_pixel_op.width() == 0 {
             debug!("Edit state pixel comp buffer is default, cloning from image");
             // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_pixel_op = img.clone();
+            state.edit_state.result_pixel_op = DynamicImage::clone(img);
             pixels_changed = true;
         }
         if state.edit_state.result_image_op.width() == 0 {
             debug!("Edit state image comp buffer is default, cloning from image");
             // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_image_op = img.clone();
+            state.edit_state.result_image_op = DynamicImage::clone(img);
             image_changed = true;
         }
     }
@@ -387,7 +387,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .on_hover_text("Apply all edits to the image and reset edit controls")
                     .clicked()
                     && let Some(img) = &mut state.current_image {
-                        *img = state.edit_state.result_pixel_op.clone();
+                        *img = state.edit_state.result_pixel_op.clone().into();
                         state.edit_state = Default::default();
                         // state.dimensions = img.dimensions();
                         pixels_changed = true;
@@ -575,7 +575,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     let stamp = Instant::now();
                     // start with a fresh copy of the unmodified image
                     // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = img.clone();
+                    state.edit_state.result_image_op = DynamicImage::clone(img);
                     for operation in &state.edit_state.image_op_stack {
                         if !operation.active {
                             continue;

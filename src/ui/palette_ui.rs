@@ -171,7 +171,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     ui.ctx()
                         .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
-                    if let Ok(mut pipeline) = PalettePipeline::try_from(&img.clone().into_rgb8()) {
+                    if let Ok(mut pipeline) = PalettePipeline::try_from(&img.to_rgb8()) {
                         let palette = pipeline
                             .palette_size(32)
                             .colorspace(ColorSpace::Oklab)

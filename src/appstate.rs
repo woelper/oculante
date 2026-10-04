@@ -67,7 +67,8 @@ pub struct OculanteState {
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
     pub current_path: Option<PathBuf>,
-    pub current_image: Option<DynamicImage>,
+    /// Shared with the cache and the threads that look at the image
+    pub current_image: Option<std::sync::Arc<DynamicImage>>,
     pub settings_enabled: bool,
     pub image_metadata: Option<ExtendedImageInfo>,
     pub tiling: usize,
