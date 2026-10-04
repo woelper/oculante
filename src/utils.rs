@@ -26,6 +26,7 @@ use strum_macros::EnumIter;
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image, rotate_dynimage};
+use crate::scrubber::find_first_image_in_directory;
 use crate::settings::DecoderSettings;
 use crate::shortcuts::{InputEvent, Shortcuts, lookup};
 
@@ -880,6 +881,48 @@ pub fn compare_next(state: &mut OculanteState) {
             Some(Frame::CompareResult(Default::default(), geometry)),
         );
         state.current_path = Some(path);
+    }
+}
+
+/// Open the images or folders the app was started with.
+pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
+    debug!("Image is: {:?}", paths_to_open);
+
+    if paths_to_open.len() == 1 {
+        let location = paths_to_open.into_iter().next().unwrap();
+        if location.is_dir() {
+            if let Ok(first) = find_first_image_in_directory(&location) {
+                state.is_loaded = false;
+                state.player.load(&first);
+                state.current_path = Some(first);
+            }
+        } else {
+            state.is_loaded = false;
+            state.player.load(&location);
+            state.current_path = Some(location);
+        }
+    } else if paths_to_open.len() > 1 {
+        let location = paths_to_open.first().unwrap();
+        if location.is_dir() {
+            if let Ok(first) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first.clone());
+                state.player.load_advanced(
+                    &first,
+                    Some(Frame::ImageCollectionMember(Default::default())),
+                );
+            }
+        } else {
+            state.is_loaded = false;
+            state.current_path = Some(location.clone());
+            state.player.load_advanced(
+                location,
+                Some(Frame::ImageCollectionMember(Default::default())),
+            );
+        }
+        state.scrubber.fixed_paths = paths_to_open.iter().all(|p| p.is_file());
+        state.scrubber.entries = paths_to_open;
+        state.scrubber.wrap = state.persistent_settings.wrap_folder;
     }
 }
 

@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 
+use std::io::{IsTerminal, stdin};
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 
@@ -9,8 +10,7 @@ use log::{LevelFilter, error};
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
-use oculante::scrubber::find_first_image_in_directory;
-use oculante::utils::{Frame, Player};
+use oculante::utils::{Frame, Player, open_paths, request_repaint};
 use oculante::window_config::build_window_settings;
 
 fn main() -> eframe::Result<()> {
@@ -70,42 +70,10 @@ fn main() -> eframe::Result<()> {
         .map(PathBuf::from)
         .collect();
 
-    if paths_to_open.len() == 1 {
-        let location = paths_to_open.into_iter().next().unwrap();
-        if location.is_dir() {
-            if let Ok(first) = find_first_image_in_directory(&location) {
-                state.is_loaded = false;
-                state.player.load(&first);
-                state.current_path = Some(first);
-            }
-        } else {
-            state.is_loaded = false;
-            state.player.load(&location);
-            state.current_path = Some(location);
-        }
-    } else if paths_to_open.len() > 1 {
-        let location = paths_to_open.first().unwrap();
-        if location.is_dir() {
-            if let Ok(first) = find_first_image_in_directory(location) {
-                state.is_loaded = false;
-                state.current_path = Some(first.clone());
-                state.player.load_advanced(
-                    &first,
-                    Some(Frame::ImageCollectionMember(Default::default())),
-                );
-            }
-        } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone());
-            state.player.load_advanced(
-                location,
-                Some(Frame::ImageCollectionMember(Default::default())),
-            );
-        }
-        state.scrubber.fixed_paths = paths_to_open.iter().all(|p| p.is_file());
-        state.scrubber.entries = paths_to_open;
-        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-    }
+    // File names can also be piped in. They are read in the background, so the
+    // app starts right away even if stdin stays open and silent.
+    state.piped_paths = piped_paths(matches.get_flag("stdin"), paths_to_open.clone());
+    open_paths(&mut state, paths_to_open);
 
     if matches.get_flag("stdin") {
         use std::io::Read;
@@ -179,4 +147,33 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|_cc| Ok(Box::new(OculanteApp::new(state)))),
     )
+}
+
+/// Read file names piped into stdin on a background thread. They are sent once
+/// stdin is closed, followed by the paths given on the command line.
+fn piped_paths(
+    stdin_is_image_data: bool,
+    cli_paths: Vec<PathBuf>,
+) -> Option<mpsc::Receiver<Vec<PathBuf>>> {
+    if stdin_is_image_data || stdin().is_terminal() {
+        return None;
+    }
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut paths = stdin()
+            .lines()
+            .flat_map(|line| {
+                line.unwrap_or_default()
+                    .split_whitespace()
+                    .map(PathBuf::from)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if !paths.is_empty() {
+            paths.extend(cli_paths);
+            _ = sender.send(paths);
+            request_repaint();
+        }
+    });
+    Some(receiver)
 }

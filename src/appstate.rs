@@ -80,6 +80,8 @@ pub struct OculanteState {
     pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
+    /// File names piped in at startup, they arrive from a background thread
+    pub piped_paths: Option<std::sync::mpsc::Receiver<Vec<std::path::PathBuf>>>,
     /// how long the toast message appears
     /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
@@ -172,6 +174,7 @@ impl Default for OculanteState {
             volatile_settings,
             always_on_top: Default::default(),
             network_mode: Default::default(),
+            piped_paths: None,
             window_size: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),

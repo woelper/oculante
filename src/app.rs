@@ -430,6 +430,18 @@ impl eframe::App for OculanteApp {
             ctx.request_repaint();
         }
 
+        // File names piped in at startup arrive from a background thread
+        if let Some(receiver) = &self.state.piped_paths {
+            match receiver.try_recv() {
+                Ok(paths) => {
+                    self.state.piped_paths = None;
+                    open_paths(&mut self.state, paths);
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => self.state.piped_paths = None,
+            }
+        }
+
         // Reload the image if its file changed on disk
         if self.last_file_check.elapsed() > Duration::from_millis(800) {
             self.last_file_check = Instant::now();
