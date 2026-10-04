@@ -6,7 +6,7 @@ use crate::filebrowser::browse_for_image_path;
 use crate::glow_renderer::{self, GlowRenderer, GlowTile, Quad};
 use crate::icons::*;
 use crate::utils::*;
-use egui_plot::{Line, Plot, PlotPoints};
+use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
@@ -364,47 +364,60 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         }
 
-        let red_vals = Line::new(
-            "red",
-            info.red_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::RED);
+        let line = |name: &str, histogram: &[(i32, u64)], color: Color32| {
+            Line::new(
+                name,
+                histogram
+                    .iter()
+                    .map(|(k, v)| [*k as f64, *v as f64])
+                    .collect::<PlotPoints>(),
+            )
+            .color(color)
+        };
 
-        let green_vals = Line::new(
-            "green",
-            info.green_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::GREEN);
-
-        let blue_vals = Line::new(
-            "blue",
-            info.blue_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::BLUE);
-
-        Plot::new("histogram")
+        let plot = Plot::new("histogram")
             .allow_zoom(false)
             .allow_drag(false)
             .show_axes(false)
             .show_grid(false)
             .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
             .show(ui, |plot_ui| {
-                plot_ui.line(red_vals);
-                plot_ui.line(green_vals);
-                plot_ui.line(blue_vals);
+                plot_ui.line(line("red", &info.red_histogram, Color32::RED));
+                plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));
+                plot_ui.line(line("blue", &info.blue_histogram, Color32::BLUE));
             });
+
+        // The areas below the lines. The plot's own fill does not add colors up, here
+        // red and green give yellow, and all three channels a neutral gray.
+        let painter = ui.painter().with_clip_rect(plot.response.rect);
+        let base_y = plot
+            .transform
+            .position_from_point(&PlotPoint::new(0.0, 0.0))
+            .y;
+        const FILL: u8 = 70;
+        for (histogram, color) in [
+            (&info.red_histogram, Color32::from_rgb_additive(FILL, 0, 0)),
+            (
+                &info.green_histogram,
+                Color32::from_rgb_additive(0, FILL, 0),
+            ),
+            (&info.blue_histogram, Color32::from_rgb_additive(0, 0, FILL)),
+        ] {
+            let mut mesh = Mesh::default();
+            for (i, (k, v)) in histogram.iter().enumerate() {
+                let top = plot
+                    .transform
+                    .position_from_point(&PlotPoint::new(*k as f64, *v as f64));
+                mesh.colored_vertex(top, color);
+                mesh.colored_vertex(pos2(top.x, base_y), color);
+                if i > 0 {
+                    let n = (2 * i) as u32;
+                    mesh.add_triangle(n - 2, n - 1, n);
+                    mesh.add_triangle(n - 1, n, n + 1);
+                }
+            }
+            painter.add(mesh);
+        }
     }
 }
 
