@@ -34,6 +34,9 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: true
+        # A release starts as a pre-release. It is promoted by hand once the
+        # builds have been tested.
+        prerelease: true
         body_path: ./changes
 
   build_job:

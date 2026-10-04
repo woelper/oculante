@@ -32,5 +32,8 @@ git commit -m "Release version $VERSION"
 git tag $VERSION
 git push --tags
 git push
+echo "Tag $VERSION is pushed. The release workflow builds it and publishes it as a pre-release."
+echo "Test those builds. Then mark the release as latest on GitHub and publish to crates.io,"
+echo "which can not be undone:"
 # this needs no-verify as we modify the plist during the build, and cargo does not accept that.
-cargo publish --no-verify
+echo "    cargo publish --no-verify"
