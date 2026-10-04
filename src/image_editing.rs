@@ -730,7 +730,10 @@ impl ImageOperation {
                 points,
                 original_size,
             } => {
-                let id = Id::new("crop");
+                // Whether the crop was applied and which corner is dragged belongs to this
+                // operation. A crop that is added later starts fresh.
+                let id = Id::new("crop").with(item_id);
+                let dragged_point_id = Id::new("crop_point").with(item_id);
                 let points_transformed = points
                     .iter()
                     .map(|p| {
@@ -742,9 +745,14 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // The handles and the outline are drawn over the whole window, like the
-                // image they belong to. The ui's own painter would clip them to the panel.
+                // The crop is drawn over the whole window, like the image it belongs to.
+                // The ui's own painter would clip it to the panel. The handles and the
+                // outline go on top of the panels, so they can always be seen and grabbed.
                 let painter = ui.ctx().layer_painter(egui::LayerId::background());
+                let handle_painter = ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    Id::new("crop_handles").with(item_id),
+                ));
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
@@ -774,11 +782,12 @@ impl ImageOperation {
                         if d < maxdist {
                             if ui.input(|i| i.pointer.any_down()) {
                                 *block_panning = true;
-                                ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                                ui.ctx().data_mut(|w| w.insert_temp(dragged_point_id, i));
                             }
                             if ui.input(|r| r.pointer.any_released()) {
                                 *block_panning = false;
-                                ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
+                                ui.ctx()
+                                    .data_mut(|w| w.remove_temp::<usize>(dragged_point_id));
                             }
                         }
 
@@ -795,7 +804,7 @@ impl ImageOperation {
                         //     format!("X"),
                         // );
 
-                        painter.rect_filled(
+                        handle_painter.rect_filled(
                             Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
                             2.,
                             col,
@@ -822,9 +831,9 @@ impl ImageOperation {
                         Color32::from_rgba_unmultiplied(255, 255, 255, 10),
                         Stroke::new(1., Color32::GOLD),
                     );
-                    painter.add(shape);
+                    handle_painter.add(shape);
 
-                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>(dragged_point_id)) {
                         points[pt].0 = cursor_relative.x as u32;
                         points[pt].1 = cursor_relative.y as u32;
                     }
@@ -847,10 +856,16 @@ impl ImageOperation {
                 // The shapes are drawn over the image, not into the panel this ui belongs
                 // to. Use a painter for the area the panels leave free, the ui's own
                 // painter would clip them away.
+                let mut image_area = ui.ctx().available_rect();
+                // the panel this ui is in still counts as free while it is being built
+                let panel = ui.clip_rect();
+                if panel.left() <= image_area.left() {
+                    image_area.min.x = image_area.min.x.max(panel.right());
+                }
                 let painter = ui
                     .ctx()
                     .layer_painter(egui::LayerId::background())
-                    .with_clip_rect(ui.ctx().available_rect());
+                    .with_clip_rect(image_area);
                 // enable this if this is used to draw
                 // let id = Id::new("shapes");
 
@@ -895,6 +910,10 @@ impl ImageOperation {
                             color,
                             width,
                         } => {
+                            // nothing was measured yet
+                            if points[0] == points[1] {
+                                continue;
+                            }
                             let points_transformed = points
                                 .iter()
                                 .map(|p| {
