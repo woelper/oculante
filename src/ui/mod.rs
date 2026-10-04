@@ -20,6 +20,7 @@ pub use theme::*;
 mod thumbnail_rendering;
 pub use thumbnail_rendering::*;
 
+use crate::egui_modal;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 use crate::icons::*;
