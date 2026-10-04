@@ -8,6 +8,7 @@ Each test checks behaviour that broke before. See README.md.
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -111,6 +112,50 @@ def test_image_cannot_get_lost(binary):
         app.drag(0.9, 0.5, 0.3, 0.5)
         back = app.shot("back")
         assert changed_pixels(gone, back) > 20000, "the image was dragged further away than the window is wide"
+
+
+# name, ImageMagick options that give the file its layout
+LAYOUTS = [
+    ("gray8.png", ["-colorspace", "Gray", "-define", "png:color-type=0", "-depth", "8"]),
+    ("gray_alpha8.png", ["-colorspace", "Gray", "-alpha", "set", "-define", "png:color-type=4", "-depth", "8"]),
+    ("rgb8.png", ["-define", "png:color-type=2", "-depth", "8"]),
+    ("rgba8.png", ["-alpha", "set", "-define", "png:color-type=6", "-depth", "8"]),
+    ("gray16.png", ["-colorspace", "Gray", "-define", "png:color-type=0", "-depth", "16"]),
+    ("gray_alpha16.png", ["-colorspace", "Gray", "-alpha", "set", "-define", "png:color-type=4", "-depth", "16"]),
+    ("rgb16.png", ["-define", "png:color-type=2", "-depth", "16"]),
+    ("rgba16.png", ["-alpha", "set", "-define", "png:color-type=6", "-depth", "16"]),
+]
+LEFT, RIGHT = (200, 200, 200), (60, 60, 60)
+
+
+def test_image_layouts(binary):
+    """Gray, gray with alpha, RGB and RGBA images of 8 and 16 bit are shown with the right pixels."""
+    folder = os.path.join(OUT, "layout_source")
+    os.makedirs(folder, exist_ok=True)
+    failures = []
+    for name, options in LAYOUTS:
+        path = os.path.join(folder, name)
+        # Light on the left, dark on the right. The odd width makes rows that do not
+        # end on a four byte boundary, which shears the image if the upload ignores it.
+        draw = ["-size", "401x301", "xc:rgb(200,200,200)", "-fill", "rgb(60,60,60)", "-draw", "rectangle 201,0 400,300"]
+        subprocess.run(["convert", *draw, *options, path], check=True)
+        with App(binary, "layout", [path]) as app:
+            app.wait_window()
+            assert app.wait_for_log(LOADED), f"{name} never loaded"
+            app.move(0.5, 0.97)
+            app.settle(1.0)
+            cx, cy = app.geom["WIDTH"] // 2, app.geom["HEIGHT"] // 2
+            shot = app.shot(name[:-4])
+            for dy in (-100, 100):
+                for dx, color in ((-100, LEFT), (100, RIGHT)):
+                    if not region_has_color(shot, (cx + dx, cy + dy, 3, 3), color, 12):
+                        failures.append(f"{name}: wrong color at {dx},{dy}")
+            # the alpha channel of an opaque image is white
+            app.key("a")
+            shot = app.shot(name[:-4] + "_alpha")
+            if not region_has_color(shot, (cx + 100, cy + 100, 3, 3), (255, 255, 255), 12):
+                failures.append(f"{name}: the alpha channel is not white")
+    assert not failures, "; ".join(failures)
 
 
 RAIL = (60, 60, 60)
@@ -242,6 +287,7 @@ TESTS = [
     test_piped_file_names,
     test_reload_when_file_changes,
     test_image_cannot_get_lost,
+    test_image_layouts,
     test_slider_changes_image,
     test_measure_draws_rectangle,
 ]

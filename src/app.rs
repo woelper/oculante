@@ -33,8 +33,8 @@ pub struct OculanteApp {
     /// Tiles covering the current image. One tile for images that fit in the
     /// renderer's tile size; a grid for anything larger.
     image_tiles: Vec<GlowTile>,
-    /// Color type of the uploaded image (selects the channel swizzle)
-    image_color: image::ColorType,
+    /// Format of the uploaded image (selects the channel swizzle)
+    image_format: TexFormat,
     /// True while an animation is playing (keeps repainting)
     animation_playing: bool,
     /// Checker texture for transparency grid
@@ -62,7 +62,7 @@ impl OculanteApp {
             texture_dirty: false,
             renderer: None,
             image_tiles: Vec::new(),
-            image_color: image::ColorType::Rgba8,
+            image_format: TexFormat::Rgba8,
             animation_playing: false,
             checker_texture: None,
             reset_after_upload: false,
@@ -94,15 +94,10 @@ impl OculanteApp {
 
         let (w, h) = (img.width(), img.height());
 
-        // RGBA8 is uploaded as is, everything else is converted first
-        let converted;
-        let bytes: &[u8] = match img {
-            image::DynamicImage::ImageRgba8(buf) => buf.as_raw(),
-            _ => {
-                converted = img.to_rgba8();
-                converted.as_raw()
-            }
-        };
+        // 8 bit images are uploaded as they are, everything else is converted first
+        let (format, layout) = glow_renderer::texture_layout(img);
+        debug!("Uploading {:?} as {:?}", img.color(), format);
+        let bytes = layout.as_bytes();
 
         let filter = TexFilter {
             linear_min: self.state.persistent_settings.linear_min_filter,
@@ -111,12 +106,12 @@ impl OculanteApp {
         };
 
         // Update in place if the tile layout is unchanged, otherwise start over
-        if !renderer.update_tiles(gl, &self.image_tiles, bytes, w, h, filter) {
+        if !renderer.update_tiles(gl, &self.image_tiles, bytes, w, h, format, filter) {
             let old = std::mem::take(&mut self.image_tiles);
             renderer.delete_tiles(gl, old);
-            self.image_tiles = renderer.create_tiles(gl, bytes, w, h, TexFormat::Rgba8, filter);
+            self.image_tiles = renderer.create_tiles(gl, bytes, w, h, format, filter);
         }
-        self.image_color = img.color();
+        self.image_format = format;
 
         // Now that the texture is ready, update geometry and reset view
         self.state.image_geometry.dimensions = (w, h);
@@ -677,7 +672,7 @@ impl eframe::App for OculanteApp {
                 state,
                 self.renderer.as_ref(),
                 &self.image_tiles,
-                self.image_color,
+                self.image_format,
             );
         }
 
@@ -961,7 +956,7 @@ impl eframe::App for OculanteApp {
                     let shader = renderer.image_shader();
                     let (swizzle_mat, color_offset) = glow_renderer::get_swizzle_mat_vec(
                         self.state.persistent_settings.current_channel,
-                        self.image_color,
+                        self.image_format,
                     );
                     let swizzle_mat = swizzle_mat.to_cols_array();
                     let color_offset = color_offset.to_array();

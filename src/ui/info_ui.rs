@@ -21,7 +21,7 @@ pub fn info_ui(
     state: &mut OculanteState,
     renderer: Option<&GlowRenderer>,
     image_tiles: &[GlowTile],
-    image_color: ColorType,
+    image_format: glow_renderer::TexFormat,
 ) -> (Pos2, Pos2) {
     let ctx_owned = ui.ctx().clone();
     let ctx = &ctx_owned;
@@ -147,7 +147,7 @@ pub fn info_ui(
 
                 // Draw magnified pixel preview
                 if let Some(renderer) = renderer {
-                    zoom_preview(ui, state, preview_rect, renderer, image_tiles, image_color);
+                    zoom_preview(ui, state, preview_rect, renderer, image_tiles, image_format);
                 }
 
                 ui.advance_cursor_after_rect(preview_rect);
@@ -430,7 +430,7 @@ fn zoom_preview(
     rect: egui::Rect,
     renderer: &GlowRenderer,
     tiles: &[GlowTile],
-    image_color: ColorType,
+    image_format: glow_renderer::TexFormat,
 ) {
     if tiles.is_empty() {
         return;
@@ -507,7 +507,7 @@ fn zoom_preview(
     // preview stays crisp even if the image is displayed interpolated.
     let shader = renderer.image_shader();
     let (swizzle_mat, color_offset) =
-        glow_renderer::get_swizzle_mat_vec(state.persistent_settings.current_channel, image_color);
+        glow_renderer::get_swizzle_mat_vec(state.persistent_settings.current_channel, image_format);
     let swizzle_mat = swizzle_mat.to_cols_array();
     let color_offset = color_offset.to_array();
     let cb = egui_glow::CallbackFn::new(move |info, painter| {

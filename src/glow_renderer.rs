@@ -10,6 +10,9 @@ use glow::HasContext;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TexFormat {
     Rgba8,
+    Rgb8,
+    /// Gray with alpha: gray in the red, alpha in the green channel
+    Rg8,
     R8,
     Rgba32F,
     SRgba8,
@@ -154,6 +157,8 @@ impl GlowRenderer {
             gl.bind_texture(glow::TEXTURE_2D, Some(texture));
 
             let (internal, fmt, typ) = gl_format(format);
+            // Rows of one or three bytes per pixel do not end on four byte boundaries
+            gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
             gl.tex_image_2d(
                 glow::TEXTURE_2D,
                 0,
@@ -195,6 +200,7 @@ impl GlowRenderer {
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
             let (_internal, fmt, typ) = gl_format(tex.format);
+            gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
             gl.tex_sub_image_2d(
                 glow::TEXTURE_2D,
                 0,
@@ -239,7 +245,7 @@ impl GlowRenderer {
         TILE_TARGET.min(self.max_texture_size).max(1)
     }
 
-    /// Slice a full-image RGBA buffer into tiles, uploading each as its own GPU texture.
+    /// Slice a full-image buffer into tiles, uploading each as its own GPU texture.
     /// For images that fit in a single tile this is a single allocation/upload — no per-tile copy.
     pub fn create_tiles(
         &self,
@@ -301,8 +307,9 @@ impl GlowRenderer {
         tiles
     }
 
-    /// Update existing tiles in place when the image dimensions match the current grid.
-    /// Returns `false` if the grid would differ (caller must delete and re-create).
+    /// Update existing tiles in place when the image dimensions and the format match the
+    /// current grid. Returns `false` if they differ (caller must delete and re-create).
+    #[allow(clippy::too_many_arguments)]
     pub fn update_tiles(
         &self,
         gl: &glow::Context,
@@ -310,9 +317,10 @@ impl GlowRenderer {
         bytes: &[u8],
         width: u32,
         height: u32,
+        format: TexFormat,
         filter: TexFilter,
     ) -> bool {
-        if tiles.is_empty() || width == 0 || height == 0 {
+        if tiles.is_empty() || width == 0 || height == 0 || tiles[0].texture.format != format {
             return false;
         }
 
@@ -511,6 +519,8 @@ unsafe fn apply_filter(gl: &glow::Context, filter: TexFilter) {
 fn bytes_per_pixel(format: TexFormat) -> usize {
     match format {
         TexFormat::Rgba8 | TexFormat::SRgba8 => 4,
+        TexFormat::Rgb8 => 3,
+        TexFormat::Rg8 => 2,
         TexFormat::R8 => 1,
         TexFormat::Rgba32F => 16,
     }
@@ -520,6 +530,8 @@ fn gl_format(format: TexFormat) -> (u32, u32, u32) {
     match format {
         TexFormat::Rgba8 => (glow::RGBA8, glow::RGBA, glow::UNSIGNED_BYTE),
         TexFormat::SRgba8 => (glow::SRGB8_ALPHA8, glow::RGBA, glow::UNSIGNED_BYTE),
+        TexFormat::Rgb8 => (glow::RGB8, glow::RGB, glow::UNSIGNED_BYTE),
+        TexFormat::Rg8 => (glow::RG8, glow::RG, glow::UNSIGNED_BYTE),
         TexFormat::R8 => (glow::R8, glow::RED, glow::UNSIGNED_BYTE),
         TexFormat::Rgba32F => (glow::RGBA32F, glow::RGBA, glow::FLOAT),
     }
@@ -578,13 +590,65 @@ fn compile_program(gl: &glow::Context, vertex_src: &str, fragment_src: &str) -> 
     }
 }
 
+/// The texture format an image is uploaded with, and the image in that layout.
+///
+/// Images keep the channels they have, at 8 bit per channel. A gray image takes a
+/// quarter of the memory of an RGBA one that way. More than 8 bit would not be
+/// visible on screen.
+pub fn texture_layout(
+    img: &image::DynamicImage,
+) -> (TexFormat, std::borrow::Cow<'_, image::DynamicImage>) {
+    use image::ColorType::*;
+    use image::DynamicImage;
+    use std::borrow::Cow;
+    let img = match img.color() {
+        L8 | La8 | Rgb8 | Rgba8 => Cow::Borrowed(img),
+        L16 => Cow::Owned(DynamicImage::ImageLuma8(img.to_luma8())),
+        La16 => Cow::Owned(DynamicImage::ImageLumaA8(img.to_luma_alpha8())),
+        Rgb16 | Rgb32F => Cow::Owned(DynamicImage::ImageRgb8(img.to_rgb8())),
+        _ => Cow::Owned(DynamicImage::ImageRgba8(img.to_rgba8())),
+    };
+    let format = match img.color() {
+        L8 => TexFormat::R8,
+        La8 => TexFormat::Rg8,
+        Rgb8 => TexFormat::Rgb8,
+        _ => TexFormat::Rgba8,
+    };
+    (format, img)
+}
+
 /// Compute the swizzle matrix and offset vector for a given color channel selection.
-pub fn get_swizzle_mat_vec(channel: ColorChannel, image_color: image::ColorType) -> (Mat4, Vec4) {
-    if image_color == image::ColorType::L8 || image_color == image::ColorType::L16 {
-        get_swizzle_gray(channel)
-    } else {
-        get_swizzle_rgba(channel)
+pub fn get_swizzle_mat_vec(channel: ColorChannel, format: TexFormat) -> (Mat4, Vec4) {
+    match format {
+        TexFormat::R8 => get_swizzle_gray(channel),
+        TexFormat::Rg8 => get_swizzle_gray_alpha(channel),
+        // A texture without alpha is sampled with an alpha of one
+        TexFormat::Rgb8 | TexFormat::Rgba8 | TexFormat::SRgba8 | TexFormat::Rgba32F => {
+            get_swizzle_rgba(channel)
+        }
     }
+}
+
+/// Gray is in the red channel of the texture, alpha in the green one
+fn get_swizzle_gray_alpha(channel: ColorChannel) -> (Mat4, Vec4) {
+    let mut mat = Mat4::ZERO;
+    let mut vec = Vec4::ZERO;
+    let one = Vec4::new(1.0, 1.0, 1.0, 0.0);
+    match channel {
+        ColorChannel::Alpha => {
+            mat.y_axis = one;
+            vec.w = 1.0;
+        }
+        ColorChannel::Rgba => {
+            mat.x_axis = one;
+            mat.y_axis = Vec4::new(0.0, 0.0, 0.0, 1.0);
+        }
+        _ => {
+            mat.x_axis = one;
+            vec.w = 1.0;
+        }
+    }
+    (mat, vec)
 }
 
 fn get_swizzle_gray(channel: ColorChannel) -> (Mat4, Vec4) {
@@ -633,4 +697,87 @@ fn get_swizzle_rgba(channel: ColorChannel) -> (Mat4, Vec4) {
         }
     }
     (mat, vec)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::DynamicImage;
+
+    fn shown(channel: ColorChannel, format: TexFormat, texel: Vec4) -> Vec4 {
+        let (mat, vec) = get_swizzle_mat_vec(channel, format);
+        mat * texel + vec
+    }
+
+    #[test]
+    fn images_keep_their_channels() {
+        let layout = |img: DynamicImage| texture_layout(&img).0;
+        assert_eq!(layout(DynamicImage::new_luma8(3, 3)), TexFormat::R8);
+        assert_eq!(layout(DynamicImage::new_luma16(3, 3)), TexFormat::R8);
+        assert_eq!(layout(DynamicImage::new_luma_a8(3, 3)), TexFormat::Rg8);
+        assert_eq!(layout(DynamicImage::new_luma_a16(3, 3)), TexFormat::Rg8);
+        assert_eq!(layout(DynamicImage::new_rgb8(3, 3)), TexFormat::Rgb8);
+        assert_eq!(layout(DynamicImage::new_rgb16(3, 3)), TexFormat::Rgb8);
+        assert_eq!(layout(DynamicImage::new_rgb32f(3, 3)), TexFormat::Rgb8);
+        assert_eq!(layout(DynamicImage::new_rgba8(3, 3)), TexFormat::Rgba8);
+        assert_eq!(layout(DynamicImage::new_rgba16(3, 3)), TexFormat::Rgba8);
+        assert_eq!(layout(DynamicImage::new_rgba32f(3, 3)), TexFormat::Rgba8);
+    }
+
+    #[test]
+    fn layout_has_one_byte_per_channel() {
+        for img in [
+            DynamicImage::new_luma16(5, 3),
+            DynamicImage::new_luma_a16(5, 3),
+            DynamicImage::new_rgb32f(5, 3),
+            DynamicImage::new_rgba16(5, 3),
+        ] {
+            let (format, layout) = texture_layout(&img);
+            assert_eq!(layout.as_bytes().len(), 5 * 3 * bytes_per_pixel(format));
+        }
+    }
+
+    #[test]
+    fn gray_is_shown_on_all_color_channels() {
+        // a gray texture is sampled as (gray, 0, 0, 1)
+        let texel = Vec4::new(0.5, 0.0, 0.0, 1.0);
+        let gray = Vec4::new(0.5, 0.5, 0.5, 1.0);
+        for channel in [ColorChannel::Rgba, ColorChannel::Rgb, ColorChannel::Red] {
+            assert_eq!(shown(channel, TexFormat::R8, texel), gray);
+        }
+        assert_eq!(shown(ColorChannel::Alpha, TexFormat::R8, texel), Vec4::ONE);
+    }
+
+    #[test]
+    fn gray_with_alpha_keeps_its_alpha() {
+        // sampled as (gray, alpha, 0, 1)
+        let texel = Vec4::new(0.5, 0.25, 0.0, 1.0);
+        assert_eq!(
+            shown(ColorChannel::Rgba, TexFormat::Rg8, texel),
+            Vec4::new(0.5, 0.5, 0.5, 0.25)
+        );
+        assert_eq!(
+            shown(ColorChannel::Rgb, TexFormat::Rg8, texel),
+            Vec4::new(0.5, 0.5, 0.5, 1.0)
+        );
+        assert_eq!(
+            shown(ColorChannel::Green, TexFormat::Rg8, texel),
+            Vec4::new(0.5, 0.5, 0.5, 1.0)
+        );
+        assert_eq!(
+            shown(ColorChannel::Alpha, TexFormat::Rg8, texel),
+            Vec4::new(0.25, 0.25, 0.25, 1.0)
+        );
+    }
+
+    #[test]
+    fn rgb_without_alpha_is_opaque() {
+        // sampled with an alpha of one
+        let texel = Vec4::new(0.1, 0.2, 0.3, 1.0);
+        assert_eq!(shown(ColorChannel::Rgba, TexFormat::Rgb8, texel), texel);
+        assert_eq!(
+            shown(ColorChannel::Blue, TexFormat::Rgb8, texel),
+            Vec4::new(0.3, 0.3, 0.3, 1.0)
+        );
+    }
 }
