@@ -208,68 +208,17 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     debug!("matches {:?}", matches);
 
-    let paths_to_open = piped_paths(&matches)
-        .map(|iter| iter.collect::<Vec<_>>())
+    let paths_to_open = matches
+        .remove_many::<String>("INPUT")
         .unwrap_or_default()
-        .into_iter()
-        .chain(
-            matches
-                .remove_many::<String>("INPUT")
-                .unwrap_or_default()
-                .map(PathBuf::from),
-        )
+        .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    debug!("Image is: {:?}", paths_to_open);
+    // File names can also be piped in. They are read in the background, so the
+    // start is never held up by a pipe that stays open without delivering anything.
+    state.piped_paths = piped_paths(&matches, paths_to_open.clone());
 
-    if paths_to_open.len() == 1 {
-        let location = paths_to_open
-            .into_iter()
-            .next()
-            .expect("It should be tested already that exactly one argument was passed.");
-        if location.is_dir() {
-            // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
-                state.is_loaded = false;
-                state.player.load(&first_img_location);
-                state.current_path = Some(first_img_location);
-            }
-        } else {
-            state.is_loaded = false;
-            state.player.load(&location);
-            state.current_path = Some(location);
-        };
-    } else if paths_to_open.len() > 1 {
-        let location = paths_to_open
-            .first()
-            .expect("It should be verified already that exactly one argument was passed.");
-        if location.is_dir() {
-            // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                state.is_loaded = false;
-                state.current_path = Some(first_img_location.clone());
-                state.player.load_advanced(
-                    &first_img_location,
-                    Some(Frame::ImageCollectionMember(Default::default())),
-                );
-            }
-        } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone());
-            state.player.load_advanced(
-                location,
-                Some(Frame::ImageCollectionMember(Default::default())),
-            );
-        };
-
-        // If launched with more than one path and none of those paths are directories, it's likely
-        // that the user wants to view a fixed set of images rather than traverse into directories.
-        // This handles the case where the app is launched with files from different dirs as well e.g.
-        // a/1.png b/2.png c/3.png
-        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
-        state.scrubber.entries = paths_to_open;
-        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-    }
+    open_paths(&mut state, paths_to_open);
 
     if matches.contains_id("stdin") {
         debug!("Trying to read from pipe");
@@ -756,6 +705,25 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
+    // File names piped in at startup arrive from a background thread
+    if let Some(receiver) = &state.piped_paths {
+        match receiver.try_recv() {
+            Ok(paths) => {
+                state.piped_paths = None;
+                open_paths(state, paths);
+                app.window().request_frame();
+            }
+            Err(mpsc::TryRecvError::Disconnected) => state.piped_paths = None,
+            Err(mpsc::TryRecvError::Empty) => {
+                // The loop only runs on events, so keep it going for a moment.
+                // Names that arrive later are picked up with the next event.
+                if app.timer.elapsed_f32() < 3.0 {
+                    app.window().request_frame();
+                }
+            }
+        }
+    }
+
     // redraw if extended info is missing so we make sure it's promply displayed
     if state.persistent_settings.info_enabled && state.image_metadata.is_none() {
         app.window().request_frame();
@@ -819,7 +787,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // Drain loop to get latest frame and prevent animation speedup on focus loss
     let latest_frame = state.texture_channel.1.try_iter().last();
 
-        if let Some(frame) = latest_frame {
+    if let Some(frame) = latest_frame {
         state.is_loaded = true;
 
         debug!("Got frame: {}", frame);
@@ -1351,15 +1319,85 @@ fn compare_next(_app: &mut App, state: &mut OculanteState) {
     }
 }
 
-// Parse piped file names from stdin.
-fn piped_paths(args: &clap::ArgMatches) -> Option<impl Iterator<Item = PathBuf>> {
-    // Don't yield paths if user is piping in raw image data
-    (!args.contains_id("stdin") && !stdin().is_terminal()).then(|| {
-        stdin().lines().flat_map(|line| {
-            line.unwrap_or_default()
-                .split_whitespace()
-                .map(PathBuf::from)
-                .collect::<Vec<_>>()
-        })
-    })
+/// Open the images or folders the app was started with.
+fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
+    debug!("Image is: {:?}", paths_to_open);
+
+    if paths_to_open.len() == 1 {
+        let location = paths_to_open
+            .into_iter()
+            .next()
+            .expect("It should be tested already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
+                state.is_loaded = false;
+                state.player.load(&first_img_location);
+                state.current_path = Some(first_img_location);
+            }
+        } else {
+            state.is_loaded = false;
+            state.player.load(&location);
+            state.current_path = Some(location);
+        };
+    } else if paths_to_open.len() > 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be verified already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state.player.load_advanced(
+                    &first_img_location,
+                    Some(Frame::ImageCollectionMember(Default::default())),
+                );
+            }
+        } else {
+            state.is_loaded = false;
+            state.current_path = Some(location.clone());
+            state.player.load_advanced(
+                location,
+                Some(Frame::ImageCollectionMember(Default::default())),
+            );
+        };
+
+        // If launched with more than one path and none of those paths are directories, it's likely
+        // that the user wants to view a fixed set of images rather than traverse into directories.
+        // This handles the case where the app is launched with files from different dirs as well e.g.
+        // a/1.png b/2.png c/3.png
+        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
+        state.scrubber.entries = paths_to_open;
+        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+    }
+}
+
+// Parse piped file names from stdin on a background thread. The names are sent
+// once stdin is closed, followed by the paths given on the command line.
+fn piped_paths(
+    args: &clap::ArgMatches,
+    cli_paths: Vec<PathBuf>,
+) -> Option<mpsc::Receiver<Vec<PathBuf>>> {
+    // Don't read paths if user is piping in raw image data
+    if args.contains_id("stdin") || stdin().is_terminal() {
+        return None;
+    }
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut paths = stdin()
+            .lines()
+            .flat_map(|line| {
+                line.unwrap_or_default()
+                    .split_whitespace()
+                    .map(PathBuf::from)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if !paths.is_empty() {
+            paths.extend(cli_paths);
+            _ = sender.send(paths);
+        }
+    });
+    Some(receiver)
 }

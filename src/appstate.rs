@@ -66,6 +66,8 @@ pub struct OculanteState {
     pub message_channel: (Sender<Message>, Receiver<Message>),
     /// Channel to load images from
     pub load_channel: (Sender<PathBuf>, Receiver<PathBuf>),
+    /// File names piped in through stdin, once they have been read
+    pub piped_paths: Option<Receiver<Vec<PathBuf>>>,
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
@@ -160,6 +162,7 @@ impl Default for OculanteState {
             texture_channel: tx_channel,
             message_channel: msg_channel,
             load_channel: mpsc::channel(),
+            piped_paths: None,
             extended_info_channel: meta_channel,
             mouse_delta: Default::default(),
             current_texture: Default::default(),
