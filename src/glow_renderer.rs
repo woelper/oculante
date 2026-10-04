@@ -152,13 +152,34 @@ impl GlowRenderer {
         format: TexFormat,
         filter: TexFilter,
     ) -> GlowTexture {
+        let whole = Region {
+            row_length: width,
+            x: 0,
+            y: 0,
+        };
+        self.create_texture_from(gl, bytes, whole, width, height, format, filter)
+    }
+
+    /// Upload a new texture from a region of a larger image. The region is read
+    /// straight from the image, it is not copied first.
+    #[allow(clippy::too_many_arguments)]
+    fn create_texture_from(
+        &self,
+        gl: &glow::Context,
+        bytes: &[u8],
+        region: Region,
+        width: u32,
+        height: u32,
+        format: TexFormat,
+        filter: TexFilter,
+    ) -> GlowTexture {
+        region.assert_inside(bytes, width, height, format);
         unsafe {
             let texture = gl.create_texture().expect("Failed to create texture");
             gl.bind_texture(glow::TEXTURE_2D, Some(texture));
 
             let (internal, fmt, typ) = gl_format(format);
-            // Rows of one or three bytes per pixel do not end on four byte boundaries
-            gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
+            set_unpack_region(gl, Some(region));
             gl.tex_image_2d(
                 glow::TEXTURE_2D,
                 0,
@@ -170,6 +191,7 @@ impl GlowRenderer {
                 typ,
                 glow::PixelUnpackData::Slice(Some(bytes)),
             );
+            set_unpack_region(gl, None);
 
             gl.tex_parameter_i32(
                 glow::TEXTURE_2D,
@@ -197,10 +219,27 @@ impl GlowRenderer {
     /// Update an existing texture's data (must be same dimensions and format).
     /// Mipmaps are not regenerated, follow up with `set_filter` for that.
     pub fn update_texture(&self, gl: &glow::Context, tex: &GlowTexture, bytes: &[u8]) {
+        let whole = Region {
+            row_length: tex.width,
+            x: 0,
+            y: 0,
+        };
+        self.update_texture_from(gl, tex, bytes, whole);
+    }
+
+    /// Update an existing texture from a region of a larger image, without copying it first.
+    fn update_texture_from(
+        &self,
+        gl: &glow::Context,
+        tex: &GlowTexture,
+        bytes: &[u8],
+        region: Region,
+    ) {
+        region.assert_inside(bytes, tex.width, tex.height, tex.format);
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
             let (_internal, fmt, typ) = gl_format(tex.format);
-            gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
+            set_unpack_region(gl, Some(region));
             gl.tex_sub_image_2d(
                 glow::TEXTURE_2D,
                 0,
@@ -212,6 +251,7 @@ impl GlowRenderer {
                 typ,
                 glow::PixelUnpackData::Slice(Some(bytes)),
             );
+            set_unpack_region(gl, None);
             gl.bind_texture(glow::TEXTURE_2D, None);
         }
     }
@@ -245,8 +285,8 @@ impl GlowRenderer {
         TILE_TARGET.min(self.max_texture_size).max(1)
     }
 
-    /// Slice a full-image buffer into tiles, uploading each as its own GPU texture.
-    /// For images that fit in a single tile this is a single allocation/upload — no per-tile copy.
+    /// Split a full-image buffer into tiles, uploading each as its own GPU texture.
+    /// The tiles are read straight from the buffer, nothing is copied per tile.
     pub fn create_tiles(
         &self,
         gl: &glow::Context,
@@ -265,37 +305,18 @@ impl GlowRenderer {
         let rows = height.div_ceil(cap);
         let mut tiles = Vec::with_capacity((cols * rows) as usize);
 
-        // Single-tile fast path: forward the original byte slice with no copy.
-        if cols == 1 && rows == 1 {
-            let texture = self.create_texture(gl, bytes, width, height, format, filter);
-            tiles.push(GlowTile {
-                texture,
-                x: 0,
-                y: 0,
-            });
-            return tiles;
-        }
-
-        let bpp = bytes_per_pixel(format);
-        let stride = width as usize * bpp;
-
         for row in 0..rows {
             let ty = row * cap;
             let th = cap.min(height - ty);
             for col in 0..cols {
                 let tx = col * cap;
                 let tw = cap.min(width - tx);
-
-                let mut tile_bytes = vec![0u8; tw as usize * th as usize * bpp];
-                for y in 0..th {
-                    let src_off = (ty + y) as usize * stride + tx as usize * bpp;
-                    let dst_off = y as usize * tw as usize * bpp;
-                    let len = tw as usize * bpp;
-                    tile_bytes[dst_off..dst_off + len]
-                        .copy_from_slice(&bytes[src_off..src_off + len]);
-                }
-
-                let texture = self.create_texture(gl, &tile_bytes, tw, th, format, filter);
+                let region = Region {
+                    row_length: width,
+                    x: tx,
+                    y: ty,
+                };
+                let texture = self.create_texture_from(gl, bytes, region, tw, th, format, filter);
                 tiles.push(GlowTile {
                     texture,
                     x: tx,
@@ -345,27 +366,13 @@ impl GlowRenderer {
             }
         }
 
-        // Single-tile fast path: no copy.
-        if tiles.len() == 1 {
-            self.update_texture(gl, &tiles[0].texture, bytes);
-            self.set_filter(gl, &tiles[0].texture, filter);
-            return true;
-        }
-
-        let bpp = bytes_per_pixel(tiles[0].texture.format);
-        let stride = width as usize * bpp;
-
         for tile in tiles {
-            let tw = tile.texture.width;
-            let th = tile.texture.height;
-            let mut sub = vec![0u8; tw as usize * th as usize * bpp];
-            for y in 0..th {
-                let src_off = (tile.y + y) as usize * stride + tile.x as usize * bpp;
-                let dst_off = y as usize * tw as usize * bpp;
-                let len = tw as usize * bpp;
-                sub[dst_off..dst_off + len].copy_from_slice(&bytes[src_off..src_off + len]);
-            }
-            self.update_texture(gl, &tile.texture, &sub);
+            let region = Region {
+                row_length: width,
+                x: tile.x,
+                y: tile.y,
+            };
+            self.update_texture_from(gl, &tile.texture, bytes, region);
             self.set_filter(gl, &tile.texture, filter);
         }
 
@@ -513,6 +520,48 @@ unsafe fn apply_filter(gl: &glow::Context, filter: TexFilter) {
         if filter.mipmaps {
             gl.generate_mipmap(glow::TEXTURE_2D);
         }
+    }
+}
+
+/// Where the pixels of a texture are inside a larger image
+#[derive(Debug, Clone, Copy)]
+struct Region {
+    /// Width of the whole image in pixels
+    row_length: u32,
+    x: u32,
+    y: u32,
+}
+
+impl Region {
+    /// GL reads the region through a raw pointer, so make sure all of it is in the buffer.
+    fn assert_inside(&self, bytes: &[u8], width: u32, height: u32, format: TexFormat) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        let last_row = (self.y + height - 1) as usize * self.row_length as usize;
+        let needed = (last_row + (self.x + width) as usize) * bytes_per_pixel(format);
+        assert!(
+            self.x + width <= self.row_length && bytes.len() >= needed,
+            "texture region {self:?} of {width}x{height} {format:?} needs {needed} bytes, the image has {}",
+            bytes.len()
+        );
+    }
+}
+
+/// Tell GL to read the next upload from a region of the buffer it is given, or
+/// reset that to the defaults. egui uploads its own textures and expects the defaults.
+unsafe fn set_unpack_region(gl: &glow::Context, region: Option<Region>) {
+    let region = region.unwrap_or(Region {
+        row_length: 0,
+        x: 0,
+        y: 0,
+    });
+    unsafe {
+        // Rows of one or three bytes per pixel do not end on four byte boundaries
+        gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
+        gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, region.row_length as i32);
+        gl.pixel_store_i32(glow::UNPACK_SKIP_PIXELS, region.x as i32);
+        gl.pixel_store_i32(glow::UNPACK_SKIP_ROWS, region.y as i32);
     }
 }
 
@@ -767,6 +816,28 @@ mod tests {
         assert_eq!(
             shown(ColorChannel::Alpha, TexFormat::Rg8, texel),
             Vec4::new(0.25, 0.25, 0.25, 1.0)
+        );
+    }
+
+    #[test]
+    fn regions_must_be_inside_the_image() {
+        // a 10x4 gray image, split into a tile of 8 and one of 2 pixels width
+        let bytes = vec![0u8; 10 * 4];
+        let region = |x| Region {
+            row_length: 10,
+            x,
+            y: 0,
+        };
+        region(0).assert_inside(&bytes, 8, 4, TexFormat::R8);
+        region(8).assert_inside(&bytes, 2, 4, TexFormat::R8);
+        // wider than the image, or more channels than the buffer has
+        assert!(
+            std::panic::catch_unwind(|| region(8).assert_inside(&bytes, 3, 4, TexFormat::R8))
+                .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(|| region(0).assert_inside(&bytes, 8, 4, TexFormat::Rgb8))
+                .is_err()
         );
     }
 
