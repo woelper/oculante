@@ -133,6 +133,16 @@ def test_measure_draws_rectangle(binary):
 GOLD = (185, 156, 0)
 
 
+def add_perspective_crop(app):
+    app.click(900, 58)  # open the filter list
+    app.settle(0.8)
+    app.scroll_down(912, 200, 16)  # to the end of the list
+    app.click(912, 361)  # add "Perspective crop"
+    app.settle(1.0)
+    app.move(0.3, 0.8)
+    app.settle(1.0)
+
+
 def test_perspective_crop_handles(binary):
     """The perspective crop shows its corner handles over the image and can be applied (handles were hidden in 0.9.3)."""
     with App(binary, "perspective_crop", [image("moss.jpg")]) as app:
@@ -141,13 +151,7 @@ def test_perspective_crop_handles(binary):
         assert app.wait_for_log("Got frame"), "the image never loaded"
         app.key("e")
         app.settle(1.0)
-        app.click(900, 58)  # open the filter list
-        app.settle(0.8)
-        app.scroll_down(912, 200, 16)  # to the end of the list
-        app.click(912, 361)  # add "Perspective crop"
-        app.settle(1.0)
-        app.move(0.3, 0.8)
-        app.settle(1.0)
+        add_perspective_crop(app)
         added = app.shot("added")
         top_left = (125, 25, 30, 30)  # around the image's top left corner
         assert region_has_color(added, top_left, GOLD, 25), "the corner handle is not drawn"
@@ -163,6 +167,13 @@ def test_perspective_crop_handles(binary):
         applied = app.shot("applied")
         assert "panicked" not in app.log(), "the app crashed when applying the crop"
         assert changed_pixels(dragged, applied) > 50_000, "applying the crop did not change the image"
+
+        # a crop that is added after an applied one was removed starts with its handles again
+        app.click(868, 185)  # the x in the header of the crop
+        app.settle(1.5)
+        add_perspective_crop(app)
+        again = app.shot("added_again")
+        assert region_has_color(again, top_left, GOLD, 25), "a crop added a second time has no handles"
 
 
 TESTS = [
