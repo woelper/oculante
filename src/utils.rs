@@ -1012,3 +1012,47 @@ pub fn get_pixel_checked(img: &DynamicImage, x: u32, y: u32) -> Option<Rgba<u8>>
     }
     None
 }
+
+/// How much scroll distance is missing from a mouse wheel event that notan reports.
+///
+/// Notan turns wheel notches into multiples of 50 and leaves the other axis at 0.
+/// Pixel precise scrolling, as touchpads deliver it, is divided by 10 instead, and
+/// each axis is then kept at least 0.1 away from 0. The UI gets these values as
+/// points, which makes precise scrolling ten times too slow. Both axes being
+/// different from 0 tells the two kinds apart. For a precise event this returns
+/// the nine tenths that are missing, for a wheel notch nothing.
+pub fn precise_scroll_remainder(delta_x: f32, delta_y: f32) -> (f32, f32) {
+    if delta_x == 0.0 || delta_y == 0.0 {
+        return (0.0, 0.0);
+    }
+    // 0.1 is what notan puts in place of a smaller movement, there is nothing to add
+    let missing = |delta: f32| if delta.abs() <= 0.1 { 0.0 } else { delta * 9.0 };
+    (missing(delta_x), missing(delta_y))
+}
+
+#[cfg(test)]
+mod scroll_tests {
+    use super::precise_scroll_remainder;
+
+    #[test]
+    fn wheel_notches_are_left_alone() {
+        assert_eq!(precise_scroll_remainder(0.0, 50.0), (0.0, 0.0));
+        assert_eq!(precise_scroll_remainder(0.0, -150.0), (0.0, 0.0));
+        assert_eq!(precise_scroll_remainder(50.0, 0.0), (0.0, 0.0));
+        // a high resolution wheel reports fractions of a notch
+        assert_eq!(precise_scroll_remainder(0.0, 12.5), (0.0, 0.0));
+    }
+
+    #[test]
+    fn precise_scrolling_gets_its_full_distance() {
+        // 30 pixels down arrive as 3.0, the axis that did not move as -0.1
+        assert_eq!(precise_scroll_remainder(-0.1, 3.0), (0.0, 27.0));
+        assert_eq!(precise_scroll_remainder(-0.1, -3.0), (0.0, -27.0));
+        assert_eq!(precise_scroll_remainder(2.0, -4.0), (18.0, -36.0));
+    }
+
+    #[test]
+    fn tiny_movements_are_not_blown_up() {
+        assert_eq!(precise_scroll_remainder(0.1, -0.1), (0.0, 0.0));
+    }
+}
