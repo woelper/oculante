@@ -7,10 +7,12 @@ Each test checks behaviour that broke before. See README.md.
 """
 import argparse
 import os
+import shutil
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from uitest import App, changed_pixels, changed_pixels_in, image, region_has_color, rightmost_x  # noqa: E402
+from uitest import OUT, App, changed_pixels, changed_pixels_in, image, region_has_color, rightmost_x  # noqa: E402
 
 # what the app logs once an image is on screen
 LOADED = "Received image"
@@ -57,6 +59,58 @@ def test_start_with_idle_stdin(binary):
     finally:
         os.close(read_end)
         os.close(write_end)
+
+
+def test_piped_file_names(binary):
+    """File names piped into stdin are opened as a list."""
+    read_end, write_end = os.pipe()
+    os.write(write_end, f"{image('test.png')}\n{image('rust.png')}\n".encode())
+    os.close(write_end)
+    try:
+        with App(binary, "piped_names", [], stdin=read_end) as app:
+            app.wait_window()
+            assert app.wait_for_log(LOADED), "the piped image never loaded"
+            opened = [l for l in app.log().splitlines() if "Image is: [" in l and "rust.png" in l]
+            assert opened, "the second piped file is missing from the list"
+    finally:
+        os.close(read_end)
+
+
+def test_reload_when_file_changes(binary):
+    """An image that is overwritten on disk is loaded again."""
+    folder = os.path.join(OUT, "reload_source")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "watched.png")
+    shutil.copy(image("test.png"), path)
+    with App(binary, "reload", [path]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        before = app.shot("before")
+        time.sleep(1.1)  # file times can be as coarse as a second
+        shutil.copy(image("rust.png"), path)
+        time.sleep(1.0)
+        # the file is looked at when a frame is drawn
+        app.settle(2.0)
+        app.settle(1.0)
+        after = app.shot("after")
+        assert changed_pixels(before, after) > 5000, "the changed file was not loaded again"
+
+
+def test_image_cannot_get_lost(binary):
+    """Panning stops at the edge of the window, so a short drag brings the image back."""
+    with App(binary, "pan_limit", [image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.5, 0.5)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        for _ in range(4):
+            app.drag(0.1, 0.5, 0.95, 0.5)
+        gone = app.shot("gone")
+        app.drag(0.9, 0.5, 0.3, 0.5)
+        back = app.shot("back")
+        assert changed_pixels(gone, back) > 20000, "the image was dragged further away than the window is wide"
 
 
 RAIL = (60, 60, 60)
@@ -185,6 +239,9 @@ TESTS = [
     test_perspective_crop_handles,
     test_shortcuts,
     test_start_with_idle_stdin,
+    test_piped_file_names,
+    test_reload_when_file_changes,
+    test_image_cannot_get_lost,
     test_slider_changes_image,
     test_measure_draws_rectangle,
 ]
