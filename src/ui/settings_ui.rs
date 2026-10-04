@@ -88,7 +88,9 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
                 let mut scroll_to = SettingsState::None;
 
-                ui.horizontal(|ui|{
+                // Take the whole height of the window. A plain horizontal layout is only as
+                // high as one row, which pins the scroll area and with it the window height.
+                ui.allocate_ui_with_layout(ui.available_size(), egui::Layout::left_to_right(egui::Align::Min), |ui|{
                     ui.vertical(|ui| {
                         if ui.styled_button(format!("{OPTIONS} General")).clicked() {
                             scroll_to = SettingsState::General;
