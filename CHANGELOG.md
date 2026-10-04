@@ -1,3 +1,30 @@
+\# 0.9.5
+
+### :beetle: Bug Fixes
+
+* Touchpad scrolling in the UI is no longer ten times too slow (5fe3a5ad)
+* Slider handle stays filled, section carets are centered (68a54730)
+* Perspective crop works when added again, measure section is tidy (a05f9679)
+* Changing the UI scale no longer runs away or ignores the display scale (b7aed01a)
+* "Update position" in the compare list works again (96c2bd4b)
+* Perspective crop shows its handles and outline again (51e59cf7)
+* Measure tool draws its rectangle again (bc03a14f)
+* Slider value stays inside narrow panels (7f2f6eb5)
+* Mac app no longer needs liblcms2 from Homebrew (01a4193b)
+* Starting no longer hangs when stdin is an open pipe (a291920f)
+* Custom sliders have a handle and rail again (e3ed1f18)
+* Window no longer turns see-through around half transparent pixels (02d14c6a)
+* Shortcuts work again after the notan 0.14 update (6853e3cb)
+
+### :green_apple: Chore
+
+* Releases are published as pre-release, crates.io is a separate step (8e447d33)
+* Compare list test cycles through three items (65c9052f)
+* UI test covers adding a perspective crop a second time (2f4b01b3)
+* UI test for the perspective crop (ab7f9ae6)
+* UI test for the measure tool, slider test finds the handle itself (b36e09f5)
+* UI tests that drive the app on a virtual display (b765908b)
+
 \# 0.9.4
 
 ### :beetle: Bug Fixes
