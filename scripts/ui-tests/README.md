@@ -34,6 +34,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_reload_when_file_changes` | An image that is overwritten on disk is loaded again |
 | `test_image_cannot_get_lost` | Panning stops at the edge of the window |
 | `test_image_layouts` | Gray, gray with alpha, RGB and RGBA images of 8 and 16 bit are shown with the right pixels and alpha |
+| `test_system_fonts_on_demand` | The fonts of the system are loaded for a Japanese file name, and not for a plain one |
 | `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
 | `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image, in any direction, and not over the info panel |
 | `test_perspective_crop_handles` | The perspective crop shows its handles, they can be dragged, the crop applied, removed and added again |

@@ -114,6 +114,27 @@ def test_image_cannot_get_lost(binary):
         assert changed_pixels(gone, back) > 20000, "the image was dragged further away than the window is wide"
 
 
+def test_system_fonts_on_demand(binary):
+    """The fonts of the system are only loaded for file names that need them."""
+    folder = os.path.join(OUT, "font_source")
+    os.makedirs(folder, exist_ok=True)
+    loading = "Attempting to load sys fonts"
+    for name, needed in (("plain name.png", False), ("写真 こんにちは.png", True)):
+        path = os.path.join(folder, name)
+        shutil.copy(image("test.png"), path)
+        with App(binary, "fonts", [path]) as app:
+            app.wait_window()
+            app.move(0.6, 0.6)
+            assert app.wait_for_log(LOADED), "the image never loaded"
+            app.key("i")
+            app.settle(1.5)
+            app.shot("needed" if needed else "plain")
+            if needed:
+                assert loading in app.log(), "no system fonts were loaded for a Japanese file name"
+            else:
+                assert loading not in app.log(), "system fonts were loaded although nothing needs them"
+
+
 # name, ImageMagick options that give the file its layout
 LAYOUTS = [
     ("gray8.png", ["-colorspace", "Gray", "-define", "png:color-type=0", "-depth", "8"]),
@@ -288,6 +309,7 @@ TESTS = [
     test_reload_when_file_changes,
     test_image_cannot_get_lost,
     test_image_layouts,
+    test_system_fonts_on_demand,
     test_slider_changes_image,
     test_measure_draws_rectangle,
 ]

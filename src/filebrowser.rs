@@ -422,6 +422,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     for folder in &settings.folder_bookmarks.clone() {
+                        crate::ui::want_system_fonts_for(&folder.to_string_lossy());
                         let res = ui.styled_button(format!(
                             "{FOLDERBOOKMARK} {}",
                             folder
@@ -639,6 +640,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
         match fs::read_dir(&path) {
             Ok(contents) => {
                 debug!("Successfully read {}", path.display());
+                crate::ui::want_system_fonts_for(&path.to_string_lossy());
                 let mut contents = contents
                     .into_iter()
                     .flatten()
@@ -663,6 +665,11 @@ pub fn browse<F: FnMut(&PathBuf)>(
                         )
                 });
                 contents.sort_by_key(|b| std::cmp::Reverse(b.is_dir()));
+                for entry in &contents {
+                    if let Some(name) = entry.file_name() {
+                        crate::ui::want_system_fonts_for(&name.to_string_lossy());
+                    }
+                }
                 state.entries = Some(contents);
             }
             Err(_e) => {

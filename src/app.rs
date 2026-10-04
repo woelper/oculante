@@ -52,6 +52,15 @@ pub struct OculanteApp {
     last_system_theme: Option<egui::Theme>,
     /// When the current file was last checked for changes on disk
     last_file_check: Instant,
+    /// Fonts of the system for scripts the built-in fonts do not cover
+    system_fonts: SystemFonts,
+}
+
+enum SystemFonts {
+    /// Holds the built-in fonts, the system fonts are added to them
+    NotLoaded(Box<FontDefinitions>),
+    Loading(std::sync::mpsc::Receiver<FontDefinitions>),
+    Loaded,
 }
 
 impl OculanteApp {
@@ -71,6 +80,56 @@ impl OculanteApp {
             egui_started_press: false,
             last_system_theme: None,
             last_file_check: Instant::now(),
+            system_fonts: SystemFonts::Loaded,
+        }
+    }
+
+    /// Load the fonts of the system once text needs them. Reading them takes a
+    /// moment and tens of megabytes, so it happens on demand and in the background.
+    fn update_system_fonts(&mut self, ctx: &egui::Context) {
+        if matches!(self.system_fonts, SystemFonts::Loaded) {
+            return;
+        }
+        if !system_fonts_wanted() {
+            // Text that comes from outside: paths and whatever is typed or pasted
+            if let Some(path) = &self.state.current_path {
+                want_system_fonts_for(&path.to_string_lossy());
+            }
+            for path in &self.state.volatile_settings.recent_images {
+                want_system_fonts_for(&path.to_string_lossy());
+            }
+            ctx.input(|i| {
+                for event in &i.events {
+                    match event {
+                        egui::Event::Text(text) | egui::Event::Paste(text) => {
+                            want_system_fonts_for(text)
+                        }
+                        egui::Event::Ime(_) => want_system_fonts_for_ime(),
+                        _ => {}
+                    }
+                }
+            });
+            if !system_fonts_wanted() {
+                return;
+            }
+        }
+        match std::mem::replace(&mut self.system_fonts, SystemFonts::Loaded) {
+            SystemFonts::NotLoaded(fonts) => {
+                let (sender, receiver) = std::sync::mpsc::channel();
+                std::thread::spawn(move || {
+                    _ = sender.send(load_system_fonts(*fonts));
+                    request_repaint();
+                });
+                self.system_fonts = SystemFonts::Loading(receiver);
+            }
+            SystemFonts::Loading(receiver) => match receiver.try_recv() {
+                Ok(fonts) => ctx.set_fonts(fonts),
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    self.system_fonts = SystemFonts::Loading(receiver)
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {}
+            },
+            SystemFonts::Loaded => {}
         }
     }
 
@@ -192,7 +251,9 @@ impl OculanteApp {
             vec!["inter-bold".into()],
         );
 
-        let fonts = load_system_fonts(fonts);
+        // Fonts of the system for other scripts are loaded once they are needed
+        want_system_fonts_for_locale();
+        self.system_fonts = SystemFonts::NotLoaded(Box::new(fonts.clone()));
 
         apply_theme(&mut self.state, ctx);
         self.last_system_theme = ctx.system_theme();
@@ -420,6 +481,8 @@ impl eframe::App for OculanteApp {
             }
         }
 
+        self.update_system_fonts(ctx);
+
         // The setting "Redraw every frame" turns off drawing on demand
         if self.state.persistent_settings.force_redraw {
             ctx.request_repaint();
@@ -471,6 +534,9 @@ impl eframe::App for OculanteApp {
         self.process_messages();
 
         if let Ok(info) = self.state.extended_info_channel.1.try_recv() {
+            for value in info.exif.values() {
+                want_system_fonts_for(value);
+            }
             self.state.image_metadata = Some(info);
             ctx.request_repaint();
         }
