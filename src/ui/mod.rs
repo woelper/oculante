@@ -431,13 +431,7 @@ impl EguiExt for Ui {
                         .show_value(false)
                         .integer(),
                 );
-                ui.allocate_ui_with_layout(
-                    egui::vec2(40.0, ui.available_height()),
-                    egui::Layout::right_to_left(egui::Align::Center),
-                    |ui| {
-                        ui.monospace(format!("{:.0}", value.to_f64()));
-                    },
-                );
+                ui.monospace(format!("{:.0}", value.to_f64()));
                 r
             })
             .inner
