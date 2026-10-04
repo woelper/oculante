@@ -124,8 +124,23 @@ jobs:
       run: ./build_mac.sh
       if: matrix.os == 'macos-latest'
 
+    # Signs with the Developer ID certificate and notarises the app, so it opens
+    # on a double-click. Without the certificate secret the app stays ad-hoc signed.
+    - name: Sign and notarise Mac Silicon Bundle
+      uses: ./.github/actions/macos-sign
+      with:
+        app-path: target/release/bundle/osx/oculante.app
+        certificate-p12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+        certificate-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        team-id: ${{ secrets.MACOS_TEAM_ID }}
+        api-key-p8: ${{ secrets.MACOS_API_KEY_P8 }}
+        api-key-id: ${{ secrets.MACOS_API_KEY_ID }}
+        api-issuer-id: ${{ secrets.MACOS_API_ISSUER_ID }}
+      if: matrix.os == 'macos-latest'
+
+    # ditto keeps the bundle metadata that zip drops, including the notarisation ticket
     - name: Zip Mac Silicon Bundle
-      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app.zip oculante.app
+      run: mv target/release/bundle/osx/oculante.app . && ditto -c -k --keepParent oculante.app oculante_app.zip
       if: matrix.os == 'macos-latest'
 
     - name: Build Mac Intel Bundle
@@ -169,8 +184,22 @@ jobs:
           cp Info.plist target/release/bundle/osx/oculante.app/Contents/Info.plist
       if: matrix.os == 'macos-15-intel'
 
+    # Signs with the Developer ID certificate and notarises the app, so it opens
+    # on a double-click. Without the certificate secret the app stays ad-hoc signed.
+    - name: Sign and notarise Mac Intel Bundle
+      uses: ./.github/actions/macos-sign
+      with:
+        app-path: target/release/bundle/osx/oculante.app
+        certificate-p12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+        certificate-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        team-id: ${{ secrets.MACOS_TEAM_ID }}
+        api-key-p8: ${{ secrets.MACOS_API_KEY_P8 }}
+        api-key-id: ${{ secrets.MACOS_API_KEY_ID }}
+        api-issuer-id: ${{ secrets.MACOS_API_ISSUER_ID }}
+      if: matrix.os == 'macos-15-intel'
+
     - name: Zip Mac Intel Bundle
-      run: mv target/release/bundle/osx/oculante.app . && zip -r oculante_app_intel.zip oculante.app
+      run: mv target/release/bundle/osx/oculante.app . && ditto -c -k --keepParent oculante.app oculante_app_intel.zip
       if: matrix.os == 'macos-15-intel'
 
     - name: Upload Linux 24.04 Release
