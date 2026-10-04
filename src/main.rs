@@ -798,6 +798,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     let mut zoom_image = gfx.create_draw();
+    // Leave the alpha of the window untouched when blending. Otherwise half
+    // transparent pixels make the window itself translucent, and whatever is
+    // behind it shines through (#342).
+    let keep_alpha = BlendMode::new(BlendFactor::Zero, BlendFactor::One);
+    draw.set_alpha_mode(Some(keep_alpha));
+    zoom_image.set_alpha_mode(Some(keep_alpha));
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
