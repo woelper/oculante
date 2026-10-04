@@ -431,7 +431,15 @@ impl eframe::App for OculanteApp {
 
         // Update window size
         let screen_rect = ctx.content_rect();
-        self.state.window_size = Vector2::new(screen_rect.width(), screen_rect.height());
+        let window_size = Vector2::new(screen_rect.width(), screen_rect.height());
+        // By resetting the image, we make it fill the window on resize
+        if self.state.persistent_settings.fit_image_on_window_resize
+            && window_size != self.state.window_size
+            && self.state.window_size != Vector2::zeros()
+        {
+            self.state.reset_image = true;
+        }
+        self.state.window_size = window_size;
 
         // Process channels
         self.process_load_channel();
