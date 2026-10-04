@@ -429,7 +429,15 @@ pub fn paint_quads(
     unsafe {
         gl.viewport(0, 0, screen_size_px[0] as i32, screen_size_px[1] as i32);
         gl.enable(glow::BLEND);
-        gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+        // Blend the color, but leave the alpha of the window untouched. Otherwise half
+        // transparent pixels make the window itself translucent on Wayland, and
+        // whatever is behind it shines through (#342).
+        gl.blend_func_separate(
+            glow::SRC_ALPHA,
+            glow::ONE_MINUS_SRC_ALPHA,
+            glow::ZERO,
+            glow::ONE,
+        );
 
         gl.use_program(Some(program));
         gl.bind_vertex_array(Some(vao));
