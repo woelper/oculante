@@ -2,7 +2,7 @@
 ///
 /// This implements `eframe::App` and replaces notan's init/update/draw callbacks.
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use egui::{Align, FontData, FontDefinitions, FontFamily, FontTweak, Id};
 use image::GenericImageView;
@@ -50,6 +50,8 @@ pub struct OculanteApp {
     egui_started_press: bool,
     /// Updates system theme during runtime
     last_system_theme: Option<egui::Theme>,
+    /// When the current file was last checked for changes on disk
+    last_file_check: Instant,
 }
 
 impl OculanteApp {
@@ -68,6 +70,7 @@ impl OculanteApp {
             last_frame_was_compared_image: false,
             egui_started_press: false,
             last_system_theme: None,
+            last_file_check: Instant::now(),
         }
     }
 
@@ -419,6 +422,14 @@ impl eframe::App for OculanteApp {
             if current_system_theme != self.last_system_theme {
                 self.last_system_theme = current_system_theme;
                 apply_theme(&mut self.state, ctx);
+            }
+        }
+
+        // Reload the image if its file changed on disk
+        if self.last_file_check.elapsed() > Duration::from_millis(800) {
+            self.last_file_check = Instant::now();
+            if let Some(path) = &self.state.current_path {
+                self.state.player.check_modified(path);
             }
         }
 
