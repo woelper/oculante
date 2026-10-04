@@ -97,22 +97,6 @@ fn main() {
         println!("cargo:rerun-if-changed=.git/{ref_path}");
     }
 
-    // #[cfg(windows)]
-    match std::process::Command::new("convert")
-        .args(vec![
-            "res/icons/icon.png",
-            "-compress",
-            "none",
-            "-define",
-            "icon:auto-resize=16,32,48,64,128,256",
-            "res/icons/icon.ico",
-        ])
-        .spawn()
-    {
-        Ok(_b) => println!("Converted icon"),
-        Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
-    }
-
     // insert version into plist
     let mut plist: String = "".into();
     File::open("res/info.plist")
