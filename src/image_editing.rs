@@ -22,12 +22,12 @@ use notan::egui::{
     StrokeKind, Vec2,
 };
 use notan::egui::{Response, Ui};
+use num_integer::gcd;
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -841,6 +841,13 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The shapes are drawn over the image, not into the panel this ui belongs
+                // to. Use a painter for the area the panels leave free, the ui's own
+                // painter would clip them away.
+                let painter = ui
+                    .ctx()
+                    .layer_painter(egui::LayerId::background())
+                    .with_clip_rect(ui.ctx().available_rect());
                 // enable this if this is used to draw
                 // let id = Id::new("shapes");
 
@@ -871,7 +878,7 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
                             for p in points_transformed.chunks(2) {
-                                ui.painter().line_segment(
+                                painter.line_segment(
                                     [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
@@ -905,22 +912,20 @@ impl ImageOperation {
                                 max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             };
 
-                            ui.painter().rect_stroke(
+                            painter.rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32, Color32::BLACK),
+                                Stroke::new(*width as f32 / 2., Color32::WHITE),
                                 StrokeKind::Inside,
                             );
 
-                            ui.painter().rect_filled(
+                            painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::BLACK,
-                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                // StrokeKind::Inside,
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
                             );
 
-                            ui.painter().text(
+                            painter.text(
                                 rect.expand(14.).center_bottom(),
                                 Align2::CENTER_CENTER,
                                 format!(
@@ -932,12 +937,12 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.left_center(), rect.right_center()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.center_top(), rect.center_bottom()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
@@ -1115,26 +1120,33 @@ impl ImageOperation {
 
                 ui.vertical(|ui| {
                     // This handles the initial state when the filter is first added.
-                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                    if *aspect
+                        && ui
+                            .ctx()
+                            .data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none())
+                    {
                         let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
-                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                     }
 
                     // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
-                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
-                        if dimensions.1 > 0 {
-                            dimensions.0 as f64 / dimensions.1 as f64
-                        } else {
-                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
-                        }
-                    });
+                    let aspect_ratio = ui
+                        .ctx()
+                        .data(|d| d.get_temp(aspect_ratio_id))
+                        .unwrap_or_else(|| {
+                            if dimensions.1 > 0 {
+                                dimensions.0 as f64 / dimensions.1 as f64
+                            } else {
+                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                            }
+                        });
 
                     let g = gcd(dimensions.1, dimensions.0);
                     let w = dimensions.0 / g;
                     let h = dimensions.1 / g;
 
                     ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
-
 
                     ui.horizontal(|ui| {
                         let x_response = ui.add(
@@ -1173,7 +1185,8 @@ impl ImageOperation {
                                 } else {
                                     geo.dimensions.0 as f64 / geo.dimensions.1 as f64
                                 };
-                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                                ui.ctx()
+                                    .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                             }
                             r.mark_changed();
                         }
@@ -1198,22 +1211,21 @@ impl ImageOperation {
                         });
 
                     ui.vertical_centered_justified(|ui| {
+                        if ui.button("Reset").clicked() {
+                            // Reset dimensions to original
+                            *dimensions = geo.dimensions;
 
-                    if ui.button("Reset").clicked() {
-                        // Reset dimensions to original
-                        *dimensions = geo.dimensions;
+                            // Reset aspect lock to default (true)
+                            *aspect = true;
 
-                        // Reset aspect lock to default (true)
-                        *aspect = true;
+                            // Remove the stored aspect ratio from egui's memory.
+                            // This will cause it to be recalculated from the original dimensions
+                            // on the next frame, effectively resetting it.
+                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
 
-                        // Remove the stored aspect ratio from egui's memory.
-                        // This will cause it to be recalculated from the original dimensions
-                        // on the next frame, effectively resetting it.
-                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
-
-                        // Mark the UI as changed
-                        r.mark_changed();
-                    }
+                            // Mark the UI as changed
+                            r.mark_changed();
+                        }
                     });
                 });
                 r
