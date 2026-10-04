@@ -741,6 +741,36 @@ fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
             ..i.modifiers
         },
     });
+    // Ctrl with C, X or V never shows up as a held key, egui turns those into clipboard
+    // events. Remember the key from the event until it or the modifier is released.
+    // Pasting is only reported while the clipboard holds text.
+    let clipboard_keys_id = egui::Id::new("held_clipboard_keys");
+    let mut clipboard_keys: Vec<egui::Key> = ctx
+        .data(|d| d.get_temp(clipboard_keys_id))
+        .unwrap_or_default();
+    ctx.input(|i| {
+        for event in &i.events {
+            match event {
+                egui::Event::Copy => clipboard_keys.push(egui::Key::C),
+                egui::Event::Cut => clipboard_keys.push(egui::Key::X),
+                egui::Event::Paste(_) => clipboard_keys.push(egui::Key::V),
+                egui::Event::Key {
+                    key,
+                    pressed: false,
+                    ..
+                } => clipboard_keys.retain(|held| held != key),
+                _ => {}
+            }
+        }
+        if !(i.modifiers.ctrl || i.modifiers.command || i.modifiers.mac_cmd) {
+            clipboard_keys.clear();
+        }
+    });
+    clipboard_keys.sort();
+    clipboard_keys.dedup();
+    ctx.data_mut(|d| d.insert_temp(clipboard_keys_id, clipboard_keys.clone()));
+    let mut current = current;
+    current.keys.extend(clipboard_keys);
     let has_keys = !current.keys.is_empty();
 
     ui.horizontal(|ui| {
