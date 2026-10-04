@@ -104,6 +104,13 @@ class App:
         self.x("xdotool", "click", str(button))
         self.settle(0.4)
 
+    def scroll_down(self, x, y, notches):
+        self.move(x, y)
+        for _ in range(notches):
+            self.x("xdotool", "click", "5")
+            time.sleep(0.12)
+        self.settle(0.8)
+
     def drag(self, x0, y0, x1, y1, steps=10):
         self.move(x0, y0)
         self.x("xdotool", "mousedown", "1")

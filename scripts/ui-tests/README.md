@@ -33,6 +33,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_piped_file_names` | File names piped into stdin are opened |
 | `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
 | `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image |
+| `test_perspective_crop_handles` | The perspective crop shows its handles, they can be dragged and the crop applied |
 
 ## Notes
 

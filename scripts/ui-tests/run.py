@@ -112,10 +112,7 @@ def test_measure_draws_rectangle(binary):
         assert app.wait_for_log("Got frame"), "the image never loaded"
         app.key("i")
         app.settle(1.0)
-        app.move(120, 300)
-        for _ in range(12):  # scroll the info panel down to the tools
-            app.x("xdotool", "click", "5")
-        app.settle(1.0)
+        app.scroll_down(120, 300, 12)  # down to the tools in the info panel
         app.click(70, 389)  # open "Measure"
         app.settle(0.8)
         left_edge = (446, 250, 9, 60)
@@ -132,7 +129,44 @@ def test_measure_draws_rectangle(binary):
         assert region_has_color(after, left_edge, (255, 255, 255), 12), "the measured rectangle is not drawn"
 
 
+# the gold handles as they appear under the dark overlay of the crop tool
+GOLD = (185, 156, 0)
+
+
+def test_perspective_crop_handles(binary):
+    """The perspective crop shows its corner handles over the image and can be applied (handles were hidden in 0.9.3)."""
+    with App(binary, "perspective_crop", [image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log("Got frame"), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(900, 58)  # open the filter list
+        app.settle(0.8)
+        app.scroll_down(912, 200, 16)  # to the end of the list
+        app.click(912, 361)  # add "Perspective crop"
+        app.settle(1.0)
+        app.move(0.3, 0.8)
+        app.settle(1.0)
+        added = app.shot("added")
+        top_left = (125, 25, 30, 30)  # around the image's top left corner
+        assert region_has_color(added, top_left, GOLD, 25), "the corner handle is not drawn"
+        app.drag(140, 50, 300, 160)
+        app.move(0.3, 0.8)
+        app.settle(1.0)
+        dragged = app.shot("dragged")
+        assert not region_has_color(dragged, top_left, GOLD, 25), "the handle did not leave its corner"
+        assert region_has_color(dragged, (285, 145, 30, 30), GOLD, 25), "the handle did not follow the drag"
+        app.click(906, 224)  # "Apply"
+        app.move(0.3, 0.8)
+        app.settle(2.0)
+        applied = app.shot("applied")
+        assert "panicked" not in app.log(), "the app crashed when applying the crop"
+        assert changed_pixels(dragged, applied) > 50_000, "applying the crop did not change the image"
+
+
 TESTS = [
+    test_perspective_crop_handles,
     test_shortcuts,
     test_start_with_idle_stdin,
     test_piped_file_names,
