@@ -8,6 +8,7 @@
 - [ ] Paint mode
 - [ ] OSX file associations
 - [ ] See if the transparency issue has been fixed (#342) (Blending leaves the window alpha untouched now, needs a check on Wayland.)
+- [ ] UI tests: run them in a headless Wayland session (Sway or Jay) with ydotool instead of xdotool, so problems that only show on Wayland are covered (suggested by Stoppedpuma in #811)
 
 # Obvious defects
 - [ ] The > icons (carets) are off since the update to egui 0.36
