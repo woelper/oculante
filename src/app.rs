@@ -879,6 +879,8 @@ impl eframe::App for OculanteApp {
             }
         }
 
+        limit_offset(&mut self.state);
+
         // ===== IMAGE RENDERING =====
         // Render image in egui's CentralPanel (behind side panels, below UI)
         let bg = self.state.persistent_settings.background_color;
@@ -1026,4 +1028,21 @@ impl eframe::App for OculanteApp {
         _ = self.state.persistent_settings.save_blocking();
         _ = self.state.volatile_settings.save_blocking();
     }
+}
+
+/// Keep the image from being moved out of the window completely
+fn limit_offset(state: &mut OculanteState) {
+    let geometry = &mut state.image_geometry;
+    let scaled_width = geometry.dimensions.0 as f32 * geometry.scale;
+    let scaled_height = geometry.dimensions.1 as f32 * geometry.scale;
+    geometry.offset.x = geometry
+        .offset
+        .x
+        .min(state.window_size.x)
+        .max(-scaled_width);
+    geometry.offset.y = geometry
+        .offset
+        .y
+        .min(state.window_size.y)
+        .max(-scaled_height);
 }
