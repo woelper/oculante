@@ -2,7 +2,7 @@
 - [x] Shortcuts in the app: Regular and with modifiers (covered by scripts/ui-tests)
 - [ ] Shortcuts in the app: key repeat
 - [x] Shortcut settings menu (known issues with modifiers)
-- [ ] Shortcut settings menu: Ctrl+C, Ctrl+V and Ctrl+X can not be assigned, egui does not report those keys as held
+- [x] Shortcut settings menu: Ctrl+C, Ctrl+V and Ctrl+X can not be assigned, egui does not report those keys as held (Ctrl+V only while the clipboard holds text)
 - [ ] Borderless mode
 - [ ] Always on top: Works on Mac, does not work on PopOS/Cosmic (Wayland)
 - [ ] Paint mode
@@ -40,7 +40,7 @@
 - [x] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
 - [x] recent images are not added to list (seems to work on mac, test on linux)
 - [x] When loading an animated image (at least png) the view does not reset
-- [ ] File names piped into stdin are not opened (works on master)
+- [x] File names piped into stdin are not opened (works on master)
 - [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier. (Background threads request a repaint now. Could not be reproduced on a virtual display, needs a check on a real one.)
 - [x] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
 - [x] Fit image on window resize is broken
