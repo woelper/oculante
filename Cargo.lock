@@ -4901,6 +4901,7 @@ dependencies = [
  "jxl-oxide",
  "kamadak-exif",
  "ktx2",
+ "lcms2-sys",
  "lexical-sort",
  "libavif-image",
  "libblur",

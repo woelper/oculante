@@ -69,4 +69,16 @@ echo you can test target/release/bundle/osx/oculante.app now
 otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
 otool -L target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib
 
+# The app must not depend on anything from Homebrew that is not in the bundle,
+# it would crash on machines without it (#810).
+if otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante | grep /opt/homebrew; then
+    echo "The app still links a Homebrew library that is not bundled"
+    exit 1
+fi
+# The first two lines are the file name and the library's own id
+if otool -L target/release/bundle/osx/oculante.app/Contents/Frameworks/libheif.1.dylib | tail -n +3 | grep /opt/homebrew; then
+    echo "libheif still links a Homebrew library that is not bundled"
+    exit 1
+fi
+
 cd $current_dir

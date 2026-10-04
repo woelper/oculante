@@ -45,6 +45,9 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.12"
+# Always build lcms2 (used by jxl-oxide) from source. Otherwise it links to the
+# system library where there is one, which is then missing in our bundles (#810).
+lcms2-sys = { version = "4", features = ["static"], optional = true }
 # These 3 need to be updated together
 resvg = "0.48"
 usvg = "0.48"
@@ -124,7 +127,7 @@ dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 j2k = ["jpeg2k"]
-jxlcms = ["jxl-oxide/lcms2"]
+jxlcms = ["jxl-oxide/lcms2", "dep:lcms2-sys"]
 hdr = []
 lang_support = []
 
