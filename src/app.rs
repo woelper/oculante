@@ -41,6 +41,8 @@ pub struct OculanteApp {
     checker_texture: Option<egui::TextureHandle>,
     /// Set when a new image arrives; cleared after upload resets the view
     reset_after_upload: bool,
+    /// The position stored for an image of the compare list that is being shown
+    compare_geometry: Option<ImageGeometry>,
     /// True if the most recent frame is from an image in the compare menu
     last_frame_was_compared_image: bool,
     /// True if egui owned the pointer when the current press started.
@@ -62,6 +64,7 @@ impl OculanteApp {
             animation_playing: false,
             checker_texture: None,
             reset_after_upload: false,
+            compare_geometry: None,
             last_frame_was_compared_image: false,
             egui_started_press: false,
             last_system_theme: None,
@@ -114,12 +117,16 @@ impl OculanteApp {
 
         // Now that the texture is ready, update geometry and reset view
         self.state.image_geometry.dimensions = (w, h);
-        let keep_view = if self.last_frame_was_compared_image {
-            self.state.persistent_settings.compare_keep_view
-        } else {
-            self.state.persistent_settings.keep_view
-        };
-        if !keep_view && self.reset_after_upload {
+        if self.last_frame_was_compared_image {
+            // A compared image goes to the position stored for it, unless the view
+            // is to be kept across the compared images. It is never fitted anew.
+            if let Some(geometry) = self.compare_geometry.take()
+                && !self.state.persistent_settings.compare_keep_view
+            {
+                self.state.image_geometry.scale = geometry.scale;
+                self.state.image_geometry.offset = geometry.offset;
+            }
+        } else if !self.state.persistent_settings.keep_view && self.reset_after_upload {
             self.state.reset_image = true;
         }
         self.reset_after_upload = false;
@@ -244,6 +251,9 @@ impl OculanteApp {
         if let Some(frame) = latest_frame {
             self.state.is_loaded = true;
             self.last_frame_was_compared_image = matches!(frame, Frame::CompareResult(_, _));
+            if let Frame::CompareResult(_, geometry) = &frame {
+                self.compare_geometry = Some(*geometry);
+            }
 
             // Update scrubber on new images
             // Also match Animation if an AnimationStart was drained
@@ -722,6 +732,9 @@ impl eframe::App for OculanteApp {
             }
             if key_pressed(ctx, state, LastImage) {
                 last_image(state);
+            }
+            if key_pressed(ctx, state, CompareNext) {
+                compare_next(state);
             }
             if key_pressed(ctx, state, ZoomActualSize) {
                 set_zoom(1.0, None, state);

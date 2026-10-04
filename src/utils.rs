@@ -848,6 +848,19 @@ pub fn clear_image(state: &mut OculanteState) {
     }
 }
 
+/// Show the next image of the compare list at the position stored for it.
+pub fn compare_next(state: &mut OculanteState) {
+    if let Some(item) = state.compare_list.next() {
+        let (path, geometry) = (item.path.clone(), item.geometry);
+        state.is_loaded = false;
+        state.player.load_advanced(
+            &path,
+            Some(Frame::CompareResult(Default::default(), geometry)),
+        );
+        state.current_path = Some(path);
+    }
+}
+
 pub fn next_image(state: &mut OculanteState) {
     let next_img = state.scrubber.next();
     // prevent reload if at last or first
