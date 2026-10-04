@@ -31,13 +31,15 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_shortcuts` | Every default shortcut is triggered by its key |
 | `test_start_with_idle_stdin` | The app starts when stdin is an open, silent pipe |
 | `test_piped_file_names` | File names piped into stdin are opened |
-| `test_slider_changes_image` | A filter slider can be dragged and changes the image |
+| `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
+| `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image |
 
 ## Notes
 
 - The app is started with its own empty config directories, your settings are
   not read or changed.
 - Clicks use fixed window coordinates for the default window size. If the
-  layout of the edit panel changes, `test_slider_changes_image` needs new ones.
+  layout of the edit or info panel changes, the slider and measure tests need
+  new ones.
 - The app only redraws on input, so the driver nudges the pointer before it
   looks at the result.

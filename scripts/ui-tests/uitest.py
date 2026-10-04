@@ -4,6 +4,7 @@ Starts Xvfb, launches the app with its own empty config, sends keys and mouse
 input with xdotool and takes screenshots with ImageMagick. Needs `Xvfb`,
 `xdotool`, `import` and `compare` on the PATH.
 """
+import json
 import os
 import re
 import shutil
@@ -23,7 +24,7 @@ def image(name):
 class App:
     """One running instance of the app on its own display."""
 
-    def __init__(self, binary, name, args, display=":97", stdin=subprocess.DEVNULL):
+    def __init__(self, binary, name, args, display=":97", stdin=subprocess.DEVNULL, settings=None):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
         os.makedirs(self.out)
@@ -40,6 +41,12 @@ class App:
         for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
             env[var] = os.path.join(self.out, var.lower())
             os.makedirs(env[var])
+        if settings is not None:
+            # settings that are not given keep their defaults
+            settings_dir = os.path.join(env["XDG_DATA_HOME"], "oculante")
+            os.makedirs(settings_dir)
+            with open(os.path.join(settings_dir, "config.json"), "w") as f:
+                json.dump(settings, f)
         self.env = env
         self.logfile = open(os.path.join(self.out, "app.log"), "w")
         self.app = subprocess.Popen(
@@ -146,15 +153,27 @@ def changed_pixels(a, b):
     return int(float(result.stderr.strip().split()[0]))
 
 
-def region_has_color(path, box, rgb, tolerance=40):
-    """Whether any pixel inside box (x, y, w, h) of a screenshot is close to rgb."""
+def _pixels(path, box):
     x, y, w, h = box
     out = subprocess.run(
         ["convert", path, "-crop", f"{w}x{h}+{x}+{y}", "+repage", "-depth", "8", "txt:-"],
         capture_output=True,
         text=True,
     ).stdout
-    for r, g, b in re.findall(r"\((\d+),(\d+),(\d+)", out):
-        if all(abs(int(v) - t) <= tolerance for v, t in zip((r, g, b), rgb)):
-            return True
-    return False
+    for px, py, r, g, b in re.findall(r"^(\d+),(\d+): \((\d+),(\d+),(\d+)", out, re.M):
+        yield x + int(px), y + int(py), (int(r), int(g), int(b))
+
+
+def _close(color, rgb, tolerance):
+    return all(abs(v - t) <= tolerance for v, t in zip(color, rgb))
+
+
+def region_has_color(path, box, rgb, tolerance=40):
+    """Whether any pixel inside box (x, y, w, h) of a screenshot is close to rgb."""
+    return any(_close(color, rgb, tolerance) for _, _, color in _pixels(path, box))
+
+
+def rightmost_x(path, box, rgb, tolerance=40):
+    """The largest x inside box (x, y, w, h) with a pixel close to rgb, or None."""
+    xs = [x for x, _, color in _pixels(path, box) if _close(color, rgb, tolerance)]
+    return max(xs) if xs else None

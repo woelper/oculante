@@ -10,7 +10,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from uitest import App, changed_pixels, image, region_has_color  # noqa: E402
+from uitest import App, changed_pixels, image, region_has_color, rightmost_x  # noqa: E402
 
 # key combination (xdotool names) and the shortcut it must trigger
 SHORTCUTS = [
@@ -87,21 +87,58 @@ def test_slider_changes_image(binary):
         app.move(0.4, 0.5)
         app.settle(0.8)
         before = app.shot("before_drag")
-        # the slider sits in the row at y = 215: filled up to the handle in the
-        # middle, the empty rail to the right of it
-        assert region_has_color(before, (835, 211, 40, 9), ACCENT), "the filled part of the slider is missing"
-        assert region_has_color(before, (895, 211, 60, 9), RAIL), "the rail right of the handle is missing"
-        assert not region_has_color(before, (905, 211, 20, 9), ACCENT), "the slider does not start in the middle"
-        app.drag(867, 215, 930, 215)
+        # the slider sits in the row at y = 215: filled up to the handle, the
+        # empty rail to the right of it
+        row = (820, 211, 190, 9)
+        handle = rightmost_x(before, row, ACCENT)
+        assert handle is not None, "the filled part of the slider is missing"
+        rail_end = rightmost_x(before, row, RAIL, 8)
+        assert rail_end is not None and rail_end > handle + 20, "the rail right of the handle is missing"
+        app.drag(handle - 4, 215, handle + 40, 215)
         app.move(0.4, 0.5)
         app.settle(1.5)
         after = app.shot("after_drag")
-        assert region_has_color(after, (905, 211, 20, 9), ACCENT), "the handle did not follow the drag"
+        moved = rightmost_x(after, row, ACCENT)
+        assert moved is not None and moved > handle + 25, "the handle did not follow the drag"
         changed = changed_pixels(before, after)
         assert changed > 50_000, f"dragging the slider changed only {changed} pixels of the image"
 
 
-TESTS = [test_shortcuts, test_start_with_idle_stdin, test_piped_file_names, test_slider_changes_image]
+def test_measure_draws_rectangle(binary):
+    """Dragging with the right mouse button draws the measured rectangle over the image (invisible in 0.9.3)."""
+    with App(binary, "measure", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log("Got frame"), "the image never loaded"
+        app.key("i")
+        app.settle(1.0)
+        app.move(120, 300)
+        for _ in range(12):  # scroll the info panel down to the tools
+            app.x("xdotool", "click", "5")
+        app.settle(1.0)
+        app.click(70, 389)  # open "Measure"
+        app.settle(0.8)
+        left_edge = (446, 250, 9, 60)
+        before = app.shot("before_measure")
+        assert not region_has_color(before, left_edge, (255, 255, 255), 12), "there is a rectangle before measuring"
+        app.move(450, 180)
+        app.x("xdotool", "mousedown", "3")
+        for step in range(1, 11):
+            app.move(450 + 30 * step, 180 + 22 * step)
+        app.x("xdotool", "mouseup", "3")
+        app.move(900, 520)
+        app.settle(1.0)
+        after = app.shot("after_measure")
+        assert region_has_color(after, left_edge, (255, 255, 255), 12), "the measured rectangle is not drawn"
+
+
+TESTS = [
+    test_shortcuts,
+    test_start_with_idle_stdin,
+    test_piped_file_names,
+    test_slider_changes_image,
+    test_measure_draws_rectangle,
+]
 
 
 def main():
