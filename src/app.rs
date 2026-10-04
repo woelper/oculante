@@ -964,6 +964,20 @@ impl eframe::App for OculanteApp {
                         callback: Arc::new(cb),
                     });
 
+                    // The outline of the brush while painting
+                    if self.state.edit_state.painting
+                        && !self.state.pointer_over_ui
+                        && let Some(stroke) = self.state.edit_state.paint_strokes.last()
+                    {
+                        // The brush is as wide as this fraction of the smaller image side
+                        let radius = stroke.width * img_w.min(img_h) * scale / 2.;
+                        ui.painter().circle_stroke(
+                            egui::pos2(self.state.cursor.x, self.state.cursor.y),
+                            radius,
+                            egui::Stroke::new(1.5, egui::Color32::from_white_alpha(128)),
+                        );
+                    }
+
                     // Draw frame around image if enabled
                     if self.state.persistent_settings.show_frame {
                         for rep_y in 0..tiling {
