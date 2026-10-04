@@ -133,7 +133,7 @@ impl OculanteApp {
 
         let dpi = ctx.pixels_per_point();
         // Apply user UI scale on top of system DPI
-        ctx.set_pixels_per_point(dpi * self.state.persistent_settings.ui_scale);
+        ctx.set_zoom_factor(self.state.persistent_settings.ui_scale);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         let offset = if dpi > 1.0 { 0.0 } else { -1.4 };
