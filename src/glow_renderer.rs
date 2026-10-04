@@ -1,7 +1,7 @@
 /// Custom glow (OpenGL) renderer for image display.
 ///
-/// This replaces notan's Draw API for rendering the main image,
-/// checker background, zoom preview, and overlays.
+/// The image is kept on the GPU as a grid of texture tiles, which are drawn
+/// from egui paint callbacks: the main view and the zoom preview.
 use crate::utils::ColorChannel;
 use glam::{Mat4, Vec4};
 use glow::HasContext;
@@ -58,8 +58,6 @@ pub struct GlowTile {
 pub struct GlowRenderer {
     /// Shader program for textured quads with swizzle/offset uniforms
     image_program: glow::Program,
-    /// Simple shader for solid-color rectangles
-    rect_program: glow::Program,
     /// Fullscreen quad VAO (two triangles covering clip space, UVs computed from position)
     quad_vao: glow::VertexArray,
     /// Max texture size for this GPU
@@ -68,7 +66,7 @@ pub struct GlowRenderer {
 
 // The `#version` line is prepended in `compile_program`, depending on the GL flavour.
 
-// Vertex shader shared by image and rect programs
+// Vertex shader of the image program
 const VERTEX_SHADER: &str = r#"
 uniform vec2 u_offset;
 uniform vec2 u_scale;
@@ -76,7 +74,7 @@ uniform vec2 u_viewport;
 // For crop: uv offset and scale
 uniform vec2 u_uv_offset;
 uniform vec2 u_uv_scale;
-// Quad size in pixels (for image: texture size, for rect: rect size)
+// Quad size in pixels
 uniform vec2 u_size;
 
 out vec2 v_uv;
@@ -117,20 +115,10 @@ void main() {
 }
 "#;
 
-const RECT_FRAGMENT_SHADER: &str = r#"
-precision highp float;
-uniform vec4 u_color;
-out vec4 color;
-void main() {
-    color = u_color;
-}
-"#;
-
 impl GlowRenderer {
     /// Create a new renderer. Call this once with the GL context.
     pub fn new(gl: &glow::Context) -> Self {
         let image_program = compile_program(gl, VERTEX_SHADER, IMAGE_FRAGMENT_SHADER);
-        let rect_program = compile_program(gl, VERTEX_SHADER, RECT_FRAGMENT_SHADER);
 
         // Empty VAO for attribute-less rendering (we compute positions from gl_VertexID)
         let quad_vao = unsafe { gl.create_vertex_array().expect("Failed to create VAO") };
@@ -138,7 +126,6 @@ impl GlowRenderer {
 
         Self {
             image_program,
-            rect_program,
             quad_vao,
             max_texture_size,
         }
@@ -239,102 +226,10 @@ impl GlowRenderer {
         }
     }
 
-    /// Draw a textured quad with the image swizzle shader.
-    ///
-    /// `offset`: top-left position in screen pixels
-    /// `scale`: uniform scale factor
-    /// `viewport`: (width, height) of the window in pixels
-    /// `swizzle_mat`: 4x4 color channel selection matrix
-    /// `offset_vec`: additive color offset
-    /// `uv_offset`, `uv_scale`: for cropping (default: (0,0), (1,1))
-    pub fn draw_image(
-        &self,
-        gl: &glow::Context,
-        tex: &GlowTexture,
-        offset: [f32; 2],
-        scale: [f32; 2],
-        viewport: [f32; 2],
-        swizzle_mat: &[f32; 16],
-        offset_vec: &[f32; 4],
-        uv_offset: [f32; 2],
-        uv_scale: [f32; 2],
-        size_override: Option<[f32; 2]>,
-    ) {
-        unsafe {
-            gl.use_program(Some(self.image_program));
-            gl.bind_vertex_array(Some(self.quad_vao));
-
-            let size = size_override.unwrap_or([tex.width as f32, tex.height as f32]);
-
-            set_uniform_2f(gl, self.image_program, "u_offset", offset);
-            set_uniform_2f(gl, self.image_program, "u_scale", scale);
-            set_uniform_2f(gl, self.image_program, "u_viewport", viewport);
-            set_uniform_2f(gl, self.image_program, "u_size", size);
-            set_uniform_2f(gl, self.image_program, "u_uv_offset", uv_offset);
-            set_uniform_2f(gl, self.image_program, "u_uv_scale", uv_scale);
-
-            let loc = gl.get_uniform_location(self.image_program, "u_swizzle_mat");
-            gl.uniform_matrix_4_f32_slice(loc.as_ref(), false, swizzle_mat);
-
-            let loc = gl.get_uniform_location(self.image_program, "u_offset_vec");
-            gl.uniform_4_f32_slice(loc.as_ref(), offset_vec);
-
-            gl.active_texture(glow::TEXTURE0);
-            gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
-            let loc = gl.get_uniform_location(self.image_program, "u_texture");
-            gl.uniform_1_i32(loc.as_ref(), 0);
-
-            gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
-
-            gl.bind_texture(glow::TEXTURE_2D, None);
-            gl.use_program(None);
-            gl.bind_vertex_array(None);
-        }
-    }
-
-    /// Draw a solid-color rectangle.
-    pub fn draw_rect(
-        &self,
-        gl: &glow::Context,
-        pos: [f32; 2],
-        size: [f32; 2],
-        color: [f32; 4],
-        viewport: [f32; 2],
-    ) {
-        unsafe {
-            gl.use_program(Some(self.rect_program));
-            gl.bind_vertex_array(Some(self.quad_vao));
-
-            set_uniform_2f(gl, self.rect_program, "u_offset", pos);
-            set_uniform_2f(gl, self.rect_program, "u_scale", [1.0, 1.0]);
-            set_uniform_2f(gl, self.rect_program, "u_viewport", viewport);
-            set_uniform_2f(gl, self.rect_program, "u_size", size);
-            set_uniform_2f(gl, self.rect_program, "u_uv_offset", [0.0, 0.0]);
-            set_uniform_2f(gl, self.rect_program, "u_uv_scale", [1.0, 1.0]);
-
-            let loc = gl.get_uniform_location(self.rect_program, "u_color");
-            gl.uniform_4_f32_slice(loc.as_ref(), &color);
-
-            gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
-
-            gl.use_program(None);
-            gl.bind_vertex_array(None);
-        }
-    }
-
-    /// Clear the framebuffer with a color.
-    pub fn clear(&self, gl: &glow::Context, r: f32, g: f32, b: f32) {
-        unsafe {
-            gl.clear_color(r, g, b, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT);
-        }
-    }
-
     /// Clean up GL resources.
     pub fn destroy(&self, gl: &glow::Context) {
         unsafe {
             gl.delete_program(self.image_program);
-            gl.delete_program(self.rect_program);
             gl.delete_vertex_array(self.quad_vao);
         }
     }
@@ -562,7 +457,7 @@ pub fn paint_quads(
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
         }
 
-        // `draw_image` shares this program and expects filtered sampling
+        // the next use of the program expects filtered sampling unless it asks otherwise
         gl.uniform_1_i32(snap_loc.as_ref(), 0);
         gl.bind_texture(glow::TEXTURE_2D, None);
         gl.use_program(None);
