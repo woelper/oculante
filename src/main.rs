@@ -573,8 +573,14 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             _ = state.persistent_settings.save_blocking();
             _ = state.volatile_settings.save_blocking();
         }
-        Event::MouseWheel { delta_y, .. } => {
+        Event::MouseWheel { delta_x, delta_y } => {
             trace!("Mouse wheel event");
+            // Touchpads scroll ten times too slow in the UI otherwise. Only on Linux
+            // for now, where it was tested.
+            if cfg!(target_os = "linux") {
+                let (x, y) = precise_scroll_remainder(delta_x, delta_y);
+                state.scroll_remainder += Vector2::new(x, y);
+            }
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
                     // Change image to next/prev
@@ -1029,6 +1035,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     let mut bbox_br: egui::Pos2 = Default::default();
     let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
+        if state.scroll_remainder != Vector2::zeros() {
+            let remainder = egui::vec2(state.scroll_remainder.x, state.scroll_remainder.y);
+            ctx.input_mut(|input| input.smooth_scroll_delta += remainder);
+            state.scroll_remainder = Vector2::zeros();
+        }
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));

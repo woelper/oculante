@@ -62,6 +62,8 @@ pub struct OculanteState {
     pub cursor_relative: Vector2<f32>,
     pub sampled_color: [f32; 4],
     pub mouse_delta: Vector2<f32>,
+    /// Scroll distance the UI has not been given yet, see `precise_scroll_remainder`
+    pub scroll_remainder: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
     pub message_channel: (Sender<Message>, Receiver<Message>),
     /// Channel to load images from
@@ -165,6 +167,7 @@ impl Default for OculanteState {
             piped_paths: None,
             extended_info_channel: meta_channel,
             mouse_delta: Default::default(),
+            scroll_remainder: Default::default(),
             current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
