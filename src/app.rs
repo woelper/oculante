@@ -617,14 +617,14 @@ impl eframe::App for OculanteApp {
         // File drop
         ctx.input(|i| {
             for file in &i.raw.dropped_files {
-                if let Some(path) = &file.path
-                    && let Some(ext) = path.extension()
+                let path = file.path();
+                if let Some(ext) = path.extension()
                     && SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_lowercase().as_str())
                 {
                     self.state.is_loaded = false;
                     self.state.current_image = None;
                     self.state.player.load(path);
-                    self.state.current_path = Some(path.clone());
+                    self.state.current_path = Some(path.to_path_buf());
                 }
             }
         });
