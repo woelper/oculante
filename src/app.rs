@@ -425,6 +425,11 @@ impl eframe::App for OculanteApp {
             }
         }
 
+        // The setting "Redraw every frame" turns off drawing on demand
+        if self.state.persistent_settings.force_redraw {
+            ctx.request_repaint();
+        }
+
         // Reload the image if its file changed on disk
         if self.last_file_check.elapsed() > Duration::from_millis(800) {
             self.last_file_check = Instant::now();

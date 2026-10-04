@@ -8,7 +8,6 @@ pub struct WindowSettings {
     pub height: u32,
     pub resizable: bool,
     pub vsync: bool,
-    pub lazy_loop: bool,
     pub high_dpi: bool,
     pub decorations: bool,
     pub always_on_top: bool,
@@ -27,7 +26,6 @@ impl Default for WindowSettings {
             height: 600,
             resizable: true,
             vsync: true,
-            lazy_loop: true,
             high_dpi: true,
             decorations: true,
             always_on_top: true,
@@ -66,7 +64,6 @@ pub fn build_window_settings() -> WindowSettings {
     // Apply persistent settings
     if let Ok(settings) = crate::settings::PersistentSettings::load() {
         ws.vsync = settings.vsync;
-        ws.lazy_loop = !settings.force_redraw;
         ws.decorations = !settings.borderless;
         ws.min_size = Some(settings.min_window_size);
 
