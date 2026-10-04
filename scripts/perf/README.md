@@ -76,6 +76,12 @@ percent of one CPU core.
   so as fast as it can, on all cores. `animation.cpu_percent`, `pan_cpu_s` and
   `zoom_cpu_s` are therefore much higher than on a real display and mostly
   useful to compare two builds, not as absolute values.
+- For the same reason `pan_latency`, `pan_cpu_s` and `zoom_cpu_s` say little
+  about the app itself. A profile taken while panning shows 94 percent of the
+  CPU time in the software rasterizer and 0.1 percent in Oculante's own code.
+  They show how much there is to draw per frame, not how fast the app reacts
+  on a GPU. `pan_cpu_s` also differs by up to 25 percent between two runs of
+  the same build.
 - Times are measured from outside, by reading pixels from the screen every two
   milliseconds. Times until something is visible include decoding, upload and
   drawing.
