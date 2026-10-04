@@ -183,6 +183,15 @@ pub fn default_shortcuts() -> Shortcuts {
 }
 
 /// Check if a shortcut's command is currently triggered, reading from egui input.
+/// Whether egui turns pressing this key with these modifiers into a clipboard
+/// event. It does not pass such a key press on: copy and cut arrive as
+/// `Event::Copy` and `Event::Cut`, a paste only as `Event::Paste` if the clipboard
+/// holds text. The key release is passed on as usual.
+fn clipboard_event(key: Key, modifiers: Modifiers) -> bool {
+    (modifiers.command || modifiers.ctrl || modifiers.mac_cmd)
+        && matches!(key, Key::C | Key::X | Key::V)
+}
+
 pub fn key_pressed(ctx: &egui::Context, state: &mut OculanteState, command: InputEvent) -> bool {
     if state.key_grab {
         return false;
@@ -214,24 +223,32 @@ pub fn key_pressed(ctx: &egui::Context, state: &mut OculanteState, command: Inpu
         let is_release = command == InputEvent::Fullscreen;
 
         for key in &shortcut.keys {
-            let matched = input.events.iter().any(|event| {
-                if let egui::Event::Key {
+            let matched = input.events.iter().any(|event| match event {
+                egui::Event::Key {
                     key: k,
                     pressed,
                     modifiers,
                     ..
-                } = event
-                {
-                    *k == *key
-                        && *pressed != is_release
-                        && modifiers.shift == shortcut.modifiers.shift
-                        && modifiers.alt == shortcut.modifiers.alt
-                        && modifiers.ctrl == shortcut.modifiers.ctrl
-                        && (modifiers.mac_cmd || modifiers.command)
-                            == (shortcut.modifiers.mac_cmd || shortcut.modifiers.command)
-                } else {
-                    false
+                } => {
+                    // Pasting only shows up when the key is released, see `clipboard_event`
+                    let on_release =
+                        is_release || (*key == Key::V && clipboard_event(*key, shortcut.modifiers));
+                    // `matches_exact` knows that ctrl is the command key outside of macOS
+                    k == key
+                        && *pressed != on_release
+                        && modifiers.matches_exact(shortcut.modifiers)
                 }
+                egui::Event::Copy => {
+                    *key == Key::C
+                        && clipboard_event(*key, shortcut.modifiers)
+                        && input.modifiers.matches_exact(shortcut.modifiers)
+                }
+                egui::Event::Cut => {
+                    *key == Key::X
+                        && clipboard_event(*key, shortcut.modifiers)
+                        && input.modifiers.matches_exact(shortcut.modifiers)
+                }
+                _ => false,
             });
             if !matched {
                 return false;
