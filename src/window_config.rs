@@ -1,8 +1,7 @@
 /// Framework-agnostic window configuration.
 ///
 /// This struct captures all window settings so that the main entry point
-/// can convert it to whichever framework is in use (notan today, eframe later).
-
+/// can convert it to whichever framework is in use.
 pub struct WindowSettings {
     pub title: String,
     pub width: u32,

@@ -460,11 +460,7 @@ pub fn open_image(
             for frame in decoder.into_frames() {
                 let frame = frame.context("Can't decode animated webp frame")?;
                 let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
-                let delay_ms = if delay_denom == 0 {
-                    0
-                } else {
-                    delay_numer / delay_denom
-                };
+                let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
                 debug!("webp frame delay {delay_ms}ms");
                 let i = DynamicImage::ImageRgba8(frame.into_buffer());
                 let frame = Frame::new_animation(i, delay_ms as u16);
@@ -485,11 +481,7 @@ pub fn open_image(
                 for frame in decoder.apng()?.into_frames() {
                     let frame = frame.context("Can't decode APNG frame")?;
                     let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
-                    let delay_ms = if delay_denom == 0 {
-                        0
-                    } else {
-                        delay_numer / delay_denom
-                    };
+                    let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
                     debug!("apng frame delay {delay_ms}ms");
                     let i = DynamicImage::ImageRgba8(frame.into_buffer());
                     _ = sender.send(Frame::new_animation(i, delay_ms as u16));
@@ -962,8 +954,10 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "heif")]
     use std::path::Path;
 
+    #[cfg(feature = "heif")]
     use crate::{
         image_loader::open_image,
         settings::{DecoderSettings, HeifLimits, Limit},

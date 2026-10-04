@@ -37,6 +37,8 @@ impl Scrubber {
     }
 
     /// Move scrubber forward
+    // Not an iterator, this is the counterpart of `prev`
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> PathBuf {
         self.index += 1;
         if self.index == self.entries.len() {
@@ -94,6 +96,10 @@ impl Scrubber {
 
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     pub fn has_folder_changed(&self, path_to_check: &Path) -> bool {

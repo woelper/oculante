@@ -348,7 +348,6 @@ impl OculanteApp {
                     self.texture_dirty = true;
                     ctx.request_repaint();
                 }
-                _ => {}
             }
 
             // Send extended info (histogram, exif, etc.) in background thread

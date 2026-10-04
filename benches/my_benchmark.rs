@@ -1,7 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use oculante::image_editing::*;
 use oculante::image_loader::*;
-use std::hint::black_box;
 use std::path::PathBuf;
 
 fn process_pixel_ops() {
@@ -40,7 +39,7 @@ fn resize() {
     }];
     let f = open_image(&PathBuf::from("res/tests/moss.jpg"), None, None).unwrap();
     let mut buffer = f.recv().unwrap().get_image().unwrap();
-    process_pixels(&mut buffer, &ops);
+    _ = process_pixels(&mut buffer, &ops);
 }
 
 fn load_webp() {
@@ -49,10 +48,10 @@ fn load_webp() {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("pixel ops", |b| b.iter(|| process_pixel_ops()));
-    c.bench_function("blur", |b| b.iter(|| blur()));
-    c.bench_function("resize", |b| b.iter(|| resize()));
-    c.bench_function("load WebP", |b| b.iter(|| load_webp()));
+    c.bench_function("pixel ops", |b| b.iter(process_pixel_ops));
+    c.bench_function("blur", |b| b.iter(blur));
+    c.bench_function("resize", |b| b.iter(resize));
+    c.bench_function("load WebP", |b| b.iter(load_webp));
 }
 
 // criterion_group!(benches, criterion_benchmark);
