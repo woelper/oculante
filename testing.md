@@ -1,11 +1,13 @@
 # Testing steps after Notan removal
-- [ ] Shortcuts in the app: Regular, with modifiers, key repeat etc
-- [ ] Shortcut settings menu (known issues with modifiers)
+- [x] Shortcuts in the app: Regular and with modifiers (covered by scripts/ui-tests)
+- [ ] Shortcuts in the app: key repeat
+- [x] Shortcut settings menu (known issues with modifiers)
+- [ ] Shortcut settings menu: Ctrl+C, Ctrl+V and Ctrl+X can not be assigned, egui does not report those keys as held
 - [ ] Borderless mode
 - [ ] Always on top: Works on Mac, does not work on PopOS/Cosmic (Wayland)
 - [ ] Paint mode
 - [ ] OSX file associations
-- [ ] See if the transparency issue has been fixed (#342)
+- [ ] See if the transparency issue has been fixed (#342) (Blending leaves the window alpha untouched now, needs a check on Wayland.)
 
 # Obvious defects
 - [x] The loaded image is always drawn in front on top of the ui
@@ -33,26 +35,27 @@
 - [x] recent files menu is way too large and obscures the whole screen and is cut off
 - [x] When fullscreen is pressed, the exact same pixel under the cursor should still be under the cursor in full screen. The same should be true when switching back. This was old behavior.
 - [x] Some apng files don't animate, for example "tests/Animated_PNG_example_bouncing_beach_ball.png" - this is likely not an animation problem, but due to the fact that the image is not reset/centered on first load.
-- [ ] Measure draw above ui panels (#748) but is partially fixed
-- [ ] Update position button in compare menu doesn't work (in info panel)
-- [ ] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
+- [x] Measure draw above ui panels (#748) but is partially fixed
+- [x] Update position button in compare menu doesn't work (in info panel)
+- [x] Perspective crop is completely broken, only displays above ui panels (#749, not sure if duplication still applies? Definitely test further)
 - [x] recent images are not added to list (seems to work on mac, test on linux)
 - [x] When loading an animated image (at least png) the view does not reset
-- [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier.
+- [ ] File names piped into stdin are not opened (works on master)
+- [ ] When the image is finally loaded, the UI is not safely refreshed. This happens especially on very large images. A solution could be to pass a cloned ctx to the loading thread and ask it to repaint when the image was sent. Or use some kind of dirty flag that we already have, which may be easier. (Background threads request a repaint now. Could not be reproduced on a virtual display, needs a check on a real one.)
 - [x] Artifact on some apng: https://github.com/etemesi254/zune-image/issues/372
-- [ ] Fit image on window resize is broken
-- [ ] Modifier keys don't work correctly in keybinds part of preferences
+- [x] Fit image on window resize is broken
+- [x] Modifier keys don't work correctly in keybinds part of preferences
 - [x] Scrolling on menu items can change window zoom
 - [x] Animated images are broken (as of 2026-05-19)
-- [ ] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
-- [ ] Having edit menu open freezes animated image, the image has to be reloaded with the edit menu closed to continue animating
-- [ ] Floating windows cannot be resized vertically. I believe this possibly has to do with egui::ScrollArea?
+- [x] Colours on histogram no longer blend together correctly (RGB overlap should create white) and they are dim compared to 0.9.2 so this could be the issue since there is still slight blending?
+- [x] Having edit menu open freezes animated image, the image has to be reloaded with the edit menu closed to continue animating
+- [x] Floating windows cannot be resized vertically. I believe this possibly has to do with egui::ScrollArea?
 
 
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
-- [ ] switching channels (rgba) is slow
+- [x] switching channels (rgba) is slow
 
 # Cleanup
 - [x] Update to latest egui
