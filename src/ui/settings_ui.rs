@@ -265,10 +265,13 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, _gfx
                                     }, ui);
 
                                     configuration_item_ui("Scale", "Adjust the User Interface scale to be larger or smaller.", |ui| {
-                                        if ui.add(egui::DragValue::new(&mut state.persistent_settings.ui_scale)
-                                            .range(0.1..=4.0).speed(0.01))
-                                            .changed(){
-                                                ctx.set_pixels_per_point(state.persistent_settings.ui_scale);
+                                        let scale = ui.add(egui::DragValue::new(&mut state.persistent_settings.ui_scale)
+                                            .range(0.1..=4.0).speed(0.01));
+                                        // Apply the scale once the value is final. Applying it while dragging
+                                        // rescales the widget under the pointer, which feeds back into the drag.
+                                        // The setting comes on top of the scale of the display, like at startup.
+                                        if scale.drag_stopped() || scale.lost_focus() {
+                                            ctx.set_zoom_factor(state.persistent_settings.ui_scale);
                                         }
                                     }, ui);
 
