@@ -728,31 +728,16 @@ fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
 
     state.key_grab = true;
 
-    // Build shortcut from keys_down + modifiers from the latest key event
-    // (input.modifiers is not populated by notan's egui plugin, but
-    // Event::Key carries correct per-event modifiers)
-    // FIXME: This flickers and is unreliable. After notan is gone, revisit this.
+    // Build the shortcut from the keys and modifiers that are held down right now
     let ctx = ui.ctx();
-    let current = ctx.input(|i| {
-        let keys: std::collections::BTreeSet<egui::Key> = i.keys_down.iter().copied().collect();
-        // Get modifiers from the most recent key event
-        // (input.modifiers is not populated by notan's egui plugin)
-        let mods = i
-            .events
-            .iter()
-            .rev()
-            .find_map(|e| {
-                if let egui::Event::Key { modifiers, .. } = e {
-                    Some(*modifiers)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-        Shortcut {
-            keys,
-            modifiers: mods,
-        }
+    let current = ctx.input(|i| Shortcut {
+        keys: i.keys_down.iter().copied().collect(),
+        // Outside of macOS ctrl is reported as the command key as well. Only keep
+        // the key itself, like the default shortcuts do.
+        modifiers: egui::Modifiers {
+            command: false,
+            ..i.modifiers
+        },
     });
     let has_keys = !current.keys.is_empty();
 

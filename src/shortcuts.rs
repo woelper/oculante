@@ -96,10 +96,12 @@ impl Shortcut {
     /// Human-readable display string
     pub fn to_string_pretty(&self) -> String {
         let mut parts = Vec::new();
-        if self.modifiers.ctrl {
+        // "command" is the cmd key on macOS and ctrl everywhere else
+        let command_is_ctrl = !cfg!(target_os = "macos");
+        if self.modifiers.ctrl || (self.modifiers.command && command_is_ctrl) {
             parts.push("Ctrl".to_string());
         }
-        if self.modifiers.mac_cmd || self.modifiers.command {
+        if self.modifiers.mac_cmd || (self.modifiers.command && !command_is_ctrl) {
             parts.push("Cmd".to_string());
         }
         if self.modifiers.alt {
