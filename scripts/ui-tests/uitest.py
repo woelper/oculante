@@ -24,7 +24,9 @@ def image(name):
 class App:
     """One running instance of the app on its own display."""
 
-    def __init__(self, binary, name, args, display=":97", stdin=subprocess.DEVNULL, settings=None):
+    def __init__(
+        self, binary, name, args, display=":97", stdin=subprocess.DEVNULL, settings=None, env=None, pointer=None
+    ):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
         os.makedirs(self.out)
@@ -34,9 +36,12 @@ class App:
             stderr=subprocess.DEVNULL,
         )
         time.sleep(1.0)
+        self.display = display
+        extra_env = env or {}
         env = dict(os.environ)
         env.pop("WAYLAND_DISPLAY", None)
         env.update(DISPLAY=display, RUST_LOG="oculante=debug", RUST_BACKTRACE="1", LIBGL_ALWAYS_SOFTWARE="1")
+        env.update(extra_env)
         # never touch the settings of whoever runs the tests
         for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
             env[var] = os.path.join(self.out, var.lower())
@@ -48,7 +53,11 @@ class App:
             with open(os.path.join(settings_dir, "config.json"), "w") as f:
                 json.dump(settings, f)
         self.env = env
+        if pointer is not None:
+            # place the pointer before the app starts, so no input reaches the app later
+            subprocess.run(["xdotool", "mousemove", str(pointer[0]), str(pointer[1])], env=env)
         self.logfile = open(os.path.join(self.out, "app.log"), "w")
+        self.started = time.time()
         self.app = subprocess.Popen(
             [binary] + args, env=env, stdin=stdin, stdout=self.logfile, stderr=subprocess.STDOUT, cwd=REPO
         )
