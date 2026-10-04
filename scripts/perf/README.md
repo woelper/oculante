@@ -14,6 +14,10 @@ Linux with `Xvfb`, `xdotool` and ImageMagick, as for the UI tests:
 
     sudo apt install xvfb xdotool imagemagick
 
+To measure with rendering on a GPU, [VirtualGL](https://virtualgl.org) is
+needed as well, and the user has to be allowed to use the GPU (on Ubuntu:
+member of the group `render`). A monitor is not needed.
+
 ## Running
 
 Measure a release build. Debug builds are several times slower and say little.
@@ -37,6 +41,22 @@ Only some scenarios, fewer repetitions:
 The test images are generated into `target/perf/images` on the first run. They
 are noise with a patch of one color in the middle. The noise gives the decoders
 real work, the patch is what the script looks for on screen.
+
+## Software or GPU
+
+Without further options everything is rendered in software. That needs
+nothing but the packages above and shows memory well, since textures are part
+of the process memory. Times that involve drawing are far from what a desktop
+shows, though.
+
+With `--vgl` the app renders on a GPU. VirtualGL copies the finished frames to
+the virtual display, so keys, mouse and reading pixels work as before:
+
+    /opt/VirtualGL/bin/eglinfo -e          # lists the devices, egl0 is the first GPU
+    python3 scripts/perf/perf.py run --label my-change-gpu --vgl egl0
+
+Use this for everything that is about speed. Results of the two modes can not
+be compared with each other.
 
 ## What is measured
 
@@ -66,22 +86,30 @@ percent of one CPU core.
 - `idle_cpu_percent` and `idle_wakeups_per_s` are taken over 10 seconds without
   any input. Both should be zero. If they are not, something redraws or polls
   all the time.
+- On a GPU there is also `gpu_mb`, the memory the process holds on the GPU,
+  and `gpu_purgeable_mb`, the part of it the driver only keeps as a reserve
+  and gives up when memory gets tight. `idle_gpu_percent`, `gpu_percent`,
+  `pan_gpu_s` and `zoom_gpu_s` are the time the GPU worked for the process.
+  These numbers come from the kernel (`/proc/<pid>/fdinfo`), drivers that do
+  not report them leave the metrics out.
 
 ## How to read the numbers
 
-- Everything is rendered in software (llvmpipe). Textures are part of the
-  process memory, so memory includes what would be GPU memory on a desktop.
-  That makes texture formats and duplicated image data visible.
-- There is no display refresh to wait for. Whatever redraws continuously does
-  so as fast as it can, on all cores. `animation.cpu_percent`, `pan_cpu_s` and
-  `zoom_cpu_s` are therefore much higher than on a real display and mostly
-  useful to compare two builds, not as absolute values.
+- In software (llvmpipe) textures are part of the process memory, so memory
+  includes what would be GPU memory on a desktop. That makes texture formats
+  and duplicated image data visible.
+- In software there is no display refresh to wait for. Whatever redraws
+  continuously does so as fast as it can, on all cores. `animation.cpu_percent`,
+  `pan_cpu_s` and `zoom_cpu_s` are therefore much higher than on a real display.
 - For the same reason `pan_latency`, `pan_cpu_s` and `zoom_cpu_s` say little
-  about the app itself. A profile taken while panning shows 94 percent of the
-  CPU time in the software rasterizer and 0.1 percent in Oculante's own code.
-  They show how much there is to draw per frame, not how fast the app reacts
-  on a GPU. `pan_cpu_s` also differs by up to 25 percent between two runs of
-  the same build.
+  about the app itself in software. A profile taken while panning shows 94
+  percent of the CPU time in the software rasterizer and 0.1 percent in
+  Oculante's own code. `pan_cpu_s` also differs by up to 25 percent between
+  two runs of the same build. Measure these on a GPU.
+- Mipmaps and the first frame with a new image are slow in software as well,
+  which adds to every time until an image is on screen.
+- On a GPU every frame is read back for the virtual display. That costs a
+  little time per frame, the same for every build.
 - Times are measured from outside, by reading pixels from the screen every two
   milliseconds. Times until something is visible include decoding, upload and
   drawing.
