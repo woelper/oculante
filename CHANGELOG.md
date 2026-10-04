@@ -1,3 +1,14 @@
+\# 0.9.4
+
+### :beetle: Bug Fixes
+
+* Look up the x265 library name when bundling for Mac (56ff5ef4)
+
+### :green_apple: Chore
+
+* Move the vendored egui-modal into the crate (da3a0c44)
+* Use dark-light 3.0 from crates.io instead of the git version (a3066823)
+
 \# 0.9.3
 
 ### :beetle: Bug Fixes
