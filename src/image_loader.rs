@@ -164,7 +164,7 @@ pub fn open_image(
                 ctx.set_max_decoding_threads(num_threads.get() as u32);
             }
             if let Some(limits) = decoder_opts.and_then(|decoders| {
-                let DecoderSettings { heif } = decoders;
+                let DecoderSettings { heif, .. } = decoders;
                 heif.maybe_limits()
             }) {
                 ctx.set_security_limits(&limits)?;
