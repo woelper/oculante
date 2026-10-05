@@ -90,6 +90,9 @@ Found by going through the open issues and looking at the code. None of these ha
 
 # Things to improve not related to removing Notan
 - [ ] I am unhappy with the HEIC / HEIF situation. It is widely used by now and the build has been hard as we have not been using a native library and linking to libheif was hard on all platforms. Investigate if this has changed and if there is more robust heif/heic support that we can use, native rust if possible
+  - There is a pure Rust decoder now, `heic-rs`. It is in as the feature `heif_native` (not a default feature yet): HEIC on Linux with a plain build, nothing to install. If `heif` is enabled as well, libheif is used.
+  - Until tbraun96/heic-rs#7 and #8 are released, Cargo.toml patches in a fork with both. Without them photos from phones come out with wrong contrast and colour. A crate published to crates.io does not get the patch.
+  - Open: make it a default feature once upstream has released the fixes, then drop libheif from the Mac bundles (most of `scripts/build_mac.sh` and `scripts/build_mac_intel.sh` exists for it). Not decoded by heic-rs: 4:2:2 and 4:4:4 (Canon HIF, #710), image sequences (#777).
 - [ ] Painting should not be a mode but rather a normal operator
 - [x] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
 - [ ] Update dependencies: egui and helper libraries
