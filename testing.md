@@ -67,7 +67,10 @@
 - [x] Create and move scripts into a scripts folder
 - [ ] Update macOS plist
 - [ ] See if we can replace or drop fruitbasket
-- [ ] macOS: do a proper solution for "Open with" and file associations. What we have now is an ugly hack: fruitbasket starts a first app just to catch the file that Finder hands over, then Oculante starts itself a second time with that file and quits the first one (`chainload` in src/mac.rs). With eframe the open file event should be handled in the running app instead.
+- [ ] macOS: do a proper solution for "Open with" and file associations. What we have now is an ugly hack: fruitbasket starts a first app just to catch the file that Finder hands over, then Oculante starts itself a second time with that file and quits the first one (`chainload` in src/mac.rs). Finder does not pass the file as an argument, it calls `application:openFiles:` on the app delegate. Neither eframe 0.36 nor winit 0.30 pass that on (emilk/egui#5620 is open). The options:
+  - Now: what Neovide does on the same winit version. Create the event loop ourselves (`eframe::create_native` instead of `run_native`), then subclass the app delegate that winit registered at runtime, add `application:openFiles:` to it and hand the paths to the app. This has to happen before the event loop runs, the file the app is started with arrives while it launches. Setting our own delegate is not possible with winit 0.30, it panics when the delegate is not its own (rust-windowing/winit#4015).
+  - Later: winit 0.31 (still a beta) no longer registers a delegate, so the app can set its own with `application:openURLs:`. That is the way winit documents, but it needs eframe to move to winit 0.31 first.
+  - Both get rid of fruitbasket and the second start, and the running app then also receives files that are opened later.
 - [x] Move test files to res/tests
 - [x] Update to Rust 2024
 
