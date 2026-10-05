@@ -26,10 +26,10 @@ enum ToastLevel {
 impl ToastLevel {
     fn icon(self) -> &'static str {
         match self {
-            ToastLevel::Info => icons::INFO,
+            ToastLevel::Info => icons::CIRCLE_INFORMATION,
             ToastLevel::Success => icons::CHECK,
-            ToastLevel::Warning => icons::WARNING_CIRCLE,
-            ToastLevel::Error => icons::ERROR_CIRCLE,
+            ToastLevel::Warning => icons::CIRCLE_WARNING,
+            ToastLevel::Error => icons::CIRCLE_X,
         }
     }
 

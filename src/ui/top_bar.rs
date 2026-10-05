@@ -140,7 +140,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
-                unframed_button_colored(INFO, state.persistent_settings.info_enabled, ui),
+                unframed_button_colored(
+                    CIRCLE_INFORMATION,
+                    state.persistent_settings.info_enabled,
+                    ui,
+                ),
                 "Show image info",
                 &lookup(&state.persistent_settings.shortcuts, &InfoMode),
                 ui,
@@ -151,11 +155,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             }
             if window_x > ui.cursor().left() + 80.
                 && tooltip(
-                    unframed_button_colored(
-                        PENCIL_SIMPLE_LINE,
-                        state.persistent_settings.edit_enabled,
-                        ui,
-                    ),
+                    unframed_button_colored(EDIT, state.persistent_settings.edit_enabled, ui),
                     "Edit the image",
                     &lookup(&state.persistent_settings.shortcuts, &EditMode),
                     ui,
@@ -168,7 +168,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
 
         if window_x > ui.cursor().left() + 80.
             && tooltip(
-                unframed_button(ARROWS_OUT_SIMPLE, ui),
+                unframed_button(FULLSCREEN, ui),
                 "Toggle fullscreen",
                 &lookup(&state.persistent_settings.shortcuts, &Fullscreen),
                 ui,
@@ -211,7 +211,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         if state.current_image.is_some()
             && window_x > ui.cursor().left() + 80.
             && tooltip(
-                unframed_button(PLACEHOLDER, ui),
+                unframed_button(IMAGE_CLEAR, ui),
                 "Clear image",
                 &lookup(&state.persistent_settings.shortcuts, &ClearImage),
                 ui,
@@ -224,7 +224,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         if state.scrubber.len() > 1 && window_x > ui.cursor().left() {
             // TODO: Check if wrap is off and we are at first image
             if tooltip(
-                unframed_button(CARET_LEFT, ui),
+                unframed_button(CHEVRON_LEFT, ui),
                 "Previous image",
                 &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
                 ui,
@@ -235,7 +235,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             }
             // TODO: Check if wrap is off and we are at last image
             if tooltip(
-                unframed_button(CARET_RIGHT, ui),
+                unframed_button(CHEVRON_RIGHT, ui),
                 "Next image",
                 &lookup(&state.persistent_settings.shortcuts, &NextImage),
                 ui,
@@ -397,7 +397,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                 ui.close();
             }
 
-            if ui.styled_button(format!("{GEAR} Preferences")).clicked() {
+            if ui.styled_button(format!("{COG} Preferences")).clicked() {
                 state.settings_enabled = !state.settings_enabled;
                 ui.close();
             }

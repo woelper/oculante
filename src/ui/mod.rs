@@ -1,4 +1,4 @@
-const ICON_SIZE: f32 = 24. * 0.8;
+const ICON_SIZE: f32 = 24.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 pub const PANEL_WIDTH: f32 = 260.0;
@@ -298,7 +298,7 @@ impl EguiExt for Ui {
         let text: WidgetText = text.into();
         let text = text.text();
 
-        let icon_size = 12.;
+        let icon_size = 24.;
 
         let (icon, description) = parse_icon_plus_text(text);
         let icon = icon.unwrap_or_default();
@@ -783,7 +783,7 @@ pub fn blank_icon(
 fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
-            CARET_RIGHT.to_string(),
+            CHEVRON_RIGHT.to_string(),
             FontId::proportional(12.),
             ui.style().visuals.selection.bg_fill,
             10.,
@@ -896,7 +896,7 @@ impl Modal {
             ui.vertical_centered_justified(|ui| {
                 ui.add_space(10.);
                 ui.label(
-                    RichText::new(WARNING_CIRCLE)
+                    RichText::new(CIRCLE_WARNING)
                         .size(100.)
                         .color(ui.style().visuals.warn_fg_color),
                 );

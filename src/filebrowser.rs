@@ -211,7 +211,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
     ui.horizontal_wrapped(|ui| {
         ui.add_space(item_spacing);
 
-        let search_icon = if state.search_active { BOLDX } else { SEARCH };
+        let search_icon = if state.search_active { BOLD_X } else { SEARCH };
         let mut lock_search_focus = false;
 
         if ui
@@ -357,7 +357,10 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     .map(|f| f.to_string_lossy().to_string())
                     .unwrap_or("Computer".into());
                 if ui
-                    .styled_selectable_label(current_dir == c, format!("{label}  {CARET_RIGHT}"))
+                    .styled_selectable_label(
+                        current_dir == c,
+                        format!("{label}     {CHEVRON_RIGHT}"),
+                    )
                     .clicked()
                 {
                     *path = PathBuf::from(c);
@@ -394,28 +397,28 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
                     if let Some(d) = dirs::desktop_dir()
                         && ui
-                            .styled_button(format!("{FOLDERDESKTOP} Desktop"))
+                            .styled_button(format!("{FOLDER_DESKTOP} Desktop"))
                             .clicked()
                     {
                         *path = d;
                     }
                     if let Some(d) = dirs::document_dir()
                         && ui
-                            .styled_button(format!("{FOLDERDOCUMENT} Documents"))
+                            .styled_button(format!("{FOLDER_DOCUMENTS} Documents"))
                             .clicked()
                     {
                         *path = d;
                     }
                     if let Some(d) = dirs::download_dir()
                         && ui
-                            .styled_button(format!("{FOLDERDOWNLOAD} Downloads"))
+                            .styled_button(format!("{FOLDER_DOWNLOADS} Downloads"))
                             .clicked()
                     {
                         *path = d;
                     }
                     if let Some(d) = dirs::picture_dir()
                         && ui
-                            .styled_button(format!("{FOLDERIMAGE} Pictures"))
+                            .styled_button(format!("{FOLDER_PICTURES} Pictures"))
                             .clicked()
                     {
                         *path = d;
@@ -424,7 +427,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     for folder in &settings.folder_bookmarks.clone() {
                         crate::ui::want_system_fonts_for(&folder.to_string_lossy());
                         let res = ui.styled_button(format!(
-                            "{FOLDERBOOKMARK} {}",
+                            "{FOLDER_BOOKMARK} {}",
                             folder
                                 .file_name()
                                 .map(|x| x.to_string_lossy().to_string())
