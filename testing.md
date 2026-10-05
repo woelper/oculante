@@ -82,6 +82,9 @@ Found by going through the open issues and looking at the code. None of these ha
 - [x] switching channels (rgba) is slow
 
 # Cleanup
+- [x] Dependencies updated to the newest versions, unused ones removed. `wgpu` was only used for the names of its texture formats and is replaced by `wgpu-types`. Cargo.lock went from 857 to 794 packages. Checked: all 67 test files load the same as before, all edit operations give the same pixels except blur (rounding) and perspective crop (edge pixels, new imageproc).
+- [ ] Not updated: `avif-decode` 3 needs Rust 1.98, `glow` 0.18 has to wait for an egui that uses it.
+- [ ] LUT on an image with transparency: keeps the alpha now, it made the image opaque before (new lutgen works on RGBA). Check that this is what we want.
 - [x] Update to latest egui
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
 - [ ] Functionality which can be better isolated / separated should be compined in modules. Some of it makes sense, for example buttons that can be clicked and have a shortcut, other things are scattered all over the place.
@@ -95,9 +98,9 @@ Found by going through the open issues and looking at the code. None of these ha
 
 # Things to improve not related to removing Notan
 - [ ] I am unhappy with the HEIC / HEIF situation. It is widely used by now and the build has been hard as we have not been using a native library and linking to libheif was hard on all platforms. Investigate if this has changed and if there is more robust heif/heic support that we can use, native rust if possible
-  - There is a pure Rust decoder now, `heic-rs`. It is in as the feature `heif_native` (not a default feature yet): HEIC on Linux with a plain build, nothing to install. If `heif` is enabled as well, libheif is used.
-  - Until tbraun96/heic-rs#7 and #8 are released, Cargo.toml patches in a fork with both. Without them photos from phones come out with wrong contrast and colour. A crate published to crates.io does not get the patch.
-  - Open: make it a default feature once upstream has released the fixes, then drop libheif from the Mac bundles (most of `scripts/build_mac.sh` and `scripts/build_mac_intel.sh` exists for it). Not decoded by heic-rs: 4:2:2 and 4:4:4 (Canon HIF, #710), image sequences (#777).
+  - There is a pure Rust decoder now, `heic-rs`. It is the default feature `heif_native`: a plain build opens HEIC, on Linux too, with nothing to install. If `heif` is enabled as well, libheif is used (the Mac and Windows release builds).
+  - **Before the next release:** Cargo.toml patches in a fork of heic-rs with tbraun96/heic-rs#7 and #8. Without them photos from phones come out with wrong contrast and colour. A crate published to crates.io does not get the patch, and the git source in Cargo.lock is a problem for packagers who take all crates from crates.io (pkgsrc). Either upstream releases both fixes, or the fork is published under its own name.
+  - Open: drop libheif from the Mac bundles (most of `scripts/build_mac.sh` and `scripts/build_mac_intel.sh` exists for it) and the step that builds libheif in the Linux release job, it is not used there. Not decoded by heic-rs: 4:2:2 and 4:4:4 (Canon HIF, #710), image sequences (#777).
 - [ ] Painting should not be a mode but rather a normal operator
 - [x] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
 - [ ] Update dependencies: egui and helper libraries
