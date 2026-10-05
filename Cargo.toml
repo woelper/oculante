@@ -56,6 +56,8 @@ tiny-skia = "0.12"
 libheif-rs = { version = "2", default-features = false, features = [
     "v1_19",
 ], optional = true }
+# HEIC and HEIF in pure Rust, nothing to install or link
+heic-rs = { version = "0.1.1", optional = true }
 ktx2 = "0.3.0"
 basis-universal = "0.3"
 dds-rs = "0.7"
@@ -123,6 +125,8 @@ image-extras = "0.1.1"
 [features]
 default = ["turbo", "avif_native", "j2k", "jxlcms"]
 heif = ["libheif-rs"]
+# HEIC and HEIF without libheif. If `heif` is enabled as well, libheif is used.
+heif_native = ["dep:heic-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
@@ -199,3 +203,10 @@ incremental = true
 [[bench]]
 name = "my_benchmark"
 harness = false
+
+[patch.crates-io]
+# heic-rs 0.1.1 decodes photos from phones with the wrong contrast and colour:
+# it ignores what the video stream says about range and matrix when the file
+# has no colr box. Fixed in tbraun96/heic-rs#7 and #8. Remove this once a
+# release contains both.
+heic-rs = { git = "https://github.com/woelper/heic-rs", branch = "oculante" }

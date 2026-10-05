@@ -202,6 +202,13 @@ pub fn open_image(
             _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
+        // Without libheif, HEIC is decoded in pure Rust
+        #[cfg(all(feature = "heif_native", not(feature = "heif")))]
+        "heif" | "heic" => {
+            let i = load_heif_native(&img_location)?;
+            _ = sender.send(Frame::new_still(i));
+            return Ok(receiver);
+        }
         #[cfg(feature = "avif_native")]
         #[cfg(not(feature = "dav1d"))]
         "avif" => {
@@ -901,6 +908,48 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     debug!("Done decoding JXL");
 
     Ok(())
+}
+
+/// Decode a HEIC or HEIF image with `heic-rs`, in the layout the file has:
+/// with alpha if there is any, and 16 bit if it has more than 8.
+///
+/// Rotation and mirroring stored in the file are applied by the decoder.
+#[cfg(feature = "heif_native")]
+pub fn load_heif_native(path: &Path) -> Result<DynamicImage> {
+    use heic_rs::PixelLayout;
+
+    let bytes = std::fs::read(path)?;
+    let info = heic_rs::probe(&bytes).context("Can't read HEIF file")?;
+    let layout = match (info.bit_depth > 8, info.has_alpha) {
+        (false, false) => PixelLayout::Rgb8,
+        (false, true) => PixelLayout::Rgba8,
+        (true, false) => PixelLayout::Rgb16,
+        (true, true) => PixelLayout::Rgba16,
+    };
+    let options = heic_rs::DecodeOptions {
+        layout,
+        ..Default::default()
+    };
+    let img = heic_rs::decode(&bytes, &options).context("Can't decode HEIF image")?;
+    let (w, h) = (img.width, img.height);
+    // 16 bit samples come as pairs of bytes in the byte order of the machine
+    let wide = || -> Vec<u16> {
+        img.data
+            .chunks_exact(2)
+            .map(|b| u16::from_ne_bytes([b[0], b[1]]))
+            .collect()
+    };
+    let decoded = match layout {
+        PixelLayout::Rgb8 => image::RgbImage::from_raw(w, h, img.data).map(DynamicImage::ImageRgb8),
+        PixelLayout::Rgba8 => {
+            image::RgbaImage::from_raw(w, h, img.data).map(DynamicImage::ImageRgba8)
+        }
+        PixelLayout::Rgb16 => {
+            image::ImageBuffer::from_raw(w, h, wide()).map(DynamicImage::ImageRgb16)
+        }
+        _ => image::ImageBuffer::from_raw(w, h, wide()).map(DynamicImage::ImageRgba16),
+    };
+    decoded.context("HEIF decoder returned a buffer of the wrong size")
 }
 
 pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {

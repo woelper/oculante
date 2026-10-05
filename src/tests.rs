@@ -157,3 +157,31 @@ fn ci_load_jp2() {
     let frame = load_first_frame("res/tests/test.jp2");
     assert_valid_image(&frame);
 }
+
+/// HEIC without libheif. The mean color also checks that the decoder reads the
+/// range and the matrix from the video stream: this photo has no colr box, and
+/// a decoder that ignores the stream gets about 173, 139, 107.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_load_heic_native() {
+    let frame = load_first_frame("res/tests/orange.heic");
+    assert_valid_image(&frame);
+    let img = frame.get_image().unwrap();
+    // The file stores 4000x3000 and a rotation, which the decoder applies
+    assert_eq!((img.width(), img.height()), (3000, 4000));
+    let rgb = img.to_rgb8();
+    let pixels = (rgb.width() * rgb.height()) as f64;
+    let mut sum = [0f64; 3];
+    for p in rgb.pixels() {
+        for (total, channel) in sum.iter_mut().zip(p.0) {
+            *total += channel as f64;
+        }
+    }
+    // What libheif gets for this file
+    for (mean, expected) in sum.iter().map(|s| s / pixels).zip([162.0, 134.0, 104.0]) {
+        assert!(
+            (mean - expected).abs() < 2.0,
+            "mean color {mean:.1} is not near {expected}"
+        );
+    }
+}

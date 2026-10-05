@@ -26,5 +26,7 @@ jobs:
       - name: Install linux deps
         run: sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev
 
+      # heif_native is not a default feature, building and testing it here
+      # keeps it from breaking unnoticed
       - name: cargo test
-        run: cargo test ci_
+        run: cargo test --features heif_native ci_

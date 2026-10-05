@@ -82,9 +82,9 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "xpm",
     #[cfg(feature = "j2k")]
     "jp2",
-    #[cfg(feature = "heif")]
+    #[cfg(any(feature = "heif", feature = "heif_native"))]
     "heif",
-    #[cfg(feature = "heif")]
+    #[cfg(any(feature = "heif", feature = "heif_native"))]
     "heic",
     #[cfg(feature = "heif")]
     "heifs",
@@ -94,7 +94,7 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "avci",
     #[cfg(feature = "heif")]
     "avcs",
-    #[cfg(feature = "heif")]
+    #[cfg(any(feature = "heif", feature = "heif_native"))]
     "hif",
 ];
 
