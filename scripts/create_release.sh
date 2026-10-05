@@ -14,12 +14,12 @@ cd $(git rev-parse --show-toplevel)
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
-cargo check --no-default-features --features notan/shaderc
+cargo check --no-default-features
 cargo test shortcuts
 cargo bump patch
 cargo build
 cargo test flathub
-VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
+VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2 | cut -d@ -f2)
 git add README.md
 git add Cargo.toml
 git add Cargo.lock
@@ -35,7 +35,9 @@ git commit -m "Release version $VERSION"
 git tag $VERSION
 git push --tags
 git push
-# this needs no-verify as we modify the plist during the build, and cargo does not accept that.
-cargo publish --no-verify
+echo "Tag $VERSION is pushed. The release workflow builds it and publishes it as a pre-release."
+echo "Test those builds. Then mark the release as latest on GitHub and publish to crates.io,"
+echo "which can not be undone:"
+echo "    cargo publish"
 
 cd $current_dir
