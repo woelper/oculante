@@ -8,6 +8,10 @@ brew install libheif ffmpeg nasm --quiet
 rustup target add aarch64-apple-darwin
 # rustup target add x86_64-apple-darwin
 
+# Room in the header of the binary for the library paths that are rewritten
+# below. Without it install_name_tool fails once the new paths no longer fit.
+export RUSTFLAGS="-C link-arg=-Wl,-headerpad_max_install_names"
+
 cargo bundle --release --features "notan/shaderc heif"
 # cargo build --release --target aarch64-apple-darwin --features "notan/shaderc heif"
 # cargo build --release --target x86_64-apple-darwin --features notan/shaderc

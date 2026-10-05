@@ -16,7 +16,17 @@ on:
 
 jobs:
   sign:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: ./build_mac.sh
+            name: silicon
+          - os: macos-15-intel
+            build: ./build_mac_intel.sh
+            name: intel
+    runs-on: ${{ matrix.os }}
     # as in the release workflow
     env:
       MACOS_DEPLOYMENT_TARGET: 11
@@ -34,8 +44,8 @@ jobs:
       - name: Install shaderc
         run: brew install shaderc
 
-      - name: Build Mac Silicon Bundle
-        run: ./build_mac.sh
+      - name: Build the bundle
+        run: ${{ matrix.build }}
 
       - uses: ./.github/actions/macos-sign
         with:
@@ -57,5 +67,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: oculante-signed-app
+          name: oculante-signed-app-${{ matrix.name }}
           path: dist/oculante-signed.app.zip
