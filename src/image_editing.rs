@@ -22,12 +22,12 @@ use notan::egui::{
     StrokeKind, Vec2,
 };
 use notan::egui::{Response, Ui};
+use num_integer::gcd;
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
 use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
-use num_integer::gcd;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
@@ -730,7 +730,10 @@ impl ImageOperation {
                 points,
                 original_size,
             } => {
-                let id = Id::new("crop");
+                // Whether the crop was applied and which corner is dragged belongs to this
+                // operation. A crop that is added later starts fresh.
+                let id = Id::new("crop").with(item_id);
+                let dragged_point_id = Id::new("crop_point").with(item_id);
                 let points_transformed = points
                     .iter()
                     .map(|p| {
@@ -742,6 +745,14 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The crop is drawn over the whole window, like the image it belongs to.
+                // The ui's own painter would clip it to the panel. The handles and the
+                // outline go on top of the panels, so they can always be seen and grabbed.
+                let painter = ui.ctx().layer_painter(egui::LayerId::background());
+                let handle_painter = ui.ctx().layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    Id::new("crop_handles").with(item_id),
+                ));
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
@@ -771,11 +782,12 @@ impl ImageOperation {
                         if d < maxdist {
                             if ui.input(|i| i.pointer.any_down()) {
                                 *block_panning = true;
-                                ui.ctx().data_mut(|w| w.insert_temp("pt".into(), i));
+                                ui.ctx().data_mut(|w| w.insert_temp(dragged_point_id, i));
                             }
                             if ui.input(|r| r.pointer.any_released()) {
                                 *block_panning = false;
-                                ui.ctx().data_mut(|w| w.remove_temp::<usize>("pt".into()));
+                                ui.ctx()
+                                    .data_mut(|w| w.remove_temp::<usize>(dragged_point_id));
                             }
                         }
 
@@ -792,7 +804,7 @@ impl ImageOperation {
                         //     format!("X"),
                         // );
 
-                        ui.painter().rect_filled(
+                        handle_painter.rect_filled(
                             Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
                             2.,
                             col,
@@ -808,7 +820,7 @@ impl ImageOperation {
                     ];
 
                     // make a black background covering everything
-                    ui.painter().rect_filled(
+                    painter.rect_filled(
                         Rect::EVERYTHING,
                         0.,
                         Color32::from_rgba_premultiplied(0, 0, 0, 70),
@@ -819,9 +831,9 @@ impl ImageOperation {
                         Color32::from_rgba_unmultiplied(255, 255, 255, 10),
                         Stroke::new(1., Color32::GOLD),
                     );
-                    ui.painter().add(shape);
+                    handle_painter.add(shape);
 
-                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>("pt".into())) {
+                    if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>(dragged_point_id)) {
                         points[pt].0 = cursor_relative.x as u32;
                         points[pt].1 = cursor_relative.y as u32;
                     }
@@ -841,6 +853,19 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The shapes are drawn over the image, not into the panel this ui belongs
+                // to. Use a painter for the area the panels leave free, the ui's own
+                // painter would clip them away.
+                let mut image_area = ui.ctx().available_rect();
+                // the panel this ui is in still counts as free while it is being built
+                let panel = ui.clip_rect();
+                if panel.left() <= image_area.left() {
+                    image_area.min.x = image_area.min.x.max(panel.right());
+                }
+                let painter = ui
+                    .ctx()
+                    .layer_painter(egui::LayerId::background())
+                    .with_clip_rect(image_area);
                 // enable this if this is used to draw
                 // let id = Id::new("shapes");
 
@@ -871,7 +896,7 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
                             for p in points_transformed.chunks(2) {
-                                ui.painter().line_segment(
+                                painter.line_segment(
                                     [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
@@ -885,6 +910,10 @@ impl ImageOperation {
                             color,
                             width,
                         } => {
+                            // nothing was measured yet
+                            if points[0] == points[1] {
+                                continue;
+                            }
                             let points_transformed = points
                                 .iter()
                                 .map(|p| {
@@ -905,22 +934,20 @@ impl ImageOperation {
                                 max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             };
 
-                            ui.painter().rect_stroke(
+                            painter.rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32, Color32::BLACK),
+                                Stroke::new(*width as f32 / 2., Color32::WHITE),
                                 StrokeKind::Inside,
                             );
 
-                            ui.painter().rect_filled(
+                            painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::BLACK,
-                                // Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                // StrokeKind::Inside,
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
                             );
 
-                            ui.painter().text(
+                            painter.text(
                                 rect.expand(14.).center_bottom(),
                                 Align2::CENTER_CENTER,
                                 format!(
@@ -932,12 +959,12 @@ impl ImageOperation {
                                 Color32::from_rgb(color[0], color[1], color[2]),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.left_center(), rect.right_center()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
 
-                            ui.painter().line_segment(
+                            painter.line_segment(
                                 [rect.center_top(), rect.center_bottom()],
                                 Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
                             );
@@ -1115,26 +1142,33 @@ impl ImageOperation {
 
                 ui.vertical(|ui| {
                     // This handles the initial state when the filter is first added.
-                    if *aspect && ui.ctx().data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none()) {
+                    if *aspect
+                        && ui
+                            .ctx()
+                            .data(|d| d.get_temp::<f64>(aspect_ratio_id).is_none())
+                    {
                         let ratio_to_store = dimensions.0 as f64 / dimensions.1 as f64;
-                        ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                        ui.ctx()
+                            .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                     }
 
                     // Get the aspect ratio. Use the one stored in egui if it exists, otherwise calculate it.
-                    let aspect_ratio = ui.ctx().data(|d| d.get_temp(aspect_ratio_id)).unwrap_or_else(|| {
-                        if dimensions.1 > 0 {
-                            dimensions.0 as f64 / dimensions.1 as f64
-                        } else {
-                            geo.dimensions.0 as f64 / geo.dimensions.1 as f64
-                        }
-                    });
+                    let aspect_ratio = ui
+                        .ctx()
+                        .data(|d| d.get_temp(aspect_ratio_id))
+                        .unwrap_or_else(|| {
+                            if dimensions.1 > 0 {
+                                dimensions.0 as f64 / dimensions.1 as f64
+                            } else {
+                                geo.dimensions.0 as f64 / geo.dimensions.1 as f64
+                            }
+                        });
 
                     let g = gcd(dimensions.1, dimensions.0);
                     let w = dimensions.0 / g;
                     let h = dimensions.1 / g;
 
                     ui.label(format!("Aspect ratio: {}:{} ({:.5})", w, h, aspect_ratio));
-
 
                     ui.horizontal(|ui| {
                         let x_response = ui.add(
@@ -1173,7 +1207,8 @@ impl ImageOperation {
                                 } else {
                                     geo.dimensions.0 as f64 / geo.dimensions.1 as f64
                                 };
-                                ui.ctx().data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
+                                ui.ctx()
+                                    .data_mut(|d| d.insert_temp(aspect_ratio_id, ratio_to_store));
                             }
                             r.mark_changed();
                         }
@@ -1198,22 +1233,21 @@ impl ImageOperation {
                         });
 
                     ui.vertical_centered_justified(|ui| {
+                        if ui.button("Reset").clicked() {
+                            // Reset dimensions to original
+                            *dimensions = geo.dimensions;
 
-                    if ui.button("Reset").clicked() {
-                        // Reset dimensions to original
-                        *dimensions = geo.dimensions;
+                            // Reset aspect lock to default (true)
+                            *aspect = true;
 
-                        // Reset aspect lock to default (true)
-                        *aspect = true;
+                            // Remove the stored aspect ratio from egui's memory.
+                            // This will cause it to be recalculated from the original dimensions
+                            // on the next frame, effectively resetting it.
+                            ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
 
-                        // Remove the stored aspect ratio from egui's memory.
-                        // This will cause it to be recalculated from the original dimensions
-                        // on the next frame, effectively resetting it.
-                        ui.ctx().data_mut(|d| d.remove_temp::<f64>(aspect_ratio_id));
-
-                        // Mark the UI as changed
-                        r.mark_changed();
-                    }
+                            // Mark the UI as changed
+                            r.mark_changed();
+                        }
                     });
                 });
                 r

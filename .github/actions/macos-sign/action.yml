@@ -1,0 +1,182 @@
+name: Sign and notarise a macOS app
+description: >
+  Sign a .app bundle with a Developer ID certificate, notarise it with Apple
+  and staple the ticket, so that a downloaded copy opens on a double-click
+  rather than being turned away by Gatekeeper.
+
+  Self-contained on purpose: copy this directory into another repository and
+  it works there, given the same secrets. It does nothing at all when the
+  certificate secret is empty, so forks and pull requests still build.
+
+inputs:
+  app-path:
+    description: The .app bundle to sign.
+    required: true
+  certificate-p12:
+    description: >
+      Developer ID Application certificate and its private key, as a base64
+      .p12. Empty skips signing entirely — see above.
+    required: true
+  certificate-password:
+    description: The password the .p12 was exported with.
+    required: true
+  entitlements:
+    description: >
+      Entitlements plist for the outer bundle. The hardened runtime, which
+      notarisation requires, denies capabilities an app does not ask for — a
+      recorder signed without com.apple.security.device.audio-input
+      notarises cleanly and then cannot hear anything. Nested code is signed
+      without these; entitlements belong to the app.
+    default: ""
+  identity:
+    description: >
+      Which identity to sign with, e.g. "Developer ID Application: Someone
+      (TEAMID)". Left empty, the one Developer ID in the keychain is used,
+      which is what a repository with one certificate wants.
+    default: ""
+  notarize:
+    description: Submit to Apple and staple the ticket. "false" signs only.
+    default: "true"
+  team-id:
+    description: The ten-character team identifier, for notarisation.
+    default: ""
+  apple-id:
+    description: Apple ID for notarisation, if not using an API key.
+    default: ""
+  app-password:
+    description: >
+      App-specific password for that Apple ID — generated at appleid.apple.com,
+      not the account password.
+    default: ""
+  api-key-p8:
+    description: >
+      App Store Connect API key as base64 .p8. Preferred over an Apple ID: it
+      is scoped to this one job and revocable on its own.
+    default: ""
+  api-key-id:
+    description: The API key's identifier.
+    default: ""
+  api-issuer-id:
+    description: The issuer UUID the key belongs to.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Sign and notarise
+      shell: bash
+      env:
+        APP_PATH: ${{ inputs.app-path }}
+        CERT_P12: ${{ inputs.certificate-p12 }}
+        CERT_PASSWORD: ${{ inputs.certificate-password }}
+        IDENTITY: ${{ inputs.identity }}
+        ENTITLEMENTS: ${{ inputs.entitlements }}
+        NOTARIZE: ${{ inputs.notarize }}
+        TEAM_ID: ${{ inputs.team-id }}
+        APPLE_ID: ${{ inputs.apple-id }}
+        APP_PASSWORD: ${{ inputs.app-password }}
+        API_KEY_P8: ${{ inputs.api-key-p8}}
+        API_KEY_ID: ${{ inputs.api-key-id }}
+        API_ISSUER_ID: ${{ inputs.api-issuer-id }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${CERT_P12}" ]; then
+          echo "::notice::no signing certificate configured — leaving the app ad-hoc signed"
+          codesign --force --sign - "$APP_PATH" 2>/dev/null || true
+          exit 0
+        fi
+        if [ ! -d "$APP_PATH" ]; then
+          echo "::error::$APP_PATH is not a bundle"
+          exit 1
+        fi
+
+        # A keychain of its own, so nothing touches the runner's default and
+        # the whole thing disappears with the job.
+        KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+        KEYCHAIN_PASSWORD="$(uuidgen)"
+        cleanup() { security delete-keychain "$KEYCHAIN" 2>/dev/null || true; }
+        trap cleanup EXIT
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+        echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+        security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/security
+        rm -f "$RUNNER_TEMP/cert.p12"
+        # Without this, codesign blocks on a UI prompt no one can answer and
+        # the job hangs until it times out.
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+        security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+        if [ -z "$IDENTITY" ]; then
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep "Developer ID Application" | head -1 \
+            | sed -E 's/.*"(.*)"/\1/')"
+        fi
+        if [ -z "$IDENTITY" ]; then
+          echo "::error::no Developer ID Application identity in the certificate"
+          security find-identity -v -p codesigning "$KEYCHAIN" || true
+          exit 1
+        fi
+        echo "signing as: $IDENTITY"
+
+        # Inside out. --deep is deprecated and does not apply the hardened
+        # runtime to nested code, which notarisation then rejects; oculante
+        # copies libheif and friends into Contents/Frameworks, so this is not
+        # hypothetical.
+        while IFS= read -r binary; do
+          echo "  nested: ${binary#"$APP_PATH"/}"
+          codesign --force --timestamp --options runtime \
+            --keychain "$KEYCHAIN" --sign "$IDENTITY" "$binary"
+        done < <(find "$APP_PATH/Contents" \( -name "*.dylib" -o -name "*.so" -o -name "*.framework" \) -print 2>/dev/null)
+
+        ENTITLEMENT_ARGS=()
+        if [ -n "$ENTITLEMENTS" ]; then
+          if [ ! -f "$ENTITLEMENTS" ]; then
+            echo "::error::entitlements file $ENTITLEMENTS does not exist"
+            exit 1
+          fi
+          echo "entitlements: $ENTITLEMENTS"
+          ENTITLEMENT_ARGS=(--entitlements "$ENTITLEMENTS")
+        fi
+        codesign --force --timestamp --options runtime \
+          ${ENTITLEMENT_ARGS[@]+"${ENTITLEMENT_ARGS[@]}"} \
+          --keychain "$KEYCHAIN" --sign "$IDENTITY" "$APP_PATH"
+        codesign --verify --strict --verbose=2 "$APP_PATH"
+        # Printed so a missing capability is visible here rather than as a
+        # feature that does nothing on a user's machine.
+        codesign --display --entitlements - --xml "$APP_PATH" 2>/dev/null | head -20 || true
+
+        if [ "$NOTARIZE" != "true" ]; then
+          echo "::notice::signed but not notarised — first open will still warn"
+          exit 0
+        fi
+
+        # notarytool takes a zip, not a bundle. ditto keeps the metadata that
+        # plain zip drops.
+        ZIP="$RUNNER_TEMP/notarize.zip"
+        ditto -c -k --keepParent "$APP_PATH" "$ZIP"
+
+        if [ -n "$API_KEY_P8" ]; then
+          echo "$API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/key.p8"
+          xcrun notarytool submit "$ZIP" --wait --timeout 30m \
+            --key "$RUNNER_TEMP/key.p8" --key-id "$API_KEY_ID" --issuer "$API_ISSUER_ID"
+          rm -f "$RUNNER_TEMP/key.p8"
+        elif [ -n "$APPLE_ID" ]; then
+          xcrun notarytool submit "$ZIP" --wait --timeout 30m \
+            --apple-id "$APPLE_ID" --password "$APP_PASSWORD" --team-id "$TEAM_ID"
+        else
+          echo "::error::notarisation asked for, but no API key and no Apple ID"
+          exit 1
+        fi
+
+        # The ticket goes into the bundle, so it opens on a machine that
+        # cannot reach Apple.
+        xcrun stapler staple "$APP_PATH"
+        xcrun stapler validate "$APP_PATH"
+        spctl --assess --type execute --verbose=2 "$APP_PATH"
+        echo "::notice::signed, notarised and stapled"

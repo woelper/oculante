@@ -1,0 +1,71 @@
+# Exercises the signing and notarisation of the Mac app on demand, without a tag.
+#
+# Signing otherwise only runs during a release, which is the worst place to
+# find out that a certificate or an Apple credential is wrong: the version
+# number is spent by then. This builds the Mac bundle the way the release
+# does, signs it and keeps the result as an artifact to try on a real machine.
+name: macOS signing
+
+on:
+  workflow_dispatch:
+    inputs:
+      notarize:
+        description: Submit to Apple and staple (slower; leave off to test signing alone)
+        type: boolean
+        default: true
+
+jobs:
+  sign:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            build: ./build_mac.sh
+            name: silicon
+          - os: macos-15-intel
+            build: ./build_mac_intel.sh
+            name: intel
+    runs-on: ${{ matrix.os }}
+    # as in the release workflow
+    env:
+      MACOS_DEPLOYMENT_TARGET: 11
+      SHADERC_LIB_DIR: /opt/homebrew/lib
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+
+      - name: Install latest rust
+        run: rustup update
+
+      - name: Install cargo bundle
+        run: cargo install cargo-bundle
+
+      - name: Install shaderc
+        run: brew install shaderc
+
+      - name: Build the bundle
+        run: ${{ matrix.build }}
+
+      - uses: ./.github/actions/macos-sign
+        with:
+          app-path: target/release/bundle/osx/oculante.app
+          certificate-p12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          certificate-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          notarize: ${{ inputs.notarize }}
+          team-id: ${{ secrets.MACOS_TEAM_ID }}
+          api-key-p8: ${{ secrets.MACOS_API_KEY_P8 }}
+          api-key-id: ${{ secrets.MACOS_API_KEY_ID }}
+          api-issuer-id: ${{ secrets.MACOS_API_ISSUER_ID }}
+
+      # What a person downloading it would get, so the result can be opened on
+      # a real machine rather than taken on trust from a green tick.
+      - name: Package
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent target/release/bundle/osx/oculante.app dist/oculante-signed.app.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oculante-signed-app-${{ matrix.name }}
+          path: dist/oculante-signed.app.zip

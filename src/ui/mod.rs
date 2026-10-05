@@ -20,6 +20,7 @@ pub use theme::*;
 mod thumbnail_rendering;
 pub use thumbnail_rendering::*;
 
+use crate::egui_modal;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
 use crate::icons::*;
@@ -50,7 +51,7 @@ use crate::{
     },
     paint::PaintStroke,
     settings::{set_system_theme, ColorTheme, PersistentSettings, VolatileSettings},
-    shortcuts::{key_pressed, keypresses_as_string, lookup},
+    shortcuts::{key_name, key_pressed, keypresses_as_string, lookup},
     thumbnails::{self, Thumbnails, THUMB_CAPTION_HEIGHT, THUMB_SIZE},
 };
 
@@ -385,37 +386,46 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
+            let height = 7.4;
+            let rounding = 6;
+
             ui.style_mut().spacing.interact_size.y = 18.;
+            ui.style_mut().spacing.slider_rail_height = height;
 
             let color = ui.style().visuals.selection.bg_fill;
             let style = ui.style_mut();
 
-            style.visuals.widgets.inactive.fg_stroke.width = 7.0;
+            // Use fg_stroke for the rail appearance. While hovered or dragged the handle
+            // is larger than the stroke is wide, so it is filled in the same color then.
+            // The inactive fill stays as it is, the empty rail is drawn with it.
+            style.visuals.widgets.inactive.fg_stroke.width = height;
             style.visuals.widgets.inactive.fg_stroke.color = color;
-            // style.visuals.widgets.inactive.rounding =
-            //     style.visuals.widgets.inactive.rounding.at_least(18.);
+            style.visuals.widgets.inactive.corner_radius = style
+                .visuals
+                .widgets
+                .inactive
+                .corner_radius
+                .at_least(rounding);
 
-            style.visuals.widgets.inactive.corner_radius =
-                style.visuals.widgets.inactive.corner_radius.at_least(18);
-            style.visuals.widgets.inactive.expansion = -4.0;
-
-            style.visuals.widgets.hovered.fg_stroke.width = 9.0;
+            style.visuals.widgets.hovered.fg_stroke.width = height;
             style.visuals.widgets.hovered.fg_stroke.color = color;
-            // style.visuals.widgets.hovered.rounding =
-            //     style.visuals.widgets.hovered.rounding.at_least(18.);
-            style.visuals.widgets.hovered.corner_radius =
-                style.visuals.widgets.hovered.corner_radius.at_least(18);
+            style.visuals.widgets.hovered.bg_fill = color;
+            style.visuals.widgets.hovered.corner_radius = style
+                .visuals
+                .widgets
+                .hovered
+                .corner_radius
+                .at_least(rounding);
 
-            style.visuals.widgets.hovered.expansion = -4.0;
-
-            style.visuals.widgets.active.fg_stroke.width = 9.0;
+            style.visuals.widgets.active.fg_stroke.width = height;
             style.visuals.widgets.active.fg_stroke.color = color;
-            // style.visuals.widgets.active.rounding =
-            //     style.visuals.widgets.active.rounding.at_least(18.);
-            style.visuals.widgets.active.corner_radius =
-                style.visuals.widgets.active.corner_radius.at_least(18);
-
-            style.visuals.widgets.active.expansion = -4.0;
+            style.visuals.widgets.active.bg_fill = color;
+            style.visuals.widgets.active.corner_radius = style
+                .visuals
+                .widgets
+                .active
+                .corner_radius
+                .at_least(rounding);
 
             ui.horizontal(|ui| {
                 let r = ui.add(
@@ -637,7 +647,13 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         });
 
+        ui.label("Drag over the image with the right mouse button.");
+
+        // only the measurement itself, the other operations have their place in the edit panel
         for op in &mut state.edit_state.image_op_stack {
+            if !matches!(op.operation, ImageOperation::Measure { .. }) {
+                continue;
+            }
             op.operation.ui(
                 ui,
                 &state.image_geometry,
@@ -765,24 +781,25 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
             10.,
         )
     });
+    // where the glyph itself sits inside its line
+    let glyph_center = galley.mesh_bounds.center();
+    let angle = egui::lerp(0.0..=f32::consts::PI / 2., openness);
     let mut text_shape = TextShape::new(response.rect.left_top(), galley, Color32::RED);
-    text_shape.angle = egui::lerp(0.0..=f32::consts::PI / 2., openness);
+    text_shape.angle = angle;
     let mut text = egui::Shape::Text(text_shape);
     let r = text.visual_bounding_rect();
     let x_offset = 5.0;
-    let y_offset = 4.0;
 
+    // The text is rotated around its top left corner. Place that corner so the
+    // glyph ends up in the vertical middle of the row, however far it is rotated.
+    let rotated_center_y = glyph_center.x * angle.sin() + glyph_center.y * angle.cos();
     text.translate(vec2(
         egui::lerp(
             -ui.style().spacing.icon_spacing + x_offset
                 ..=r.size().x + ui.style().spacing.icon_spacing - 3.0 + x_offset,
             openness,
         ),
-        egui::lerp(
-            -ui.style().spacing.icon_spacing + y_offset
-                ..=-ui.style().spacing.icon_spacing + y_offset + 1.,
-            openness,
-        ),
+        response.rect.center().y - response.rect.top() - rotated_center_y,
     ));
 
     ui.painter().add(text);

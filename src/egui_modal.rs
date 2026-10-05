@@ -1,8 +1,37 @@
+//! Modal dialogs for egui.
+//!
+//! This is egui-modal 0.6.0 by n00kii (<https://github.com/n00kii/egui-modal>),
+//! adapted to the egui version we use. The release on crates.io needs an
+//! older egui, so it lives here instead of being a dependency.
+//!
+//! MIT License
+//!
+//! Copyright (c) 2022 n00kii
+//!
+//! Permission is hereby granted, free of charge, to any person obtaining a copy
+//! of this software and associated documentation files (the "Software"), to deal
+//! in the Software without restriction, including without limitation the rights
+//! to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//! copies of the Software, and to permit persons to whom the Software is
+//! furnished to do so, subject to the following conditions:
+//!
+//! The above copyright notice and this permission notice shall be included in all
+//! copies or substantial portions of the Software.
+//!
+//! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//! IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//! FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//! AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//! SOFTWARE.
+
 use egui::{
     emath::{Align, Align2},
-    epaint::{Color32, Pos2, Rounding},
+    epaint::{Color32, CornerRadius, Pos2},
     Area, Button, Context, Id, Layout, Response, RichText, Sense, Ui, WidgetText, Window,
 };
+use notan::egui;
 
 const ERROR_ICON_COLOR: Color32 = Color32::from_rgb(200, 90, 90);
 const INFO_ICON_COLOR: Color32 = Color32::from_rgb(150, 200, 210);
@@ -191,7 +220,7 @@ impl Default for ModalStyle {
 }
 /// A [`Modal`] is created using [`Modal::new()`]. Make sure to use a `let` binding when
 /// using [`Modal::new()`] to ensure you can call things like [`Modal::open()`] later on.
-/// ```
+/// ```ignore
 /// let modal = Modal::new(ctx, "my_modal");
 /// modal.show(|ui| {
 ///     ui.label("Hello world!")
@@ -202,7 +231,7 @@ impl Default for ModalStyle {
 /// ```
 /// Helper functions are also available to use that help apply margins based on the modal's
 /// [`ModalStyle`]. They are not necessary to use, but may help reduce boilerplate.
-/// ```
+/// ```ignore
 /// let other_modal = Modal::new(ctx, "another_modal");
 /// other_modal.show(|ui| {
 ///     other_modal.frame(ui, |ui| {
@@ -225,7 +254,7 @@ pub struct Modal {
 }
 
 fn ui_with_margin<R>(ui: &mut Ui, margin: f32, add_contents: impl FnOnce(&mut Ui) -> R) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .inner_margin(margin)
         .show(ui, |ui| add_contents(ui));
 }
@@ -300,7 +329,7 @@ impl Modal {
     }
 
     /// Helper function for styling the title of the modal.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.title(ui, "my title");
@@ -315,7 +344,7 @@ impl Modal {
     }
 
     /// Helper function for styling the icon of the modal.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.frame(ui, |ui| {
@@ -340,7 +369,7 @@ impl Modal {
     }
 
     /// Helper function for styling the container the of body and icon.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.title(ui, "my title");
@@ -375,7 +404,7 @@ impl Modal {
     }
 
     /// Helper function that should be used when using a body and icon together.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.frame(ui, |ui| {
@@ -391,7 +420,7 @@ impl Modal {
     }
 
     /// Helper function for styling the body of the modal.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.frame(ui, |ui| {
@@ -409,7 +438,7 @@ impl Modal {
     }
 
     /// Helper function for styling the button container of the modal.
-    /// ```
+    /// ```ignore
     /// let modal = Modal::new(ctx, "modal");
     /// modal.show(|ui| {
     ///     modal.buttons(ui, |ui| {
@@ -489,8 +518,11 @@ impl Modal {
                             self.close();
                         }
                     }
-                    ui.painter()
-                        .rect_filled(screen_rect, Rounding::ZERO, self.style.overlay_color);
+                    ui.painter().rect_filled(
+                        screen_rect,
+                        CornerRadius::ZERO,
+                        self.style.overlay_color,
+                    );
                 });
 
             ctx_clone.move_to_top(area_resp.response.layer_id);

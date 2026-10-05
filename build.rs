@@ -75,51 +75,60 @@ fn setup_heif() {
 
 fn main() {
     println!("Build script");
-    // #[cfg(windows)]
-    match std::process::Command::new("convert")
-        .args(vec![
-            "res/icons/icon.png",
-            "-compress",
-            "none",
-            "-define",
-            "icon:auto-resize=16,32,48,64,128,256",
-            "icon.ico",
-        ])
-        .spawn()
-    {
-        Ok(_b) => println!("Converted icon"),
-        Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
+
+    // The icon, the plist, the PKGBUILD and the README are kept up to date from
+    // here, but only in a checkout of the repository. A packaged crate is built
+    // as it is: cargo refuses to publish a crate whose build script changes its
+    // sources, and `cargo install` should not write into them either.
+    let in_repository = Path::new(".git").exists();
+
+    if in_repository {
+        // #[cfg(windows)]
+        match std::process::Command::new("convert")
+            .args(vec![
+                "res/icons/icon.png",
+                "-compress",
+                "none",
+                "-define",
+                "icon:auto-resize=16,32,48,64,128,256",
+                "icon.ico",
+            ])
+            .spawn()
+        {
+            Ok(_b) => println!("Converted icon"),
+            Err(e) => eprintln!("Error converting icon {:?}. Is imagemagick installed?", e),
+        }
+
+        // insert version into plist
+        let mut plist: String = "".into();
+        File::open("res/info.plist")
+            .unwrap()
+            .read_to_string(&mut plist)
+            .unwrap();
+        File::create("Info.plist")
+            .unwrap()
+            .write_all(
+                plist
+                    .replace("VERSION", env!("CARGO_PKG_VERSION"))
+                    .as_bytes(),
+            )
+            .unwrap();
+
+        // insert version into AUR PKGBUILD
+        let mut pkgbuild = String::new();
+        File::open("res/pkgbuild")
+            .unwrap()
+            .read_to_string(&mut pkgbuild)
+            .unwrap();
+        File::create("PKGBUILD")
+            .unwrap()
+            .write_all(
+                pkgbuild
+                    .replace("$$VERSION$$", env!("CARGO_PKG_VERSION"))
+                    .as_bytes(),
+            )
+            .unwrap();
     }
-
-    // insert version into plist
-    let mut plist: String = "".into();
-    File::open("res/info.plist")
-        .unwrap()
-        .read_to_string(&mut plist)
-        .unwrap();
-    File::create("Info.plist")
-        .unwrap()
-        .write_all(
-            plist
-                .replace("VERSION", env!("CARGO_PKG_VERSION"))
-                .as_bytes(),
-        )
-        .unwrap();
-
-    // insert version into AUR PKGBUILD
-    let mut pkgbuild = String::new();
-    File::open("res/pkgbuild")
-        .unwrap()
-        .read_to_string(&mut pkgbuild)
-        .unwrap();
-    File::create("PKGBUILD")
-        .unwrap()
-        .write_all(
-            pkgbuild
-                .replace("$$VERSION$$", env!("CARGO_PKG_VERSION"))
-                .as_bytes(),
-        )
-        .unwrap();
 
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
@@ -128,7 +137,7 @@ fn main() {
     }
 
     let shortcut_file = "shortcuts.txt";
-    if Path::new(shortcut_file).is_file() {
+    if in_repository && Path::new(shortcut_file).is_file() {
         let mut readme: String = "".into();
 
         File::open("README.md")

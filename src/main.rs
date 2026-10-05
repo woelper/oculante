@@ -208,68 +208,17 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
 
     debug!("matches {:?}", matches);
 
-    let paths_to_open = piped_paths(&matches)
-        .map(|iter| iter.collect::<Vec<_>>())
+    let paths_to_open = matches
+        .remove_many::<String>("INPUT")
         .unwrap_or_default()
-        .into_iter()
-        .chain(
-            matches
-                .remove_many::<String>("INPUT")
-                .unwrap_or_default()
-                .map(PathBuf::from),
-        )
+        .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    debug!("Image is: {:?}", paths_to_open);
+    // File names can also be piped in. They are read in the background, so the
+    // start is never held up by a pipe that stays open without delivering anything.
+    state.piped_paths = piped_paths(&matches, paths_to_open.clone());
 
-    if paths_to_open.len() == 1 {
-        let location = paths_to_open
-            .into_iter()
-            .next()
-            .expect("It should be tested already that exactly one argument was passed.");
-        if location.is_dir() {
-            // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
-                state.is_loaded = false;
-                state.player.load(&first_img_location);
-                state.current_path = Some(first_img_location);
-            }
-        } else {
-            state.is_loaded = false;
-            state.player.load(&location);
-            state.current_path = Some(location);
-        };
-    } else if paths_to_open.len() > 1 {
-        let location = paths_to_open
-            .first()
-            .expect("It should be verified already that exactly one argument was passed.");
-        if location.is_dir() {
-            // Folder - Pick first image from the folder...
-            if let Ok(first_img_location) = find_first_image_in_directory(location) {
-                state.is_loaded = false;
-                state.current_path = Some(first_img_location.clone());
-                state.player.load_advanced(
-                    &first_img_location,
-                    Some(Frame::ImageCollectionMember(Default::default())),
-                );
-            }
-        } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone());
-            state.player.load_advanced(
-                location,
-                Some(Frame::ImageCollectionMember(Default::default())),
-            );
-        };
-
-        // If launched with more than one path and none of those paths are directories, it's likely
-        // that the user wants to view a fixed set of images rather than traverse into directories.
-        // This handles the case where the app is launched with files from different dirs as well e.g.
-        // a/1.png b/2.png c/3.png
-        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
-        state.scrubber.entries = paths_to_open;
-        state.scrubber.wrap = state.persistent_settings.wrap_folder;
-    }
+    open_paths(&mut state, paths_to_open);
 
     if matches.contains_id("stdin") {
         debug!("Trying to read from pipe");
@@ -313,7 +262,8 @@ fn init(_app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteSt
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
-        ctx.set_pixels_per_point(state.persistent_settings.ui_scale);
+        // The scale setting is applied on top of the scale of the display
+        ctx.set_zoom_factor(state.persistent_settings.ui_scale);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
         info!("This Display has DPI {:?}", gfx.dpi());
@@ -623,8 +573,14 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
             _ = state.persistent_settings.save_blocking();
             _ = state.volatile_settings.save_blocking();
         }
-        Event::MouseWheel { delta_y, .. } => {
+        Event::MouseWheel { delta_x, delta_y } => {
             trace!("Mouse wheel event");
+            // Touchpads scroll ten times too slow in the UI otherwise. Seen on Linux
+            // and on macOS. Windows reports whole lines, which this leaves alone.
+            if cfg!(any(target_os = "linux", target_os = "macos")) {
+                let (x, y) = precise_scroll_remainder(delta_x, delta_y);
+                state.scroll_remainder += Vector2::new(x, y);
+            }
             if !state.pointer_over_ui {
                 if app.keyboard.ctrl() {
                     // Change image to next/prev
@@ -635,7 +591,9 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(target_os = "macos") { 0.1 } else { 10. };
+                    // A trackpad sends many small steps. The former divisor of 0.1
+                    // zoomed about five times too fast on a MacBook.
+                    let divisor = if cfg!(target_os = "macos") { 0.5 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
@@ -756,6 +714,25 @@ fn update(app: &mut App, state: &mut OculanteState) {
         );
     }
 
+    // File names piped in at startup arrive from a background thread
+    if let Some(receiver) = &state.piped_paths {
+        match receiver.try_recv() {
+            Ok(paths) => {
+                state.piped_paths = None;
+                open_paths(state, paths);
+                app.window().request_frame();
+            }
+            Err(mpsc::TryRecvError::Disconnected) => state.piped_paths = None,
+            Err(mpsc::TryRecvError::Empty) => {
+                // The loop only runs on events, so keep it going for a moment.
+                // Names that arrive later are picked up with the next event.
+                if app.timer.elapsed_f32() < 3.0 {
+                    app.window().request_frame();
+                }
+            }
+        }
+    }
+
     // redraw if extended info is missing so we make sure it's promply displayed
     if state.persistent_settings.info_enabled && state.image_metadata.is_none() {
         app.window().request_frame();
@@ -798,6 +775,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
     let mut zoom_image = gfx.create_draw();
+    // Leave the alpha of the window untouched when blending. Otherwise half
+    // transparent pixels make the window itself translucent, and whatever is
+    // behind it shines through (#342).
+    let keep_alpha = BlendMode::new(BlendFactor::Zero, BlendFactor::One);
+    draw.set_alpha_mode(Some(keep_alpha));
+    zoom_image.set_alpha_mode(Some(keep_alpha));
     if let Ok(p) = state.load_channel.1.try_recv() {
         state.is_loaded = false;
         state.current_image = None;
@@ -813,7 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     // Drain loop to get latest frame and prevent animation speedup on focus loss
     let latest_frame = state.texture_channel.1.try_iter().last();
 
-        if let Some(frame) = latest_frame {
+    if let Some(frame) = latest_frame {
         state.is_loaded = true;
 
         debug!("Got frame: {}", frame);
@@ -1054,6 +1037,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     let mut bbox_br: egui::Pos2 = Default::default();
     let mut info_panel_color = egui::Color32::from_gray(200);
     let egui_output = plugins.egui(|ctx| {
+        if state.scroll_remainder != Vector2::zeros() {
+            let remainder = egui::vec2(state.scroll_remainder.x, state.scroll_remainder.y);
+            ctx.input_mut(|input| input.smooth_scroll_delta += remainder);
+            state.scroll_remainder = Vector2::zeros();
+        }
         state.toasts.show(ctx);
         if let Some(id) = state.filebrowser_id.take() {
             ctx.memory_mut(|w| w.open_popup(Id::new(&id)));
@@ -1345,15 +1333,85 @@ fn compare_next(_app: &mut App, state: &mut OculanteState) {
     }
 }
 
-// Parse piped file names from stdin.
-fn piped_paths(args: &clap::ArgMatches) -> Option<impl Iterator<Item = PathBuf>> {
-    // Don't yield paths if user is piping in raw image data
-    (!args.contains_id("stdin") && !stdin().is_terminal()).then(|| {
-        stdin().lines().flat_map(|line| {
-            line.unwrap_or_default()
-                .split_whitespace()
-                .map(PathBuf::from)
-                .collect::<Vec<_>>()
-        })
-    })
+/// Open the images or folders the app was started with.
+fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
+    debug!("Image is: {:?}", paths_to_open);
+
+    if paths_to_open.len() == 1 {
+        let location = paths_to_open
+            .into_iter()
+            .next()
+            .expect("It should be tested already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(&location) {
+                state.is_loaded = false;
+                state.player.load(&first_img_location);
+                state.current_path = Some(first_img_location);
+            }
+        } else {
+            state.is_loaded = false;
+            state.player.load(&location);
+            state.current_path = Some(location);
+        };
+    } else if paths_to_open.len() > 1 {
+        let location = paths_to_open
+            .first()
+            .expect("It should be verified already that exactly one argument was passed.");
+        if location.is_dir() {
+            // Folder - Pick first image from the folder...
+            if let Ok(first_img_location) = find_first_image_in_directory(location) {
+                state.is_loaded = false;
+                state.current_path = Some(first_img_location.clone());
+                state.player.load_advanced(
+                    &first_img_location,
+                    Some(Frame::ImageCollectionMember(Default::default())),
+                );
+            }
+        } else {
+            state.is_loaded = false;
+            state.current_path = Some(location.clone());
+            state.player.load_advanced(
+                location,
+                Some(Frame::ImageCollectionMember(Default::default())),
+            );
+        };
+
+        // If launched with more than one path and none of those paths are directories, it's likely
+        // that the user wants to view a fixed set of images rather than traverse into directories.
+        // This handles the case where the app is launched with files from different dirs as well e.g.
+        // a/1.png b/2.png c/3.png
+        state.scrubber.fixed_paths = paths_to_open.iter().all(|path| path.is_file());
+        state.scrubber.entries = paths_to_open;
+        state.scrubber.wrap = state.persistent_settings.wrap_folder;
+    }
+}
+
+// Parse piped file names from stdin on a background thread. The names are sent
+// once stdin is closed, followed by the paths given on the command line.
+fn piped_paths(
+    args: &clap::ArgMatches,
+    cli_paths: Vec<PathBuf>,
+) -> Option<mpsc::Receiver<Vec<PathBuf>>> {
+    // Don't read paths if user is piping in raw image data
+    if args.contains_id("stdin") || stdin().is_terminal() {
+        return None;
+    }
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut paths = stdin()
+            .lines()
+            .flat_map(|line| {
+                line.unwrap_or_default()
+                    .split_whitespace()
+                    .map(PathBuf::from)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if !paths.is_empty() {
+            paths.extend(cli_paths);
+            _ = sender.send(paths);
+        }
+    });
+    Some(receiver)
 }

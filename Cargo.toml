@@ -20,7 +20,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.9.2"
+version = "0.9.6"
 
 [package.metadata.bundle]
 icon = ["icon.ico"]
@@ -50,6 +50,9 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.8"
+# Always build lcms2 (used by jxl-oxide) from source. Otherwise it links to the
+# system library where there is one, which is then missing in our bundles (#810).
+lcms2-sys = { version = "4", features = ["static"], optional = true }
 zune-png = "0.5.0-rc1" # upgrade if https://github.com/etemesi254/zune-image/issues/210 is solved
 # These 3 need to be updated together
 resvg = "0.46"
@@ -102,7 +105,7 @@ webbrowser = "1.0"
 thiserror = "2.0"
 
 img-parts = "0.4" # for exif saving
-dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" } # 2.0 is broken from zbus change, temporarily using a git version until they release a new update.
+dark-light = "3.0"
 trash = "5.2"
 flate2 = "1.0" # for KTX
 bitflags = "2.8" # for KTX
@@ -123,7 +126,6 @@ anyhow = "1.0"
 arboard = { version = "3.4", features = ["wayland-data-control"] }
 clap = "3.2" # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "6.0"
-egui-modal = {path = "egui-modal-diag"}
 num-integer = "0.1.46"
 image-extras = "0.1.0"
 
@@ -143,7 +145,7 @@ file_open = ["rfd"]
 turbo = ["turbojpeg"]
 update = ["self_update"]
 j2k = ["jpeg2k"]
-jxlcms = ["jxl-oxide/lcms2"]
+jxlcms = ["jxl-oxide/lcms2", "dep:lcms2-sys"]
 hdr = []
 lang_support = []
 notan_glsl-to-spirv = ["notan/glsl-to-spirv"]

@@ -1,6 +1,7 @@
 pub mod appstate;
 pub mod cache;
 pub mod comparelist;
+pub mod egui_modal;
 pub mod image_editing;
 pub mod image_loader;
 pub mod ktx2_loader;
