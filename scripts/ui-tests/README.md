@@ -12,6 +12,12 @@ Linux with `Xvfb`, `xdotool` and ImageMagick (`import`, `compare`, `convert`):
 
 Rendering is done in software, no GPU or desktop session is needed.
 
+The tests for fullscreen and for the window without a border need a window
+manager, since a bare X server has nothing that draws a title bar or makes a
+window fullscreen. They use `openbox` and `xprop` and are skipped without them:
+
+    sudo apt install openbox x11-utils
+
 ## Running
 
     cargo build
@@ -38,6 +44,11 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
 | `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image, in any direction, and not over the info panel |
 | `test_perspective_crop_handles` | The perspective crop shows its handles, they can be dragged, the crop applied, removed and added again |
+| `test_key_repeat` | A key that is held down goes through the images of a folder |
+| `test_zen_mode` | Zen mode hides the bar and the info panel, leaving it brings both back |
+| `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |
+| `test_fullscreen` | The window fills the screen and returns to its place and size (needs a window manager) |
+| `test_borderless` | Without a border there is no title bar, the app's own bar moves the window and its button closes it (needs a window manager) |
 
 ## Notes
 

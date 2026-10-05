@@ -15,6 +15,11 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 IMAGES = os.path.join(REPO, "res", "tests")
 OUT = os.path.join(REPO, "target", "ui-tests")
 SCREEN = (1400, 900)
+WINDOW_MANAGER = "openbox"
+
+
+def has_window_manager():
+    return shutil.which(WINDOW_MANAGER) is not None
 
 
 def image(name):
@@ -25,7 +30,16 @@ class App:
     """One running instance of the app on its own display."""
 
     def __init__(
-        self, binary, name, args, display=":97", stdin=subprocess.DEVNULL, settings=None, env=None, pointer=None
+        self,
+        binary,
+        name,
+        args,
+        display=":97",
+        stdin=subprocess.DEVNULL,
+        settings=None,
+        env=None,
+        pointer=None,
+        window_manager=False,
     ):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
@@ -53,6 +67,11 @@ class App:
             with open(os.path.join(settings_dir, "config.json"), "w") as f:
                 json.dump(settings, f)
         self.env = env
+        self.wm = None
+        if window_manager:
+            # Without one nothing draws a title bar, moves a window or makes it fullscreen
+            self.wm = subprocess.Popen([WINDOW_MANAGER], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.8)
         if pointer is not None:
             # place the pointer before the app starts, so no input reaches the app later
             subprocess.run(["xdotool", "mousemove", str(pointer[0]), str(pointer[1])], env=env)
@@ -81,11 +100,24 @@ class App:
             ids = self.x("xdotool", "search", "--onlyvisible", "--name", "culante").stdout.split()
             if ids:
                 self.win = ids[-1]
-                shell = self.x("xdotool", "getwindowgeometry", "--shell", self.win).stdout
-                self.geom = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", shell)}
+                self.update_geometry()
                 return
             time.sleep(0.3)
         raise RuntimeError(f"the window never appeared:\n{self.log()[-800:]}")
+
+    def update_geometry(self):
+        """Read position and size of the window again, after it was moved or resized."""
+        shell = self.x("xdotool", "getwindowgeometry", "--shell", self.win).stdout
+        self.geom = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", shell)}
+        return self.geom
+
+    def frame_extents(self):
+        """Width of what the window manager draws around the window: left, right, top, bottom."""
+        out = self.x("xprop", "-id", self.win, "_NET_FRAME_EXTENTS").stdout
+        return [int(v) for v in re.findall(r"\d+", out.split("=")[1])] if "=" in out else None
+
+    def running(self):
+        return self.app.poll() is None
 
     def settle(self, seconds=0.6):
         """The app only redraws on events, so nudge the pointer and wait."""
@@ -154,8 +186,8 @@ class App:
         return [l.split(marker)[1].strip() for l in self.log()[since:].splitlines() if marker in l]
 
     def close(self):
-        for proc in (self.app, self.xvfb):
-            if proc.poll() is None:
+        for proc in (self.app, self.wm, self.xvfb):
+            if proc is not None and proc.poll() is None:
                 proc.terminate()
                 try:
                     proc.wait(timeout=5)

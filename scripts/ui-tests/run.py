@@ -7,13 +7,25 @@ Each test checks behaviour that broke before. See README.md.
 """
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from uitest import OUT, App, changed_pixels, changed_pixels_in, image, region_has_color, rightmost_x  # noqa: E402
+from uitest import (  # noqa: E402
+    OUT,
+    SCREEN,
+    WINDOW_MANAGER,
+    App,
+    changed_pixels,
+    changed_pixels_in,
+    has_window_manager,
+    image,
+    region_has_color,
+    rightmost_x,
+)
 
 # what the app logs once an image is on screen
 LOADED = "Received image"
@@ -33,6 +45,10 @@ SHORTCUTS = [
     # last, this opens the file browser
     ("ctrl+o", "Browse"),
 ]
+
+
+class Skip(Exception):
+    """The machine lacks something the test needs."""
 
 
 def test_shortcuts(binary):
@@ -301,6 +317,125 @@ def test_perspective_crop_handles(binary):
         assert region_has_color(again, top_left, GOLD, 25), "a crop added a second time has no handles"
 
 
+def test_key_repeat(binary):
+    """A key that is held down goes through the images of a folder."""
+    folder = os.path.join(OUT, "key_repeat_images")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    for number in range(40):
+        shutil.copy(image("test.png"), os.path.join(folder, f"{number:02}.png"))
+    with App(binary, "key_repeat", [os.path.join(folder, "00.png")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        since = len(app.log())
+        app.key("Right", hold=2.0)
+        app.settle(1.5)
+        steps = app.matched_shortcuts(since).count("NextImage")
+        assert steps >= 10, f"holding the key for two seconds went on by {steps} images only"
+        # the title names the image that is shown
+        title = app.x("xdotool", "getwindowname", app.win).stdout
+        shown = re.search(r"(\d\d)\.png", title)
+        assert shown, f"the title names no image: {title!r}"
+        assert int(shown.group(1)) >= 10, f"the key went on {steps} times, but the image shown is {shown.group(0)}"
+
+
+def test_zen_mode(binary):
+    """Zen mode hides the bar and the panels, and leaving it brings them back."""
+    with App(binary, "zen", [image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("i")
+        app.settle(1.0)
+        bar = (0, 0, 1026, 34)
+        panel = (0, 40, 190, 540)
+        before = app.shot("before")
+        app.key("z")
+        app.settle(1.0)
+        zen = app.shot("zen")
+        assert changed_pixels_in(before, zen, bar) > 300, "the bar at the top is still there in zen mode"
+        assert changed_pixels_in(before, zen, panel) > 20_000, "the info panel is still there in zen mode"
+        app.key("z")
+        app.settle(1.0)
+        after = app.shot("after")
+        assert changed_pixels_in(before, after, bar) == 0, "the bar at the top did not come back"
+        assert changed_pixels_in(before, after, panel) < 500, "the info panel did not come back"
+
+
+def test_paint_mode(binary):
+    """In paint mode a drag over the image leaves a stroke."""
+    with App(binary, "paint", [image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(896, 162)  # "Paint mode"
+        app.settle(0.8)
+        app.move(40, 560)
+        app.settle(0.8)
+        before = app.shot("before_stroke")
+        app.drag(300, 250, 600, 400, steps=20)
+        app.move(40, 560)
+        app.settle(1.5)
+        after = app.shot("after_stroke")
+        changed = changed_pixels_in(before, after, (280, 230, 340, 190))
+        assert changed > 500, f"the stroke changed only {changed} pixels of the image"
+        # a drag that paints must not move the image as well
+        assert changed_pixels_in(before, after, (130, 60, 150, 120)) == 0, "the drag moved the image"
+
+
+def needs_window_manager():
+    if not has_window_manager():
+        raise Skip(f"needs the window manager {WINDOW_MANAGER}")
+
+
+def test_fullscreen(binary):
+    """The window fills the screen in fullscreen and returns to where it was."""
+    needs_window_manager()
+    with App(binary, "fullscreen", [image("moss.jpg")], window_manager=True) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        start = dict(app.geom)
+        app.key("f")
+        app.settle(1.5)
+        full = app.update_geometry()
+        assert (full["X"], full["Y"], full["WIDTH"], full["HEIGHT"]) == (0, 0, *SCREEN), f"not fullscreen: {full}"
+        shot = app.shot("fullscreen")
+        assert not region_has_color(shot, (0, 0, 40, 40), (0, 0, 0), 4), "the window does not cover the screen"
+        app.key("f")
+        app.settle(1.5)
+        assert app.update_geometry() == start, f"the window came back as {app.geom}, it was {start}"
+
+
+def test_borderless(binary):
+    """Without a border the window has no title bar, can be dragged by its own bar and closed with its own button."""
+    needs_window_manager()
+    with App(binary, "bordered", [image("moss.jpg")], window_manager=True) as app:
+        app.wait_window()
+        assert app.frame_extents()[2] > 0, "no title bar by default, the window manager does not decorate"
+    with App(binary, "borderless", [image("moss.jpg")], settings={"borderless": True}, window_manager=True) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        assert app.frame_extents() == [0, 0, 0, 0], f"the window still has a border: {app.frame_extents()}"
+        start = dict(app.geom)
+        app.drag(500, 18, 620, 78)
+        app.settle(1.0)
+        moved = app.update_geometry()
+        distance = (moved["X"] - start["X"], moved["Y"] - start["Y"])
+        assert abs(distance[0] - 120) < 15 and abs(distance[1] - 60) < 15, f"dragging the bar moved the window by {distance}"
+        app.click(16, 18)  # the app's own close button
+        end = time.time() + 5
+        while app.running() and time.time() < end:
+            time.sleep(0.2)
+        assert not app.running(), "the close button did not close the app"
+
+
 TESTS = [
     test_perspective_crop_handles,
     test_shortcuts,
@@ -312,6 +447,11 @@ TESTS = [
     test_system_fonts_on_demand,
     test_slider_changes_image,
     test_measure_draws_rectangle,
+    test_key_repeat,
+    test_zen_mode,
+    test_paint_mode,
+    test_fullscreen,
+    test_borderless,
 ]
 
 
@@ -323,14 +463,18 @@ def main():
     binary = os.path.abspath(args.binary)
     selected = [t for t in TESTS if not args.tests or t.__name__ in args.tests]
     failed = 0
+    skipped = 0
     for test in selected:
         try:
             test(binary)
             print(f"ok    {test.__name__}")
+        except Skip as reason:
+            skipped += 1
+            print(f"skip  {test.__name__}: {reason}")
         except (AssertionError, RuntimeError) as error:
             failed += 1
             print(f"FAIL  {test.__name__}: {error}")
-    print(f"{len(selected) - failed} of {len(selected)} passed")
+    print(f"{len(selected) - failed - skipped} of {len(selected)} passed" + (f", {skipped} skipped" if skipped else ""))
     sys.exit(1 if failed else 0)
 
 
