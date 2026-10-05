@@ -244,6 +244,9 @@ pub fn set_system_theme(ctx: &Context) {
     }
 }
 
+/// SVGs are drawn at twice their nominal size, so they stay sharp when zoomed in
+pub const DEFAULT_SVG_SCALE: f32 = 2.0;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct DecoderSettings {
@@ -255,7 +258,7 @@ impl Default for DecoderSettings {
     fn default() -> Self {
         Self {
             heif: Default::default(),
-            svg_scale: 1.0,
+            svg_scale: DEFAULT_SVG_SCALE,
         }
     }
 }

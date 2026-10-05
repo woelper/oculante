@@ -278,7 +278,7 @@ pub fn open_image(
             let svg_scale = decoder_opts
                 .map(|d| d.svg_scale)
                 .filter(|s| *s > 0.0)
-                .unwrap_or(1.0);
+                .unwrap_or(crate::settings::DEFAULT_SVG_SCALE);
 
             let render_scale = svg_scale.clamp(0.01, 100.0);
 

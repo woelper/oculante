@@ -100,6 +100,9 @@ fn ci_load_psd() {
 fn ci_load_svg() {
     let frame = load_first_frame("res/tests/johnny_automatic_lobster.svg");
     assert_valid_image(&frame);
+    // 165x282 in the file, drawn at twice that size by default
+    let img = frame.get_image().unwrap();
+    assert_eq!((img.width(), img.height()), (330, 564));
 }
 
 #[test]
