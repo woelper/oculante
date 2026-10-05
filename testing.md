@@ -9,8 +9,8 @@
 - [x] Zen mode hides the bar and the info panel and brings them back (UI test `test_zen_mode`). The zen mode issues further down are still open.
 - [x] Fullscreen fills the screen and the window returns to its place and size (UI test `test_fullscreen`, X11)
 - [x] Compared with master (f7ae7ed), same machine, release builds: all 67 test files load the same (same 4 fail on both: no HEIC without a heif feature, two float KTX2 formats, the mp4 named .gif), all 30 edit operations give the same pixels and take the same time. Differences, all on purpose or in favour of this branch: 16 bit PNGs stay 16 bit, the first frame of two animated PNGs is right here and transparent on master, SVG see next item.
-- [ ] SVG: rendered at "SVG scale" 1 by default, master always renders at 2. The same file has half the width and height here and gets blurry earlier when zooming in. Decide: default of 2 as on master, or keep 1.
-- [ ] No update check: master has "Check for updates" in the settings (feature `update`), it was removed here together with self_update. Decide if that stays out.
+- [x] SVG: the default of "SVG scale" is 2 now, as master renders them. Who has run this branch before keeps the 1 that is saved in their settings.
+- [x] No update check: master has "Check for updates" in the settings (feature `update`). It was removed here together with self_update and stays out.
 - [ ] OSX file associations: reimplemented without fruitbasket (see src/mac.rs), never run on a Mac. Check "Open with" and a double click in Finder, both with Oculante closed and with it already running, a file dropped on the app icon, several files at once, and starting from the terminal with a file as argument (the file must not be opened twice).
 - [ ] macOS trackpad: check the zoom speed on the image and the scroll speed in the panels. On master both were off (zoom five times too fast, panels ten times too slow) and got fixed for 0.9.7. That fix is specific to notan, this branch gets its scroll input from egui and has not been tried on a Mac.
 - [ ] See if the transparency issue has been fixed (#342) (Blending leaves the window alpha untouched now, needs a check on Wayland.)
