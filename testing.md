@@ -55,6 +55,22 @@
 - [x] Floating windows cannot be resized vertically. I believe this possibly has to do with egui::ScrollArea?
 
 
+# Open issues to check on this branch
+Found by going through the open issues and looking at the code. None of these has a test yet.
+- [ ] Pressing next or previous while the first image is still loading clears everything (#460). The folder list is only filled once the first image has arrived, and `next` on an empty list loads an empty path.
+- [ ] Switching quickly between large images can show the wrong one (#400). Not confirmed in the code, but frames carry no path and the cache files them under whatever is current when they arrive.
+- [ ] Info and edit buttons disappear when an image fails to decode (#426). They depend on an image being loaded.
+- [ ] Next and previous sometimes did not update the view unless "Redraw every frame" was on (#776), same in zen mode (#642). The loader threads ask for a repaint now, check with large images.
+- [ ] Animations stop after 500 loops (#504), the player has a `for _ in 0..500`.
+- [ ] "Memory limit exceeded" on large files (#782). The generic loader uses the default limits of the image crate.
+- [ ] Histogram and info do not follow edits (#647), the size falls back when the edit panel is closed (#761), reset view ignores a resize (#644). The info is computed from the original image, not from the result of the edits.
+- [ ] EXIF rotation for files that are not JPEG (#601). The bracket keys only rotate JPEGs (#707).
+- [ ] Zen mode: the hamburger menu and the file scroll bar stay visible (#690, #691), the menu does not follow a window resize (#700).
+- [ ] Borderless mode on Wayland: dragging the window crashed on master (#733).
+- [ ] Drag and drop on Wayland (#781).
+- [ ] Keys that stay "held" after the window lost focus on Wayland (#374). The cause was notan's list of held keys, check that it is gone here.
+
+
 # Performance
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
