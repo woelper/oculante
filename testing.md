@@ -6,7 +6,7 @@
 - [ ] Borderless mode
 - [ ] Always on top: Works on Mac, does not work on PopOS/Cosmic (Wayland)
 - [ ] Paint mode
-- [ ] OSX file associations
+- [ ] OSX file associations: reimplemented without fruitbasket (see src/mac.rs), never run on a Mac. Check "Open with" and a double click in Finder, both with Oculante closed and with it already running, a file dropped on the app icon, several files at once, and starting from the terminal with a file as argument (the file must not be opened twice).
 - [ ] macOS trackpad: check the zoom speed on the image and the scroll speed in the panels. On master both were off (zoom five times too fast, panels ten times too slow) and got fixed for 0.9.7. That fix is specific to notan, this branch gets its scroll input from egui and has not been tried on a Mac.
 - [ ] See if the transparency issue has been fixed (#342) (Blending leaves the window alpha untouched now, needs a check on Wayland.)
 - [ ] UI tests: run them in a headless Wayland session (Sway or Jay) with ydotool instead of xdotool, so problems that only show on Wayland are covered (suggested by Stoppedpuma in #811)
@@ -83,11 +83,8 @@ Found by going through the open issues and looking at the code. None of these ha
 - [x] egui now supports system theme, remove dark-light (#774)
 - [x] Create and move scripts into a scripts folder
 - [ ] Update macOS plist
-- [ ] See if we can replace or drop fruitbasket
-- [ ] macOS: do a proper solution for "Open with" and file associations. What we have now is an ugly hack: fruitbasket starts a first app just to catch the file that Finder hands over, then Oculante starts itself a second time with that file and quits the first one (`chainload` in src/mac.rs). Finder does not pass the file as an argument, it calls `application:openFiles:` on the app delegate. Neither eframe 0.36 nor winit 0.30 pass that on (emilk/egui#5620 is open). The options:
-  - Now: what Neovide does on the same winit version. Create the event loop ourselves (`eframe::create_native` instead of `run_native`), then subclass the app delegate that winit registered at runtime, add `application:openFiles:` to it and hand the paths to the app. This has to happen before the event loop runs, the file the app is started with arrives while it launches. Setting our own delegate is not possible with winit 0.30, it panics when the delegate is not its own (rust-windowing/winit#4015).
-  - Later: winit 0.31 (still a beta) no longer registers a delegate, so the app can set its own with `application:openURLs:`. That is the way winit documents, but it needs eframe to move to winit 0.31 first.
-  - Both get rid of fruitbasket and the second start, and the running app then also receives files that are opened later.
+- [x] See if we can replace or drop fruitbasket
+- [x] macOS: do a proper solution for "Open with" and file associations. Done the way Neovide does it on the same winit version: the event loop is created by us (`eframe::create_native`), then the app delegate that winit registered is turned into a subclass with `application:openFiles:` at runtime, and the app picks the paths up when it draws a frame. Once eframe is on winit 0.31 this can become a delegate of our own with `application:openURLs:`, which is the way winit documents (0.30 panics if the delegate is not its own, rust-windowing/winit#4015).
 - [x] Move test files to res/tests
 - [x] Update to Rust 2024
 
