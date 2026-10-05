@@ -42,13 +42,6 @@ fn main() -> eframe::Result<()> {
                 .action(clap::ArgAction::SetTrue)
                 .help("Load data from STDIN"),
         )
-        .arg(
-            Arg::new("chainload")
-                .required(false)
-                .action(clap::ArgAction::SetTrue)
-                .short('c')
-                .help("Chainload on Mac"),
-        )
         .get_matches_from(args);
 
     let mut state = OculanteState {
@@ -99,11 +92,6 @@ fn main() -> eframe::Result<()> {
         state.network_mode = true;
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        let _ = oculante::mac::launch();
-    }
-
     let ws = build_window_settings();
 
     // Load application icon from embedded ICO
@@ -142,6 +130,24 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
+    // On macOS the event loop is created here and not by eframe: the handler for
+    // files from Finder has to go in between creating and running it.
+    #[cfg(target_os = "macos")]
+    {
+        let event_loop =
+            winit::event_loop::EventLoop::<eframe::UserEvent>::with_user_event().build()?;
+        oculante::mac::register_open_files_handler();
+        let mut winit_app = eframe::create_native(
+            "oculante",
+            options,
+            Box::new(|_cc| Ok(Box::new(OculanteApp::new(state)))),
+            &event_loop,
+        );
+        event_loop.run_app(&mut winit_app)?;
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
     eframe::run_native(
         "oculante",
         options,

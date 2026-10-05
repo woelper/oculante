@@ -133,7 +133,22 @@ hdr = []
 lang_support = []
 
 [target.'cfg(target_os = "macos")'.dependencies]
-fruitbasket = "0.10.0"
+# For the files that Finder hands to the app, see src/mac.rs
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSApplication",
+    "NSResponder",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSArray",
+    "NSDictionary",
+    "NSString",
+    "NSUserDefaults",
+] }
+# The same winit that eframe uses, to create the event loop ourselves
+winit = { version = "0.30", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "0.36", default-features = false, features = [

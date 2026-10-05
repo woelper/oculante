@@ -488,6 +488,15 @@ impl eframe::App for OculanteApp {
             ctx.request_repaint();
         }
 
+        // Files that Finder asked the app to open
+        #[cfg(target_os = "macos")]
+        {
+            let files = crate::mac::take_opened_files();
+            if !files.is_empty() {
+                open_paths(&mut self.state, files);
+            }
+        }
+
         // File names piped in at startup arrive from a background thread
         if let Some(receiver) = &self.state.piped_paths {
             match receiver.try_recv() {

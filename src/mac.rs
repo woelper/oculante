@@ -1,100 +1,92 @@
-use clap::Arg;
-use fruitbasket::FruitApp;
-use fruitbasket::FruitCallbackKey;
-use fruitbasket::RunPeriod;
-use log::debug;
-use log::info;
+//! Files that Finder hands to the app: "Open with", a double click on an
+//! associated file, or a file dropped on the app icon.
+//!
+//! Finder does not pass such a file as an argument. It calls
+//! `application:openFiles:` on the delegate of the app. winit registers that
+//! delegate, does not pass the call on, and as of winit 0.30 does not accept a
+//! delegate of ours either. So the delegate winit made is turned into a
+//! subclass of itself at runtime, one that has the method. Neovide does the
+//! same on the same winit version.
+//!
+//! This has to be set up after the event loop was created, which is when winit
+//! registers its delegate, and before the event loop runs: the file the app is
+//! started with arrives while the app launches.
+
 use std::path::PathBuf;
-use std::process::Command;
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-};
+use std::sync::Mutex;
 
-pub fn launch() -> Result<(), Box<dyn Error>> {
-    info!("Starting MacOS integration");
+use log::{debug, error};
+use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
+use objc2::{MainThreadMarker, sel};
+use objc2_app_kit::NSApplication;
+use objc2_foundation::{NSArray, NSDictionary, NSString, NSUserDefaults, ns_string};
 
-    // It's not good design that the MacOS workaround does its own argument parsing again,
-    // However, the notan (and possibly other engines/libraries) structure prefer argument parsing
-    // in an init funcion, from which fruitbasked panics internally. For this reason this extra
-    // module keeps everything self-contained and barebones so it can be called independently
-    // early on.
+/// Files Finder asked for that the app has not picked up yet
+static OPENED_FILES: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
-    info!("Mac: Now matching arguments {:?}", std::env::args());
-    // Filter out strange mac args
-    let args: Vec<String> = std::env::args().filter(|a| !a.contains("psn_")).collect();
-    let matches = clap::Command::new("Oculante")
-        .arg(
-            Arg::new("INPUT")
-                .help("Display this image")
-                // .required(true)
-                .index(1),
-        )
-        .arg(
-            Arg::new("chainload")
-                .required(false)
-                .action(clap::ArgAction::SetTrue)
-                .short('c')
-                .help("Chainload on Mac"),
-        )
-        .get_matches_from(args);
+/// The files Finder asked to open since the last call
+pub fn take_opened_files() -> Vec<PathBuf> {
+    match OPENED_FILES.lock() {
+        Ok(mut files) => std::mem::take(&mut *files),
+        Err(_) => Vec::new(),
+    }
+}
 
-    debug!("Completed argument parsing.");
-    let maybe_img_location = matches.get_one::<String>("INPUT").map(PathBuf::from);
+/// `application:openFiles:` of `NSApplicationDelegate`
+unsafe extern "C-unwind" fn open_files(
+    _this: &AnyObject,
+    _sel: Sel,
+    _sender: &AnyObject,
+    filenames: &NSArray<NSString>,
+) {
+    let paths = filenames
+        .iter()
+        .map(|name| PathBuf::from(name.to_string()))
+        .collect::<Vec<_>>();
+    debug!("Asked to open {paths:?}");
+    if let Ok(mut files) = OPENED_FILES.lock() {
+        files.extend(paths);
+    }
+    // The app looks for new files when it draws a frame
+    crate::utils::request_repaint();
+}
 
-    if !matches.get_flag("chainload") && maybe_img_location.is_none() {
-        info!("Chainload not specified, and no input file present. Invoking mac hack.");
-    } else {
-        return Ok(());
+/// Make the app receive the files Finder wants it to open. Call this after the
+/// event loop was created and before it runs.
+pub fn register_open_files_handler() {
+    let Some(mtm) = MainThreadMarker::new() else {
+        error!("Files from Finder can only be set up on the main thread");
+        return;
+    };
+    let app = NSApplication::sharedApplication(mtm);
+    let Some(delegate) = app.delegate() else {
+        error!("There is no application delegate, files from Finder will not be opened");
+        return;
+    };
+
+    unsafe {
+        let delegate: &AnyObject = delegate.as_ref();
+        let class: &AnyClass = delegate.class();
+        let Some(mut subclass) = ClassBuilder::new(c"OculanteApplicationDelegate", class) else {
+            error!(
+                "Could not extend the application delegate, files from Finder will not be opened"
+            );
+            return;
+        };
+        subclass.add_method(
+            sel!(application:openFiles:),
+            open_files as unsafe extern "C-unwind" fn(_, _, _, _),
+        );
+        // The subclass adds a method and no data, so the object can change over to it
+        AnyObject::set_class(delegate, subclass.register());
     }
 
-    let file_arg: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-
-    let mut app = FruitApp::new();
-    let stopper = app.stopper();
-
-    app.register_callback(
-        FruitCallbackKey::Method("applicationDidFinishLaunching:"),
-        Box::new(move |_event| {
-            info!("Application finished launching, sending stop.");
-            // Send stop when app finishes launching
-            stopper.stop();
-        }),
-    );
-
-    // clone file_arg to move it into closure
-    let farg = file_arg.clone();
-    let stopper = app.stopper();
-    app.register_callback(
-        FruitCallbackKey::Method("application:openFile:"),
-        Box::new(move |file| {
-            let file = fruitbasket::nsstring_to_string(file);
-            info!("Received {}. Stopping", file);
-            let mut f = farg.lock().unwrap();
-            *f = Some(file.clone());
-            stopper.stop();
-        }),
-    );
-
-    // Run 'forever', until the URL callback fires
-    let _ = app.run(RunPeriod::Forever);
-
-    // Now it gets real ugly: Chainload this executable and quit, passing the received image as arg
-    if let Ok(oculante_exe) = std::env::current_exe() {
-        match file_arg.lock().unwrap().as_ref() {
-            Some(f) => {
-                info!("Chainloading {:?} with {}", oculante_exe, f);
-                let _ = Command::new(oculante_exe).args([f, "-c"]).spawn();
-            }
-            None => {
-                info!("Chainloading {:?} with -c arg", oculante_exe);
-                let _ = Command::new(oculante_exe).args(["-c"]).spawn();
-            }
-        }
+    // Otherwise AppKit takes the arguments on the command line for files to open
+    // as well, and they would arrive twice.
+    let keys = &[ns_string!("NSTreatUnknownArgumentsAsOpen")];
+    let objects = &[ns_string!("NO") as &AnyObject];
+    let defaults = NSDictionary::from_slices(keys, objects);
+    unsafe {
+        NSUserDefaults::standardUserDefaults().registerDefaults(&defaults);
     }
-
-    fruitbasket::FruitApp::terminate(0);
-
-    // This will never execute.
-    Ok(())
 }
