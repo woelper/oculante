@@ -575,9 +575,9 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
         }
         Event::MouseWheel { delta_x, delta_y } => {
             trace!("Mouse wheel event");
-            // Touchpads scroll ten times too slow in the UI otherwise. Only on Linux
-            // for now, where it was tested.
-            if cfg!(target_os = "linux") {
+            // Touchpads scroll ten times too slow in the UI otherwise. Seen on Linux
+            // and on macOS. Windows reports whole lines, which this leaves alone.
+            if cfg!(any(target_os = "linux", target_os = "macos")) {
                 let (x, y) = precise_scroll_remainder(delta_x, delta_y);
                 state.scroll_remainder += Vector2::new(x, y);
             }
@@ -591,7 +591,9 @@ fn process_events(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(target_os = "macos") { 0.1 } else { 10. };
+                    // A trackpad sends many small steps. The former divisor of 0.1
+                    // zoomed about five times too fast on a MacBook.
+                    let divisor = if cfg!(target_os = "macos") { 0.5 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
                         ((delta_y / divisor) * state.persistent_settings.zoom_multiplier)
