@@ -5,7 +5,8 @@ edition = "2024"
 exclude = [
     ".github/*",
     "res/fonts/NotoSansSC-Regular.ttf",
-    "res/icons/*",
+    # icon.ico is compiled into the app
+    "res/icons/*.png",
     "res/*.svg",
     "res/premult.png",
     "res/screen*.png",
