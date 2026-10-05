@@ -1,4 +1,4 @@
-const ICON_SIZE: f32 = 24.;
+const ICON_SIZE: f32 = 20.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 pub const PANEL_WIDTH: f32 = 260.0;
@@ -293,35 +293,46 @@ impl EguiExt for Ui {
         r
     }
 
-    /// Draw a justified icon from a string starting with an emoji
+    /// A button with an icon after its text, from a string that ends with the icon
     fn styled_selectable_label(&mut self, _active: bool, text: impl Into<WidgetText>) -> Response {
         let text: WidgetText = text.into();
         let text = text.text();
 
-        let icon_size = 24.;
-
         let (icon, description) = parse_icon_plus_text(text);
         let icon = icon.unwrap_or_default();
 
+        // Text and icon are laid out as one piece of text, so the button is as
+        // wide as both and nothing has to be placed by hand.
+        let font = TextStyle::Button.resolve(self.style());
+        let mut job = LayoutJob::default();
+        job.append(
+            &description,
+            0.,
+            TextFormat {
+                font_id: font.clone(),
+                // takes the color the button has in its current state
+                color: Color32::PLACEHOLDER,
+                ..Default::default()
+            },
+        );
+        if !icon.is_empty() {
+            job.append(
+                &icon,
+                2.,
+                TextFormat {
+                    font_id: font,
+                    color: self.style().visuals.selection.bg_fill,
+                    ..Default::default()
+                },
+            );
+        }
+
         self.spacing_mut().button_padding = Vec2::new(8., 0.);
-        let spacing = if icon.is_empty() { "" } else { "  " };
-        let r = self.add(
-            egui::Button::new(format!("{description}{spacing}"))
+        self.add(
+            egui::Button::new(job)
                 .corner_radius(self.get_rounding(BUTTON_HEIGHT_LARGE))
-                .min_size(vec2(0., BUTTON_HEIGHT_LARGE)), // .shortcut_text("sds")
-        );
-
-        let mut icon_pos = r.rect.right_center();
-        icon_pos.x -= icon_size;
-
-        self.painter().text(
-            icon_pos,
-            Align2::CENTER_CENTER,
-            icon,
-            FontId::proportional(icon_size),
-            self.style().visuals.selection.bg_fill,
-        );
-        r
+                .min_size(vec2(0., BUTTON_HEIGHT_LARGE)),
+        )
     }
 
     /// Draw a right justified label

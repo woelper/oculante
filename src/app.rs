@@ -227,9 +227,9 @@ impl OculanteApp {
             "icons".to_owned(),
             Arc::new(
                 FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
-                    scale: 1.0,
+                    scale: 1.2,
                     y_offset_factor: 0.0,
-                    y_offset: 1.0,
+                    y_offset: offset,
                     ..Default::default()
                 }),
             ),
