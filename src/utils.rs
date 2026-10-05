@@ -21,7 +21,7 @@ use std::sync::mpsc::{self};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, OnceLock};
 use strum::Display;
-use strum_macros::EnumIter;
+use strum::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;

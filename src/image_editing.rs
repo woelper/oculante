@@ -1275,20 +1275,20 @@ impl ImageOperation {
             DynamicImage::ImageRgba8(img) => {
                 match self {
                     Self::Blur(amt) if *amt != 0 => {
-                        let i = img.clone();
-                        let mut data = i.into_raw();
-                        libblur::stack_blur(
-                            data.as_mut_slice(),
-                            img.width() * 4,
-                            img.width(),
-                            img.height(),
-                            (*amt as u32).clamp(2, 254),
+                        let (width, height) = img.dimensions();
+                        // blurs the pixels in place
+                        let mut pixels = libblur::BlurImageMut::borrow(
+                            img,
+                            width,
+                            height,
                             libblur::FastBlurChannels::Channels4,
-                            libblur::ThreadingPolicy::Adaptive,
                         );
-                        use anyhow::Context;
-                        *img = RgbaImage::from_raw(img.width(), img.height(), data)
-                            .context("Can't construct image from blur result")?;
+                        libblur::stack_blur(
+                            &mut pixels,
+                            libblur::AnisotropicRadius::new((*amt as u32).clamp(2, 254)),
+                            libblur::ThreadingPolicy::Adaptive,
+                        )
+                        .map_err(|e| anyhow::anyhow!("Can't blur the image: {e}"))?;
                     }
                     Self::Filter3x3(amt) => {
                         let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
@@ -1296,16 +1296,12 @@ impl ImageOperation {
                     }
                     Self::LUT(lut_name) => {
                         use lutgen::identity::correct_image;
-                        let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
                         if let Some(lut_data) = builtin_luts().get(lut_name) {
                             let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
-                            correct_image(&mut external_image, &lut_img);
-                        } else {
-                            if let Ok(lut_img) = image::open(lut_name) {
-                                correct_image(&mut external_image, &lut_img.to_rgb8());
-                            }
+                            correct_image(img, &lut_img);
+                        } else if let Ok(lut_img) = image::open(lut_name) {
+                            correct_image(img, &lut_img.to_rgb8());
                         }
-                        *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
                     }
                     Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
                         let window = cropped_range(dim, &(img.width(), img.height()));
@@ -1347,9 +1343,9 @@ impl ImageOperation {
 
                             *img = imageproc::geometric_transformations::warp(
                                 img,
-                                &proj,
+                                proj,
                                 Interpolation::Bicubic,
-                                default_p,
+                                imageproc::geometric_transformations::Border::Constant(default_p),
                             );
 
                             *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);

@@ -3,7 +3,7 @@ use crate::appstate::OculanteState;
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
-use quantette::{ColorSpace, PalettePipeline};
+use quantette::{ImageBuf, PaletteSize, Pipeline, QuantizeMethod};
 
 pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
     ui.styled_collapsing("Palette", |ui| {
@@ -171,14 +171,16 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                     ui.ctx()
                         .memory_mut(|w| w.data.remove_temp::<Vec<[u8; 4]>>("picker".into()));
 
-                    if let Ok(mut pipeline) = PalettePipeline::try_from(&img.to_rgb8()) {
-                        let palette = pipeline
-                            .palette_size(32)
-                            .colorspace(ColorSpace::Oklab)
-                            .quantize_method(quantette::KmeansOptions::new())
-                            .palette_par();
-
-                        for col in palette {
+                    if let Ok(pixels) = ImageBuf::try_from(img.to_rgb8())
+                        && let Ok(size) = PaletteSize::try_from(32u16)
+                        && let Some(palette) = Pipeline::new()
+                            .palette_size(size)
+                            .quantize_method(QuantizeMethod::kmeans())
+                            .parallel(true)
+                            .input_image(pixels.as_ref())
+                            .output_srgb8_palette()
+                    {
+                        for col in palette.iter() {
                             ui.ctx().memory_mut(|w| {
                                 let cols = w
                                     .data

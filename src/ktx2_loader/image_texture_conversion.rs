@@ -5,7 +5,7 @@ use crate::ktx2_loader::Image;
 use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
 use log::debug;
-use wgpu::TextureFormat;
+use wgpu_types::TextureFormat;
 
 impl Image {
     /// Convert a [`Image`] to a [`DynamicImage`]. Useful for editing image
