@@ -789,27 +789,15 @@ fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
             10.,
         )
     });
-    let mut text_shape = TextShape::new(response.rect.left_top(), galley, Color32::RED);
-    text_shape.angle = egui::lerp(0.0..=f32::consts::PI / 2., openness);
-    let mut text = egui::Shape::Text(text_shape);
-    let r = text.visual_bounding_rect();
-    let x_offset = 5.0;
-    let y_offset = 4.0;
-
-    text.translate(vec2(
-        egui::lerp(
-            -ui.style().spacing.icon_spacing + x_offset
-                ..=r.size().x + ui.style().spacing.icon_spacing - 3.0 + x_offset,
-            openness,
-        ),
-        egui::lerp(
-            -ui.style().spacing.icon_spacing + y_offset
-                ..=-ui.style().spacing.icon_spacing + y_offset + 1.,
-            openness,
-        ),
-    ));
-
-    ui.painter().add(text);
+    // Text is rotated around its top left corner. Go by where the glyph itself
+    // is drawn inside the text, and place that corner so the glyph stays in the
+    // middle of the icon area however far it is rotated. Offsets that depend on
+    // the metrics of the font break with every change to the text layout.
+    let angle = egui::lerp(0.0..=f32::consts::PI / 2., openness);
+    let glyph_center = galley.mesh_bounds.center().to_vec2();
+    let pos = response.rect.center() - emath::Rot2::from_angle(angle) * glyph_center;
+    ui.painter()
+        .add(TextShape::new(pos, galley, Color32::RED).with_angle(angle));
 }
 
 fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
