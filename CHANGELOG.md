@@ -1,3 +1,13 @@
+\# 0.9.6
+
+### :beetle: Bug Fixes
+
+* Intel Mac build no longer fails when the library paths do not fit (96d1079d)
+
+### :green_apple: Chore
+
+* Sign and notarise the Mac app in the release (7bc3d647)
+
 \# 0.9.5
 
 ### :beetle: Bug Fixes
