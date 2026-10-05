@@ -67,6 +67,7 @@
 - [x] Create and move scripts into a scripts folder
 - [ ] Update macOS plist
 - [ ] See if we can replace or drop fruitbasket
+- [ ] macOS: do a proper solution for "Open with" and file associations. What we have now is an ugly hack: fruitbasket starts a first app just to catch the file that Finder hands over, then Oculante starts itself a second time with that file and quits the first one (`chainload` in src/mac.rs). With eframe the open file event should be handled in the running app instead.
 - [x] Move test files to res/tests
 - [x] Update to Rust 2024
 
