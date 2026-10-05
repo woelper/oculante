@@ -122,9 +122,11 @@ num-integer = "0.1.46"
 image-extras = "0.1.1"
 
 [features]
-default = ["turbo", "avif_native", "j2k", "jxlcms"]
+default = ["turbo", "avif_native", "j2k", "jxlcms", "heif_native"]
 heif = ["libheif-rs"]
-# HEIC and HEIF without libheif. If `heif` is enabled as well, libheif is used.
+# HEIC and HEIF without libheif, in pure Rust. This is what a plain build uses,
+# so Linux builds open these files without anything installed. If `heif` is
+# enabled as well, libheif is used.
 heif_native = ["dep:heic-rs"]
 avif_native = ["avif-decode"]
 dav1d = ["libavif-image"]
