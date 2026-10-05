@@ -97,35 +97,43 @@ fn main() {
         println!("cargo:rerun-if-changed=.git/{ref_path}");
     }
 
-    // insert version into plist
-    let mut plist: String = "".into();
-    File::open("res/info.plist")
-        .unwrap()
-        .read_to_string(&mut plist)
-        .unwrap();
-    File::create("Info.plist")
-        .unwrap()
-        .write_all(
-            plist
-                .replace("VERSION", env!("CARGO_PKG_VERSION"))
-                .as_bytes(),
-        )
-        .unwrap();
+    // The plist, the PKGBUILD and the README are kept up to date from here, but
+    // only in a checkout of the repository. A packaged crate is built as it is:
+    // cargo refuses to publish a crate whose build script changes its sources,
+    // and `cargo install` should not write into them either.
+    let in_repository = Path::new(".git").exists();
 
-    // insert version into AUR PKGBUILD
-    let mut pkgbuild = String::new();
-    File::open("res/pkgbuild")
-        .unwrap()
-        .read_to_string(&mut pkgbuild)
-        .unwrap();
-    File::create("PKGBUILD")
-        .unwrap()
-        .write_all(
-            pkgbuild
-                .replace("$$VERSION$$", env!("CARGO_PKG_VERSION"))
-                .as_bytes(),
-        )
-        .unwrap();
+    if in_repository {
+        // insert version into plist
+        let mut plist: String = "".into();
+        File::open("res/info.plist")
+            .unwrap()
+            .read_to_string(&mut plist)
+            .unwrap();
+        File::create("Info.plist")
+            .unwrap()
+            .write_all(
+                plist
+                    .replace("VERSION", env!("CARGO_PKG_VERSION"))
+                    .as_bytes(),
+            )
+            .unwrap();
+
+        // insert version into AUR PKGBUILD
+        let mut pkgbuild = String::new();
+        File::open("res/pkgbuild")
+            .unwrap()
+            .read_to_string(&mut pkgbuild)
+            .unwrap();
+        File::create("PKGBUILD")
+            .unwrap()
+            .write_all(
+                pkgbuild
+                    .replace("$$VERSION$$", env!("CARGO_PKG_VERSION"))
+                    .as_bytes(),
+            )
+            .unwrap();
+    }
 
     if cfg!(target_os = "windows") {
         let mut res = winres::WindowsResource::new();
@@ -134,7 +142,7 @@ fn main() {
     }
 
     let shortcut_file = "shortcuts.txt";
-    if Path::new(shortcut_file).is_file() {
+    if in_repository && Path::new(shortcut_file).is_file() {
         let mut readme: String = "".into();
 
         File::open("README.md")
