@@ -604,24 +604,24 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
 }
 
 pub fn delete_file(state: &mut OculanteState) {
-    if let Some(p) = &state.current_path {
+    if let Some(p) = state.current_path.clone() {
+        let name = p
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_default();
         #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-        {
-            _ = trash::delete(p);
-        }
+        let deleted = trash::delete(&p).map_err(|e| e.to_string());
         #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
-        {
-            _ = std::fs::remove_file(p)
-        }
+        let deleted = std::fs::remove_file(&p).map_err(|e| e.to_string());
 
-        state.send_message_info(&format!(
-            "Deleted {}",
-            p.file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_default()
-        ));
+        // The image stays when the file is still there
+        if let Err(e) = deleted {
+            state.send_message_err(&format!("Could not delete {name}: {e}"));
+            return;
+        }
+        state.send_message_info(&format!("Deleted {name}"));
         // remove from cache so we don't suceed to load it agaim
-        state.player.cache.data.remove(p);
+        state.player.cache.data.remove(&p);
     }
     clear_image(state);
 }
@@ -1093,6 +1093,22 @@ fn is_dicom(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A file that can not be deleted is reported as such and stays on screen.
+    /// Before, the app said it was deleted and moved on.
+    #[test]
+    fn failed_delete_is_reported() {
+        let mut state = OculanteState::default();
+        let missing = std::env::temp_dir().join("oculante_test_not_there/missing.png");
+        state.current_path = Some(missing.clone());
+        delete_file(&mut state);
+        let messages: Vec<Message> = state.message_channel.1.try_iter().collect();
+        assert!(
+            matches!(messages.as_slice(), [Message::Error(e)] if e.contains("missing.png")),
+            "expected one error, got {messages:?}"
+        );
+        assert_eq!(state.current_path, Some(missing));
+    }
 
     /// Only DICOM files are read as DICOM. Every image was tried before.
     #[test]
