@@ -1316,6 +1316,11 @@ impl ImageOperation {
 
     /// Process all image operators (All things that modify the image and are not "per pixel")
     pub fn process_image(&self, dyn_img: &mut DynamicImage) -> Result<()> {
+        // the same for every layout
+        if let Self::ColorConverter(t) = self {
+            convert_color_type(dyn_img, t);
+            return Ok(());
+        }
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
@@ -1337,7 +1342,21 @@ impl ImageOperation {
                     }
                     Self::Filter3x3(amt) => {
                         let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
-                        *img = imageops::filter3x3(img, &kernel);
+                        let mut filtered = imageops::filter3x3(img, &kernel);
+                        // The image crate leaves the outermost pixels black and transparent,
+                        // they keep their values
+                        let (w, h) = img.dimensions();
+                        for x in 0..w {
+                            for y in [0, h - 1] {
+                                filtered.put_pixel(x, y, *img.get_pixel(x, y));
+                            }
+                        }
+                        for y in 0..h {
+                            for x in [0, w - 1] {
+                                filtered.put_pixel(x, y, *img.get_pixel(x, y));
+                            }
+                        }
+                        *img = filtered;
                     }
                     Self::LUT(lut_name) => {
                         use lutgen::identity::correct_image;
@@ -1520,38 +1539,6 @@ impl ImageOperation {
                 info!("Proc with color type {:?}", dyn_img.color());
 
                 match self {
-                    Self::ColorConverter(t) => match t {
-                        ColorTypeExt::L8 => {
-                            *dyn_img = DynamicImage::ImageLuma8(dyn_img.to_luma8());
-                        }
-                        ColorTypeExt::La8 => {
-                            *dyn_img = DynamicImage::ImageLumaA8(dyn_img.to_luma_alpha8());
-                        }
-                        ColorTypeExt::Rgb8 => {
-                            *dyn_img = DynamicImage::ImageRgb8(dyn_img.to_rgb8());
-                        }
-                        ColorTypeExt::Rgba8 => {
-                            *dyn_img = DynamicImage::ImageRgba8(dyn_img.to_rgba8());
-                        }
-                        ColorTypeExt::L16 => {
-                            *dyn_img = DynamicImage::ImageLuma16(dyn_img.to_luma16());
-                        }
-                        ColorTypeExt::La16 => {
-                            *dyn_img = DynamicImage::ImageLumaA16(dyn_img.to_luma_alpha16());
-                        }
-                        ColorTypeExt::Rgb16 => {
-                            *dyn_img = DynamicImage::ImageRgb16(dyn_img.to_rgb16());
-                        }
-                        ColorTypeExt::Rgba16 => {
-                            *dyn_img = DynamicImage::ImageRgba16(dyn_img.to_rgba16());
-                        }
-                        ColorTypeExt::Rgb32F => {
-                            *dyn_img = DynamicImage::ImageRgb32F(dyn_img.to_rgb32f());
-                        }
-                        ColorTypeExt::Rgba32F => {
-                            *dyn_img = DynamicImage::ImageRgba32F(dyn_img.to_rgba32f());
-                        }
-                    },
                     Self::Flip(vert) => {
                         if *vert {
                             *dyn_img = dyn_img.flipv();
@@ -1579,7 +1566,9 @@ impl ImageOperation {
                             ScaleFilter::Lanczos3 => imageops::FilterType::Lanczos3,
                             _ => imageops::FilterType::Gaussian,
                         };
-                        *dyn_img = dyn_img.resize(dimensions.0, dimensions.0, filter);
+                        if *dimensions != Default::default() {
+                            *dyn_img = dyn_img.resize_exact(dimensions.0, dimensions.1, filter);
+                        }
                     }
                     _ => {
                         bail!("This color type is unsupported: {:?}", dyn_img.color())
@@ -1741,9 +1730,10 @@ impl ImageOperation {
             Self::Contrast(val) => {
                 let factor: f32 = (1.015_686_3 * (*val as f32 / 255. + 1.0))
                     / (1.0 * (1.015_686_3 - *val as f32 / 255.));
-                p[0] = (factor * p[0] - 0.5) + 0.5;
-                p[1] = (factor * p[1] - 0.5) + 0.5;
-                p[2] = (factor * p[2] - 0.5) + 0.5;
+                // away from the middle, or towards it
+                p[0] = factor * (p[0] - 0.5) + 0.5;
+                p[1] = factor * (p[1] - 0.5) + 0.5;
+                p[2] = factor * (p[2] - 0.5) + 0.5;
             }
             _ => (),
         }
@@ -1753,7 +1743,8 @@ impl ImageOperation {
 
 pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     // G*.59+R*.3+B*.11
-    let val = p[0] * 0.59 + p[1] * 0.3 + p[2] * 0.11;
+    // the luma, green counts most
+    let val = p[0] * 0.299 + p[1] * 0.587 + p[2] * 0.114;
     p[0] = egui::lerp(p[0]..=val, factor);
     p[1] = egui::lerp(p[1]..=val, factor);
     p[2] = egui::lerp(p[2]..=val, factor);
@@ -1792,9 +1783,9 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
                     }
                 }
                 float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
-                px[2] = (float_pixel[2]) as u8;
+                px[0] = float_pixel[0].round() as u8;
+                px[1] = float_pixel[1].round() as u8;
+                px[2] = float_pixel[2].round() as u8;
             });
         }
         DynamicImage::ImageRgba8(buffer) => {
@@ -1808,10 +1799,10 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
                     }
                 }
                 float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
-                px[2] = (float_pixel[2]) as u8;
-                px[3] = (float_pixel[3]) as u8;
+                px[0] = float_pixel[0].round() as u8;
+                px[1] = float_pixel[1].round() as u8;
+                px[2] = float_pixel[2].round() as u8;
+                px[3] = float_pixel[3].round() as u8;
             });
         }
         DynamicImage::ImageLuma8(buffer) => {
@@ -1824,7 +1815,7 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
                     }
                 }
                 float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
+                px[0] = float_pixel[0].round() as u8;
             });
         }
         DynamicImage::ImageLumaA8(buffer) => {
@@ -1837,8 +1828,8 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
                     }
                 }
                 float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
+                px[0] = float_pixel[0].round() as u8;
+                px[1] = float_pixel[1].round() as u8;
             });
         }
         DynamicImage::ImageRgb32F(buffer) => {
@@ -1874,6 +1865,42 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
         }
     }
     Ok(())
+}
+
+/// Converts the image to another color type
+fn convert_color_type(image: &mut DynamicImage, t: &ColorTypeExt) {
+    match t {
+        ColorTypeExt::L8 => {
+            *image = DynamicImage::ImageLuma8(image.to_luma8());
+        }
+        ColorTypeExt::La8 => {
+            *image = DynamicImage::ImageLumaA8(image.to_luma_alpha8());
+        }
+        ColorTypeExt::Rgb8 => {
+            *image = DynamicImage::ImageRgb8(image.to_rgb8());
+        }
+        ColorTypeExt::Rgba8 => {
+            *image = DynamicImage::ImageRgba8(image.to_rgba8());
+        }
+        ColorTypeExt::L16 => {
+            *image = DynamicImage::ImageLuma16(image.to_luma16());
+        }
+        ColorTypeExt::La16 => {
+            *image = DynamicImage::ImageLumaA16(image.to_luma_alpha16());
+        }
+        ColorTypeExt::Rgb16 => {
+            *image = DynamicImage::ImageRgb16(image.to_rgb16());
+        }
+        ColorTypeExt::Rgba16 => {
+            *image = DynamicImage::ImageRgba16(image.to_rgba16());
+        }
+        ColorTypeExt::Rgb32F => {
+            *image = DynamicImage::ImageRgb32F(image.to_rgb32f());
+        }
+        ColorTypeExt::Rgba32F => {
+            *image = DynamicImage::ImageRgba32F(image.to_rgba32f());
+        }
+    }
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
@@ -2096,5 +2123,416 @@ impl ColorTypeExt {
             ColorType::Rgba32F => ColorTypeExt::Rgba32F,
             _ => ColorTypeExt::Rgba8,
         }
+    }
+}
+
+#[cfg(test)]
+mod operation_tests {
+    use super::*;
+    use image::RgbaImage;
+
+    /// 16x12 pixels with different values in every channel, the last pixel transparent
+    fn sample() -> DynamicImage {
+        DynamicImage::ImageRgba8(RgbaImage::from_fn(16, 12, |x, y| {
+            let alpha = if (x, y) == (15, 11) { 0 } else { 255 };
+            image::Rgba([
+                (x * 16 + 5) as u8,
+                (y * 21 + 3) as u8,
+                (250 - x * 9 - y * 7) as u8,
+                alpha,
+            ])
+        }))
+    }
+
+    fn apply(op: ImageOperation, image: &DynamicImage) -> DynamicImage {
+        let mut out = image.clone();
+        if op.is_per_pixel() {
+            process_pixels(&mut out, &vec![op]).unwrap();
+        } else {
+            op.process_image(&mut out).unwrap();
+        }
+        out
+    }
+
+    /// Every pixel of `out` against `expected(pixel of input)`
+    fn assert_each(op: ImageOperation, expected: impl Fn([u8; 4]) -> [u8; 4]) {
+        let input = sample().to_rgba8();
+        let out = apply(op.clone(), &DynamicImage::ImageRgba8(input.clone())).to_rgba8();
+        for (x, y, p) in input.enumerate_pixels() {
+            assert_eq!(
+                out.get_pixel(x, y).0,
+                expected(p.0),
+                "{op:?} at {x},{y} from {:?}",
+                p.0
+            );
+        }
+    }
+
+    fn scale(v: u8, f: f32) -> u8 {
+        (v as f32 * f).round().clamp(0., 255.) as u8
+    }
+
+    #[test]
+    fn neutral_settings_change_nothing() {
+        let input = sample();
+        for op in [
+            ImageOperation::Brightness(0),
+            ImageOperation::Exposure(0),
+            ImageOperation::Contrast(0),
+            ImageOperation::Equalize((0, 255)),
+            ImageOperation::Desaturate(0),
+            ImageOperation::Posterize(255),
+            ImageOperation::Mult([255, 255, 255]),
+            ImageOperation::Add([0, 0, 0]),
+            ImageOperation::Fill([255, 0, 0, 0]),
+            ImageOperation::Expression("r = r".into()),
+            ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
+            ImageOperation::Noise {
+                amt: 0,
+                mono: false,
+            },
+            ImageOperation::Blur(0),
+            ImageOperation::Rotate(0),
+            ImageOperation::Crop([0, 0, 0, 0]),
+            ImageOperation::Filter3x3([0, 0, 0, 0, 100, 0, 0, 0, 0]),
+            ImageOperation::Resize {
+                dimensions: (0, 0),
+                aspect: true,
+                filter: ScaleFilter::Bilinear,
+            },
+        ] {
+            assert_eq!(apply(op.clone(), &input), input, "{op:?}");
+        }
+        // HSL and back may differ by a rounding step
+        let hsv = apply(ImageOperation::HSV((0, 100, 100)), &input).to_rgba8();
+        for (a, b) in hsv.pixels().zip(input.to_rgba8().pixels()) {
+            for c in 0..4 {
+                assert!(
+                    a.0[c].abs_diff(b.0[c]) <= 1,
+                    "HSV: {:?} from {:?}",
+                    a.0,
+                    b.0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pixel_operations_give_the_exact_values() {
+        assert_each(ImageOperation::Invert, |p| {
+            [255 - p[0], 255 - p[1], 255 - p[2], p[3]]
+        });
+        assert_each(ImageOperation::Brightness(30), |p| {
+            [
+                p[0].saturating_add(30),
+                p[1].saturating_add(30),
+                p[2].saturating_add(30),
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Add([10, 20, 30]), |p| {
+            [
+                p[0].saturating_add(10),
+                p[1].saturating_add(20),
+                p[2].saturating_add(30),
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Mult([255, 128, 0]), |p| {
+            [p[0], scale(p[1], 128. / 255.), 0, p[3]]
+        });
+        // an exposure of 25 is one stop, twice as bright
+        assert_each(ImageOperation::Exposure(25), |p| {
+            [scale(p[0], 2.), scale(p[1], 2.), scale(p[2], 2.), p[3]]
+        });
+        assert_each(ImageOperation::Fill([10, 20, 30, 255]), |_| {
+            [10, 20, 30, 255]
+        });
+        assert_each(
+            ImageOperation::ChannelSwap((Channel::Red, Channel::Blue)),
+            |p| [p[2], p[1], p[2], p[3]],
+        );
+        assert_each(ImageOperation::Expression("r = 1.0 - r".into()), |p| {
+            [255 - p[0], p[1], p[2], p[3]]
+        });
+        assert_each(ImageOperation::Posterize(1), |p| {
+            [
+                scale(p[0], 1. / 255.) * 255,
+                scale(p[1], 1. / 255.) * 255,
+                scale(p[2], 1. / 255.) * 255,
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Equalize((50, 100)), |p| {
+            let f = |v: u8| (50. + v as f32 / 255. * 50.).round() as u8;
+            [f(p[0]), f(p[1]), f(p[2]), p[3]]
+        });
+        // MMult multiplies by alpha: the transparent pixel turns black
+        assert_each(ImageOperation::MMult, |p| {
+            let a = p[3] as f32 / 255.;
+            [scale(p[0], a), scale(p[1], a), scale(p[2], a), p[3]]
+        });
+        // gray as the luma of the color, the same weights as the gradient map
+        assert_each(ImageOperation::Desaturate(100), |p| {
+            let v = (p[0] as f32 * 0.299 + p[1] as f32 * 0.587 + p[2] as f32 * 0.114).round() as u8;
+            [v, v, v, p[3]]
+        });
+    }
+
+    /// Scaling to the range of the image stretches its darkest value to 0 and its
+    /// brightest to 255
+    #[test]
+    fn scale_to_min_max() {
+        let input = sample();
+        let values = |img: &DynamicImage| {
+            let rgba = img.to_rgba8();
+            let all = rgba
+                .pixels()
+                .flat_map(|p| p.0[..3].to_vec())
+                .collect::<Vec<_>>();
+            (*all.iter().min().unwrap(), *all.iter().max().unwrap())
+        };
+        assert_eq!(values(&input), (3, 250));
+        assert_eq!(
+            values(&apply(ImageOperation::ScaleImageMinMax, &input)),
+            (0, 255)
+        );
+    }
+
+    /// A 3x3 filter leaves no black frame around the image
+    #[test]
+    fn filter_keeps_the_border() {
+        let input = sample();
+        let sharpened = apply(
+            ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
+            &input,
+        )
+        .to_rgba8();
+        let original = input.to_rgba8();
+        for (x, y) in [(0, 0), (15, 0), (0, 11), (7, 0), (0, 5)] {
+            assert_eq!(
+                sharpened.get_pixel(x, y),
+                original.get_pixel(x, y),
+                "at {x},{y}"
+            );
+        }
+    }
+
+    /// Inverting twice gives the image back
+    #[test]
+    fn invert_twice_is_the_image() {
+        let input = sample();
+        let twice = apply(
+            ImageOperation::Invert,
+            &apply(ImageOperation::Invert, &input),
+        );
+        assert_eq!(twice, input);
+    }
+
+    /// Contrast pushes values away from the middle, the middle stays
+    #[test]
+    fn contrast_keeps_the_middle() {
+        let gray = |v: u8| {
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([v, v, v, 255])))
+        };
+        let out = |v: u8| {
+            apply(ImageOperation::Contrast(60), &gray(v))
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert!(out(64) < 64, "dark gets darker: {}", out(64));
+        assert!(out(192) > 192, "bright gets brighter: {}", out(192));
+        assert!(
+            out(128).abs_diff(128) <= 1,
+            "the middle stays: {}",
+            out(128)
+        );
+        let less = |v: u8| {
+            apply(ImageOperation::Contrast(-60), &gray(v))
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert!(
+            less(64) > 64 && less(192) < 192,
+            "less contrast moves values to the middle"
+        );
+    }
+
+    #[test]
+    fn hsv_turns_red_into_cyan() {
+        let red =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255])));
+        let out = apply(ImageOperation::HSV((180, 100, 100)), &red)
+            .to_rgba8()
+            .get_pixel(0, 0)
+            .0;
+        assert_eq!(out, [0, 255, 255, 255]);
+    }
+
+    #[test]
+    fn gradient_map_from_black_to_white_is_the_brightness() {
+        let stops = vec![
+            GradientStop::new(0, [0, 0, 0]),
+            GradientStop::new(255, [255, 255, 255]),
+        ];
+        let out = apply(ImageOperation::GradientMap(stops), &sample()).to_rgba8();
+        for p in out.pixels() {
+            assert!(p.0[0] == p.0[1] && p.0[1] == p.0[2], "not gray: {:?}", p.0);
+        }
+    }
+
+    #[test]
+    fn slice_keeps_only_the_range() {
+        let out = |v: u8| {
+            let gray =
+                DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([v, v, v, 255])));
+            apply(ImageOperation::Slice(128, 20, false), &gray)
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert_eq!(out(128), 128);
+        assert_eq!(out(60), 0);
+        assert_eq!(out(220), 0);
+    }
+
+    /// Noise stays gray on a gray image when it is mono, and changes the image
+    #[test]
+    fn noise() {
+        let gray = DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+            8,
+            8,
+            image::Rgba([100, 100, 100, 255]),
+        ));
+        let mono = apply(
+            ImageOperation::Noise {
+                amt: 50,
+                mono: true,
+            },
+            &gray,
+        )
+        .to_rgba8();
+        assert!(mono.pixels().all(|p| p.0[0] == p.0[1] && p.0[1] == p.0[2]));
+        assert_ne!(DynamicImage::ImageRgba8(mono), gray);
+    }
+
+    #[test]
+    fn geometry() {
+        let input = sample();
+        let (w, h) = (input.width(), input.height());
+        let corner = input.to_rgba8().get_pixel(0, 0).0;
+        let at = |img: &DynamicImage, x: u32, y: u32| img.to_rgba8().get_pixel(x, y).0;
+
+        let turned = apply(ImageOperation::Rotate(90), &input);
+        assert_eq!((turned.width(), turned.height()), (h, w));
+        assert_eq!(at(&turned, h - 1, 0), corner, "clockwise");
+        let turned = apply(ImageOperation::Rotate(-90), &input);
+        assert_eq!(at(&turned, 0, w - 1), corner, "counter clockwise");
+        assert_eq!(apply(ImageOperation::Rotate(270), &input), turned);
+        let turned = apply(ImageOperation::Rotate(180), &input);
+        assert_eq!(at(&turned, w - 1, h - 1), corner);
+
+        assert_eq!(
+            at(&apply(ImageOperation::Flip(true), &input), 0, h - 1),
+            corner,
+            "vertical"
+        );
+        assert_eq!(
+            at(&apply(ImageOperation::Flip(false), &input), w - 1, 0),
+            corner,
+            "horizontal"
+        );
+
+        // a quarter off every side, in ten thousandths
+        let cropped = apply(ImageOperation::Crop([2500, 2500, 2500, 2500]), &input);
+        assert_eq!((cropped.width(), cropped.height()), (8, 6));
+        assert_eq!(at(&cropped, 0, 0), at(&input, 4, 3));
+        assert_eq!(cropped_range(&[2500; 4], &(100, 100)), [25, 25, 50, 50]);
+
+        // the whole image as the perspective crop keeps it
+        let whole = apply(
+            ImageOperation::CropPerspective {
+                points: [(0, 0), (w, 0), (0, h), (w, h)],
+                original_size: (w, h),
+            },
+            &input,
+        );
+        assert_eq!((whole.width(), whole.height()), (w, h));
+    }
+
+    /// Resize gives the size it is asked for, in every layout. Other layouts than
+    /// RGBA used the width for the height too, and kept the aspect ratio.
+    #[test]
+    fn resize_gives_the_size_asked_for() {
+        let resize = ImageOperation::Resize {
+            dimensions: (7, 3),
+            aspect: false,
+            filter: ScaleFilter::Lanczos3,
+        };
+        let input = sample();
+        for layout in [
+            input.clone(),
+            DynamicImage::ImageRgb8(input.to_rgb8()),
+            DynamicImage::ImageLuma16(input.to_luma16()),
+        ] {
+            let out = apply(resize.clone(), &layout);
+            assert_eq!((out.width(), out.height()), (7, 3), "{:?}", layout.color());
+            assert_eq!(out.color(), layout.color());
+        }
+    }
+
+    /// The conversion of the color type works on every layout. It did nothing on RGBA.
+    #[test]
+    fn color_conversion_on_every_layout() {
+        let input = sample();
+        for layout in [input.clone(), DynamicImage::ImageRgb8(input.to_rgb8())] {
+            let out = apply(ImageOperation::ColorConverter(ColorTypeExt::L8), &layout);
+            assert_eq!(
+                out.color(),
+                image::ColorType::L8,
+                "from {:?}",
+                layout.color()
+            );
+        }
+    }
+
+    /// The other whole-image operations change the image, keep its size and give
+    /// the same result every time
+    #[test]
+    fn image_operations_are_deterministic() {
+        // with structure, a sharpened gradient is the gradient
+        let input = DynamicImage::ImageRgba8(RgbaImage::from_fn(16, 12, |x, y| {
+            let v = ((x * 31 + y * 17) * 7 % 256) as u8;
+            image::Rgba([
+                v,
+                255 - v,
+                v / 2 + 40,
+                if (x, y) == (15, 11) { 0 } else { 255 },
+            ])
+        }));
+        for op in [
+            ImageOperation::Blur(10),
+            ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
+            ImageOperation::LUT("Fuji Superia 1600 2".into()),
+            ImageOperation::ChromaticAberration(30),
+        ] {
+            let first = apply(op.clone(), &input);
+            assert_eq!(
+                (first.width(), first.height()),
+                (input.width(), input.height()),
+                "{op:?}"
+            );
+            assert_ne!(first, input, "{op:?} changed nothing");
+            assert_eq!(
+                apply(op.clone(), &input),
+                first,
+                "{op:?} differs from run to run"
+            );
+        }
+        // a LUT keeps the alpha
+        let lut = apply(ImageOperation::LUT("Fuji Superia 1600 2".into()), &input).to_rgba8();
+        assert_eq!(lut.get_pixel(15, 11).0[3], 0);
     }
 }
