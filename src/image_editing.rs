@@ -114,6 +114,18 @@ pub fn saved_edits(image_path: &Path) -> Option<Result<(EditState, &'static str)
     )))
 }
 
+impl EditState {
+    /// The result of the image operations is kept when that saves work: when
+    /// there is an operation other than the conversion of the color type. The
+    /// conversion alone is cheap to do again, and keeping its result would hold
+    /// a second copy of the image.
+    pub fn keeps_image_op_result(&self) -> bool {
+        self.image_op_stack
+            .iter()
+            .any(|op| op.active && !matches!(op.operation, ImageOperation::ColorConverter(_)))
+    }
+}
+
 impl Default for EditState {
     fn default() -> Self {
         Self {

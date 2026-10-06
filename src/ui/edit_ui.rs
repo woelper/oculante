@@ -33,18 +33,15 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
     let mut image_changed = false;
     let mut pixels_changed = false;
 
-    if let Some(img) = &state.current_image {
-        // Ensure that edit result image is always filled
+    if state.current_image.is_some() {
+        // Ensure that the edit results are filled, by the processing below
         if state.edit_state.result_pixel_op.width() == 0 {
-            debug!("Edit state pixel comp buffer is default, cloning from image");
-            // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_pixel_op = DynamicImage::clone(img);
+            debug!("Edit state pixel comp buffer is default");
             pixels_changed = true;
         }
-        if state.edit_state.result_image_op.width() == 0 {
-            debug!("Edit state image comp buffer is default, cloning from image");
-            // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_image_op = DynamicImage::clone(img);
+        if state.edit_state.keeps_image_op_result() && state.edit_state.result_image_op.width() == 0
+        {
+            debug!("Edit state image comp buffer is default");
             image_changed = true;
         }
     }
@@ -535,7 +532,10 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             });
         });
 
-        if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
+        // the result has the color type the image operations produce
+        if state.edit_state.result_pixel_op.width() > 0
+            && state.edit_state.result_pixel_op.color() != ColorType::Rgba8
+        {
             let op_present = state.edit_state.image_op_stack.first().map(|op| matches!(op.operation, ImageOperation::ColorConverter(_))).unwrap_or_default();
             if !op_present {
                 state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
@@ -569,20 +569,25 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;
+            let keep_image_op_result = state.edit_state.keeps_image_op_result();
             if image_changed {
-                if let Some(img) = &mut state.current_image {
+                if let Some(img) = &state.current_image {
                     let stamp = Instant::now();
-                    // start with a fresh copy of the unmodified image
-                    // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = DynamicImage::clone(img);
-                    for operation in &state.edit_state.image_op_stack {
-                        if !operation.active {
-                            continue;
+                    if keep_image_op_result {
+                        // start with a fresh copy of the unmodified image, in the buffer of the last one
+                        state.edit_state.result_image_op.clone_from(img);
+                        for operation in &state.edit_state.image_op_stack {
+                            if !operation.active {
+                                continue;
+                            }
+                            if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
+                                error!("{e}");
+                                state.send_message_warn(&format!("{e}"));
+                            }
                         }
-                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}");
-                            state.send_message_warn(&format!("{e}"));
-                        }
+                    } else {
+                        // nothing worth keeping, the conversion is done with the pixel operations
+                        state.edit_state.result_image_op = DynamicImage::default();
                     }
                     debug!(
                         "Image changed. Finished evaluating in {}s",
@@ -601,8 +606,18 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 // init result as a clean copy of image operation result
                 let stamp = Instant::now();
 
-                // start from the result of the image operations
-                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
+                // start from the result of the image operations, in the buffer of the last result
+                if keep_image_op_result {
+                    state.edit_state.result_pixel_op.clone_from(&state.edit_state.result_image_op);
+                } else if let Some(img) = &state.current_image {
+                    state.edit_state.result_pixel_op.clone_from(img);
+                    // only the conversion of the color type, if there is one
+                    for operation in state.edit_state.image_op_stack.iter().filter(|op| op.active) {
+                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_pixel_op) {
+                            error!("{e}");
+                        }
+                    }
+                }
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
