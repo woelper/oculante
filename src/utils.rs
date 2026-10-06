@@ -153,9 +153,7 @@ impl ExtendedImageInfo {
 
     pub fn with_dicom(&mut self, image_path: &Path) -> Result<()> {
         self.name = image_path.to_string_lossy().to_string();
-        if image_path.extension() != Some(OsStr::new("dcm"))
-            || image_path.extension() != Some(OsStr::new("ima"))
-        {
+        if is_dicom(image_path) {
             let obj = dicom_object::open_file(image_path)?;
             let mut dicom_data = HashMap::new();
 
@@ -1081,9 +1079,37 @@ pub fn get_pixel_checked(img: &DynamicImage, x: u32, y: u32) -> Option<Rgba<u8>>
     None
 }
 
+/// DICOM files carry "DICM" after a preamble of 128 bytes. Files are told
+/// apart by that, whatever their name.
+fn is_dicom(path: &Path) -> bool {
+    use std::io::Read;
+    let mut head = [0u8; 132];
+    std::fs::File::open(path)
+        .and_then(|mut file| file.read_exact(&mut head))
+        .is_ok()
+        && &head[128..] == b"DICM"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only DICOM files are read as DICOM. Every image was tried before.
+    #[test]
+    fn dicom_is_recognised_by_content() {
+        let dir = std::env::temp_dir();
+        let dicom = dir.join("oculante_test_is_dicom.png");
+        let mut bytes = vec![0u8; 128];
+        bytes.extend_from_slice(b"DICM");
+        std::fs::write(&dicom, &bytes).unwrap();
+        let short = dir.join("oculante_test_is_dicom_short.dcm");
+        std::fs::write(&short, b"DICM").unwrap();
+        assert!(is_dicom(&dicom), "a DICOM file with the extension of a PNG");
+        assert!(!is_dicom(&short), "a file too short to be DICOM");
+        assert!(!is_dicom(Path::new("res/tests/test.png")));
+        _ = std::fs::remove_file(dicom);
+        _ = std::fs::remove_file(short);
+    }
 
     /// Something with many different values, in every channel
     fn pattern(bytes_per_pixel: usize) -> Vec<u8> {
