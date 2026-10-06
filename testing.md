@@ -81,6 +81,46 @@ Found by going through the open issues and looking at the code. None of these ha
 
 
 # Performance
+
+## Loading and memory, plan of 2026-10-06
+Measured on the OptiPlex with release builds and photos of 24 megapixels from Wikimedia Commons (scratch tools: a stage benchmark, heaptrack, RSS while browsing and editing).
+
+Done:
+- [x] Info panel numbers only while it is open, once per image, in parallel: 24 MP 27 -> 6 ms, 144 MP 189 -> 24 ms, 16 bit gray 155 -> 20 ms. Before, every edit slider tick computed them again.
+- [x] EXIF read for display without reading the file twice (288 MB for a 144 MB EXR), TIFF 45 -> 12 ms, EXR 90 -> 0 ms. Saving takes the EXIF from the source file.
+- [x] Cache keeps to a memory budget (1/16 of RAM, 256 MB to 1 GB): 30 photos 2.1 GB -> levels off at about 1.4 GB in total.
+- [x] Editing keeps one RGBA copy instead of two: one filter on 24 MP +245 MB -> +122 MB.
+- [x] EXIF orientation in parallel: 75 -> 16 ms for a turned 24 MP photo.
+- [x] Bugs found on the way: saved edits were never read again, false extension warning on every .heic, crash of pixel filters on float RGBA, saving as PNG crashed for everything but 8 bit RGBA, delete said "Deleted" when it failed, every image was opened as DICOM.
+
+Open:
+- [ ] Prefetch the next and the previous image of the folder into the cache while one is shown, cancelled when moving on. A cache hit shows the image in about 30 ms, decoding a 24 MP photo takes 110-500 ms depending on the format. Needs a load counter first, so a late result can never be shown for another image (the first step of the state handling rework).
+- [ ] Bounded memory for long animations: all frames are kept as full RGBA, 380 small frames take 204 MB, a 1080p GIF of 300 frames would need about 2.5 GB. Keep all frames while they fit a budget, above it stream them: the loader decodes ahead into a bounded channel and again for every loop.
+- [ ] Measure first: skip mipmaps for images that are never zoomed out below 100% (a third of the GPU memory of an image); the slow decoders (WebP 348 ms, TIFF 342 ms, AVIF 499 ms, HEIC without tiles 1.3 s for 24 MP) against alternatives.
+- [ ] Not worth it, measured: decoding a JPEG at a reduced size first. libjpeg-turbo at 1/8 is only 10-40% faster.
+
+Simplifications found (read and spot checked, nothing changed yet):
+- [ ] About 1100 lines can go without a change in behaviour: src/ktx2_loader/dds.rs and image_loader.rs are in no mod and could not compile, about 300 lines of unused KTX2 code, about 200 lines of functions nobody calls (image_ui, label_i_selected, rotate_rgbaimage, solo_channel, unpremult, LegacyEditState is used again now), unused Frame constructors, the fields redraw, first_start and name, src/input.rs (only comments), commented out code. Every module is `pub mod`, so rustc does not warn; `pub(crate)` would show the next batch.
+- [ ] One `load()` and `reload()` for about 15 copies of `is_loaded = false; player.load(..); current_path = ..`.
+- [ ] `Frame::ImageCollectionMember` behaves like `Still` everywhere.
+- [ ] Mark the texture dirty directly instead of sending `Frame::UpdateTexture` through the channel from the main thread.
+- [ ] Compare mode: pass the stored geometry instead of a dummy `CompareResult` frame and `transmute`. Removes reset_after_upload, compare_geometry and last_frame_was_compared_image.
+- [ ] "Save as..." with the file_open feature saves with the image crate defaults instead of the encoder settings.
+
+Tests to add:
+- [ ] Exact output of every edit operation on a small image (Noise only for its bounds).
+- [ ] Lossless JPEG rotations and crops on a JPEG whose size is not a multiple of the block size.
+- [ ] One table test that loads every file in res/tests: about 30 files and a dozen formats are loaded by no test (TIFF, HDR, BMP, ICO, TGA, QOI, raw, the 10 and 12 bit AVIFs, most KTX2, EXR and JXL files).
+- [ ] Scrubber: natural sort, wrap, removing entries at the ends.
+- [ ] Delete in a UI test, and the shortcuts the shortcut test misses (Delete, Shift+Delete, [, ], q).
+- [ ] Settings: defaults from an empty file, a saved file of 0.9.6 still loads.
+- [ ] Clipboard copy and paste with xclip.
+
+Reported by reading the code, not checked yet:
+- [ ] Resize of images that are not 8 bit RGBA may pass the width as the height (image_editing.rs, Resize in process_image).
+- [ ] A TIFF with a single value may come out black (autoscale divides by zero).
+- [ ] Copy to the clipboard may not stay on X11 without a clipboard manager (the handle is dropped right away).
+- [ ] Paste may run twice while the menu is open.
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
 - [x] switching channels (rgba) is slow
