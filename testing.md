@@ -17,6 +17,7 @@
 - [ ] UI tests: run them in a headless Wayland session (Sway or Jay) with ydotool instead of xdotool, so problems that only show on Wayland are covered (suggested by Stoppedpuma in #811)
 
 # Obvious defects
+- [ ] At 100% an image with an odd width or height sits on a half pixel, since it is centred in the window. With linear filtering (the default) the whole image is blurred, a 301x201 test image differs from the file in 27% of its pixels. With nearest filtering one edge row or column is missing. Even sizes are exact. Round the image origin to whole screen pixels when drawing. Found while checking GIF playback, the code for it is older.
 - [x] The > icons (carets) are off since the update to egui 0.36
 - [x] The loaded image is always drawn in front on top of the ui
 - [x] Background color does not work
