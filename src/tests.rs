@@ -228,6 +228,83 @@ fn ci_pixel_operations_on_every_layout() {
     assert!(process_pixels(&mut sixteen, &ops).is_err());
 }
 
+/// Every encoder saves every layout an image can have, and the file opens
+/// again with the same size. Lossless formats keep the pixels.
+#[test]
+fn ci_save_every_layout_with_every_encoder() {
+    use crate::file_encoder::{CompressionLevel, FileEncoder};
+    use image::{DynamicImage, GenericImageView, RgbaImage};
+    let base = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 50) as u8, (y * 80) as u8, 90, 255])
+    }));
+    let layouts = [
+        base.to_luma8().into(),
+        base.to_luma_alpha8().into(),
+        base.to_rgb8().into(),
+        base.clone(),
+        base.to_luma16().into(),
+        base.to_rgba16().into(),
+        base.to_rgb32f().into(),
+        DynamicImage::ImageRgba32F(base.to_rgba32f()),
+    ];
+    let encoders = [
+        FileEncoder::Png {
+            compressionlevel: CompressionLevel::Default,
+        },
+        FileEncoder::Jpg { quality: 90 },
+        FileEncoder::Bmp,
+        FileEncoder::WebP,
+        FileEncoder::Avif,
+    ];
+    let dir = std::env::temp_dir().join("oculante_test_save");
+    _ = std::fs::create_dir_all(&dir);
+    let mut failures = vec![];
+    for encoder in &encoders {
+        for image in &layouts {
+            let path = dir.join(format!("{:?}.{}", image.color(), encoder.ext()));
+            let result = std::panic::catch_unwind(|| encoder.save(image, &path));
+            let saved = match result {
+                Ok(Ok(())) => open_image(&path, None, None).and_then(|receiver| {
+                    receiver
+                        .recv_timeout(Duration::from_secs(30))?
+                        .get_image()
+                        .ok_or(anyhow::anyhow!("no image"))
+                }),
+                Ok(Err(e)) => {
+                    failures.push(format!("{encoder} {:?}: {e}", image.color()));
+                    continue;
+                }
+                Err(_) => {
+                    failures.push(format!("{encoder} {:?}: panicked", image.color()));
+                    continue;
+                }
+            };
+            match saved {
+                Ok(saved) if saved.dimensions() != (5, 3) => failures.push(format!(
+                    "{encoder} {:?}: size {:?}",
+                    image.color(),
+                    saved.dimensions()
+                )),
+                Ok(saved) => {
+                    let lossless = matches!(
+                        encoder,
+                        FileEncoder::Png { .. } | FileEncoder::Bmp | FileEncoder::WebP
+                    );
+                    if lossless && saved.to_rgb8() != image.to_rgb8() {
+                        failures.push(format!("{encoder} {:?}: pixels differ", image.color()));
+                    }
+                }
+                Err(e) => failures.push(format!(
+                    "{encoder} {:?}: can not open the file: {e}",
+                    image.color()
+                )),
+            }
+        }
+    }
+    _ = std::fs::remove_dir_all(&dir);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();
