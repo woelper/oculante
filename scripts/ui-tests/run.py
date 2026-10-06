@@ -332,6 +332,62 @@ def test_relative_file_name(binary):
         assert shown_file(app) == "c.png", f"after b.png came {shown_file(app)}"
 
 
+def test_delete(binary):
+    """Delete asks first and moves the file to the trash, Cancel keeps it, and
+    Shift+Delete only takes the image off the list."""
+    folder = folder_of("delete_images", [("a.png", "test.png"), ("b.png", "test.png"), ("c.png", "test.png")])
+    with start(binary, "delete", os.path.join(folder, "b.png")) as app:
+        trash = os.path.join(app.env["XDG_DATA_HOME"], "Trash", "files")
+        app.key("Delete")
+        app.settle(1.0)
+        app.click(512, 380)  # "Yes"
+        app.settle(1.5)
+        assert not os.path.exists(os.path.join(folder, "b.png")), "the file is still there"
+        assert os.path.isfile(os.path.join(trash, "b.png")), "the file is not in the trash"
+        assert shown_file(app) == "c.png", f"after deleting b.png came {shown_file(app)}"
+
+        app.key("Delete")
+        app.settle(1.0)
+        app.click(512, 420)  # "Cancel"
+        app.settle(1.0)
+        assert os.path.isfile(os.path.join(folder, "c.png")), "Cancel deleted the file"
+        assert shown_file(app) == "c.png"
+
+        since = len(app.log())
+        app.key("shift+Delete")
+        app.settle(1.5)
+        assert "ClearImage" in app.matched_shortcuts(since)
+        assert os.path.isfile(os.path.join(folder, "c.png")), "Shift+Delete deleted the file"
+        assert shown_file(app) == "a.png", f"after taking c.png off the list came {shown_file(app)}"
+
+
+def test_lossless_rotation_keys_and_quit(binary):
+    """] and [ turn a JPEG on disk without recompressing it, q quits."""
+    folder = folder_of("rotation_keys_images", [("moss.jpg", "moss.jpg")])
+    path = os.path.join(folder, "moss.jpg")
+
+    def size():
+        out = subprocess.run(["identify", "-format", "%w %h", path], capture_output=True, text=True).stdout
+        return tuple(int(v) for v in out.split())
+
+    with start(binary, "rotation_keys", path) as app:
+        assert size() == (1000, 750)
+        app.key("bracketright")
+        app.settle(2.0)
+        width, height = size()
+        assert width < height, f"] did not turn the file: {width}x{height}"
+        app.key("bracketleft")
+        app.settle(2.0)
+        width, height = size()
+        assert width > height, f"[ did not turn it back: {width}x{height}"
+        assert {"LosslessRotateRight", "LosslessRotateLeft"} <= set(app.matched_shortcuts())
+        app.key("q")
+        end = time.time() + 5
+        while app.running() and time.time() < end:
+            time.sleep(0.2)
+        assert not app.running(), "q did not quit"
+
+
 def test_key_repeat(binary):
     """A key that is held down goes through the images of a folder."""
     folder = os.path.join(OUT, "key_repeat_images")
@@ -785,6 +841,8 @@ TESTS = [
     test_measure_draws_rectangle,
     test_key_repeat,
     test_relative_file_name,
+    test_delete,
+    test_lossless_rotation_keys_and_quit,
     test_zen_mode,
     test_paint_mode,
     test_fullscreen,
