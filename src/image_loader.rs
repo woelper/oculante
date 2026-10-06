@@ -470,7 +470,7 @@ pub fn open_image(
                 let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
                 debug!("webp frame delay {delay_ms}ms");
                 let i = DynamicImage::ImageRgba8(frame.into_buffer());
-                let frame = Frame::new_animation(i, delay_ms as u16);
+                let frame = Frame::new_animation(i, delay_ms);
                 _ = sender.send(frame);
             }
 
@@ -491,7 +491,7 @@ pub fn open_image(
                     let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
                     debug!("apng frame delay {delay_ms}ms");
                     let i = DynamicImage::ImageRgba8(frame.into_buffer());
-                    _ = sender.send(Frame::new_animation(i, delay_ms as u16));
+                    _ = sender.send(Frame::new_animation(i, delay_ms));
                 }
 
                 return Ok(receiver);
@@ -522,7 +522,8 @@ pub fn open_image(
                     );
                     let buf = buf.context("Can't read gif frame")?;
                     let i = DynamicImage::ImageRgba8(buf);
-                    _ = sender.send(Frame::new_animation(i, frame.delay * 10));
+                    // the delay is in hundredths of a second, up to more than ten minutes
+                    _ = sender.send(Frame::new_animation(i, u32::from(frame.delay) * 10));
                 } else {
                     break;
                 }
@@ -811,17 +812,16 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
 
     debug!("{:#?}", image.image_header().metadata);
     let is_jxl_anim = image.image_header().metadata.animation.is_some();
-    let ticks_ms = image
+    // Durations are counted in ticks. A tick can be shorter than a millisecond,
+    // so this stays a fraction until a frame's duration is computed.
+    let ms_per_tick = image
         .image_header()
         .metadata
         .animation
         .as_ref()
-        .map(|hdr| hdr.tps_numerator as f32 / hdr.tps_denominator as f32)
-        // map this into milliseconds
-        .map(|x| 1000. / x)
-        .map(|x| x as u16)
-        .unwrap_or(40);
-    debug!("TPS: {ticks_ms}");
+        .map(|hdr| 1000.0 * hdr.tps_denominator as f64 / hdr.tps_numerator as f64)
+        .unwrap_or(40.0);
+    debug!("ms per tick: {ms_per_tick}");
 
     for keyframe_idx in 0..image.num_loaded_keyframes() {
         // create a mutable image to hold potential decoding results. We can then use this only once at the end of the loop/
@@ -832,7 +832,7 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
             .map_err(|e| anyhow!("{e}"))
             .context("Can't render JXL")?;
 
-        let frame_duration = render.duration() as u16 * ticks_ms;
+        let frame_duration = (render.duration() as f64 * ms_per_tick).round() as u32;
         debug!("duration {frame_duration} ms");
         let framebuffer = render.image_all_channels();
         debug!("{:?}", image.pixel_format());

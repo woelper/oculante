@@ -79,7 +79,7 @@ impl Animation {
     }
 
     /// Frames without a delay play at 25 fps, nothing plays faster than 60 fps
-    fn delay(delay_ms: u16) -> Duration {
+    fn delay(delay_ms: u32) -> Duration {
         Duration::from_millis(if delay_ms > 0 {
             delay_ms.max(17) as u64
         } else {
@@ -87,7 +87,7 @@ impl Animation {
         })
     }
 
-    fn push(&mut self, image: Arc<DynamicImage>, delay_ms: u16) {
+    fn push(&mut self, image: Arc<DynamicImage>, delay_ms: u32) {
         if self.frames.is_empty() {
             self.next_switch = Instant::now() + Self::delay(delay_ms);
         }

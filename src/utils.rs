@@ -489,7 +489,7 @@ pub enum Frame {
     /// A regular still frame (most common)
     Still(Arc<DynamicImage>),
     /// Part of an animation. Delay in ms
-    Animation(Arc<DynamicImage>, u16),
+    Animation(Arc<DynamicImage>, u32),
     /// First frame of animation. This is necessary to reset the image and stop the player.
     AnimationStart(Arc<DynamicImage>),
     /// Result of an edit operation with image
@@ -513,7 +513,7 @@ impl Frame {
         Frame::AnimationStart(buffer.into())
     }
 
-    pub fn new_animation(buffer: impl Into<Arc<DynamicImage>>, delay_ms: u16) -> Frame {
+    pub fn new_animation(buffer: impl Into<Arc<DynamicImage>>, delay_ms: u32) -> Frame {
         Frame::Animation(buffer.into(), delay_ms)
     }
 

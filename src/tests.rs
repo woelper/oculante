@@ -65,6 +65,44 @@ fn ci_load_webp() {
     assert_valid_image(&frame);
 }
 
+/// Writes an animated GIF with the given frame delays in milliseconds
+fn write_gif(path: &std::path::Path, delays_ms: &[u32]) {
+    use image::codecs::gif::{GifEncoder, Repeat};
+    use image::{Delay, Frame as ImageFrame, Rgba, RgbaImage};
+    let mut encoder = GifEncoder::new(std::fs::File::create(path).unwrap());
+    encoder.set_repeat(Repeat::Infinite).unwrap();
+    for (i, delay) in delays_ms.iter().enumerate() {
+        let color = Rgba([(i * 80) as u8, 0, 0, 255]);
+        let buffer = RgbaImage::from_pixel(8, 8, color);
+        encoder
+            .encode_frame(ImageFrame::from_parts(
+                buffer,
+                0,
+                0,
+                Delay::from_numer_denom_ms(*delay, 1),
+            ))
+            .unwrap();
+    }
+}
+
+/// GIF delays go up to more than ten minutes. A frame of 100 seconds kept
+/// its delay instead of overflowing.
+#[test]
+fn ci_load_gif_long_delay() {
+    let path = std::env::temp_dir().join("oculante_test_long_delay.gif");
+    write_gif(&path, &[100, 100_000, 20]);
+    let receiver = open_image(&path, None, None).expect("open_image failed");
+    let delays: Vec<u32> = receiver
+        .iter()
+        .filter_map(|frame| match frame {
+            Frame::Animation(_, delay) => Some(delay),
+            _ => None,
+        })
+        .collect();
+    _ = std::fs::remove_file(&path);
+    assert_eq!(delays, vec![100, 100_000, 20]);
+}
+
 #[test]
 fn ci_load_misnamed_mp4_as_gif() {
     // This file is actually an MP4 with a .gif extension.
