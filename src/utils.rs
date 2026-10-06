@@ -352,10 +352,7 @@ impl Player {
             image_sender,
             stop_sender,
             message_sender,
-            cache: Cache {
-                data: Default::default(),
-                cache_size,
-            },
+            cache: Cache::new(cache_size),
             watcher: Default::default(),
             decoder_opts,
         }
