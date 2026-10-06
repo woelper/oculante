@@ -103,6 +103,46 @@ fn ci_load_gif_long_delay() {
     assert_eq!(delays, vec![100, 100_000, 20]);
 }
 
+/// An animated PNG of 4x4 pixels with 16 bit colors: a red frame, then a blue one
+fn write_apng_16bit(path: &std::path::Path) {
+    let file = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+    let mut encoder = png::Encoder::new(file, 4, 4);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Sixteen);
+    encoder.set_animated(2, 0).unwrap();
+    encoder.set_frame_delay(1, 10).unwrap();
+    let mut writer = encoder.write_header().unwrap();
+    let red = [0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff].repeat(16);
+    let blue = [0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff].repeat(16);
+    writer.write_image_data(&red).unwrap();
+    writer.write_image_data(&blue).unwrap();
+    writer.finish().unwrap();
+}
+
+/// The image crate can not composite the frames of a 16 bit APNG. The default
+/// image is shown instead, with a warning, as the APNG specification recommends
+/// for animations that can not be played.
+#[test]
+fn ci_load_apng_16bit_shows_default_image() {
+    let path = std::env::temp_dir().join("oculante_test_apng_16bit.png");
+    write_apng_16bit(&path);
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    let receiver = open_image(&path, Some(message_sender), None).expect("open_image failed");
+    let frames: Vec<Frame> = receiver.iter().collect();
+    _ = std::fs::remove_file(&path);
+    assert_eq!(frames.len(), 1, "expected the default image only");
+    let Frame::Still(image) = &frames[0] else {
+        panic!("expected a still image, got {}", frames[0]);
+    };
+    assert_eq!(image.to_rgba8().get_pixel(0, 0).0, [255, 0, 0, 255]);
+    assert!(
+        messages
+            .try_iter()
+            .any(|m| matches!(m, crate::appstate::Message::Warning(_))),
+        "no warning that the animation can not be played"
+    );
+}
+
 #[test]
 fn ci_load_misnamed_mp4_as_gif() {
     // This file is actually an MP4 with a .gif extension.

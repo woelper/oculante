@@ -172,6 +172,8 @@ eframe = { version = "0.36", default-features = false, features = [
 winres = "0.1"
 
 [dev-dependencies]
+# to write test images the image crate can not write, already used by it
+png = "0.18"
 criterion = { version = "0.8", features = ["html_reports", "stable"] }
 
 [profile.release]

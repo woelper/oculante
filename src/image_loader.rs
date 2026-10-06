@@ -2,7 +2,7 @@ use crate::ktx2_loader::CompressedImageFormats;
 use crate::settings::DecoderSettings;
 use crate::utils::{Frame, fit};
 use crate::{FONT, appstate::Message, ktx2_loader};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use psd::Psd;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -62,7 +62,7 @@ pub fn open_image(
             if unchecked_extensions.contains(&extension.as_str()) {
                 info!("Extension {extension} skipped check.")
             } else {
-                message_sender.map(|s| {
+                message_sender.as_ref().map(|s| {
                     s.send(Message::Warning(format!(
                         "Extension mismatch. This image is loaded as {}",
                         fmt.extension()
@@ -479,25 +479,36 @@ pub fn open_image(
         }
         "png" | "apng" => {
             let contents = std::fs::read(&img_location)?;
+            let open = || image::codecs::png::PngDecoder::new(std::io::Cursor::new(&contents[..]));
 
-            let decoder = image::codecs::png::PngDecoder::new(std::io::Cursor::new(contents))?;
-
-            if decoder.is_apng()? {
+            let decoder = open()?;
+            let decoder = if decoder.is_apng()? {
                 info!("Image is animated (APNG)");
-
-                for frame in decoder.apng()?.into_frames() {
-                    let frame = frame.context("Can't decode APNG frame")?;
-                    let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
-                    let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
-                    debug!("apng frame delay {delay_ms}ms");
-                    let i = DynamicImage::ImageRgba8(frame.into_buffer());
-                    _ = sender.send(Frame::new_animation(i, delay_ms));
+                match decode_apng(decoder) {
+                    Ok(frames) => {
+                        for (image, delay_ms) in frames {
+                            _ = sender.send(Frame::new_animation(image, delay_ms));
+                        }
+                        return Ok(receiver);
+                    }
+                    // A broken animation, or one with 16 bit colors that can not be
+                    // composited, shows its default image instead, as the APNG
+                    // specification recommends.
+                    Err(e) => {
+                        warn!("{e:#}");
+                        if let Some(s) = &message_sender {
+                            _ = s.send(Message::warn(&format!(
+                                "This animation can't be played, showing its still image instead ({e:#})"
+                            )));
+                        }
+                        open()?
+                    }
                 }
+            } else {
+                decoder
+            };
 
-                return Ok(receiver);
-            }
-
-            debug!("Image is not animated");
+            debug!("Showing a still image");
             let img = DynamicImage::from_decoder(decoder)?;
             _ = sender.send(Frame::new_still(img));
             return Ok(receiver);
@@ -908,6 +919,22 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     debug!("Done decoding JXL");
 
     Ok(())
+}
+
+/// All frames of an animated PNG, with their delays in milliseconds
+fn decode_apng<R: std::io::BufRead + std::io::Seek>(
+    decoder: image::codecs::png::PngDecoder<R>,
+) -> Result<Vec<(DynamicImage, u32)>> {
+    decoder
+        .apng()?
+        .into_frames()
+        .map(|frame| {
+            let frame = frame.context("Can't decode APNG frame")?;
+            let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
+            let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
+            Ok((DynamicImage::ImageRgba8(frame.into_buffer()), delay_ms))
+        })
+        .collect()
 }
 
 /// Decode a HEIC or HEIF image with `heic-rs`, in the layout the file has:
