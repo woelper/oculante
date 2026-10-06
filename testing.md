@@ -17,7 +17,10 @@
 - [ ] UI tests: run them in a headless Wayland session (Sway or Jay) with ydotool instead of xdotool, so problems that only show on Wayland are covered (suggested by Stoppedpuma in #811)
 
 # Obvious defects
-- [ ] At 100% an image with an odd width or height sits on a half pixel, since it is centred in the window. With linear filtering (the default) the whole image is blurred, a 301x201 test image differs from the file in 27% of its pixels. With nearest filtering one edge row or column is missing. Even sizes are exact. Round the image origin to whole screen pixels when drawing. Found while checking GIF playback, the code for it is older.
+- [ ] Animations loop forever. The play count of a GIF or an APNG is not read, so one that should play once or twice keeps going (APNG conformance tests 031 and 032).
+- [ ] A 16 bit APNG shows its default image instead of playing, the image crate can not composite 16 bit frames. Rare, but a valid file. Fix upstream in the image crate, or convert to 8 bit before compositing.
+- [ ] Three broken APNGs of the conformance tests play although they are invalid (040 repeated acTL, 047 num_frames too low, 060 fdAT too large). The png crate does not notice, the spec asks to show the default image.
+- [x] At 100% an image with an odd width or height sat on a half pixel and was blurred. Fixed, UI test `test_actual_size_is_pixel_exact`.
 - [x] The > icons (carets) are off since the update to egui 0.36
 - [x] The loaded image is always drawn in front on top of the ui
 - [x] Background color does not work
