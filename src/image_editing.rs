@@ -81,6 +81,39 @@ impl LegacyEditState {
     }
 }
 
+/// Edits saved with "Save edits" next to an image, or with "Save directory
+/// edits" for all images of a folder, with a message for the user. `None` if
+/// there are none, an error if the file of the image can not be read.
+pub fn saved_edits(image_path: &Path) -> Option<Result<(EditState, &'static str), String>> {
+    let own = image_path.with_extension("oculante");
+    if own.is_file() {
+        let loaded = "Edits have been loaded for this image.";
+        let text = match std::fs::read_to_string(&own) {
+            Ok(text) => text,
+            Err(e) => return Some(Err(format!("Edits could not be loaded: {e}"))),
+        };
+        if let Ok(edit_state) = serde_json::from_str::<EditState>(&text) {
+            return Some(Ok((edit_state, loaded)));
+        }
+        // Edits saved by older versions are upgraded, and saved again that way
+        if let Ok(legacy) = serde_json::from_str::<LegacyEditState>(&text) {
+            let edit_state = legacy.upgrade();
+            if let Ok(file) = std::fs::File::create(&own) {
+                _ = serde_json::to_writer_pretty(file, &edit_state);
+            }
+            return Some(Ok((edit_state, loaded)));
+        }
+        return Some(Err("Edits could not be loaded.".into()));
+    }
+    let folder = image_path.parent()?.join(".oculante");
+    let edit_state =
+        serde_json::from_str::<EditState>(&std::fs::read_to_string(folder).ok()?).ok()?;
+    Some(Ok((
+        edit_state,
+        "Directory edits have been loaded for this image.",
+    )))
+}
+
 impl Default for EditState {
     fn default() -> Self {
         Self {

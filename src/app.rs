@@ -465,6 +465,19 @@ impl OculanteApp {
             if !self.state.persistent_settings.keep_edits {
                 self.state.edit_state = Default::default();
             }
+            // Edits saved for this image or its folder take over
+            if let Some(path) = &self.state.current_path
+                && let Some(saved) = crate::image_editing::saved_edits(path)
+            {
+                match saved {
+                    Ok((edit_state, message)) => {
+                        self.state.edit_state = edit_state;
+                        self.state.persistent_settings.edit_enabled = true;
+                        self.state.send_message_info(message);
+                    }
+                    Err(message) => self.state.send_message_err(&message),
+                }
+            }
         }
 
         match frame {

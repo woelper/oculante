@@ -575,6 +575,28 @@ def test_keep_edits(binary):
                 assert changed > 50_000, "the edits stayed although they should be dropped"
 
 
+def test_saved_edits_come_back(binary):
+    """Edits saved with "Save edits" are applied again when the image is opened later."""
+    folder = folder_of("saved_edits_images", [("moss.jpg", "moss.jpg")])
+    path = os.path.join(folder, "moss.jpg")
+    # the image, left of the edit panel, whose width can change a little
+    area = (130, 50, 560, 450)
+    with start(binary, "saved_edits", path) as app:
+        plain = app.shot("plain")
+        brighten(app)
+        edited = app.shot("edited")
+        app.click(890, 486)  # "Save edits"
+        app.settle(1.0)
+    assert os.path.isfile(os.path.join(folder, "moss.oculante")), "no file with the edits was written"
+    with start(binary, "saved_edits_again", path) as app:
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        again = app.shot("again")
+    assert changed_pixels_in(plain, again, area) > 50_000, "the saved edits were not applied"
+    changed = changed_pixels_in(edited, again, area)
+    assert changed < 500, f"the image looks different from when the edits were saved ({changed} pixels)"
+
+
 def test_single_frame_gif_is_editable(binary):
     """A GIF with a single frame is a still image, so a filter changes it."""
     folder = folder_of("single_frame_gif_images", [])
@@ -741,6 +763,7 @@ TESTS = [
     test_keep_view,
     test_keep_edits,
     test_single_frame_gif_is_editable,
+    test_saved_edits_come_back,
     test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,

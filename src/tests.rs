@@ -305,6 +305,58 @@ fn ci_save_every_layout_with_every_encoder() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
+/// Edits saved for an image or a folder are found again, older files are
+/// upgraded. They were written and never read since the move to egui.
+#[test]
+fn ci_saved_edits_are_found() {
+    use crate::image_editing::{
+        EditState, ImageOperation, ImgOpItem, LegacyEditState, saved_edits,
+    };
+    let dir = std::env::temp_dir().join("oculante_test_saved_edits");
+    _ = std::fs::remove_dir_all(&dir);
+    for sub in ["own", "folder", "legacy", "broken", "none"] {
+        std::fs::create_dir_all(dir.join(sub)).unwrap();
+    }
+    let edits = EditState {
+        pixel_op_stack: vec![ImgOpItem::new(ImageOperation::Invert)],
+        ..Default::default()
+    };
+    let json = serde_json::to_string(&edits).unwrap();
+    std::fs::write(dir.join("own/a.oculante"), &json).unwrap();
+    std::fs::write(dir.join("folder/.oculante"), &json).unwrap();
+    let legacy = LegacyEditState {
+        painting: false,
+        non_destructive_painting: false,
+        paint_strokes: vec![],
+        paint_fade: false,
+        pixel_op_stack: vec![ImageOperation::Invert],
+        image_op_stack: vec![],
+        export_extension: "png".into(),
+    };
+    std::fs::write(
+        dir.join("legacy/a.oculante"),
+        serde_json::to_string(&legacy).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(dir.join("broken/a.oculante"), "not json").unwrap();
+
+    let found = |sub: &str| saved_edits(&dir.join(sub).join("a.png"));
+    let (own, message) = found("own").unwrap().unwrap();
+    assert_eq!(own.pixel_op_stack.len(), 1);
+    assert!(message.contains("this image"));
+    let (folder, message) = found("folder").unwrap().unwrap();
+    assert_eq!(folder.pixel_op_stack.len(), 1);
+    assert!(message.contains("Directory"));
+    let (upgraded, _) = found("legacy").unwrap().unwrap();
+    assert_eq!(upgraded.pixel_op_stack.len(), 1);
+    // and saved in the current format
+    let rewritten = std::fs::read_to_string(dir.join("legacy/a.oculante")).unwrap();
+    assert!(serde_json::from_str::<EditState>(&rewritten).is_ok());
+    assert!(found("broken").unwrap().is_err());
+    assert!(found("none").is_none());
+    _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();
