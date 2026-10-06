@@ -388,6 +388,8 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .clicked()
                     && let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result_pixel_op.clone().into();
+                        // the info panel counts the new pixels
+                        state.image_version += 1;
                         state.edit_state = Default::default();
                         // state.dimensions = img.dimensions();
                         pixels_changed = true;
@@ -437,7 +439,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
                         let err_sender = state.message_channel.0.clone();
-                        let image_info = state.image_metadata.clone();
+                        let source = state.current_path.clone();
 
                         std::thread::spawn(move || {
                             let file_dialog_result = rfd::FileDialog::new()
@@ -446,25 +448,22 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
                                 if let Some(file_path) = file_dialog_result {
                                     debug!("Selected File Path = {:?}", file_path);
+                                    // read before saving, the file may be the one that is overwritten
+                                    let exif = source.as_deref().and_then(crate::utils::raw_exif);
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
                                                 _ = msg_sender.send(crate::appstate::Message::Saved(file_path.clone()));
                                                 debug!("Saved to {}", file_path.display());
                                                 // Re-apply exif
-                                                if let Some(info) = &image_info {
-                                                    debug!("Extended image info present");
-
-                                                    // before doing anything, make sure we have raw exif data
-                                                    if info.raw_exif.is_some() {
-                                                        if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
-                                                            error!("{e}");
-                                                        } else {
-                                                            info!("Saved EXIF.")
-                                                        }
+                                                if exif.is_some() {
+                                                    if let Err(e) = fix_exif(&file_path, exif) {
+                                                        error!("{e}");
                                                     } else {
-                                                        debug!("No raw exif");
+                                                        info!("Saved EXIF.")
                                                     }
+                                                } else {
+                                                    debug!("No raw exif");
                                                 }
                                             }
                                             Err(e) => {
@@ -498,7 +497,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                             key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &encoders);
+                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, state.current_path.as_deref(), &encoders);
                             },
                             ctx,
                             Id::new("SAVE"),
@@ -511,7 +510,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
                     let modal = Modal::new("overwrite", ui.ctx());
                     modal.show("Overwrite?", |_|{
-                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     });
 
 
@@ -519,7 +518,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         if p.exists() {
                             modal.open();
                         } else {
-                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                         }
                     }
 

@@ -831,24 +831,22 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
 }
 
 /// Save an image to a path using encoding options and generate a thumbnail
+/// The EXIF data of the source file, the image was loaded from, goes into the saved file.
 fn save_with_encoding(
     image: &DynamicImage,
     path: &Path,
-    image_info: &Option<ExtendedImageInfo>,
+    source: Option<&Path>,
     encoders: &Vec<FileEncoder>,
 ) -> anyhow::Result<()> {
     let encoding_options = FileEncoder::matching_variant(path, encoders);
+    // read before saving, the source may be the file that is overwritten
+    let exif = source.and_then(raw_exif);
     encoding_options.save(image, path)?;
     debug!("Saved to {}", path.display());
-    // Re-apply exif
-    if let Some(info) = &image_info {
-        debug!("Extended image info present");
-        // before doing anything, make sure we have raw exif data
-        if info.raw_exif.is_some() {
-            fix_exif(path, info.raw_exif.clone())?;
-        } else {
-            debug!("No raw exif");
-        }
+    if exif.is_some() {
+        fix_exif(path, exif)?;
+    } else {
+        debug!("No raw exif");
     }
     thumbnails::generate(path)?;
     Ok(())

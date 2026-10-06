@@ -63,7 +63,11 @@ pub struct OculanteState {
     pub message_channel: (Sender<Message>, Receiver<Message>),
     /// Channel to load images from
     pub load_channel: (Sender<PathBuf>, Receiver<PathBuf>),
-    pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+    pub extended_info_channel: crate::utils::ExtendedInfoChannel,
+    /// Changes whenever the pixels of the current image change: a new image,
+    /// or edits applied to it. The info panel computes its numbers once for
+    /// every version.
+    pub image_version: u64,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
     pub current_path: Option<PathBuf>,
@@ -161,6 +165,7 @@ impl Default for OculanteState {
             message_channel: msg_channel,
             load_channel: mpsc::channel(),
             extended_info_channel: meta_channel,
+            image_version: 0,
             mouse_delta: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),

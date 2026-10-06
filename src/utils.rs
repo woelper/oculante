@@ -114,7 +114,6 @@ pub struct ExtendedImageInfo {
     pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
     pub dicom: Option<DicomData>,
-    pub raw_exif: Option<Bytes>,
     pub name: String,
 }
 
@@ -125,23 +124,10 @@ impl ExtendedImageInfo {
             return Ok(());
         }
 
-        let input = std::fs::read(image_path)?;
-
-        // Store original EXIF to write in in case of save event
-        if let Some(d) = DynImage::from_bytes(input.clone().into())? {
-            self.raw_exif = d.exif()
-        }
-
-        // User-friendly Exif in key/value form
-        let mut c = Cursor::new(input);
-        let exifreader = exif::Reader::new();
-        let exif = exifreader.read_from_container(&mut c)?;
-        // in case exif could not be set, for example for DNG or other "exotic" formats,
-        // just bang in raw exif and let the writer deal with it later.
-        // The good stuff is that this will be automagically preserved across formats.
-        if self.raw_exif.is_none() {
-            self.raw_exif = Some(exif.buf().to_vec().into());
-        }
+        // User-friendly Exif in key/value form. The reader only reads as much of
+        // the file as it needs, and gives up early on formats without EXIF.
+        let mut reader = std::io::BufReader::new(std::fs::File::open(image_path)?);
+        let exif = exif::Reader::new().read_from_container(&mut reader)?;
         for f in exif.fields() {
             self.exif.insert(
                 f.tag.to_string(),
@@ -192,100 +178,154 @@ impl ExtendedImageInfo {
     }
 
     pub fn from_image(img: &RgbaImage) -> Self {
-        Self::from_pixels(
-            img.as_raw()
-                .chunks_exact(4)
-                .map(|p| [p[0], p[1], p[2], p[3]]),
-        )
+        Self::from_bands(img.height(), |y, rows, counts| {
+            let row = img.width() as usize * 4;
+            let band = &img.as_raw()[y as usize * row..(y + rows) as usize * row];
+            counts.add(band.chunks_exact(4).map(|p| [p[0], p[1], p[2], p[3]]));
+        })
     }
 
-    /// Like `from_image`, but reads 8 bit images in the layout they have instead of
-    /// converting the whole image to RGBA first.
+    /// Like `from_image`, but reads 8 bit images in the layout they have, and
+    /// converts others band by band, instead of converting the whole image to
+    /// RGBA first.
     pub fn from_dynamic_image(img: &DynamicImage) -> Self {
-        match img {
-            DynamicImage::ImageRgba8(i) => Self::from_image(i),
-            DynamicImage::ImageRgb8(i) => Self::from_pixels(
-                i.as_raw()
+        let width = img.width() as usize;
+        // the samples of the rows from y on
+        let band = |channels: usize, y: u32, rows: u32| {
+            y as usize * width * channels..(y + rows) as usize * width * channels
+        };
+        Self::from_bands(img.height(), |y, rows, counts| match img {
+            DynamicImage::ImageRgba8(i) => counts.add(
+                i.as_raw()[band(4, y, rows)]
+                    .chunks_exact(4)
+                    .map(|p| [p[0], p[1], p[2], p[3]]),
+            ),
+            DynamicImage::ImageRgb8(i) => counts.add(
+                i.as_raw()[band(3, y, rows)]
                     .chunks_exact(3)
                     .map(|p| [p[0], p[1], p[2], u8::MAX]),
             ),
-            DynamicImage::ImageLuma8(i) => {
-                Self::from_pixels(i.as_raw().iter().map(|l| [*l, *l, *l, u8::MAX]))
+            DynamicImage::ImageLuma8(i) => counts.add(
+                i.as_raw()[band(1, y, rows)]
+                    .iter()
+                    .map(|l| [*l, *l, *l, u8::MAX]),
+            ),
+            DynamicImage::ImageLumaA8(i) => counts.add(
+                i.as_raw()[band(2, y, rows)]
+                    .chunks_exact(2)
+                    .map(|p| [p[0], p[0], p[0], p[1]]),
+            ),
+            // the conversion of the image crate, on one band at a time
+            _ => {
+                let rgba = img.crop_imm(0, y, img.width(), rows).to_rgba8();
+                counts.add(
+                    rgba.as_raw()
+                        .chunks_exact(4)
+                        .map(|p| [p[0], p[1], p[2], p[3]]),
+                );
             }
-            DynamicImage::ImageLumaA8(i) => {
-                Self::from_pixels(i.as_raw().chunks_exact(2).map(|p| [p[0], p[0], p[0], p[1]]))
-            }
-            _ => Self::from_image(&img.to_rgba8()),
-        }
+        })
     }
 
-    fn from_pixels(pixels: impl Iterator<Item = [u8; 4]>) -> Self {
-        let mut hist_r: [u64; 256] = [0; 256];
-        let mut hist_g: [u64; 256] = [0; 256];
-        let mut hist_b: [u64; 256] = [0; 256];
-
-        let mut num_pixels = 0;
-        let mut num_transparent_pixels = 0;
-
-        //Colors counting
-        const FIXED_RGB_SIZE: usize = 24;
-        const SUB_INDEX_SIZE: usize = 5;
-        const MAIN_INDEX_SIZE: usize = 1 << (FIXED_RGB_SIZE - SUB_INDEX_SIZE);
-        let mut color_map = vec![0u32; MAIN_INDEX_SIZE];
-
-        for p in pixels {
-            num_pixels += 1;
-            if p == [0, 0, 0, 0] {
-                num_transparent_pixels += 1;
-            }
-
-            hist_r[p[0] as usize] += 1;
-            hist_g[p[1] as usize] += 1;
-            hist_b[p[2] as usize] += 1;
-
-            //Store every existing color combination in a bit
-            //Therefore we use a 24 bit index, splitted into a main and a sub index.
-            let pos = u32::from_le_bytes([p[0], p[1], p[2], 0]);
-            let pos_main = pos >> SUB_INDEX_SIZE;
-            let pos_sub = pos - (pos_main << SUB_INDEX_SIZE);
-            color_map[pos_main as usize] |= 1 << pos_sub;
-        }
-
-        let mut full_colors = 0u32;
-        for &intensity in color_map.iter() {
-            full_colors += intensity.count_ones();
-        }
-
-        let green_histogram: Vec<(i32, u64)> = hist_g
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
+    /// Counts the image in bands of rows, in parallel. `band` adds the pixels of
+    /// the rows from y on to the counts.
+    fn from_bands(height: u32, band: impl Fn(u32, u32, &mut PixelCounts) + Sync) -> Self {
+        use rayon::prelude::*;
+        const BAND_ROWS: u32 = 64;
+        // Every color that occurs sets a bit, shared by all bands
+        let color_map: Vec<std::sync::atomic::AtomicU32> = (0..PixelCounts::COLOR_WORDS)
+            .map(|_| std::sync::atomic::AtomicU32::new(0))
             .collect();
+        let counts = (0..height.div_ceil(BAND_ROWS))
+            .into_par_iter()
+            .map(|index| {
+                let y = index * BAND_ROWS;
+                let mut counts = PixelCounts::new(&color_map);
+                band(y, BAND_ROWS.min(height - y), &mut counts);
+                counts
+            })
+            .reduce(
+                || PixelCounts::new(&color_map),
+                |mut a, b| {
+                    a.merge(&b);
+                    a
+                },
+            );
 
-        let red_histogram: Vec<(i32, u64)> = hist_r
+        let num_colors = color_map
             .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
-            .collect();
-
-        let blue_histogram: Vec<(i32, u64)> = hist_b
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (k as i32, *v))
-            .collect();
+            .map(|word| word.load(std::sync::atomic::Ordering::Relaxed).count_ones() as usize)
+            .sum();
+        let histogram = |channel: &[u64; 256]| -> Vec<(i32, u64)> {
+            channel
+                .iter()
+                .enumerate()
+                .map(|(k, v)| (k as i32, *v))
+                .collect()
+        };
 
         Self {
-            num_pixels,
-            num_transparent_pixels,
-            num_colors: full_colors as usize,
-            blue_histogram,
-            green_histogram,
-            red_histogram,
-            raw_exif: Default::default(),
+            num_pixels: counts.pixels,
+            num_transparent_pixels: counts.transparent,
+            num_colors,
+            blue_histogram: histogram(&counts.histograms[2]),
+            green_histogram: histogram(&counts.histograms[1]),
+            red_histogram: histogram(&counts.histograms[0]),
             name: Default::default(),
             exif: Default::default(),
             dicom: Default::default(),
         }
+    }
+}
+
+/// Histograms and pixel counts of a part of an image
+struct PixelCounts<'a> {
+    histograms: [[u64; 256]; 3],
+    pixels: usize,
+    transparent: usize,
+    color_map: &'a [std::sync::atomic::AtomicU32],
+}
+
+impl<'a> PixelCounts<'a> {
+    /// One bit for every 24 bit color
+    const COLOR_WORDS: usize = 1 << (24 - 5);
+
+    fn new(color_map: &'a [std::sync::atomic::AtomicU32]) -> Self {
+        Self {
+            histograms: [[0; 256]; 3],
+            pixels: 0,
+            transparent: 0,
+            color_map,
+        }
+    }
+
+    fn add(&mut self, pixels: impl Iterator<Item = [u8; 4]>) {
+        use std::sync::atomic::Ordering::Relaxed;
+        for p in pixels {
+            self.pixels += 1;
+            if p == [0, 0, 0, 0] {
+                self.transparent += 1;
+            }
+            self.histograms[0][p[0] as usize] += 1;
+            self.histograms[1][p[1] as usize] += 1;
+            self.histograms[2][p[2] as usize] += 1;
+            let color = u32::from_le_bytes([p[0], p[1], p[2], 0]);
+            let (word, bit) = ((color >> 5) as usize, 1 << (color & 31));
+            // most colors are seen again and again, reading first saves writes
+            if self.color_map[word].load(Relaxed) & bit == 0 {
+                self.color_map[word].fetch_or(bit, Relaxed);
+            }
+        }
+    }
+
+    fn merge(&mut self, other: &Self) {
+        for (mine, theirs) in self.histograms.iter_mut().zip(&other.histograms) {
+            for (a, b) in mine.iter_mut().zip(theirs) {
+                *a += b;
+            }
+        }
+        self.pixels += other.pixels;
+        self.transparent += other.transparent;
     }
 }
 
@@ -749,10 +789,13 @@ pub fn pos_from_coord(
     size
 }
 
+/// Computes the numbers of the info panel for an image in the background. They
+/// come back with the version of the image they belong to.
 pub fn send_extended_info(
     current_image: &Option<Arc<DynamicImage>>,
     current_path: &Option<PathBuf>,
-    channel: &(Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+    version: u64,
+    channel: &ExtendedInfoChannel,
 ) {
     if let Some(img) = current_image {
         // The image is shared with the thread, not copied
@@ -766,7 +809,7 @@ pub fn send_extended_info(
                 _ = e_info.with_dicom(&p);
             }
             debug!("Sending extended info");
-            _ = sender.send(e_info);
+            _ = sender.send((version, e_info));
             request_repaint();
         });
     }
@@ -1036,6 +1079,28 @@ pub fn toggle_zen_mode(state: &mut OculanteState, ctx: &egui::Context) {
 }
 
 /// Fix missing exif by re-applying exif to saved files
+/// The channel for the numbers of the info panel, with the version of the image
+pub type ExtendedInfoChannel = (
+    Sender<(u64, ExtendedImageInfo)>,
+    Receiver<(u64, ExtendedImageInfo)>,
+);
+
+/// The EXIF data of a file, to write into a copy of the image that is saved
+pub fn raw_exif(path: &Path) -> Option<Bytes> {
+    let input: Bytes = std::fs::read(path).ok()?.into();
+    if let Ok(Some(image)) = DynImage::from_bytes(input.clone())
+        && let Some(exif) = image.exif()
+    {
+        return Some(exif);
+    }
+    // Other formats, DNG for example: the EXIF block as the reader finds it.
+    // It is kept across formats when it is written again.
+    exif::Reader::new()
+        .read_from_container(&mut Cursor::new(&input[..]))
+        .ok()
+        .map(|exif| exif.buf().to_vec().into())
+}
+
 pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     use std::fs::{self, File};
     let input = fs::read(p)?;
@@ -1127,35 +1192,58 @@ mod tests {
         _ = std::fs::remove_file(short);
     }
 
-    /// Something with many different values, in every channel
-    fn pattern(bytes_per_pixel: usize) -> Vec<u8> {
-        (0..37 * 23 * bytes_per_pixel)
-            .map(|i| (i * 7 % 256) as u8)
-            .collect()
-    }
-
     #[test]
     fn image_info_does_not_depend_on_the_layout() {
+        // high enough for several bands of rows, counted in parallel
+        let (w, h) = (37, 150);
+        let rgba = RgbaImage::from_fn(w, h, |x, y| {
+            let v = (x * 7 + y * 13) as u8;
+            image::Rgba([
+                v,
+                v.wrapping_mul(3),
+                (x * y) as u8,
+                if x % 5 == 0 { 0 } else { 255 },
+            ])
+        });
+        let base = DynamicImage::ImageRgba8(rgba);
         let images = [
-            DynamicImage::ImageLuma8(image::GrayImage::from_raw(37, 23, pattern(1)).unwrap()),
-            DynamicImage::ImageLumaA8(image::GrayAlphaImage::from_raw(37, 23, pattern(2)).unwrap()),
-            DynamicImage::ImageRgb8(image::RgbImage::from_raw(37, 23, pattern(3)).unwrap()),
-            DynamicImage::ImageRgba8(RgbaImage::from_raw(37, 23, pattern(4)).unwrap()),
-            DynamicImage::ImageRgb16(
-                image::ImageBuffer::from_raw(37, 23, vec![40000u16; 37 * 23 * 3]).unwrap(),
-            ),
+            DynamicImage::ImageLuma8(base.to_luma8()),
+            DynamicImage::ImageLumaA8(base.to_luma_alpha8()),
+            DynamicImage::ImageRgb8(base.to_rgb8()),
+            base.clone(),
+            DynamicImage::ImageLuma16(base.to_luma16()),
+            DynamicImage::ImageRgb16(base.to_rgb16()),
+            DynamicImage::ImageRgba16(base.to_rgba16()),
+            DynamicImage::ImageRgb32F(base.to_rgb32f()),
+            DynamicImage::ImageRgba32F(base.to_rgba32f()),
         ];
         for img in images {
-            // what the info was computed from before: the image converted to RGBA
-            let expected = ExtendedImageInfo::from_image(&img.to_rgba8());
+            // counted the simple way, from the image converted to RGBA
+            let pixels: Vec<[u8; 4]> = img.to_rgba8().pixels().map(|p| p.0).collect();
+            let colors: std::collections::HashSet<[u8; 3]> =
+                pixels.iter().map(|p| [p[0], p[1], p[2]]).collect();
+            let histogram = |c: usize| -> Vec<(i32, u64)> {
+                (0..256)
+                    .map(|v| {
+                        (
+                            v as i32,
+                            pixels.iter().filter(|p| p[c] as usize == v).count() as u64,
+                        )
+                    })
+                    .collect()
+            };
             let info = ExtendedImageInfo::from_dynamic_image(&img);
-            assert_eq!(info.num_pixels, 37 * 23, "{:?}", img.color());
-            assert_eq!(info.num_pixels, expected.num_pixels);
-            assert_eq!(info.num_colors, expected.num_colors, "{:?}", img.color());
-            assert_eq!(info.num_transparent_pixels, expected.num_transparent_pixels);
-            assert_eq!(info.red_histogram, expected.red_histogram);
-            assert_eq!(info.green_histogram, expected.green_histogram);
-            assert_eq!(info.blue_histogram, expected.blue_histogram);
+            let layout = img.color();
+            assert_eq!(info.num_pixels, (w * h) as usize, "{layout:?}");
+            assert_eq!(info.num_colors, colors.len(), "{layout:?}");
+            assert_eq!(
+                info.num_transparent_pixels,
+                pixels.iter().filter(|p| **p == [0, 0, 0, 0]).count(),
+                "{layout:?}"
+            );
+            assert_eq!(info.red_histogram, histogram(0), "{layout:?}");
+            assert_eq!(info.green_histogram, histogram(1), "{layout:?}");
+            assert_eq!(info.blue_histogram, histogram(2), "{layout:?}");
         }
     }
 }

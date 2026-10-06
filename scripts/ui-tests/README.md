@@ -54,6 +54,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_animation_plays_as_often_as_the_file_asks` | A GIF that is to be played once stops on its last frame with a message |
 | `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
 | `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
+| `test_image_info_is_computed_when_shown` | The numbers of the info panel are computed only while it is open, once per image, not for every edit change, and again after edits are applied |
 | `test_saved_edits_come_back` | Edits saved with "Save edits" are applied again when the image is opened the next time |
 | `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |
 | `test_actual_size_is_pixel_exact` | At 100% an image with an odd width and height shows exactly the pixels of the file, with linear and with nearest filtering |

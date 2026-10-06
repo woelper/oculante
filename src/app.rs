@@ -55,6 +55,8 @@ pub struct OculanteApp {
     last_file_check: Instant,
     /// Fonts of the system for scripts the built-in fonts do not cover
     system_fonts: SystemFonts,
+    /// The image version the numbers of the info panel were asked for
+    info_requested: Option<u64>,
 }
 
 /// The frames of an animation and the time to show the next one. The frames
@@ -167,6 +169,7 @@ impl OculanteApp {
             last_system_theme: None,
             last_file_check: Instant::now(),
             system_fonts: SystemFonts::Loaded,
+            info_requested: None,
         }
     }
 
@@ -458,8 +461,10 @@ impl OculanteApp {
             }
         }
 
-        self.state.image_metadata = None;
         if !matches!(frame, Frame::EditResult(_) | Frame::UpdateTexture) {
+            // a new image, its numbers are computed when the info panel shows them
+            self.state.image_metadata = None;
+            self.state.image_version += 1;
             self.state.edit_state.result_pixel_op = Default::default();
             self.state.edit_state.result_image_op = Default::default();
             if !self.state.persistent_settings.keep_edits {
@@ -522,13 +527,6 @@ impl OculanteApp {
             // handled at the top
             Frame::Animation(..) | Frame::AnimationEnd(_) => {}
         }
-
-        // Send extended info (histogram, exif, etc.) in background thread
-        send_extended_info(
-            &self.state.current_image,
-            &self.state.current_path,
-            &self.state.extended_info_channel,
-        );
 
         // Update window title
         set_title(ctx, &mut self.state);
@@ -667,7 +665,26 @@ impl eframe::App for OculanteApp {
             self.upload_image_to_glow(gl);
         }
 
-        if let Ok(info) = self.state.extended_info_channel.1.try_recv() {
+        // The numbers of the info panel are computed when it shows them, once for
+        // every version of the image: not while it is closed, not for every frame
+        // of an animation and not for every change of an edit.
+        if self.state.persistent_settings.info_enabled
+            && self.state.current_image.is_some()
+            && self.info_requested != Some(self.state.image_version)
+        {
+            self.info_requested = Some(self.state.image_version);
+            send_extended_info(
+                &self.state.current_image,
+                &self.state.current_path,
+                self.state.image_version,
+                &self.state.extended_info_channel,
+            );
+        }
+        while let Ok((version, info)) = self.state.extended_info_channel.1.try_recv() {
+            // numbers for an image that is no longer shown are dropped
+            if version != self.state.image_version {
+                continue;
+            }
             for value in info.exif.values() {
                 want_system_fonts_for(value);
             }

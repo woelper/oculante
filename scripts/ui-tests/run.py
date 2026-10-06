@@ -575,6 +575,23 @@ def test_keep_edits(binary):
                 assert changed > 50_000, "the edits stayed although they should be dropped"
 
 
+def test_image_info_is_computed_when_shown(binary):
+    """The histogram and the other numbers of the info panel are computed once for
+    every version of the image, and only while the panel is open."""
+    computed = "Sending extended info"
+    with start(binary, "info_when_shown", image("moss.jpg")) as app:
+        app.settle(1.5)
+        assert app.log().count(computed) == 0, "computed with the info panel closed"
+        app.key("i")
+        app.settle(1.5)
+        assert app.log().count(computed) == 1, "not computed when the info panel opened"
+        brighten(app)
+        assert app.log().count(computed) == 1, "computed again for every change of an edit"
+        app.click(890, 306)  # "Apply all edits"
+        app.settle(1.5)
+        assert app.log().count(computed) == 2, "not computed again after the edits were applied"
+
+
 def test_saved_edits_come_back(binary):
     """Edits saved with "Save edits" are applied again when the image is opened later."""
     folder = folder_of("saved_edits_images", [("moss.jpg", "moss.jpg")])
@@ -764,6 +781,7 @@ TESTS = [
     test_keep_edits,
     test_single_frame_gif_is_editable,
     test_saved_edits_come_back,
+    test_image_info_is_computed_when_shown,
     test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,

@@ -357,6 +357,65 @@ fn ci_saved_edits_are_found() {
     _ = std::fs::remove_dir_all(&dir);
 }
 
+/// EXIF data with only an orientation tag, as TIFF data the way JPEG files hold it
+pub(crate) fn exif_with_orientation(orientation: u16) -> Vec<u8> {
+    let mut exif = vec![b'I', b'I', 42, 0, 8, 0, 0, 0, 1, 0];
+    // tag 0x0112, type SHORT, one value
+    exif.extend_from_slice(&[0x12, 0x01, 3, 0, 1, 0, 0, 0]);
+    exif.extend_from_slice(&orientation.to_le_bytes());
+    exif.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+    exif
+}
+
+/// A JPEG of 4x2 pixels with a red pixel at the top left and the given EXIF
+/// orientation
+pub(crate) fn write_jpeg_with_orientation(path: &std::path::Path, orientation: u16) {
+    let image = image::RgbImage::from_fn(4, 2, |x, y| {
+        if (x, y) == (0, 0) {
+            image::Rgb([255, 0, 0])
+        } else {
+            image::Rgb([0, 0, 255])
+        }
+    });
+    image.save(path).unwrap();
+    crate::utils::fix_exif(path, Some(exif_with_orientation(orientation).into())).unwrap();
+}
+
+/// EXIF is read for the info panel, and kept when a copy is saved in another
+/// format, also now that it is taken from the file at the time of saving
+#[test]
+fn ci_exif_is_read_and_kept_when_saving() {
+    use crate::file_encoder::{CompressionLevel, FileEncoder};
+    use crate::utils::{ExtendedImageInfo, fix_exif, raw_exif};
+    let dir = std::env::temp_dir().join("oculante_test_exif");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.jpg");
+    write_jpeg_with_orientation(&source, 6);
+
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&source).unwrap();
+    assert!(
+        // orientation 6, as the EXIF reader describes it
+        info.exif
+            .get("Orientation")
+            .is_some_and(|o| o.contains("row 0 at right")),
+        "{:?}",
+        info.exif
+    );
+
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    let copy = dir.join("copy.png");
+    let image = image::open(&source).unwrap();
+    FileEncoder::Png {
+        compressionlevel: CompressionLevel::Default,
+    }
+    .save(&image, &copy)
+    .unwrap();
+    fix_exif(&copy, Some(exif.clone())).unwrap();
+    assert_eq!(raw_exif(&copy), Some(exif));
+    _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();
