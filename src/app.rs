@@ -1062,7 +1062,15 @@ impl eframe::App for OculanteApp {
                 if let Some(renderer) = &self.renderer
                     && !self.image_tiles.is_empty()
                 {
-                    let offset = self.state.image_geometry.offset;
+                    // The image starts on a whole screen pixel. A centred image with an odd
+                    // width or height would otherwise sit on half a pixel, and at 100% every
+                    // pixel of it would be blended with its neighbour.
+                    let pixels_per_point = ui.ctx().pixels_per_point();
+                    let offset = self
+                        .state
+                        .image_geometry
+                        .offset
+                        .map(|v| (v * pixels_per_point).round() / pixels_per_point);
                     let scale = self.state.image_geometry.scale;
                     let img_w = self.state.image_geometry.dimensions.0 as f32;
                     let img_h = self.state.image_geometry.dimensions.1 as f32;

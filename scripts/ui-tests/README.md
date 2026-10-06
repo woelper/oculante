@@ -54,6 +54,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
 | `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
 | `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |
+| `test_actual_size_is_pixel_exact` | At 100% an image with an odd width and height shows exactly the pixels of the file, with linear and with nearest filtering |
 | `test_overtaken_load` | A slow image that was skipped over does not show up later |
 | `test_load_error_shows_toast` | A broken file shows an error toast and the app keeps running |
 | `test_channel_view` | A single channel changes the image and all channels restore it |

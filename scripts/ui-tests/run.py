@@ -569,6 +569,43 @@ def test_single_frame_gif_is_editable(binary):
         assert changed > 50_000, f"the filter changed only {changed} pixels of a single-frame GIF"
 
 
+def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
+    """Pixels of an image file that differ on screen, where it fits best within margin of x, y."""
+    crop = screenshot[:-4] + "_at.png"
+    best = None
+    for dy in range(-margin, margin + 1):
+        for dx in range(-margin, margin + 1):
+            box = f"{width}x{height}+{x + dx}+{y + dy}"
+            subprocess.run(["convert", screenshot, "-crop", box, "+repage", crop], check=True)
+            result = subprocess.run(
+                ["compare", "-metric", "AE", "-fuzz", "2%", crop, expected, "null:"],
+                capture_output=True,
+                text=True,
+            )
+            off = int(float(result.stderr.split()[0]))
+            best = off if best is None else min(best, off)
+    return best
+
+
+def test_actual_size_is_pixel_exact(binary):
+    """At 100% the screen shows the pixels of the file, also for an odd width and height."""
+    folder = folder_of("actual_size_images", [])
+    path = os.path.join(folder, "odd.png")
+    width, height = 301, 201
+    subprocess.run(["convert", image("moss.jpg"), "-resize", f"{width}x{height}!", path], check=True)
+    for linear in (True, False):
+        settings = {"linear_mag_filter": linear, "linear_min_filter": linear, "use_mipmaps": False}
+        with start(binary, f"actual_size_{'linear' if linear else 'nearest'}", path, settings=settings) as app:
+            # zoom to 100% around the middle of the window, where the image is centred
+            app.move(513, 300)
+            app.key("1")
+            app.x("xdotool", "mousemove", "1020", "595")
+            app.settle(1.0)
+            shot = app.shot("actual_size")
+        off = differing_pixels_near(shot, path, 513 - width // 2, 300 - height // 2, width, height)
+        assert off < width * height / 1000, f"{off} of {width * height} pixels differ from the file at 100% (linear filter: {linear})"
+
+
 def test_overtaken_load(binary):
     """A slow image that is skipped over does not show up later and overwrite the image that was chosen."""
     folder = folder_of("overtaken_images", [("00.png", "test.png"), ("02.jpg", "moss.jpg")])
@@ -683,6 +720,7 @@ TESTS = [
     test_keep_view,
     test_keep_edits,
     test_single_frame_gif_is_editable,
+    test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,
     test_channel_view,
