@@ -17,7 +17,7 @@
 - [ ] UI tests: run them in a headless Wayland session (Sway or Jay) with ydotool instead of xdotool, so problems that only show on Wayland are covered (suggested by Stoppedpuma in #811)
 
 # Obvious defects
-- [ ] Animations loop forever. The play count of a GIF or an APNG is not read, so one that should play once or twice keeps going (APNG conformance tests 031 and 032).
+- [x] Animations play as often as the file asks (GIF loop block, APNG num_plays, WebP and JXL loop counts), stop on the last frame and say so in a message. A GIF without a loop block plays once, as in browsers. Unit tests for GIF and APNG, UI test `test_animation_plays_as_often_as_the_file_asks`. There is no key to play it again yet, opening the file again does.
 - [ ] A 16 bit APNG shows its default image instead of playing, the image crate can not composite 16 bit frames. Rare, but a valid file. Fix upstream in the image crate, or convert to 8 bit before compositing.
 - [ ] Three broken APNGs of the conformance tests play although they are invalid (040 repeated acTL, 047 num_frames too low, 060 fdAT too large). The png crate does not notice, the spec asks to show the default image.
 - [x] At 100% an image with an odd width or height sat on a half pixel and was blurred. Fixed, UI test `test_actual_size_is_pixel_exact`.
