@@ -34,31 +34,20 @@ pub fn open_image(
 
     use file_format::FileFormat;
 
-    let mut extension = img_location
-        .extension()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-        .to_lowercase()
-        // add aliased extensions here if the same formats have multiple extensions
-        .replace("tiff", "tif")
-        .replace("jpeg", "jpg")
-        .replace("jfif", "jpg")
-        .replace("ima", "dcm")
-        .replace("heic", "heif")
-        .replace("hif", "heic");
+    let mut extension = canonical_extension(
+        img_location
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default(),
+    );
 
     // These are detected incorrectly, for example svg is xml etc
     let unchecked_extensions = ["svg", "kra", "tga", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
-        if fmt
-            .extension()
-            .replace("tiff", "tif")
-            .replace("apng", "png")
-            != extension
-        {
+        if canonical_extension(fmt.extension()) != extension {
             if unchecked_extensions.contains(&extension.as_str()) {
                 info!("Extension {extension} skipped check.")
             } else {
@@ -947,6 +936,21 @@ fn plays(count: image::metadata::LoopCount) -> Option<u32> {
         image::metadata::LoopCount::Infinite => None,
         image::metadata::LoopCount::Finite(n) => Some(n.get()),
     }
+}
+
+/// One name for the extensions of a format, so the extension of a file and the
+/// format found in its content can be compared
+fn canonical_extension(extension: &str) -> String {
+    let extension = extension.to_lowercase();
+    match extension.as_str() {
+        "tiff" => "tif",
+        "jpeg" | "jfif" => "jpg",
+        "ima" => "dcm",
+        "heic" | "hif" => "heif",
+        "apng" => "png",
+        other => other,
+    }
+    .to_string()
 }
 
 /// The decoded frames of an animated PNG

@@ -201,6 +201,31 @@ fn ci_load_apng_16bit_shows_default_image() {
     );
 }
 
+/// The warnings the loader sends while opening a file
+fn warnings_for(path: &str) -> Vec<String> {
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    if let Ok(receiver) = open_image(&PathBuf::from(path), Some(message_sender), None) {
+        _ = receiver.recv_timeout(Duration::from_secs(30));
+    }
+    messages
+        .try_iter()
+        .filter_map(|m| match m {
+            crate::appstate::Message::Warning(w) => Some(w),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A HEIC file is a HEIF file. Every one of them was reported as having the
+/// wrong extension.
+#[cfg(any(feature = "heif", feature = "heif_native"))]
+#[test]
+fn ci_heic_has_the_right_extension() {
+    assert_eq!(warnings_for("res/tests/orange.heic"), Vec::<String>::new());
+    // a file that really has the wrong extension is still reported
+    assert_eq!(warnings_for("res/tests/mp4_ex-signature.gif").len(), 1);
+}
+
 #[test]
 fn ci_load_misnamed_mp4_as_gif() {
     // This file is actually an MP4 with a .gif extension.
