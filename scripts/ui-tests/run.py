@@ -6,6 +6,7 @@
 Each test checks behaviour that broke before. See README.md.
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -16,6 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(__file__))
 from uitest import (  # noqa: E402
     OUT,
+    REPO,
     SCREEN,
     WINDOW_MANAGER,
     App,
@@ -386,6 +388,21 @@ def test_lossless_rotation_keys_and_quit(binary):
         while app.running() and time.time() < end:
             time.sleep(0.2)
         assert not app.running(), "q did not quit"
+
+
+def test_settings_of_0_9_6(binary):
+    """The settings saved by 0.9.6 are used. They could not be read at all, the
+    app started with the defaults and overwrote them."""
+    with open(os.path.join(REPO, "res", "tests", "settings-0.9.6", "config.json")) as f:
+        settings = json.load(f)
+    assert settings["info_enabled"], "the info panel was open in the saved settings"
+    with start(binary, "settings_default", image("moss.jpg")) as app:
+        default = app.shot("default")
+    with start(binary, "settings_096", image("moss.jpg"), settings=settings) as app:
+        saved = app.shot("saved")
+        log = app.log()
+    assert changed_pixels_in(default, saved, (0, 40, 190, 540)) > 20_000, "the info panel of the saved settings is not open"
+    assert "Could not load" not in log
 
 
 def test_key_repeat(binary):
@@ -843,6 +860,7 @@ TESTS = [
     test_relative_file_name,
     test_delete,
     test_lossless_rotation_keys_and_quit,
+    test_settings_of_0_9_6,
     test_zen_mode,
     test_paint_mode,
     test_fullscreen,

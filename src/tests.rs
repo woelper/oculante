@@ -746,6 +746,85 @@ fn ci_load_generated_formats() {
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
+/// An empty settings file gives the defaults
+#[test]
+fn ci_settings_defaults_from_an_empty_file() {
+    use crate::settings::{PersistentSettings, VolatileSettings};
+    let persistent: PersistentSettings = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(&persistent).unwrap(),
+        serde_json::to_value(PersistentSettings::default()).unwrap()
+    );
+    let volatile: VolatileSettings = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(&volatile).unwrap(),
+        serde_json::to_value(VolatileSettings::default()).unwrap()
+    );
+}
+
+/// Settings saved by 0.9.6 are read, the values that were set are kept. They
+/// could not be read at all: the shortcuts were saved in another format, and
+/// the app started with the defaults and overwrote them.
+#[test]
+fn ci_settings_of_0_9_6_are_read() {
+    use crate::settings::{PersistentSettings, VolatileSettings};
+    use crate::shortcuts::{InputEvent, default_shortcuts};
+    let text = std::fs::read_to_string("res/tests/settings-0.9.6/config.json").unwrap();
+    let persistent: PersistentSettings = serde_json::from_str(&text).unwrap();
+    assert!(persistent.info_enabled, "a value that was set");
+    // the file has the default shortcuts of 0.9.6, which are the ones of now
+    assert_eq!(persistent.shortcuts.len(), 36);
+    let defaults = default_shortcuts();
+    for (event, shortcut) in &persistent.shortcuts {
+        assert_eq!(Some(shortcut), defaults.get(event), "{event:?}");
+    }
+    // changed ones are kept, one that can not be read is left out
+    let changed = serde_json::from_str::<PersistentSettings>(
+        r#"{"shortcuts": {"ZoomIn": ["LControl", "Key2"], "Quit": ["Banana"]}}"#,
+    )
+    .unwrap()
+    .shortcuts;
+    assert_eq!(changed.len(), 1);
+    let zoom_in = &changed[&InputEvent::ZoomIn];
+    assert_eq!(
+        zoom_in.keys,
+        defaults[&InputEvent::ZoomDouble].keys,
+        "the key 2"
+    );
+    assert_eq!(
+        zoom_in.modifiers,
+        defaults[&InputEvent::Copy].modifiers,
+        "with ctrl"
+    );
+
+    let text = std::fs::read_to_string("res/tests/settings-0.9.6/config_volatile.json").unwrap();
+    let volatile: VolatileSettings = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        volatile.recent_images.front(),
+        Some(&PathBuf::from("/photos/test.png"))
+    );
+    assert_eq!(volatile.encoding_options.len(), 4);
+}
+
+/// The default shortcuts survive saving, and no two of them are the same keys
+#[test]
+fn ci_default_shortcuts() {
+    use crate::shortcuts::{Shortcuts, default_shortcuts};
+    let shortcuts = default_shortcuts();
+    let saved = serde_json::to_string(&shortcuts).unwrap();
+    assert_eq!(
+        serde_json::from_str::<Shortcuts>(&saved).unwrap(),
+        shortcuts
+    );
+    let mut seen = std::collections::HashMap::new();
+    for (event, shortcut) in &shortcuts {
+        let keys = serde_json::to_string(shortcut).unwrap();
+        if let Some(other) = seen.insert(keys, event) {
+            panic!("{event:?} and {other:?} have the same keys");
+        }
+    }
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();

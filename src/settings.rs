@@ -50,6 +50,7 @@ pub struct PersistentSettings {
     pub vsync: bool,
     pub force_redraw: bool,
     /// Keyboard map to actions
+    #[serde(deserialize_with = "crate::shortcuts::deserialize_shortcuts")]
     pub shortcuts: Shortcuts,
     /// Do not reset view when receiving a new image
     pub keep_view: bool,
