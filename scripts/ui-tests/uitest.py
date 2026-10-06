@@ -236,6 +236,20 @@ def region_has_color(path, box, rgb, tolerance=40):
     return any(_close(color, rgb, tolerance) for _, _, color in _pixels(path, box))
 
 
+def find_slider(path, box, rgb, tolerance=40, min_fill=40):
+    """The filled part of a slider inside box: (right end, y), or None. A row counts
+    if at least min_fill pixels in it are close to rgb, which leaves out icons."""
+    rows = {}
+    for x, y, color in _pixels(path, box):
+        if _close(color, rgb, tolerance):
+            rows.setdefault(y, []).append(x)
+    filled = sorted(y for y, xs in rows.items() if len(xs) >= min_fill)
+    if not filled:
+        return None
+    middle = filled[len(filled) // 2]
+    return max(rows[middle]), middle
+
+
 def rightmost_x(path, box, rgb, tolerance=40):
     """The largest x inside box (x, y, w, h) with a pixel close to rgb, or None."""
     xs = [x for x, _, color in _pixels(path, box) if _close(color, rgb, tolerance)]

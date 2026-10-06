@@ -53,6 +53,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_animation_plays_and_stops` | An animated GIF plays, and stops when the next image is shown |
 | `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
 | `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
+| `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |
 | `test_overtaken_load` | A slow image that was skipped over does not show up later |
 | `test_load_error_shows_toast` | A broken file shows an error toast and the app keeps running |
 | `test_channel_view` | A single channel changes the image and all channels restore it |

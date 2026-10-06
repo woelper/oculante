@@ -1,6 +1,7 @@
 /// eframe-based application shell.
 ///
 /// This implements `eframe::App` and replaces notan's init/update/draw callbacks.
+use image::DynamicImage;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -35,8 +36,8 @@ pub struct OculanteApp {
     image_tiles: Vec<GlowTile>,
     /// Format of the uploaded image (selects the channel swizzle)
     image_format: TexFormat,
-    /// True while an animation is playing (keeps repainting)
-    animation_playing: bool,
+    /// The animation that is playing, with its frames and its clock
+    animation: Option<Animation>,
     /// Checker texture for transparency grid
     checker_texture: Option<egui::TextureHandle>,
     /// Set when a new image arrives; cleared after upload resets the view
@@ -56,6 +57,76 @@ pub struct OculanteApp {
     system_fonts: SystemFonts,
 }
 
+/// The frames of an animation and the time to show the next one. The frames
+/// arrive from the loader thread while the first ones are already playing.
+struct Animation {
+    frames: Vec<(Arc<DynamicImage>, Duration)>,
+    current: usize,
+    /// When the frame after the current one is due
+    next_switch: Instant,
+    /// All frames are here, playback wraps around at the end
+    complete: bool,
+}
+
+impl Animation {
+    fn new() -> Self {
+        Self {
+            frames: Vec::new(),
+            current: 0,
+            next_switch: Instant::now(),
+            complete: false,
+        }
+    }
+
+    /// Frames without a delay play at 25 fps, nothing plays faster than 60 fps
+    fn delay(delay_ms: u16) -> Duration {
+        Duration::from_millis(if delay_ms > 0 {
+            delay_ms.max(17) as u64
+        } else {
+            40
+        })
+    }
+
+    fn push(&mut self, image: Arc<DynamicImage>, delay_ms: u16) {
+        if self.frames.is_empty() {
+            self.next_switch = Instant::now() + Self::delay(delay_ms);
+        }
+        self.frames.push((image, Self::delay(delay_ms)));
+    }
+
+    /// The frame to show now, if it is time for a new one
+    fn advance(&mut self, now: Instant) -> Option<Arc<DynamicImage>> {
+        if self.frames.len() < 2 || now < self.next_switch {
+            return None;
+        }
+        let next = self.current + 1;
+        if next < self.frames.len() {
+            self.current = next;
+        } else if self.complete {
+            self.current = 0;
+        } else {
+            // the rest is still being decoded, the next frame arrives from the loader
+            return None;
+        }
+        let (image, delay) = &self.frames[self.current];
+        // The next frame is due one delay after this one was due, not after it was
+        // shown, or the small lateness of every wake-up adds up and the animation
+        // plays too slow. After a long gap, a hidden window for example, start over.
+        self.next_switch = if now.duration_since(self.next_switch) < *delay {
+            self.next_switch + *delay
+        } else {
+            now + *delay
+        };
+        Some(image.clone())
+    }
+
+    /// How long until the next frame is due, if one is known
+    fn wake_in(&self, now: Instant) -> Option<Duration> {
+        let has_next = self.current + 1 < self.frames.len() || self.complete;
+        (self.frames.len() > 1 && has_next).then(|| self.next_switch.saturating_duration_since(now))
+    }
+}
+
 enum SystemFonts {
     /// Holds the built-in fonts, the system fonts are added to them
     NotLoaded(Box<FontDefinitions>),
@@ -72,7 +143,7 @@ impl OculanteApp {
             renderer: None,
             image_tiles: Vec::new(),
             image_format: TexFormat::Rgba8,
-            animation_playing: false,
+            animation: None,
             checker_texture: None,
             reset_after_upload: false,
             compare_geometry: None,
@@ -142,7 +213,7 @@ impl OculanteApp {
 
         // Prefer the edit result if present. Animations show their frames unedited.
         let edit_result = &self.state.edit_state.result_pixel_op;
-        let img = if edit_result.width() > 0 && !self.animation_playing {
+        let img = if edit_result.width() > 0 && self.animation.is_none() {
             edit_result
         } else {
             match &self.state.current_image {
@@ -294,142 +365,144 @@ impl OculanteApp {
     }
 
     fn process_texture_channel(&mut self, ctx: &egui::Context) {
-        // Drain to get latest frame (prevents animation speedup on focus loss)
-        // If an AnimationStart is encountered during drain, preserve its reset flag
-        let latest_frame = self
-            .state
-            .texture_channel
-            .1
-            .try_iter()
-            .inspect(|f| {
-                if matches!(f, Frame::AnimationStart(_)) {
-                    self.reset_after_upload = true;
-                }
-            })
-            .last();
-
-        if let Some(frame) = latest_frame {
-            self.state.is_loaded = true;
-            self.last_frame_was_compared_image = matches!(frame, Frame::CompareResult(_, _));
-            if let Frame::CompareResult(_, geometry) = &frame {
-                self.compare_geometry = Some(*geometry);
-            }
-
-            // Update scrubber on new images
-            // Also match Animation if an AnimationStart was drained
-            if matches!(
-                &frame,
-                Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
-            ) || (self.reset_after_upload && matches!(&frame, Frame::Animation(_, _)))
-            {
-                if let Some(path) = &self.state.current_path {
-                    if self.state.scrubber.has_folder_changed(path)
-                        && !self.state.scrubber.fixed_paths
-                    {
-                        self.state.scrubber = crate::scrubber::Scrubber::new(path);
-                        self.state.scrubber.wrap = self.state.persistent_settings.wrap_folder;
-                    } else {
-                        let index = self
-                            .state
-                            .scrubber
-                            .entries
-                            .iter()
-                            .position(|p| p == path)
-                            .unwrap_or_default();
-                        if index < self.state.scrubber.entries.len() {
-                            self.state.scrubber.index = index;
-                        }
-                    }
-                }
-
-                // Update recent images
-                if let Some(path) = &self.state.current_path
-                    && self.state.persistent_settings.max_recents > 0
-                    && !self.state.volatile_settings.recent_images.contains(path)
-                {
-                    self.state
-                        .volatile_settings
-                        .recent_images
-                        .push_front(path.clone());
-                    self.state
-                        .volatile_settings
-                        .recent_images
-                        .truncate(self.state.persistent_settings.max_recents.into());
-                }
-            }
-
-            // Clear metadata and edit state for non-animation frames
-            if !matches!(frame, Frame::Animation(_, _)) {
-                self.state.image_metadata = None;
-            }
-            if !matches!(
-                frame,
-                Frame::Animation(_, _) | Frame::EditResult(_) | Frame::UpdateTexture
-            ) {
-                self.state.edit_state.result_pixel_op = Default::default();
-                self.state.edit_state.result_image_op = Default::default();
-                if !self.state.persistent_settings.keep_edits {
-                    self.state.edit_state = Default::default();
-                }
-            }
-
-            match frame {
-                Frame::Still(img)
-                | Frame::CompareResult(img, _)
-                | Frame::ImageCollectionMember(img) => {
-                    debug!("Received image {}x{}", img.width(), img.height());
-
-                    // Insert into cache for fast back/forth navigation
-                    if self.state.persistent_settings.max_cache != 0
-                        && let Some(p) = self.state.current_path.clone()
-                    {
-                        self.state.player.cache.insert(&p, img.clone());
-                    }
-
-                    self.state.current_image = Some(img);
-                    self.state.new_image_loaded = true;
-                    self.texture_dirty = true;
-                    self.animation_playing = false;
-                    self.reset_after_upload = true;
-                    ctx.request_repaint();
-                }
-                Frame::AnimationStart(img) => {
-                    debug!("Animation start {}x{}", img.width(), img.height());
-                    self.state.current_image = Some(img);
-                    self.state.new_image_loaded = true;
-                    self.reset_after_upload = true;
-                    self.texture_dirty = true;
-                    self.animation_playing = true;
-                    ctx.request_repaint();
-                }
-                Frame::EditResult(img) => {
-                    self.state.current_image = Some(img);
-                    self.texture_dirty = true;
-                    ctx.request_repaint();
-                }
-                Frame::Animation(img, _delay) => {
-                    // delay is not used since the sender delays (sleeps) and we repaint on every frame when anim is playing
-                    self.state.current_image = Some(img);
-                    self.texture_dirty = true;
-                    self.animation_playing = true;
-                }
-                Frame::UpdateTexture => {
-                    debug!("received UpdateTexture");
-                    self.texture_dirty = true;
-                    ctx.request_repaint();
-                }
-            }
-
-            // Send extended info (histogram, exif, etc.) in background thread
-            send_extended_info(
-                &self.state.current_image,
-                &self.state.current_path,
-                &self.state.extended_info_channel,
-            );
-
-            // Update window title
-            set_title(ctx, &mut self.state);
+        let frames: Vec<Frame> = self.state.texture_channel.1.try_iter().collect();
+        for frame in frames {
+            self.process_frame(ctx, frame);
         }
+    }
+
+    fn process_frame(&mut self, ctx: &egui::Context, frame: Frame) {
+        // The frames of an animation go to the animation, the clock in `ui` shows them
+        match frame {
+            Frame::Animation(img, delay) => {
+                if let Some(animation) = &mut self.animation {
+                    animation.push(img, delay);
+                }
+                return;
+            }
+            Frame::AnimationEnd => {
+                if let Some(animation) = &mut self.animation {
+                    animation.complete = true;
+                    // Every GIF arrives as an animation. One with a single frame is a
+                    // still image, so filters and edits apply to it.
+                    if animation.frames.len() < 2 {
+                        self.animation = None;
+                        self.texture_dirty = true;
+                    }
+                }
+                return;
+            }
+            _ => {}
+        }
+
+        self.state.is_loaded = true;
+        self.last_frame_was_compared_image = matches!(frame, Frame::CompareResult(_, _));
+        if let Frame::CompareResult(_, geometry) = &frame {
+            self.compare_geometry = Some(*geometry);
+        }
+
+        // Update scrubber on new images
+        // Also match Animation if an AnimationStart was drained
+        if matches!(
+            &frame,
+            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
+        ) {
+            if let Some(path) = &self.state.current_path {
+                if self.state.scrubber.has_folder_changed(path) && !self.state.scrubber.fixed_paths
+                {
+                    self.state.scrubber = crate::scrubber::Scrubber::new(path);
+                    self.state.scrubber.wrap = self.state.persistent_settings.wrap_folder;
+                } else {
+                    let index = self
+                        .state
+                        .scrubber
+                        .entries
+                        .iter()
+                        .position(|p| p == path)
+                        .unwrap_or_default();
+                    if index < self.state.scrubber.entries.len() {
+                        self.state.scrubber.index = index;
+                    }
+                }
+            }
+
+            // Update recent images
+            if let Some(path) = &self.state.current_path
+                && self.state.persistent_settings.max_recents > 0
+                && !self.state.volatile_settings.recent_images.contains(path)
+            {
+                self.state
+                    .volatile_settings
+                    .recent_images
+                    .push_front(path.clone());
+                self.state
+                    .volatile_settings
+                    .recent_images
+                    .truncate(self.state.persistent_settings.max_recents.into());
+            }
+        }
+
+        self.state.image_metadata = None;
+        if !matches!(frame, Frame::EditResult(_) | Frame::UpdateTexture) {
+            self.state.edit_state.result_pixel_op = Default::default();
+            self.state.edit_state.result_image_op = Default::default();
+            if !self.state.persistent_settings.keep_edits {
+                self.state.edit_state = Default::default();
+            }
+        }
+
+        match frame {
+            Frame::Still(img)
+            | Frame::CompareResult(img, _)
+            | Frame::ImageCollectionMember(img) => {
+                debug!("Received image {}x{}", img.width(), img.height());
+
+                // Insert into cache for fast back/forth navigation
+                if self.state.persistent_settings.max_cache != 0
+                    && let Some(p) = self.state.current_path.clone()
+                {
+                    self.state.player.cache.insert(&p, img.clone());
+                }
+
+                self.state.current_image = Some(img);
+                self.state.new_image_loaded = true;
+                self.texture_dirty = true;
+                self.animation = None;
+                self.reset_after_upload = true;
+                ctx.request_repaint();
+            }
+            Frame::AnimationStart(img) => {
+                debug!("Animation start {}x{}", img.width(), img.height());
+                self.state.current_image = Some(img);
+                self.state.new_image_loaded = true;
+                self.reset_after_upload = true;
+                self.texture_dirty = true;
+                self.animation = Some(Animation::new());
+                ctx.request_repaint();
+            }
+            Frame::EditResult(img) => {
+                self.state.current_image = Some(img);
+                self.texture_dirty = true;
+                ctx.request_repaint();
+            }
+            Frame::UpdateTexture => {
+                debug!("received UpdateTexture");
+                self.texture_dirty = true;
+                ctx.request_repaint();
+            }
+            // handled at the top
+            Frame::Animation(..) | Frame::AnimationEnd => {}
+        }
+
+        // Send extended info (histogram, exif, etc.) in background thread
+        send_extended_info(
+            &self.state.current_image,
+            &self.state.current_path,
+            &self.state.extended_info_channel,
+        );
+
+        // Update window title
+        set_title(ctx, &mut self.state);
     }
 
     fn process_messages(&mut self) {
@@ -517,14 +590,6 @@ impl eframe::App for OculanteApp {
             }
         }
 
-        // Upload image to the GPU if needed
-        if self.texture_dirty
-            && let Some(gl) = frame.gl()
-        {
-            debug!("Texture was dirty. uploading");
-            self.upload_image_to_glow(gl);
-        }
-
         // Update window size
         let screen_rect = ctx.content_rect();
         let window_size = Vector2::new(screen_rect.width(), screen_rect.height());
@@ -541,6 +606,26 @@ impl eframe::App for OculanteApp {
         self.process_load_channel();
         self.process_texture_channel(ctx);
         self.process_messages();
+
+        // Show the next frame of an animation when it is due, and come back for the one after
+        if let Some(animation) = &mut self.animation {
+            let now = Instant::now();
+            if let Some(image) = animation.advance(now) {
+                self.state.current_image = Some(image);
+                self.texture_dirty = true;
+            }
+            if let Some(wait) = animation.wake_in(now) {
+                ctx.request_repaint_after(wait);
+            }
+        }
+
+        // Upload image to the GPU if needed, in the same pass as the frame that arrived
+        if self.texture_dirty
+            && let Some(gl) = frame.gl()
+        {
+            debug!("Texture was dirty. uploading");
+            self.upload_image_to_glow(gl);
+        }
 
         if let Ok(info) = self.state.extended_info_channel.1.try_recv() {
             for value in info.exif.values() {
@@ -1103,7 +1188,7 @@ impl eframe::App for OculanteApp {
         }
 
         // Repaint if needed
-        if self.state.network_mode || self.animation_playing {
+        if self.state.network_mode {
             ctx.request_repaint();
         }
         if self.state.new_image_loaded {

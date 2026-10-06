@@ -21,6 +21,7 @@ from uitest import (  # noqa: E402
     App,
     changed_pixels,
     changed_pixels_in,
+    find_slider,
     has_window_manager,
     image,
     region_has_color,
@@ -523,9 +524,11 @@ def brighten(app):
     app.settle(0.8)
     app.move(0.4, 0.5)
     app.settle(0.8)
-    handle = rightmost_x(app.shot("slider"), (770, 210, 200, 9), ACCENT)
-    assert handle is not None, "the slider is missing"
-    app.drag(handle - 4, 214, handle + 60, 214)
+    # the row of the slider depends on the filters that are already there
+    slider = find_slider(app.shot("slider"), (770, 60, 200, 400), ACCENT)
+    assert slider is not None, "the slider is missing"
+    handle, y = slider
+    app.drag(handle - 4, y, handle + 60, y)
     app.move(0.4, 0.5)
     app.settle(1.5)
 
@@ -550,6 +553,20 @@ def test_keep_edits(binary):
                 assert changed < 500, f"the edits were not kept ({changed} pixels differ)"
             else:
                 assert changed > 50_000, "the edits stayed although they should be dropped"
+
+
+def test_single_frame_gif_is_editable(binary):
+    """A GIF with a single frame is a still image, so a filter changes it."""
+    folder = folder_of("single_frame_gif_images", [])
+    path = os.path.join(folder, "moss.gif")
+    subprocess.run(["convert", image("moss.jpg"), path], check=True)
+    with start(binary, "single_frame_gif", path) as app:
+        area = (120, 40, 640, 470)
+        plain = app.shot("plain")
+        brighten(app)
+        edited = app.shot("edited")
+        changed = changed_pixels_in(plain, edited, area)
+        assert changed > 50_000, f"the filter changed only {changed} pixels of a single-frame GIF"
 
 
 def test_overtaken_load(binary):
@@ -665,6 +682,7 @@ TESTS = [
     test_animation_plays_and_stops,
     test_keep_view,
     test_keep_edits,
+    test_single_frame_gif_is_editable,
     test_overtaken_load,
     test_load_error_shows_toast,
     test_channel_view,

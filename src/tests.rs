@@ -27,7 +27,9 @@ fn assert_valid_image(frame: &Frame) {
                 "Image has zero dimensions"
             );
         }
-        Frame::UpdateTexture => panic!("Expected an image frame, got UpdateTexture"),
+        Frame::UpdateTexture | Frame::AnimationEnd => {
+            panic!("Expected an image frame, got {frame}")
+        }
     }
 }
 

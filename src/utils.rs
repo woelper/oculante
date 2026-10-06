@@ -12,7 +12,7 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use image::{self, DynamicImage, GenericImageView};
@@ -419,14 +419,16 @@ pub fn send_image_threaded(
 
     let path = img_location.to_path_buf();
     thread::spawn(move || {
-        let mut framecache = vec![];
-        let mut timer = std::time::Instant::now();
+        let timer = std::time::Instant::now();
 
         match open_image(&loc, Some(message_sender.clone()), Some(decoder_opts)) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
-                let mut first = true;
+                // The frames of an animation are handed over as they are decoded.
+                // The app keeps them and keeps the time, so this thread never
+                // waits and ends with the decoding.
+                let mut animation_frames = 0;
                 for mut f in frame_receiver.iter() {
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
@@ -434,23 +436,13 @@ pub fn send_image_threaded(
                     }
 
                     match f {
-                        Frame::Animation(ref buffer, delay) => {
-                            framecache.push(f.clone());
-                            if first {
-                                _ = texture_sender
-                                    .clone()
-                                    .send(Frame::new_reset(buffer.clone()));
-                            } else {
-                                let _ = texture_sender.send(f.clone());
+                        Frame::Animation(ref buffer, _) => {
+                            if animation_frames == 0 {
+                                _ = texture_sender.send(Frame::new_reset(buffer.clone()));
                             }
+                            animation_frames += 1;
+                            _ = texture_sender.send(f);
                             request_repaint();
-                            let elapsed = timer.elapsed().as_millis();
-                            let wait_time_after_loading = delay.saturating_sub(elapsed as u16);
-                            debug!("elapsed {elapsed}, wait {wait_time_after_loading}");
-                            std::thread::sleep(Duration::from_millis(
-                                wait_time_after_loading as u64,
-                            ));
-                            timer = std::time::Instant::now();
                         }
                         Frame::Still(ref mut buffer) => {
                             debug!("Received image in {:?}", timer.elapsed());
@@ -469,29 +461,12 @@ pub fn send_image_threaded(
                         }
                         _ => (),
                     }
-
-                    first = false;
                 }
 
-                // loop over the image. For sanity, stop at a limit of iterations.
-                for _ in 0..500 {
-                    for frame in &framecache {
-                        if stop_receiver.try_recv().is_ok() {
-                            debug!("Stopped from receiver.");
-                            return;
-                        }
-
-                        if let Frame::Animation(_, delay) = frame {
-                            let _ = texture_sender.send(frame.clone());
-                            request_repaint();
-                            if *delay > 0 {
-                                //                                      cap at 60fps
-                                thread::sleep(Duration::from_millis(*delay.max(&17) as u64));
-                            } else {
-                                thread::sleep(Duration::from_millis(40_u64));
-                            }
-                        }
-                    }
+                if animation_frames > 0 {
+                    debug!("Animation decoded, {animation_frames} frames");
+                    _ = texture_sender.send(Frame::AnimationEnd);
+                    request_repaint();
                 }
             }
             Err(e) => {
@@ -521,6 +496,8 @@ pub enum Frame {
     EditResult(Arc<DynamicImage>),
     /// Only update the current texture.
     UpdateTexture,
+    /// All frames of the animation were sent, it loops from here on.
+    AnimationEnd,
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
     CompareResult(Arc<DynamicImage>, ImageGeometry),
     /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
@@ -571,9 +548,9 @@ impl Frame {
                 | Frame::EditResult(ref mut image_buffer)
                 | Frame::CompareResult(ref mut image_buffer, _)
                 | Frame::ImageCollectionMember(ref mut image_buffer) => *image_buffer = img.clone(),
-                Frame::UpdateTexture => (),
+                Frame::UpdateTexture | Frame::AnimationEnd => (),
             },
-            Frame::UpdateTexture => (),
+            Frame::UpdateTexture | Frame::AnimationEnd => (),
         }
         forced_variant
     }
