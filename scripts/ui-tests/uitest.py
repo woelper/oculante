@@ -44,6 +44,9 @@ class App:
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
         os.makedirs(self.out)
+        # a display left behind by a test that died would swallow the keys of this one
+        subprocess.run(["pkill", "-f", f"^Xvfb {display} "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.3)
         self.xvfb = subprocess.Popen(
             ["Xvfb", display, "-screen", "0", f"{SCREEN[0]}x{SCREEN[1]}x24", "-nolisten", "tcp"],
             stdout=subprocess.DEVNULL,

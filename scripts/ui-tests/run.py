@@ -386,6 +386,215 @@ def test_paint_mode(binary):
         assert changed_pixels_in(before, after, (130, 60, 150, 120)) == 0, "the drag moved the image"
 
 
+# the image area right of the info panel, free of anything that depends on the pointer
+# and above the frame counter a debug build draws at the bottom
+IMAGE_AREA = (290, 40, 720, 470)
+# where toasts appear
+TOAST_AREA = (0, 300, 330, 290)
+
+
+def folder_of(name, files):
+    """A fresh folder in the output directory holding copies of test images, as (new name, source)."""
+    folder = os.path.join(OUT, name)
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    for new_name, source in files:
+        shutil.copy(image(source), os.path.join(folder, new_name))
+    return folder
+
+
+def shown_file(app):
+    """The file named in the window title."""
+    title = app.x("xdotool", "getwindowname", app.win).stdout
+    found = re.search(r"(\S+\.(?:png|jpg|gif))", title)
+    return os.path.basename(found.group(1)) if found else title.strip()
+
+
+def start(binary, name, path, settings=None):
+    """The app with an image on screen. Closes it if that fails, so nothing is left behind."""
+    app = App(binary, name, [path], settings=settings)
+    try:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        # the first upload to the GPU, for still images and animations alike
+        assert app.wait_for_log("Texture was dirty"), "the image never loaded"
+        app.settle(1.0)
+    except Exception:
+        app.close()
+        raise
+    return app
+
+
+def add_to_compare_list(app):
+    app.key("i")
+    app.settle(1.0)
+    app.click(60, 555)  # open "Compare"
+    app.settle(0.8)
+    app.scroll_down(120, 300, 12)
+    app.click(139, 329)  # "Add current image"
+    app.settle(0.8)
+    app.move(0.6, 0.6)
+    app.settle(0.5)
+
+
+def test_compare_list(binary):
+    """An image from the compare list comes back with the zoom and position it was added with."""
+    folder = folder_of("compare_images", [("00.jpg", "moss.jpg"), ("01.png", "test.png")])
+    with start(binary, "compare", os.path.join(folder, "00.jpg")) as app:
+        app.key("2")  # zoom to 200%
+        add_to_compare_list(app)
+        zoomed = app.shot("zoomed")
+        app.key("Right")
+        app.settle(1.5)
+        assert shown_file(app) == "01.png", f"the next image did not load: {shown_file(app)}"
+        other = app.shot("other")
+        assert changed_pixels_in(zoomed, other, IMAGE_AREA) > 50_000, "the next image looks like the first"
+        app.key("shift+c")  # next image of the compare list
+        app.settle(2.0)
+        back = app.shot("back")
+        assert shown_file(app) == "00.jpg", f"the compared image did not come back: {shown_file(app)}"
+        changed = changed_pixels_in(zoomed, back, IMAGE_AREA)
+        assert changed < 500, f"the compared image is not at its stored zoom and position ({changed} pixels differ)"
+    # with the view kept, the compared image takes the current view instead of its stored one
+    with start(binary, "compare_keep_view", os.path.join(folder, "00.jpg"), settings={"compare_keep_view": True}) as app:
+        app.key("2")
+        add_to_compare_list(app)
+        zoomed = app.shot("zoomed")
+        app.key("Right")
+        app.settle(1.5)
+        app.key("shift+c")
+        app.settle(2.0)
+        back = app.shot("back")
+        assert shown_file(app) == "00.jpg", f"the compared image did not come back: {shown_file(app)}"
+        assert changed_pixels_in(zoomed, back, IMAGE_AREA) > 50_000, "the stored view was restored although the view is to be kept"
+
+
+def make_animation(path):
+    """A GIF of three colored frames, 200 ms each."""
+    subprocess.run(
+        ["convert", "-delay", "20", "-size", "200x200", "xc:red", "xc:lime", "xc:blue", "-loop", "0", path],
+        check=True,
+    )
+
+
+def test_animation_plays_and_stops(binary):
+    """An animation plays, and stops when another image is shown."""
+    folder = folder_of("animation_images", [("01.png", "test.png")])
+    make_animation(os.path.join(folder, "00.gif"))
+    with start(binary, "animation", os.path.join(folder, "00.gif")) as app:
+        frames = []
+        for n in range(4):
+            frames.append(app.shot(f"frame_{n}"))
+            time.sleep(0.25)
+        changes = [changed_pixels_in(a, b, IMAGE_AREA) for a, b in zip(frames, frames[1:])]
+        assert max(changes) > 10_000, f"the animation does not play ({changes} pixels changed between frames)"
+        app.key("Right")
+        app.settle(1.5)
+        assert shown_file(app) == "01.png", f"the next image did not load: {shown_file(app)}"
+        still_a = app.shot("still_a")
+        time.sleep(0.5)
+        still_b = app.shot("still_b")
+        assert changed_pixels_in(still_a, still_b, IMAGE_AREA) == 0, "the image keeps changing after the animation"
+        assert not region_has_color(still_b, (460, 250, 100, 100), (255, 0, 0), 10), "a frame of the animation is still shown"
+
+
+def test_keep_view(binary):
+    """With "keep view" the next image is shown at the same zoom, without it is fitted again."""
+    folder = folder_of("keep_view_images", [("00.png", "test.png"), ("01.png", "test.png")])
+    for keep in (True, False):
+        with start(binary, f"keep_view_{keep}", os.path.join(folder, "00.png"), settings={"keep_view": keep}) as app:
+            app.key("2")
+            zoomed = app.shot("zoomed")
+            app.key("Right")
+            app.settle(1.5)
+            assert shown_file(app) == "01.png", f"the next image did not load: {shown_file(app)}"
+            after = app.shot("after")
+            changed = changed_pixels_in(zoomed, after, IMAGE_AREA)
+            if keep:
+                assert changed == 0, f"the view was not kept ({changed} pixels differ)"
+            else:
+                assert changed > 10_000, "the view was kept although it should be reset"
+
+
+def brighten(app):
+    """Adds a brightness filter and drags its slider up."""
+    open_edit_panel(app)
+    app.click(897, 117)  # add "Brightness"
+    app.settle(0.8)
+    app.move(0.4, 0.5)
+    app.settle(0.8)
+    handle = rightmost_x(app.shot("slider"), (770, 210, 200, 9), ACCENT)
+    assert handle is not None, "the slider is missing"
+    app.drag(handle - 4, 214, handle + 60, 214)
+    app.move(0.4, 0.5)
+    app.settle(1.5)
+
+
+def test_keep_edits(binary):
+    """With "keep edits" the filters stay on the next image, without them it is shown as it is."""
+    folder = folder_of("keep_edits_images", [("00.jpg", "moss.jpg"), ("01.jpg", "moss.jpg")])
+    for keep in (True, False):
+        with start(binary, f"keep_edits_{keep}", os.path.join(folder, "00.jpg"), settings={"keep_edits": keep}) as app:
+            # the image, above the frame counter of a debug build
+            area = (120, 40, 640, 470)
+            plain = app.shot("plain")
+            brighten(app)
+            edited = app.shot("edited")
+            assert changed_pixels_in(plain, edited, area) > 50_000, "the filter changed nothing"
+            app.key("Right")
+            app.settle(2.0)
+            assert shown_file(app) == "01.jpg", f"the next image did not load: {shown_file(app)}"
+            after = app.shot("after")
+            changed = changed_pixels_in(edited, after, area)
+            if keep:
+                assert changed < 500, f"the edits were not kept ({changed} pixels differ)"
+            else:
+                assert changed > 50_000, "the edits stayed although they should be dropped"
+
+
+def test_overtaken_load(binary):
+    """A slow image that is skipped over does not show up later and overwrite the image that was chosen."""
+    folder = folder_of("overtaken_images", [("00.png", "test.png"), ("02.jpg", "moss.jpg")])
+    subprocess.run(["convert", "-size", "5000x5000", "xc:gray50", os.path.join(folder, "01.png")], check=True)
+    with start(binary, "overtaken", os.path.join(folder, "00.png")) as app:
+        app.key("Right", hold=0.05)
+        app.key("Right", hold=0.05)
+        app.settle(6.0)
+        assert shown_file(app) == "02.jpg", f"the chosen image is not shown: {shown_file(app)}"
+        first = app.shot("first")
+        time.sleep(3.0)
+        app.settle(0.5)
+        assert shown_file(app) == "02.jpg", f"a skipped image came back: {shown_file(app)}"
+        second = app.shot("second")
+        assert changed_pixels_in(first, second, IMAGE_AREA) == 0, "the image changed after the skipped one finished loading"
+        assert not region_has_color(second, (600, 250, 100, 100), (128, 128, 128), 3), "the skipped gray image is shown"
+
+
+def test_load_error_shows_toast(binary):
+    """A file that can not be decoded shows an error toast instead of failing silently."""
+    with App(binary, "load_error", [image("mp4_ex-signature.gif")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        app.settle(1.5)
+        shot = app.shot("error")
+        assert region_has_color(shot, TOAST_AREA, ACCENT, 30), "no error toast is shown"
+        assert app.running(), "the app quit on a broken file"
+
+
+def test_channel_view(binary):
+    """Showing a single channel changes the image, showing all channels again restores it."""
+    with start(binary, "channels", image("moss.jpg")) as app:
+        rgba = app.shot("rgba")
+        app.key("r")
+        app.settle(1.0)
+        red = app.shot("red")
+        assert changed_pixels_in(rgba, red, IMAGE_AREA) > 100_000, "the red channel looks like the full image"
+        app.key("c")
+        app.settle(1.0)
+        back = app.shot("back")
+        assert changed_pixels_in(rgba, back, IMAGE_AREA) == 0, "the full image did not come back"
+
+
 def needs_window_manager():
     if not has_window_manager():
         raise Skip(f"needs the window manager {WINDOW_MANAGER}")
@@ -452,6 +661,13 @@ TESTS = [
     test_paint_mode,
     test_fullscreen,
     test_borderless,
+    test_compare_list,
+    test_animation_plays_and_stops,
+    test_keep_view,
+    test_keep_edits,
+    test_overtaken_load,
+    test_load_error_shows_toast,
+    test_channel_view,
 ]
 
 

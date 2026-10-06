@@ -49,6 +49,13 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |
 | `test_fullscreen` | The window fills the screen and returns to its place and size (needs a window manager) |
 | `test_borderless` | Without a border there is no title bar, the app's own bar moves the window and its button closes it (needs a window manager) |
+| `test_compare_list` | An image from the compare list comes back at its stored zoom and position, or keeps the current view with "persistent zoom" |
+| `test_animation_plays_and_stops` | An animated GIF plays, and stops when the next image is shown |
+| `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
+| `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
+| `test_overtaken_load` | A slow image that was skipped over does not show up later |
+| `test_load_error_shows_toast` | A broken file shows an error toast and the app keeps running |
+| `test_channel_view` | A single channel changes the image and all channels restore it |
 
 ## Notes
 
