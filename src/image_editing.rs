@@ -1798,7 +1798,8 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
         }
         DynamicImage::ImageRgb32F(buffer) => {
             buffer.par_chunks_mut(3).for_each(|px| {
-                let mut float_pixel = Vector4::new(px[0], px[1], px[2], 0.0);
+                // opaque, as for 8 bit RGB
+                let mut float_pixel = Vector4::new(px[0], px[1], px[2], 1.0);
                 for operation in operators {
                     if let Err(e) = operation.process_pixel(&mut float_pixel) {
                         error!("{e}")
@@ -1810,7 +1811,7 @@ pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperatio
             });
         }
         DynamicImage::ImageRgba32F(buffer) => {
-            buffer.par_chunks_mut(3).for_each(|px| {
+            buffer.par_chunks_mut(4).for_each(|px| {
                 let mut float_pixel = Vector4::new(px[0], px[1], px[2], px[3]);
                 for operation in operators {
                     if let Err(e) = operation.process_pixel(&mut float_pixel) {

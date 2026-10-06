@@ -201,6 +201,33 @@ fn ci_load_apng_16bit_shows_default_image() {
     );
 }
 
+/// Pixel operations work on every layout they support, and refuse the others
+/// instead of crashing. 32 bit float RGBA crashed.
+#[test]
+fn ci_pixel_operations_on_every_layout() {
+    use crate::image_editing::{ImageOperation, process_pixels};
+    use image::{DynamicImage, Rgba32FImage, RgbaImage};
+    let ops = vec![ImageOperation::Invert];
+    let base = RgbaImage::from_pixel(3, 2, image::Rgba([10, 20, 30, 255]));
+    let layouts = [
+        DynamicImage::ImageLuma8(DynamicImage::ImageRgba8(base.clone()).to_luma8()),
+        DynamicImage::ImageLumaA8(DynamicImage::ImageRgba8(base.clone()).to_luma_alpha8()),
+        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(base.clone()).to_rgb8()),
+        DynamicImage::ImageRgba8(base.clone()),
+        DynamicImage::ImageRgb32F(DynamicImage::ImageRgba8(base.clone()).to_rgb32f()),
+        DynamicImage::ImageRgba32F(Rgba32FImage::from(DynamicImage::ImageRgba8(base.clone()))),
+    ];
+    for mut image in layouts {
+        let color = image.color();
+        process_pixels(&mut image, &ops).unwrap_or_else(|e| panic!("{color:?}: {e}"));
+        // every pixel, including the last one, was inverted
+        let last = image.to_rgba8().get_pixel(2, 1).0;
+        assert!(last[0] > 200, "{color:?} was not inverted: {last:?}");
+    }
+    let mut sixteen = DynamicImage::ImageRgba16(DynamicImage::ImageRgba8(base).to_rgba16());
+    assert!(process_pixels(&mut sixteen, &ops).is_err());
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();
