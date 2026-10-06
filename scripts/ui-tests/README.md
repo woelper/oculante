@@ -44,6 +44,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
 | `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image, in any direction, and not over the info panel |
 | `test_perspective_crop_handles` | The perspective crop shows its handles, they can be dragged, the crop applied, removed and added again |
+| `test_relative_file_name` | Started in the folder of the image with only its file name, the next image is the one after it |
 | `test_key_repeat` | A key that is held down goes through the images of a folder |
 | `test_zen_mode` | Zen mode hides the bar and the info panel, leaving it brings both back |
 | `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |

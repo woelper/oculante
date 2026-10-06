@@ -318,6 +318,20 @@ def test_perspective_crop_handles(binary):
         assert region_has_color(again, top_left, GOLD, 25), "a crop added a second time has no handles"
 
 
+def test_relative_file_name(binary):
+    """Started from a terminal in the folder of the image, with only its file name,
+    the next image is the one after it. The same image came again."""
+    folder = folder_of("relative_images", [("a.png", "test.png"), ("b.png", "test.png"), ("c.png", "test.png")])
+    with App(binary, "relative_file_name", ["b.png"], cwd=folder) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log("Texture was dirty"), "the image never loaded"
+        app.settle(1.0)
+        app.key("Right")
+        app.settle(1.5)
+        assert shown_file(app) == "c.png", f"after b.png came {shown_file(app)}"
+
+
 def test_key_repeat(binary):
     """A key that is held down goes through the images of a folder."""
     folder = os.path.join(OUT, "key_repeat_images")
@@ -770,6 +784,7 @@ TESTS = [
     test_slider_changes_image,
     test_measure_draws_rectangle,
     test_key_repeat,
+    test_relative_file_name,
     test_zen_mode,
     test_paint_mode,
     test_fullscreen,

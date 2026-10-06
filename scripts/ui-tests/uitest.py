@@ -40,6 +40,7 @@ class App:
         env=None,
         pointer=None,
         window_manager=False,
+        cwd=None,
     ):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
@@ -81,7 +82,7 @@ class App:
         self.logfile = open(os.path.join(self.out, "app.log"), "w")
         self.started = time.time()
         self.app = subprocess.Popen(
-            [binary] + args, env=env, stdin=stdin, stdout=self.logfile, stderr=subprocess.STDOUT, cwd=REPO
+            [binary] + args, env=env, stdin=stdin, stdout=self.logfile, stderr=subprocess.STDOUT, cwd=cwd or REPO
         )
         self.win = None
         self.geom = None
