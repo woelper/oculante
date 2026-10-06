@@ -547,6 +547,205 @@ fn ci_lossless_jpeg_transforms() {
     _ = std::fs::remove_dir_all(&dir);
 }
 
+/// All frames the loader sends for a file, and the warnings
+fn load_all(path: &std::path::Path) -> anyhow::Result<(Vec<Frame>, Vec<String>)> {
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    let receiver = open_image(path, Some(message_sender), None)?;
+    let mut frames = vec![];
+    while let Ok(frame) = receiver.recv_timeout(Duration::from_secs(60)) {
+        frames.push(frame);
+    }
+    let warnings = messages
+        .try_iter()
+        .filter_map(|m| match m {
+            crate::appstate::Message::Warning(w) => Some(w),
+            _ => None,
+        })
+        .collect();
+    Ok((frames, warnings))
+}
+
+/// The size a file name gives, like 600x300 in "600x300_float.exr"
+fn size_in_name(name: &str) -> Option<(u32, u32)> {
+    name.split(|c: char| !c.is_ascii_alphanumeric())
+        .find_map(|part| {
+            let (w, h) = part.split_once('x')?;
+            Some((w.parse().ok()?, h.parse().ok()?))
+        })
+}
+
+/// Every file in res/tests loads, with the size its name gives, and the
+/// animated ones as animations. About 30 of them were loaded by no test.
+#[test]
+fn ci_load_every_test_file() {
+    // not supported, or not an image
+    let mut expected_errors = vec![
+        "mp4_ex-signature.gif",
+        "test_R16G16B16_SFLOAT.ktx2",
+        "test_R32G32B32_SFLOAT.ktx2",
+    ];
+    if cfg!(not(any(feature = "heif", feature = "heif_native"))) {
+        expected_errors.push("orange.heic");
+    }
+    let animated = [
+        "APNG_throbber.png",
+        "Animated_PNG_example_bouncing_beach_ball.png",
+        "3d2.png",
+    ];
+    let mut paths: Vec<_> = std::fs::read_dir("res/tests")
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_file())
+        .collect();
+    paths.sort();
+    let mut failures = vec![];
+    for path in paths {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let frames = match load_all(&path) {
+            Ok((frames, _)) => frames,
+            Err(e) => {
+                if !expected_errors.contains(&name.as_str()) {
+                    failures.push(format!("{name}: {e}"));
+                }
+                continue;
+            }
+        };
+        let images: Vec<_> = frames.iter().filter_map(|f| f.get_image()).collect();
+        let Some(first) = images.first() else {
+            if !expected_errors.contains(&name.as_str()) {
+                failures.push(format!("{name}: no image"));
+            }
+            continue;
+        };
+        if expected_errors.contains(&name.as_str()) {
+            failures.push(format!("{name}: loads now, update the test"));
+        }
+        if first.width() == 0 || first.height() == 0 {
+            failures.push(format!("{name}: empty"));
+        }
+        if let Some(size) = size_in_name(&name)
+            && (first.width(), first.height()) != size
+        {
+            failures.push(format!("{name}: {}x{}", first.width(), first.height()));
+        }
+        if animated.contains(&name.as_str()) {
+            let ended = frames.iter().any(|f| matches!(f, Frame::AnimationEnd(_)));
+            if images.len() < 2 || !ended {
+                failures.push(format!(
+                    "{name}: {} frames, end sent: {ended}",
+                    images.len()
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// Formats without a test file are written here and loaded, with the right
+/// size, a pixel that is right, and no warning about the extension
+#[test]
+fn ci_load_generated_formats() {
+    use image::{DynamicImage, GrayImage, ImageBuffer, Luma, RgbaImage};
+    let dir = std::env::temp_dir().join("oculante_test_formats");
+    _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let rgba = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 50) as u8, (y * 80) as u8, 90, 255])
+    }));
+    // the pixel at 4,2
+    let corner = [200, 160, 90];
+    let gray16 = DynamicImage::ImageLuma16(ImageBuffer::from_fn(5, 3, |x, y| {
+        Luma([(x * 10000 + y * 500) as u16])
+    }));
+    let written = [
+        ("a.bmp", rgba.to_rgb8().into()),
+        ("a.ico", rgba.clone()),
+        ("a.tga", rgba.clone()),
+        ("a.qoi", rgba.clone()),
+        ("a.ppm", rgba.to_rgb8().into()),
+        ("a.ff", rgba.to_rgba16().into()),
+        ("a.jpeg", rgba.to_rgb8().into()),
+        ("a.tif", rgba.to_rgb8().into()),
+        ("rgba.tiff", rgba.clone()),
+        (
+            "gray.tif",
+            DynamicImage::ImageLuma8(GrayImage::from_fn(5, 3, |x, _| Luma([(x * 50) as u8]))),
+        ),
+        ("gray16.tif", gray16),
+        ("float.hdr", rgba.to_rgb32f().into()),
+    ];
+    let mut failures = vec![];
+    for (name, image) in written {
+        let path = dir.join(name);
+        image.save(&path).unwrap();
+        let (frames, warnings) = match load_all(&path) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                failures.push(format!("{name}: {e}"));
+                continue;
+            }
+        };
+        let Some(loaded) = frames.first().and_then(|f| f.get_image()) else {
+            failures.push(format!("{name}: no image"));
+            continue;
+        };
+        if (loaded.width(), loaded.height()) != (5, 3) {
+            failures.push(format!("{name}: {}x{}", loaded.width(), loaded.height()));
+        }
+        if !warnings.is_empty() {
+            failures.push(format!("{name}: {warnings:?}"));
+        }
+        let pixel = loaded.to_rgb8().get_pixel(4, 2).0;
+        let lossless =
+            !name.ends_with(".jpeg") && !name.ends_with(".hdr") && !name.starts_with("gray");
+        if lossless && pixel != corner {
+            failures.push(format!("{name}: {pixel:?} at 4,2"));
+        }
+    }
+
+    // A 16 bit TIFF with a single value has its level, it came out black
+    let flat = DynamicImage::ImageLuma16(ImageBuffer::from_pixel(4, 4, Luma([30000u16])));
+    let path = dir.join("flat.tif");
+    flat.save(&path).unwrap();
+    let level = load_all(&path).unwrap().0[0]
+        .get_image()
+        .unwrap()
+        .to_luma8()
+        .get_pixel(0, 0)
+        .0[0];
+    if level.abs_diff(117) > 1 {
+        failures.push(format!("flat.tif: level {level}"));
+    }
+
+    // formats the image crate can not write: written by hand
+    let by_hand: [(&str, &[u8]); 3] = [
+        (
+            "a.xbm",
+            b"#define a_width 5\n#define a_height 3\nstatic unsigned char a_bits[] = { 0x01, 0x02, 0x04 };\n",
+        ),
+        (
+            "a.xpm",
+            b"/* XPM */\nstatic char *a[] = {\n\"5 3 2 1\",\n\"r c #FF0000\",\n\"b c #0000FF\",\n\"rrbbb\",\n\"bbbbb\",\n\"rrrrr\"\n};\n",
+        ),
+        // type 0, no extended header, 5x3, one byte per row
+        ("a.wbmp", &[0, 0, 5, 3, 0b1000_0000, 0b0100_0000, 0b0010_0000]),
+    ];
+    for (name, bytes) in by_hand {
+        let path = dir.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        match load_all(&path).map(|(frames, _)| frames.first().and_then(|f| f.get_image())) {
+            Ok(Some(image)) if (image.width(), image.height()) == (5, 3) => {}
+            Ok(Some(image)) => {
+                failures.push(format!("{name}: {}x{}", image.width(), image.height()))
+            }
+            Ok(None) => failures.push(format!("{name}: no image")),
+            Err(e) => failures.push(format!("{name}: {e}")),
+        }
+    }
+    _ = std::fs::remove_dir_all(&dir);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();

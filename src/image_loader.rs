@@ -708,7 +708,10 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
         tiff::decoder::DecodingResult::U16(contents) => {
             debug!("TIFF U16");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (0., u16::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::F16(contents) => {
             debug!("TIFF F16");
@@ -716,46 +719,73 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
                 .par_iter()
                 .map(|p| f32::from(*p))
                 .collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (0., 1.))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::U32(contents) => {
             debug!("TIFF U32");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (0., u32::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::U64(contents) => {
             debug!("TIFF U64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (0., u64::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::F32(contents) => {
             debug!("TIFF F32");
-            autoscale(&contents).par_iter().map(|x| *x as u8).collect()
+            autoscale(&contents, (0., 1.))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::F64(contents) => {
             debug!("TIFF F64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (0., 1.))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::I8(contents) => {
             debug!("TIFF I8");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (i8::MIN as f32, i8::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::I16(contents) => {
             debug!("TIFF I16");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (i16::MIN as f32, i16::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::I32(contents) => {
             debug!("TIFF I32");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (i32::MIN as f32, i32::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
         tiff::decoder::DecodingResult::I64(contents) => {
             debug!("TIFF I64");
             let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values).par_iter().map(|x| *x as u8).collect()
+            autoscale(&values, (i64::MIN as f32, i64::MAX as f32))
+                .par_iter()
+                .map(|x| *x as u8)
+                .collect()
         }
     };
 
@@ -793,7 +823,10 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
     }
 }
 
-fn autoscale(values: &Vec<f32>) -> Vec<f32> {
+/// Stretches the values from the lowest to the highest to 0 to 255. An image
+/// with a single value has nothing to stretch, it is shown at its level in the
+/// range of its sample type. It came out black, from a division by zero.
+fn autoscale(values: &Vec<f32>, type_range: (f32, f32)) -> Vec<f32> {
     let mut lowest = f32::MAX;
     let mut highest = f32::MIN;
 
@@ -805,10 +838,13 @@ fn autoscale(values: &Vec<f32>) -> Vec<f32> {
             highest = *v
         }
     }
+    if highest <= lowest {
+        (lowest, highest) = type_range;
+    }
 
     values
         .iter()
-        .map(|v| fit(*v, lowest, highest, 0., 255.))
+        .map(|v| fit(*v, lowest, highest, 0., 255.).clamp(0., 255.))
         .collect()
 }
 
@@ -948,6 +984,8 @@ fn canonical_extension(extension: &str) -> String {
         "ima" => "dcm",
         "heic" | "hif" => "heif",
         "apng" => "png",
+        // the Netpbm family, its content is named pam
+        "pbm" | "pgm" | "ppm" | "pnm" | "pam" => "pnm",
         other => other,
     }
     .to_string()
