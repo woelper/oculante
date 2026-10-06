@@ -1021,9 +1021,102 @@ pub fn load_heif_native(path: &Path) -> Result<DynamicImage> {
 }
 
 pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {
-    let mut decoder = ImageReader::open(path)?.into_decoder()?;
-    di.apply_orientation(decoder.orientation()?);
+    reorient(di, orientation_of(path)?);
     Ok(())
+}
+
+/// The EXIF orientation of a file
+fn orientation_of(path: &Path) -> Result<image::metadata::Orientation> {
+    use image::metadata::Orientation;
+    let reader = ImageReader::open(path)?.with_guessed_format()?;
+    if reader.format() == Some(image::ImageFormat::Jpeg) {
+        // The decoder reads the whole file for this, the EXIF reader only up to
+        // the EXIF block
+        let mut file = BufReader::new(File::open(path)?);
+        let orientation = exif::Reader::new()
+            .read_from_container(&mut file)
+            .ok()
+            .and_then(|exif| {
+                exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY)?
+                    .value
+                    .get_uint(0)
+            })
+            .and_then(|value| Orientation::from_exif(value as u8));
+        return Ok(orientation.unwrap_or(Orientation::NoTransforms));
+    }
+    Ok(reader.into_decoder()?.orientation()?)
+}
+
+/// Like `DynamicImage::apply_orientation`. The orientations that swap width
+/// and height make a new image, its rows are filled in parallel.
+pub fn reorient(image: &mut DynamicImage, orientation: image::metadata::Orientation) {
+    use image::metadata::Orientation::*;
+    if matches!(
+        orientation,
+        Rotate90 | Rotate270 | Rotate90FlipH | Rotate270FlipH
+    ) {
+        macro_rules! reoriented {
+            ($($variant:ident),*) => {
+                match image {
+                    $(DynamicImage::$variant(buffer) => {
+                        *image = DynamicImage::$variant(reoriented(buffer, orientation))
+                    })*
+                    _ => image.apply_orientation(orientation),
+                }
+            };
+        }
+        reoriented!(
+            ImageLuma8,
+            ImageLumaA8,
+            ImageRgb8,
+            ImageRgba8,
+            ImageLuma16,
+            ImageLumaA16,
+            ImageRgb16,
+            ImageRgba16,
+            ImageRgb32F,
+            ImageRgba32F
+        );
+    } else {
+        // flips and half turns are done in place
+        image.apply_orientation(orientation);
+    }
+}
+
+/// A copy of the image turned by a quarter, with or without a flip
+fn reoriented<P>(
+    source: &image::ImageBuffer<P, Vec<P::Subpixel>>,
+    orientation: image::metadata::Orientation,
+) -> image::ImageBuffer<P, Vec<P::Subpixel>>
+where
+    P: image::Pixel + Send + Sync,
+    P::Subpixel: Send + Sync,
+{
+    use image::metadata::Orientation::*;
+    use rayon::prelude::*;
+    let (width, height) = (source.width() as usize, source.height() as usize);
+    let channels = P::CHANNEL_COUNT as usize;
+    let samples = source.as_raw();
+    // the new image is as wide as the old one is high
+    let mut target = image::ImageBuffer::<P, Vec<P::Subpixel>>::new(height as u32, width as u32);
+    target
+        .par_chunks_mut(height * channels)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for x in 0..height {
+                // where the pixel at x, y of the new image comes from
+                let (from_x, from_y) = match orientation {
+                    Rotate90 => (y, height - 1 - x),
+                    Rotate270 => (width - 1 - y, x),
+                    Rotate90FlipH => (y, x),
+                    _ => (width - 1 - y, height - 1 - x),
+                };
+                let from = (from_y * width + from_x) * channels;
+                row[x * channels..(x + 1) * channels]
+                    .copy_from_slice(&samples[from..from + channels]);
+            }
+        });
+    target
 }
 
 #[allow(unused)]

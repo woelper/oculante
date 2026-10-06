@@ -416,6 +416,63 @@ fn ci_exif_is_read_and_kept_when_saving() {
     _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The parallel reorientation gives the same pixels as the image crate, for
+/// every orientation and layout
+#[test]
+fn ci_reorient_like_the_image_crate() {
+    use crate::image_loader::reorient;
+    use image::{DynamicImage, RgbaImage, metadata::Orientation};
+    let base = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 40) as u8, (y * 70) as u8, (x * y * 9) as u8, 200])
+    }));
+    let layouts = [
+        DynamicImage::ImageLuma8(base.to_luma8()),
+        DynamicImage::ImageRgb8(base.to_rgb8()),
+        base.clone(),
+        DynamicImage::ImageLumaA16(base.to_luma_alpha16()),
+        DynamicImage::ImageRgba32F(base.to_rgba32f()),
+    ];
+    for exif in 1..=8 {
+        let orientation = Orientation::from_exif(exif).unwrap();
+        for layout in &layouts {
+            let mut expected = layout.clone();
+            expected.apply_orientation(orientation);
+            let mut ours = layout.clone();
+            reorient(&mut ours, orientation);
+            assert_eq!(ours, expected, "{orientation:?} {:?}", layout.color());
+        }
+    }
+}
+
+/// A photo with an EXIF orientation comes out turned, through the decoder the
+/// app uses. None of the test images had an orientation.
+#[test]
+fn ci_exif_orientation_is_applied() {
+    use crate::image_loader::rotate_dynimage;
+    let dir = std::env::temp_dir().join("oculante_test_orientation");
+    _ = std::fs::create_dir_all(&dir);
+    for (orientation, size, red_at) in [
+        (1, (4, 2), (0, 0)),
+        (6, (2, 4), (1, 0)),
+        (8, (2, 4), (0, 3)),
+    ] {
+        let path = dir.join(format!("turned_{orientation}.jpg"));
+        write_jpeg_with_orientation(&path, orientation);
+        let mut image = load_first_frame(path.to_str().unwrap())
+            .get_image()
+            .unwrap();
+        rotate_dynimage(&mut image, &path).unwrap();
+        let rgb = image.to_rgb8();
+        assert_eq!(rgb.dimensions(), size, "orientation {orientation}");
+        let red = rgb.get_pixel(red_at.0, red_at.1).0;
+        assert!(
+            red[0] > 180 && red[2] < 100,
+            "orientation {orientation}: {red:?} at {red_at:?}"
+        );
+    }
+    _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();
