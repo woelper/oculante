@@ -18,6 +18,8 @@ window fullscreen. They use `openbox` and `xprop` and are skipped without them:
 
     sudo apt install openbox x11-utils
 
+The clipboard test needs `xclip` and is skipped without it.
+
 ## Running
 
     cargo build
@@ -48,6 +50,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_delete` | Delete asks first and moves the file to the trash, Cancel keeps it, Shift+Delete only takes the image off the list |
 | `test_lossless_rotation_keys_and_quit` | `]` and `[` turn a JPEG on disk, `q` quits |
 | `test_settings_of_0_9_6` | The settings file 0.9.6 saved is used, with its info panel open |
+| `test_clipboard` | Ctrl+C copies the image and Ctrl+Shift+C its path, Ctrl+V shows the image from the clipboard (needs xclip) |
 | `test_key_repeat` | A key that is held down goes through the images of a folder |
 | `test_zen_mode` | Zen mode hides the bar and the info panel, leaving it brings both back |
 | `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |

@@ -322,7 +322,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
-    use crate::shortcuts::InputEvent::*;
     let ctx = ui.ctx().clone();
 
     ui.scope(|ui| {
@@ -350,7 +349,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
             }
 
             let shift_held = ui.input(|i| i.modifiers.shift);
-            let copy_pressed = key_pressed(&ctx, state, Copy);
 
             if shift_held {
                 if let Some(path) = &state.current_path
@@ -363,12 +361,13 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     state.send_message_info("Path copied");
                     ui.close();
                 }
+            // The keys for copy and paste are handled with the other shortcuts, also
+            // while the menu is open. Handled here as well, they did everything twice.
             } else if let Some(img) = effective_image(state)
-                && (ui
+                && ui
                     .styled_button(format!("{COPY} Copy"))
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
-                    || copy_pressed)
             {
                 clipboard_copy(img);
                 ui.close();
@@ -378,7 +377,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                 .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
-                || key_pressed(&ctx, state, Paste)
             {
                 match clipboard_to_image() {
                     Ok(img) => {

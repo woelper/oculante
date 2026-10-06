@@ -405,6 +405,54 @@ def test_settings_of_0_9_6(binary):
     assert "Could not load" not in log
 
 
+def test_clipboard(binary):
+    """Ctrl+C copies the image, Ctrl+Shift+C its path, Ctrl+V shows an image from
+    the clipboard. Checked with xclip, the way other programs see the clipboard."""
+    if shutil.which("xclip") is None:
+        raise Skip("needs xclip")
+    folder = folder_of("clipboard_images", [("test.png", "test.png")])
+    path = os.path.join(folder, "test.png")
+    pasted = os.path.join(folder, "pasted.png")
+    subprocess.run(["convert", image("moss.jpg"), pasted], check=True)
+    with start(binary, "clipboard", path) as app:
+
+        def clipboard(target):
+            return subprocess.run(
+                ["xclip", "-selection", "clipboard", "-t", target, "-o"], env=app.env, capture_output=True, timeout=10
+            ).stdout
+
+        app.key("ctrl+c")
+        app.settle(1.0)
+        copied = os.path.join(folder, "copied.png")
+        with open(copied, "wb") as f:
+            f.write(clipboard("image/png"))
+        size = subprocess.run(["identify", "-format", "%w %h", copied], capture_output=True, text=True).stdout
+        assert size == "256 256", f"the clipboard holds no copy of the image: {size!r}"
+
+        app.key("ctrl+shift+c")
+        app.settle(1.0)
+        assert clipboard("UTF8_STRING").decode() == path, "the path was not copied"
+
+        xclip = subprocess.Popen(
+            ["xclip", "-selection", "clipboard", "-t", "image/png", "-i", pasted], env=app.env, stderr=subprocess.DEVNULL
+        )
+        xclip.wait(timeout=10)
+        app.settle(0.5)
+        since = len(app.log())
+        app.key("ctrl+v")
+        app.settle(2.0)
+        assert "Received image 1000x750" in app.log()[since:], "the image from the clipboard is not shown"
+
+        # with the menu open, once: it pasted twice
+        app.click(1005, 18)  # the menu
+        app.settle(1.0)
+        since = len(app.log())
+        app.key("ctrl+v")
+        app.settle(2.0)
+        pastes = app.log()[since:].count("Received image")
+        assert pastes == 1, f"one Ctrl+V with the menu open pasted {pastes} times"
+
+
 def test_key_repeat(binary):
     """A key that is held down goes through the images of a folder."""
     folder = os.path.join(OUT, "key_repeat_images")
@@ -861,6 +909,7 @@ TESTS = [
     test_delete,
     test_lossless_rotation_keys_and_quit,
     test_settings_of_0_9_6,
+    test_clipboard,
     test_zen_mode,
     test_paint_mode,
     test_fullscreen,
