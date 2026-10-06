@@ -473,6 +473,80 @@ fn ci_exif_orientation_is_applied() {
     _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The mean difference of two images of the same size, per channel
+fn mean_difference(a: &image::RgbImage, b: &image::RgbImage) -> f64 {
+    assert_eq!(a.dimensions(), b.dimensions());
+    let sum: u64 = a
+        .as_raw()
+        .iter()
+        .zip(b.as_raw())
+        .map(|(x, y)| x.abs_diff(*y) as u64)
+        .sum();
+    sum as f64 / a.as_raw().len() as f64
+}
+
+/// Lossless rotations and flips of a JPEG whose size is not a multiple of its
+/// blocks: the result is the turned image, without strips of the old one at an
+/// edge. Blocks that can not be moved are trimmed, a few pixels at most.
+#[cfg(feature = "turbo")]
+#[test]
+fn ci_lossless_jpeg_transforms() {
+    use crate::image_editing::lossless_tx;
+    use image::GenericImageView;
+    use turbojpeg::{Transform, TransformOp};
+    let dir = std::env::temp_dir().join("oculante_test_lossless");
+    _ = std::fs::create_dir_all(&dir);
+    // 1000x750 in blocks of 16: 8 and 14 pixels are left over
+    let original = image::open("res/tests/moss.jpg").unwrap();
+    for (op, expected) in [
+        (TransformOp::Rot90, original.rotate90()),
+        (TransformOp::Rot180, original.rotate180()),
+        (TransformOp::Rot270, original.rotate270()),
+        (TransformOp::Hflip, original.fliph()),
+        (TransformOp::Vflip, original.flipv()),
+    ] {
+        let path = dir.join(format!("{op:?}.jpg"));
+        std::fs::copy("res/tests/moss.jpg", &path).unwrap();
+        lossless_tx(&path, Transform::op(op)).unwrap();
+        let turned = image::open(&path).unwrap();
+        let (w, h) = turned.dimensions();
+        assert!(
+            expected.width() - w < 16 && expected.height() - h < 16,
+            "{op:?}: {w}x{h} from {:?}",
+            expected.dimensions()
+        );
+        // trimmed blocks were at the start of the turned image when the edge moved
+        // to the left or the top
+        let x = expected.width() - w;
+        let y = expected.height() - h;
+        let best = [(0, 0), (x, 0), (0, y), (x, y)]
+            .into_iter()
+            .map(|(x, y)| {
+                mean_difference(&turned.to_rgb8(), &expected.crop_imm(x, y, w, h).to_rgb8())
+            })
+            .fold(f64::MAX, f64::min);
+        assert!(
+            best < 1.5,
+            "{op:?} differs from the turned image by {best:.2} on average"
+        );
+    }
+
+    // a crop that does not start on a block keeps to the image
+    let path = dir.join("crop.jpg");
+    std::fs::copy("res/tests/moss.jpg", &path).unwrap();
+    let mut crop = Transform::default();
+    crop.crop = Some(turbojpeg::TransformCrop {
+        x: 13,
+        y: 21,
+        width: Some(300),
+        height: Some(200),
+    });
+    lossless_tx(&path, crop).unwrap();
+    let cropped = image::open(&path).unwrap();
+    assert_eq!(cropped.dimensions(), (300, 200));
+    _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();

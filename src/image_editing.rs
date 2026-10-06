@@ -1944,8 +1944,14 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
 
     debug!("h {mcu_h} w {mcu_w}");
 
-    // make sure crop is aligned to mcu bounds
     let mut transform = transform;
+    // Blocks at the right and bottom edge that are not complete can not be
+    // moved to the left or the top. They would stay where they are, a strip of
+    // the old image at an edge of the new one. They are left out instead, a few
+    // pixels at most.
+    transform.trim = true;
+
+    // make sure crop is aligned to mcu bounds
     if let Some(c) = transform.crop.as_mut() {
         c.x = (c.x as f32 / mcu_w as f32) as usize * mcu_w;
         c.y = (c.y as f32 / mcu_h as f32) as usize * mcu_h;
