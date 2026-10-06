@@ -108,19 +108,19 @@ Simplifications found (read and spot checked, nothing changed yet):
 - [ ] "Save as..." with the file_open feature saves with the image crate defaults instead of the encoder settings.
 
 Tests to add:
-- [ ] Exact output of every edit operation on a small image (Noise only for its bounds).
-- [ ] Lossless JPEG rotations and crops on a JPEG whose size is not a multiple of the block size.
-- [ ] One table test that loads every file in res/tests: about 30 files and a dozen formats are loaded by no test (TIFF, HDR, BMP, ICO, TGA, QOI, raw, the 10 and 12 bit AVIFs, most KTX2, EXR and JXL files).
-- [ ] Scrubber: natural sort, wrap, removing entries at the ends.
-- [ ] Delete in a UI test, and the shortcuts the shortcut test misses (Delete, Shift+Delete, [, ], q).
-- [ ] Settings: defaults from an empty file, a saved file of 0.9.6 still loads.
-- [ ] Clipboard copy and paste with xclip.
+- [x] Exact output of every edit operation on a small image. Found and fixed: results were cut instead of rounded (Invert off by one for 159 of 256 values), Contrast was a multiplication, Desaturate had red and green weights swapped, resize in other layouts than RGBA used the width as the height, the color conversion did nothing on RGBA, 3x3 filters left a black frame.
+- [x] Lossless JPEG rotations and crops on a JPEG whose size is not a multiple of the block size. Found and fixed: a strip of the unturned image stayed at an edge, the incomplete blocks are trimmed now.
+- [x] One table test that loads every file in res/tests, and one that writes and loads BMP, ICO, TGA, QOI, PNM, Farbfeld, HDR, TIFF in five layouts, XBM, XPM and WBMP. Found and fixed: a single valued 16 bit or float TIFF came out black, Netpbm files reported a wrong extension. Still without a test file: raw formats, DICOM, KRA, ORA, ICNS.
+- [x] Scrubber: natural sort, wrap, removing entries at the ends. Found and fixed: started with only a file name (from a terminal in its folder), the first arrow key showed the same image again.
+- [x] Delete in a UI test, and the shortcuts the shortcut test missed (Delete, Shift+Delete, [, ], q).
+- [x] Settings: defaults from an empty file, a saved file of 0.9.6 still loads. Found and fixed: the settings of 0.9.6 could not be read at all (shortcuts in another format), everybody upgrading would have lost all settings.
+- [x] Clipboard copy and paste with xclip. Found and fixed: with the menu open, Ctrl+V pasted twice.
 
 Reported by reading the code, not checked yet:
-- [ ] Resize of images that are not 8 bit RGBA may pass the width as the height (image_editing.rs, Resize in process_image).
-- [ ] A TIFF with a single value may come out black (autoscale divides by zero).
-- [ ] Copy to the clipboard may not stay on X11 without a clipboard manager (the handle is dropped right away).
-- [ ] Paste may run twice while the menu is open.
+- [x] Resize of images that are not 8 bit RGBA passed the width as the height: confirmed and fixed.
+- [x] A TIFF with a single value came out black: confirmed and fixed.
+- [x] Copy to the clipboard may not stay on X11: not so, the UI test reads it back with xclip.
+- [x] Paste ran twice while the menu is open: confirmed and fixed.
 - [x] When loading large images (/tests/large_image.jpg), panning and zooming is slow.
 - [x] Loading large images (/tests/large_image.jpg) is significantly slower than Apple's "Preview". For most other images it is faster. We need to implement a test or benchmark and see if we can improve this.
 - [x] switching channels (rgba) is slow
