@@ -66,6 +66,12 @@ struct Animation {
     next_switch: Instant,
     /// All frames are here, playback wraps around at the end
     complete: bool,
+    /// How often the file asks to play it, `None` for forever
+    plays: Option<u32>,
+    /// How often it was played to the end
+    played: u32,
+    /// All plays are done, the last frame stays
+    finished: bool,
 }
 
 impl Animation {
@@ -75,6 +81,9 @@ impl Animation {
             current: 0,
             next_switch: Instant::now(),
             complete: false,
+            plays: None,
+            played: 0,
+            finished: false,
         }
     }
 
@@ -96,13 +105,18 @@ impl Animation {
 
     /// The frame to show now, if it is time for a new one
     fn advance(&mut self, now: Instant) -> Option<Arc<DynamicImage>> {
-        if self.frames.len() < 2 || now < self.next_switch {
+        if self.frames.len() < 2 || self.finished || now < self.next_switch {
             return None;
         }
         let next = self.current + 1;
         if next < self.frames.len() {
             self.current = next;
         } else if self.complete {
+            self.played += 1;
+            if self.plays.is_some_and(|plays| self.played >= plays) {
+                self.finished = true;
+                return None;
+            }
             self.current = 0;
         } else {
             // the rest is still being decoded, the next frame arrives from the loader
@@ -123,7 +137,8 @@ impl Animation {
     /// How long until the next frame is due, if one is known
     fn wake_in(&self, now: Instant) -> Option<Duration> {
         let has_next = self.current + 1 < self.frames.len() || self.complete;
-        (self.frames.len() > 1 && has_next).then(|| self.next_switch.saturating_duration_since(now))
+        (self.frames.len() > 1 && has_next && !self.finished)
+            .then(|| self.next_switch.saturating_duration_since(now))
     }
 }
 
@@ -380,9 +395,10 @@ impl OculanteApp {
                 }
                 return;
             }
-            Frame::AnimationEnd => {
+            Frame::AnimationEnd(plays) => {
                 if let Some(animation) = &mut self.animation {
                     animation.complete = true;
+                    animation.plays = plays;
                     // Every GIF arrives as an animation. One with a single frame is a
                     // still image, so filters and edits apply to it.
                     if animation.frames.len() < 2 {
@@ -491,7 +507,7 @@ impl OculanteApp {
                 ctx.request_repaint();
             }
             // handled at the top
-            Frame::Animation(..) | Frame::AnimationEnd => {}
+            Frame::Animation(..) | Frame::AnimationEnd(_) => {}
         }
 
         // Send extended info (histogram, exif, etc.) in background thread
@@ -610,9 +626,20 @@ impl eframe::App for OculanteApp {
         // Show the next frame of an animation when it is due, and come back for the one after
         if let Some(animation) = &mut self.animation {
             let now = Instant::now();
+            let was_playing = !animation.finished;
             if let Some(image) = animation.advance(now) {
                 self.state.current_image = Some(image);
                 self.texture_dirty = true;
+            }
+            if was_playing && animation.finished {
+                let times = match animation.plays {
+                    Some(1) => "once".to_string(),
+                    Some(plays) => format!("{plays} times"),
+                    None => "forever".to_string(),
+                };
+                self.state.toasts.info(format!(
+                    "The animation has ended, the file asks to play it {times}"
+                ));
             }
             if let Some(wait) = animation.wake_in(now) {
                 ctx.request_repaint_after(wait);

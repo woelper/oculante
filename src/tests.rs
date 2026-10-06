@@ -27,7 +27,7 @@ fn assert_valid_image(frame: &Frame) {
                 "Image has zero dimensions"
             );
         }
-        Frame::UpdateTexture | Frame::AnimationEnd => {
+        Frame::UpdateTexture | Frame::AnimationEnd(_) => {
             panic!("Expected an image frame, got {frame}")
         }
     }
@@ -65,12 +65,19 @@ fn ci_load_webp() {
     assert_valid_image(&frame);
 }
 
-/// Writes an animated GIF with the given frame delays in milliseconds
-fn write_gif(path: &std::path::Path, delays_ms: &[u32]) {
-    use image::codecs::gif::{GifEncoder, Repeat};
+/// Writes an animated GIF with the given frame delays in milliseconds. Without
+/// a repeat, the GIF has no loop block.
+fn write_gif(
+    path: &std::path::Path,
+    delays_ms: &[u32],
+    repeat: Option<image::codecs::gif::Repeat>,
+) {
+    use image::codecs::gif::GifEncoder;
     use image::{Delay, Frame as ImageFrame, Rgba, RgbaImage};
     let mut encoder = GifEncoder::new(std::fs::File::create(path).unwrap());
-    encoder.set_repeat(Repeat::Infinite).unwrap();
+    if let Some(repeat) = repeat {
+        encoder.set_repeat(repeat).unwrap();
+    }
     for (i, delay) in delays_ms.iter().enumerate() {
         let color = Rgba([(i * 80) as u8, 0, 0, 255]);
         let buffer = RgbaImage::from_pixel(8, 8, color);
@@ -90,7 +97,11 @@ fn write_gif(path: &std::path::Path, delays_ms: &[u32]) {
 #[test]
 fn ci_load_gif_long_delay() {
     let path = std::env::temp_dir().join("oculante_test_long_delay.gif");
-    write_gif(&path, &[100, 100_000, 20]);
+    write_gif(
+        &path,
+        &[100, 100_000, 20],
+        Some(image::codecs::gif::Repeat::Infinite),
+    );
     let receiver = open_image(&path, None, None).expect("open_image failed");
     let delays: Vec<u32> = receiver
         .iter()
@@ -101,6 +112,53 @@ fn ci_load_gif_long_delay() {
         .collect();
     _ = std::fs::remove_file(&path);
     assert_eq!(delays, vec![100, 100_000, 20]);
+}
+
+/// How often the loader says an animation is to be played
+fn plays_of(path: &std::path::Path) -> Option<u32> {
+    let receiver = open_image(path, None, None).expect("open_image failed");
+    receiver
+        .iter()
+        .find_map(|frame| match frame {
+            Frame::AnimationEnd(plays) => Some(plays),
+            _ => None,
+        })
+        .expect("the animation has no end")
+}
+
+/// A GIF without a loop block plays once, a loop count of n repeats it n more
+/// times, 0 is forever.
+#[test]
+fn ci_gif_play_count() {
+    use image::codecs::gif::Repeat;
+    let path = std::env::temp_dir().join("oculante_test_play_count.gif");
+    for (repeat, plays) in [
+        (None, Some(1)),
+        (Some(Repeat::Finite(2)), Some(3)),
+        (Some(Repeat::Infinite), None),
+    ] {
+        write_gif(&path, &[100, 100], repeat);
+        assert_eq!(plays_of(&path), plays, "for {repeat:?}");
+    }
+    _ = std::fs::remove_file(&path);
+}
+
+/// An APNG says how often it is played, 0 is forever
+#[test]
+fn ci_apng_play_count() {
+    let path = std::env::temp_dir().join("oculante_test_play_count.png");
+    for (num_plays, plays) in [(1, Some(1)), (3, Some(3)), (0, None)] {
+        let file = std::io::BufWriter::new(std::fs::File::create(&path).unwrap());
+        let mut encoder = png::Encoder::new(file, 2, 2);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_animated(2, num_plays).unwrap();
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&[255; 16]).unwrap();
+        writer.write_image_data(&[0; 16]).unwrap();
+        writer.finish().unwrap();
+        assert_eq!(plays_of(&path), plays, "for num_plays {num_plays}");
+    }
+    _ = std::fs::remove_file(&path);
 }
 
 /// An animated PNG of 4x4 pixels with 16 bit colors: a red frame, then a blue one

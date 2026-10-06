@@ -464,6 +464,7 @@ pub fn open_image(
                 return Ok(receiver);
             }
 
+            let plays = plays(decoder.loop_count());
             for frame in decoder.into_frames() {
                 let frame = frame.context("Can't decode animated webp frame")?;
                 let (delay_numer, delay_denom) = frame.delay().numer_denom_ms();
@@ -473,6 +474,7 @@ pub fn open_image(
                 let frame = Frame::new_animation(i, delay_ms);
                 _ = sender.send(frame);
             }
+            _ = sender.send(Frame::AnimationEnd(plays));
 
             // TODO: Use thread for animation and return receiver immediately, but this needs error handling
             return Ok(receiver);
@@ -485,10 +487,11 @@ pub fn open_image(
             let decoder = if decoder.is_apng()? {
                 info!("Image is animated (APNG)");
                 match decode_apng(decoder) {
-                    Ok(frames) => {
+                    Ok(Apng { frames, plays }) => {
                         for (image, delay_ms) in frames {
                             _ = sender.send(Frame::new_animation(image, delay_ms));
                         }
+                        _ = sender.send(Frame::AnimationEnd(plays));
                         return Ok(receiver);
                     }
                     // A broken animation, or one with 16 bit colors that can not be
@@ -540,6 +543,13 @@ pub fn open_image(
                 }
             }
             debug!("Done decoding Gif!");
+            // A GIF without a loop block plays once. A count of n repeats it n more
+            // times after the first play, as browsers read it, and 0 is forever.
+            let plays = match decoder.repeat() {
+                gif::Repeat::Infinite => None,
+                gif::Repeat::Finite(repeats) => Some(u32::from(repeats) + 1),
+            };
+            _ = sender.send(Frame::AnimationEnd(plays));
 
             return Ok(receiver);
 
@@ -917,16 +927,42 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
         }
     }
     debug!("Done decoding JXL");
+    if is_jxl_anim {
+        // 0 loops is forever
+        let loops = image
+            .image_header()
+            .metadata
+            .animation
+            .as_ref()
+            .map_or(0, |animation| animation.num_loops);
+        _ = frame_sender.send(Frame::AnimationEnd((loops > 0).then_some(loops)));
+    }
 
     Ok(())
 }
 
-/// All frames of an animated PNG, with their delays in milliseconds
+/// How often an animation is to be played, `None` for forever
+fn plays(count: image::metadata::LoopCount) -> Option<u32> {
+    match count {
+        image::metadata::LoopCount::Infinite => None,
+        image::metadata::LoopCount::Finite(n) => Some(n.get()),
+    }
+}
+
+/// The decoded frames of an animated PNG
+struct Apng {
+    /// Every frame with its delay in milliseconds
+    frames: Vec<(DynamicImage, u32)>,
+    /// How often it is to be played, `None` for forever
+    plays: Option<u32>,
+}
+
 fn decode_apng<R: std::io::BufRead + std::io::Seek>(
     decoder: image::codecs::png::PngDecoder<R>,
-) -> Result<Vec<(DynamicImage, u32)>> {
-    decoder
-        .apng()?
+) -> Result<Apng> {
+    let apng = decoder.apng()?;
+    let plays = plays(apng.loop_count());
+    let frames = apng
         .into_frames()
         .map(|frame| {
             let frame = frame.context("Can't decode APNG frame")?;
@@ -934,7 +970,8 @@ fn decode_apng<R: std::io::BufRead + std::io::Seek>(
             let delay_ms = delay_numer.checked_div(delay_denom).unwrap_or(0);
             Ok((DynamicImage::ImageRgba8(frame.into_buffer()), delay_ms))
         })
-        .collect()
+        .collect::<Result<_>>()?;
+    Ok(Apng { frames, plays })
 }
 
 /// Decode a HEIC or HEIF image with `heic-rs`, in the layout the file has:

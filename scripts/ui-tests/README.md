@@ -51,6 +51,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_borderless` | Without a border there is no title bar, the app's own bar moves the window and its button closes it (needs a window manager) |
 | `test_compare_list` | An image from the compare list comes back at its stored zoom and position, or keeps the current view with "persistent zoom" |
 | `test_animation_plays_and_stops` | An animated GIF plays, and stops when the next image is shown |
+| `test_animation_plays_as_often_as_the_file_asks` | A GIF that is to be played once stops on its last frame with a message |
 | `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
 | `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
 | `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |

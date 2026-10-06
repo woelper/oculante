@@ -429,6 +429,7 @@ pub fn send_image_threaded(
                 // The app keeps them and keeps the time, so this thread never
                 // waits and ends with the decoding.
                 let mut animation_frames = 0;
+                let mut end_sent = false;
                 for mut f in frame_receiver.iter() {
                     if stop_receiver.try_recv().is_ok() {
                         debug!("Stopped from receiver.");
@@ -459,13 +460,20 @@ pub fn send_image_threaded(
                             request_repaint();
                             return;
                         }
+                        Frame::AnimationEnd(plays) => {
+                            debug!("Animation decoded, {animation_frames} frames, plays {plays:?}");
+                            _ = texture_sender.send(f);
+                            request_repaint();
+                            end_sent = true;
+                        }
                         _ => (),
                     }
                 }
 
-                if animation_frames > 0 {
+                // a loader that does not know the play count, the animation loops
+                if animation_frames > 0 && !end_sent {
                     debug!("Animation decoded, {animation_frames} frames");
-                    _ = texture_sender.send(Frame::AnimationEnd);
+                    _ = texture_sender.send(Frame::AnimationEnd(None));
                     request_repaint();
                 }
             }
@@ -496,8 +504,9 @@ pub enum Frame {
     EditResult(Arc<DynamicImage>),
     /// Only update the current texture.
     UpdateTexture,
-    /// All frames of the animation were sent, it loops from here on.
-    AnimationEnd,
+    /// All frames of the animation were sent. Holds how often the file asks to
+    /// play it, `None` for forever.
+    AnimationEnd(Option<u32>),
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
     CompareResult(Arc<DynamicImage>, ImageGeometry),
     /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
@@ -548,9 +557,9 @@ impl Frame {
                 | Frame::EditResult(ref mut image_buffer)
                 | Frame::CompareResult(ref mut image_buffer, _)
                 | Frame::ImageCollectionMember(ref mut image_buffer) => *image_buffer = img.clone(),
-                Frame::UpdateTexture | Frame::AnimationEnd => (),
+                Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
             },
-            Frame::UpdateTexture | Frame::AnimationEnd => (),
+            Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
         }
         forced_variant
     }

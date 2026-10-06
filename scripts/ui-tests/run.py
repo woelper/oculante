@@ -499,6 +499,26 @@ def test_animation_plays_and_stops(binary):
         assert not region_has_color(still_b, (460, 250, 100, 100), (255, 0, 0), 10), "a frame of the animation is still shown"
 
 
+def test_animation_plays_as_often_as_the_file_asks(binary):
+    """A GIF that is to be played once stops on its last frame and says so."""
+    folder = folder_of("play_once_images", [])
+    path = os.path.join(folder, "once.gif")
+    # with a loop of 1 ImageMagick writes no loop block, which means a single play
+    subprocess.run(
+        ["convert", "-delay", "20", "-size", "200x200", "xc:red", "xc:lime", "xc:blue", "-loop", "1", path],
+        check=True,
+    )
+    with start(binary, "play_once", path) as app:
+        time.sleep(1.5)
+        app.settle(0.5)
+        end = app.shot("end")
+        assert region_has_color(end, (460, 250, 100, 100), (0, 0, 255), 10), "the last frame is not shown"
+        assert region_has_color(end, TOAST_AREA, ACCENT, 30), "no message that the animation ended"
+        time.sleep(1.0)
+        later = app.shot("later")
+        assert changed_pixels_in(end, later, IMAGE_AREA) == 0, "the animation goes on after its last play"
+
+
 def test_keep_view(binary):
     """With "keep view" the next image is shown at the same zoom, without it is fitted again."""
     folder = folder_of("keep_view_images", [("00.png", "test.png"), ("01.png", "test.png")])
@@ -717,6 +737,7 @@ TESTS = [
     test_borderless,
     test_compare_list,
     test_animation_plays_and_stops,
+    test_animation_plays_as_often_as_the_file_asks,
     test_keep_view,
     test_keep_edits,
     test_single_frame_gif_is_editable,
