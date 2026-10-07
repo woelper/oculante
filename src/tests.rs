@@ -565,6 +565,29 @@ fn load_all(path: &std::path::Path) -> anyhow::Result<(Vec<Frame>, Vec<String>)>
     Ok((frames, warnings))
 }
 
+/// AVIF images of 10 and 12 bits stay 16 bit, and show the same picture as the
+/// one of 8 bits. They were cut to 8 bits before.
+#[cfg(all(feature = "avif_native", not(feature = "dav1d")))]
+#[test]
+fn ci_avif_bit_depths() {
+    let load = |bits: u8| {
+        let name = format!("res/tests/red-at-12-oclock-with-color-profile-{bits}bpc.avif");
+        let (frames, _) = load_all(std::path::Path::new(&name)).unwrap();
+        frames.first().and_then(|f| f.get_image()).unwrap()
+    };
+    let eight = load(8);
+    assert_eq!(eight.color(), image::ColorType::Rgb8);
+    for bits in [10, 12] {
+        let image = load(bits);
+        assert_eq!(image.color(), image::ColorType::Rgb16, "{bits} bit");
+        let difference = mean_difference(&eight.to_rgb8(), &image.to_rgb8());
+        assert!(
+            difference < 1.0,
+            "{bits} bit differs by {difference} from 8 bit"
+        );
+    }
+}
+
 /// The image library refuses images that need more than 512 MiB unless told
 /// otherwise, which showed as "Memory limit exceeded" for photos of 200
 /// megapixels (#782). This one needs 537 MB. A QOI file of one colour is

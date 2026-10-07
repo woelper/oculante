@@ -201,67 +201,28 @@ pub fn open_image(
         #[cfg(feature = "avif_native")]
         #[cfg(not(feature = "dav1d"))]
         "avif" => {
-            let mut file = File::open(img_location)?;
-            let avif = avif_decode::Decoder::from_reader(&mut file)?.to_image()?;
-            match avif {
-                avif_decode::Image::Rgb8(img) => {
-                    let mut img_buffer = vec![];
-                    let (buf, width, height) = img.into_contiguous_buf();
-                    for b in buf {
-                        img_buffer.push(b.r);
-                        img_buffer.push(b.g);
-                        img_buffer.push(b.b);
-                        img_buffer.push(255);
-                    }
-                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
-                        .context("Can't create avif ImageBuffer with given res")?;
-                    let i = DynamicImage::ImageRgba8(buf);
-
-                    _ = sender.send(Frame::new_still(i));
-                    return Ok(receiver);
-                }
-                avif_decode::Image::Rgba8(img) => {
-                    let mut img_buffer = vec![];
-                    let (buf, width, height) = img.into_contiguous_buf();
-                    for b in buf {
-                        img_buffer.push(b.r);
-                        img_buffer.push(b.g);
-                        img_buffer.push(b.b);
-                        img_buffer.push(b.a);
-                    }
-                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
-                        .context("Can't create avif ImageBuffer with given res")?;
-                    let i = DynamicImage::ImageRgba8(buf);
-
-                    _ = sender.send(Frame::new_still(i));
-                    return Ok(receiver);
-                }
-                avif_decode::Image::Rgb16(img) => {
-                    let mut img_buffer = vec![];
-                    let (buf, width, height) = img.into_contiguous_buf();
-                    for b in buf {
-                        img_buffer.push(u16_to_u8(b.r));
-                        img_buffer.push(u16_to_u8(b.g));
-                        img_buffer.push(u16_to_u8(b.b));
-                        img_buffer.push(255);
-                    }
-                    let buf = image::ImageBuffer::from_vec(width as u32, height as u32, img_buffer)
-                        .context("Can't create avif ImageBuffer with given res")?;
-                    let i = DynamicImage::ImageRgba8(buf);
-
-                    _ = sender.send(Frame::new_still(i));
-                    return Ok(receiver);
-                }
-                avif_decode::Image::Rgba16(_) => {
-                    anyhow::bail!("This avif is not yet supported (Rgba16).")
-                }
-                avif_decode::Image::Gray8(_) => {
-                    anyhow::bail!("This avif is not yet supported (Gray8).")
-                }
-                avif_decode::Image::Gray16(_) => {
-                    anyhow::bail!("This avif is not yet supported (Gray16).")
-                }
+            let data = std::fs::read(&img_location)?;
+            // 10 and 12 bit images stay 16 bit, as for PNG
+            macro_rules! image {
+                ($pixels:expr, $layout:ident) => {{
+                    let (pixels, width, height) = $pixels.into_contiguous_buf();
+                    let samples = bytemuck::cast_slice(&pixels).to_vec();
+                    DynamicImage::$layout(
+                        image::ImageBuffer::from_raw(width as u32, height as u32, samples)
+                            .context("Can't create avif ImageBuffer with given res")?,
+                    )
+                }};
             }
+            let image = match avif_decode::Decoder::from_avif(&data)?.to_image()? {
+                avif_decode::Image::Rgb8(pixels) => image!(pixels, ImageRgb8),
+                avif_decode::Image::Rgba8(pixels) => image!(pixels, ImageRgba8),
+                avif_decode::Image::Rgb16(pixels) => image!(pixels, ImageRgb16),
+                avif_decode::Image::Rgba16(pixels) => image!(pixels, ImageRgba16),
+                avif_decode::Image::Gray8(pixels) => image!(pixels, ImageLuma8),
+                avif_decode::Image::Gray16(pixels) => image!(pixels, ImageLuma16),
+            };
+            _ = sender.send(Frame::new_still(image));
+            return Ok(receiver);
         }
         "svg" => {
             let svg_scale = decoder_opts

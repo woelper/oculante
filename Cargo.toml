@@ -40,7 +40,8 @@ egui_plot = "0.37"
 egui_extras = { version = "0.36", features = ["image", "file"] }
 
 # === IMAGE FORMATS
-avif-decode = { version = "1.0", optional = true }
+avif-decode = { version = "3", optional = true }
+bytemuck = { version = "1", optional = true }
 turbojpeg = { version = "1.5", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
@@ -128,7 +129,7 @@ heif = ["libheif-rs"]
 # so Linux builds open these files without anything installed. If `heif` is
 # enabled as well, libheif is used.
 heif_native = ["dep:heic-rs"]
-avif_native = ["avif-decode"]
+avif_native = ["avif-decode", "bytemuck"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
@@ -190,6 +191,15 @@ opt-level = 0
 lto = false
 codegen-units = 64
 incremental = true
+
+# The AVIF decoder, unoptimized it takes seconds for a photo
+[profile.dev.package.rav1d]
+opt-level = 2
+debug-assertions = false
+
+[profile.dev.package.yuv]
+opt-level = 2
+debug-assertions = false
 
 
 [[bench]]
