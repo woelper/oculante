@@ -251,6 +251,22 @@ def find_slider(path, box, rgb, tolerance=40, min_fill=40):
     return max(rows[middle]), middle
 
 
+def count_color(path, box, rgb, tolerance=40):
+    """Number of pixels inside box (x, y, w, h) of a screenshot close to rgb."""
+    return sum(1 for _, _, color in _pixels(path, box) if _close(color, rgb, tolerance))
+
+
+def panel_edge(path, x_range=(100, 900), rows=(80, 160, 240, 320, 400, 480, 560)):
+    """The x of the right edge of a panel on the left: the rightmost column with the
+    same color in all the rows. The image right of the panel differs from row to row."""
+    colors = {}
+    for y in rows:
+        for x, _, color in _pixels(path, (x_range[0], y, x_range[1] - x_range[0], 1)):
+            colors.setdefault(x, set()).add(color)
+    constant = [x for x, seen in colors.items() if len(seen) == 1]
+    return max(constant) if constant else None
+
+
 def rightmost_x(path, box, rgb, tolerance=40):
     """The largest x inside box (x, y, w, h) with a pixel close to rgb, or None."""
     xs = [x for x, _, color in _pixels(path, box) if _close(color, rgb, tolerance)]

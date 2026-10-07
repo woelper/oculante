@@ -55,6 +55,7 @@ pub fn info_ui(
     egui::Panel::left("info")
     .show_separator_line(true)
     .default_size(PANEL_WIDTH)
+    .size_range(MIN_WIDTH..=MAX_WIDTH)
     .resizable(true)
     .show(ui, |ui| {
         egui::ScrollArea::vertical()
@@ -63,81 +64,37 @@ pub fn info_ui(
 
             // SECTION 1: Info grid
             if state.current_image.is_some() {
-                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
-                egui::Grid::new("info")
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                    ui.label_i(format!("{ARROWS_OUT} Size",));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{}x{}",
-                            state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
-                        ))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{ARROWS_OUT} Size")), format!(
+                    "{}x{}",
+                    state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
+                ));
 
-                    if let Some(path) = &state.current_path {
-                        // make sure we truncate filenames
-                        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(format!("{} File", IMAGE));
-                        let path_label = egui::Label::new(
-                            RichText::new(file_name)
-                        ).truncate();
-                        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                            ui.add(path_label)
-                            .on_hover_text(format!("{}", path.display()));
-                        });
-                        ui.end_row();
-                    }
+                if let Some(path) = &state.current_path {
+                    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                    info_row(ui, |ui| ui.label_i(format!("{IMAGE} File")), file_name)
+                        .on_hover_text(format!("{}", path.display()));
+                }
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col(state.sampled_color))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col_norm(state.sampled_color, 255.))
-                    );
-                    ui.end_row();
+                let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
+                info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
+                    "{:.0},{:.0}",
+                    state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
+                ));
+                info_row(ui, |ui| ui.label_i(format!("{INTERSECT} UV")), format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1));
 
-                    ui.label_i(format!("{PALETTE} HEX"));
-                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
-                    ui.label_right(
-                        RichText::new(hex)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{PALETTE} Color"));
-                    ui.label_right(
-                        format!("{:?}", color_type)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{MOVE} Pos"));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{:.0},{:.0}",
-                            state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
-                        ))
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{INTERSECT} UV"));
-                    ui.label_right(
-                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                    );
-                    ui.end_row();
-                });
-                // SECTION 2: Zoom preview
+                // SECTION 2: Zoom preview, as wide as the panel and square
                 ui.add_space(10.);
-                let preview_size = desired_width as f32;
+                let preview_size = ui.available_width();
                 let preview_rect = egui::Rect::from_min_size(
                     ui.cursor().left_top(),
                     egui::Vec2::splat(preview_size),
@@ -300,23 +257,46 @@ pub fn info_ui(
     (bbox_tl, bbox_br)
 }
 
+/// The narrowest and widest the info panel can be dragged to. While its edge is
+/// dragged, the panel is cut off at the dragged width, so the narrowest has to fit
+/// what is in the panel, like the slider for tiling. Narrower, the cut off part
+/// showed the background of the canvas until the panel was let go.
+const MIN_WIDTH: f32 = 240.;
+const MAX_WIDTH: f32 = 640.;
+
+/// A row of the info panel: the label, and the value right-aligned in the space
+/// that is left. A value that does not fit is cut short, it ran over the label.
+fn info_row(
+    ui: &mut Ui,
+    label: impl FnOnce(&mut Ui) -> egui::Response,
+    value: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.horizontal(|ui| {
+        label(ui);
+        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+            ui.add(egui::Label::new(value).truncate())
+        })
+        .inner
+    })
+    .inner
+}
+
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_metadata {
-        egui::Grid::new("extended").num_columns(2).show(ui, |ui| {
-            ui.label("Number of colors");
-            ui.label_right(format!("{}", info.num_colors));
-            ui.end_row();
-
-            ui.label("Fully transparent");
-            ui.label_right(format!(
+        info_row(
+            ui,
+            |ui| ui.label("Number of colors"),
+            format!("{}", info.num_colors),
+        );
+        info_row(
+            ui,
+            |ui| ui.label("Fully transparent"),
+            format!(
                 "{:.2}%",
                 (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
-            ));
-            ui.end_row();
-            ui.label("Pixels");
-            ui.label_right(format!("{}", info.num_pixels));
-            ui.end_row();
-        });
+            ),
+        );
+        info_row(ui, |ui| ui.label("Pixels"), format!("{}", info.num_pixels));
 
         if !info.exif.is_empty() {
             ui.styled_collapsing("EXIF", |ui| {
@@ -380,7 +360,8 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             .allow_drag(false)
             .show_axes(false)
             .show_grid(false)
-            .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
+            .width(ui.available_width())
+            .view_aspect(2.0)
             .show(ui, |plot_ui| {
                 plot_ui.line(line("red", &info.red_histogram, Color32::RED));
                 plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));

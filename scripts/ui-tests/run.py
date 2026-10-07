@@ -23,9 +23,11 @@ from uitest import (  # noqa: E402
     App,
     changed_pixels,
     changed_pixels_in,
+    count_color,
     find_slider,
     has_window_manager,
     image,
+    panel_edge,
     region_has_color,
     rightmost_x,
 )
@@ -247,7 +249,7 @@ def test_measure_draws_rectangle(binary):
         app.key("i")
         app.settle(1.0)
         app.scroll_down(120, 300, 12)  # down to the tools in the info panel
-        app.click(60, 395)  # open "Measure"
+        app.click(60, 341)  # open "Measure"
         app.settle(0.8)
         app.move(900, 520)
         app.settle(0.8)
@@ -271,7 +273,8 @@ def test_measure_draws_rectangle(binary):
         backward = app.shot("measured_backwards")
         assert changed_pixels_in(before, backward, inside) > 5_000, "measuring backwards draws nothing"
         # the lower part of the info panel shows nothing that depends on the pointer
-        assert changed_pixels_in(forward, backward, (0, 300, 270, 280)) == 0, "the rectangle runs over the info panel"
+        panel = (0, 300, panel_edge(forward) - 4, 280)
+        assert changed_pixels_in(forward, backward, panel) == 0, "the rectangle runs over the info panel"
 
 
 GOLD = (255, 215, 0)
@@ -564,10 +567,10 @@ def start(binary, name, path, settings=None):
 def add_to_compare_list(app):
     app.key("i")
     app.settle(1.0)
-    app.click(60, 555)  # open "Compare"
+    app.click(60, 551)  # open "Compare"
     app.settle(0.8)
     app.scroll_down(120, 300, 12)
-    app.click(139, 329)  # "Add current image"
+    app.click(139, 275)  # "Add current image"
     app.settle(0.8)
     app.move(0.6, 0.6)
     app.settle(0.5)
@@ -725,6 +728,49 @@ def test_image_info_is_computed_when_shown(binary):
         app.click(890, 306)  # "Apply all edits"
         app.settle(1.5)
         assert app.log().count(computed) == 2, "not computed again after the edits were applied"
+
+
+def test_info_panel_resizes(binary):
+    """The info panel can be dragged narrower and wider, and its content follows.
+    The zoom preview and the histogram kept their size: a narrower panel showed a
+    black strip while dragging and jumped back when let go, and the values ran over
+    their labels."""
+
+    def drag_edge(app, x0, x1, label, y=420):
+        app.move(x0, y)
+        app.x("xdotool", "mousedown", "1")
+        for i in range(1, 11):
+            app.move(x0 + (x1 - x0) * i / 10, y)
+        app.settle(0.6)
+        held = app.shot(f"{label}_held")
+        app.x("xdotool", "mouseup", "1")
+        app.settle(0.8)
+        return held, app.shot(f"{label}_released")
+
+    panel_background = (25, 25, 25)
+    with start(binary, "info_panel_resizes", image("moss.jpg")) as app:
+        app.key("i")
+        app.settle(1.5)
+        edge = panel_edge(app.shot("open"))
+        assert edge and 200 < edge < 400, f"the edge of the info panel is at {edge}"
+
+        # narrower than the panel can be
+        held, released = drag_edge(app, edge, 120, "narrow")
+        # Inside the panel, left of its edge, the strip had the color of the empty
+        # canvas. Right of the edge that color is right, where the panel was before.
+        held_edge, narrow = panel_edge(held), panel_edge(released)
+        black = count_color(held, (110, 60, held_edge - 112, 500), (8, 8, 8), tolerance=4)
+        assert black < 2000, f"a black strip of {black} pixels inside the panel while dragging it narrower"
+        assert narrow < edge - 20, f"the panel did not get narrower: {edge} -> {narrow}"
+        assert abs(narrow - held_edge) <= 2, f"the panel jumped from {held_edge} to {narrow} when let go"
+
+        # wider: the zoom preview grows with the panel
+        _, released = drag_edge(app, narrow, 560, "wide")
+        wide = panel_edge(released)
+        assert abs(wide - 560) <= 6, f"the panel is {wide} wide, it was dragged to 560"
+        assert not region_has_color(released, (wide - 70, 340, 30, 20), panel_background, tolerance=4), (
+            "the zoom preview did not grow with the panel"
+        )
 
 
 def test_saved_edits_come_back(binary):
@@ -922,6 +968,7 @@ TESTS = [
     test_single_frame_gif_is_editable,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
+    test_info_panel_resizes,
     test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,

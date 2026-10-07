@@ -2,7 +2,6 @@ const ICON_SIZE: f32 = 24. * 0.8;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 pub const PANEL_WIDTH: f32 = 260.0;
-const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 mod info_ui;
 pub use info_ui::info_ui;
