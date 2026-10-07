@@ -181,7 +181,12 @@ impl ExtendedImageInfo {
         Self::from_bands(img.height(), |y, rows, counts| {
             let row = img.width() as usize * 4;
             let band = &img.as_raw()[y as usize * row..(y + rows) as usize * row];
-            counts.add(band.chunks_exact(4).map(|p| [p[0], p[1], p[2], p[3]]));
+            counts.add(
+                band.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|p| [p[0], p[1], p[2], p[3]]),
+            );
         })
     }
 
@@ -197,12 +202,16 @@ impl ExtendedImageInfo {
         Self::from_bands(img.height(), |y, rows, counts| match img {
             DynamicImage::ImageRgba8(i) => counts.add(
                 i.as_raw()[band(4, y, rows)]
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .map(|p| [p[0], p[1], p[2], p[3]]),
             ),
             DynamicImage::ImageRgb8(i) => counts.add(
                 i.as_raw()[band(3, y, rows)]
-                    .chunks_exact(3)
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
                     .map(|p| [p[0], p[1], p[2], u8::MAX]),
             ),
             DynamicImage::ImageLuma8(i) => counts.add(
@@ -212,7 +221,9 @@ impl ExtendedImageInfo {
             ),
             DynamicImage::ImageLumaA8(i) => counts.add(
                 i.as_raw()[band(2, y, rows)]
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|p| [p[0], p[0], p[0], p[1]]),
             ),
             // the conversion of the image crate, on one band at a time
@@ -220,7 +231,9 @@ impl ExtendedImageInfo {
                 let rgba = img.crop_imm(0, y, img.width(), rows).to_rgba8();
                 counts.add(
                     rgba.as_raw()
-                        .chunks_exact(4)
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
                         .map(|p| [p[0], p[1], p[2], p[3]]),
                 );
             }

@@ -1086,7 +1086,9 @@ pub fn load_heif_native(path: &Path) -> Result<DynamicImage> {
     // 16 bit samples come as pairs of bytes in the byte order of the machine
     let wide = || -> Vec<u16> {
         img.data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|b| u16::from_ne_bytes([b[0], b[1]]))
             .collect()
     };
