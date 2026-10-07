@@ -444,11 +444,10 @@ pub fn open_image(
             let decoder = image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&contents))?;
             if !decoder.has_animation() {
                 //force this to webp
-                let img = image::ImageReader::with_format(
+                let img = decode_without_limits(ImageReader::with_format(
                     std::io::Cursor::new(contents),
                     image::ImageFormat::WebP,
-                )
-                .decode()?;
+                ))?;
                 _ = sender.send(Frame::new_still(img));
                 return Ok(receiver);
             }
@@ -558,11 +557,14 @@ pub fn open_image(
                 Ok(i) => {
                     _ = sender.send(Frame::new_still(i));
                 }
-                Err(e) => {
+                Err(turbo_error) => {
+                    // libjpeg-turbo fails on what libjpeg only warns about, such as a
+                    // missing end of the file. The image library shows those.
                     error!(
-                        "Could not load using turbojpeg: {e}. Trying to load with image library."
+                        "Could not load using turbojpeg: {turbo_error}. Trying to load with image library."
                     );
-                    let img = image::open(img_location)?;
+                    let img = decode_without_limits(ImageReader::open(&img_location)?)
+                        .map_err(|e| anyhow!("{e} (libjpeg-turbo: {turbo_error})"))?;
                     _ = sender.send(Frame::new_still(img));
                 }
             }
@@ -620,7 +622,7 @@ pub fn open_image(
             // All other supported image files are handled by using `image` and `image_extras`
             image_extras::register();
             debug!("Loading using generic image library");
-            let img = image::open(img_location)?;
+            let img = decode_without_limits(ImageReader::open(&img_location)?)?;
             // col.add_still(img.to_rgba8());
             _ = sender.send(Frame::new_still(img));
             return Ok(receiver);
@@ -1082,7 +1084,19 @@ fn orientation_of(path: &Path) -> Result<image::metadata::Orientation> {
             .and_then(|value| Orientation::from_exif(value as u8));
         return Ok(orientation.unwrap_or(Orientation::NoTransforms));
     }
+    let mut reader = reader;
+    reader.no_limits();
     Ok(reader.into_decoder()?.orientation()?)
+}
+
+/// Decodes with the image library, which by default refuses images that need
+/// more than 512 MiB, such as a photo of 200 megapixels. The user opened the
+/// image, and large images are what Oculante is for.
+fn decode_without_limits<R: std::io::BufRead + std::io::Seek>(
+    mut reader: ImageReader<R>,
+) -> Result<DynamicImage> {
+    reader.no_limits();
+    Ok(reader.decode()?)
 }
 
 /// Like `DynamicImage::apply_orientation`. The orientations that swap width
@@ -1177,7 +1191,9 @@ fn load_kra(path: &Path) -> Result<DynamicImage> {
     let mut merged_image = archive.by_name("mergedimage.png")?;
     let mut image_bytes = Vec::<u8>::new();
     merged_image.read_to_end(&mut image_bytes)?;
-    Ok(image::load_from_memory(&image_bytes)?)
+    decode_without_limits(
+        ImageReader::new(std::io::Cursor::new(image_bytes)).with_guessed_format()?,
+    )
 }
 
 #[cfg(feature = "turbo")]

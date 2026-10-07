@@ -565,6 +565,61 @@ fn load_all(path: &std::path::Path) -> anyhow::Result<(Vec<Frame>, Vec<String>)>
     Ok((frames, warnings))
 }
 
+/// The image library refuses images that need more than 512 MiB unless told
+/// otherwise, which showed as "Memory limit exceeded" for photos of 200
+/// megapixels (#782). This one needs 537 MB. A QOI file of one colour is
+/// written by hand, it is a header, the colour and runs of 62 pixels.
+#[test]
+fn ci_images_above_512_mib_load() {
+    let (width, height) = (11586u32, 11586u32);
+    let mut qoi = b"qoif".to_vec();
+    qoi.extend(width.to_be_bytes());
+    qoi.extend(height.to_be_bytes());
+    qoi.extend([4, 0, 0xff, 30, 60, 90, 255]);
+    let mut left = width as u64 * height as u64 - 1;
+    while left > 0 {
+        let run = left.min(62);
+        qoi.push(0xc0 | (run - 1) as u8);
+        left -= run;
+    }
+    qoi.extend([0, 0, 0, 0, 0, 0, 0, 1]);
+    let path = std::env::temp_dir().join("oculante_test_large.qoi");
+    std::fs::write(&path, qoi).unwrap();
+
+    let (frames, _) = load_all(&path).unwrap();
+    std::fs::remove_file(&path).unwrap();
+    let Some(Frame::Still(image)) = frames.first() else {
+        panic!("no image")
+    };
+    assert_eq!((image.width(), image.height()), (width, height));
+    assert_eq!(image.as_bytes()[..4], [30, 60, 90, 255]);
+}
+
+/// libjpeg-turbo fails on what libjpeg only warns about, such as a missing end
+/// of the file. The image library shows those, and when both fail the error
+/// says why each of them did.
+#[cfg(feature = "turbo")]
+#[test]
+fn ci_jpeg_that_libjpeg_turbo_refuses() {
+    let dir = std::env::temp_dir().join("oculante_test_jpeg_fallback");
+    _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let jpeg = std::fs::read("res/tests/moss.jpg").unwrap();
+    let truncated = dir.join("truncated.jpg");
+    std::fs::write(&truncated, &jpeg[..jpeg.len() * 9 / 10]).unwrap();
+    let (frames, _) = load_all(&truncated).unwrap();
+    let Some(Frame::Still(image)) = frames.first() else {
+        panic!("the truncated JPEG did not load")
+    };
+    assert_eq!((image.width(), image.height()), (1000, 750));
+
+    let broken = dir.join("broken.jpg");
+    std::fs::write(&broken, b"\xff\xd8\xff\xe0 no JPEG after all").unwrap();
+    let error = load_all(&broken).unwrap_err().to_string();
+    assert!(error.contains("libjpeg-turbo:"), "{error}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// The size a file name gives, like 600x300 in "600x300_float.exr"
 fn size_in_name(name: &str) -> Option<(u32, u32)> {
     name.split(|c: char| !c.is_ascii_alphanumeric())
