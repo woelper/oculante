@@ -1,3 +1,25 @@
+# Release checklist: no regression over 0.9.6
+Written on 2026-10-08. All of it before a release, and nothing goes to crates.io before the human tests are through, a published version stays there. The human tests run on pre-release binaries, not on a crates.io version. Each platform is compared with 0.9.6 on the same machine: no worse than before.
+
+Human tests:
+- [ ] macOS, Apple Silicon (Stoppedpuma, Johann): "Open with" and a double click in Finder, with Oculante closed and already running, a file dropped on the app icon, several files at once, a file as argument in the terminal (opened once, not twice). Zoom speed with the trackpad on the image, scroll speed in the panels. The signed and notarised bundle starts without a warning.
+- [ ] macOS, Intel: starts and opens a file. Low priority.
+- [ ] Windows 10 and 11 (piperun): starts on a real GPU, display scaling 100 and 150 %, opening files from the explorer and the file dialog, drag and drop, copy and paste, a photo of 200 megapixels from a Samsung phone (#782).
+- [ ] Linux, Wayland with GNOME, KDE and Sway (Stoppedpuma for Sway): transparency (#342), borderless mode and moving the window (#733), drag and drop (#781), no keys stuck after the window lost the focus (#374), a loaded image shows without moving the mouse (#776).
+- [ ] Linux, X11: the UI tests cover it, and a session on a real display.
+- [ ] NetBSD (0323pin): builds and runs. Done for the branch on 2026-10-08, again for the release candidate.
+- [ ] The settings of a long used 0.9.6 carry over: shortcuts, recent files, colors, panel states.
+
+Before tagging:
+- [ ] heic-rs: tbraun96/heic-rs#7 and #8 released, or the fork published under its own name. A crate on crates.io does not get the patch in Cargo.toml, photos from phones would come out with the wrong contrast and colour.
+- [ ] avif-parse: kornelski/avif-parse#4 released, or the patch dropped for the release. 0.9.6 can not open those files either, without the patch nothing gets worse.
+- [ ] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build.
+- [ ] A dry run of the release workflow with a pre-release tag: all binaries build, the Mac bundles are signed and notarised, the plist is up to date (file associations).
+- [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build.
+
+Not regressions, also in 0.9.6, can come after the release: the open issues further down (#460, #400, #426, #504, #647, #761, #644, #601, #707, zen mode), always on top on Wayland, 16 bit and broken APNGs, WebP speed, AVIF grids, HDR (#746), prefetching, memory for long animations, the simplifications.
+
+
 # Testing steps after Notan removal
 - [x] Shortcuts in the app: Regular and with modifiers (covered by scripts/ui-tests)
 - [x] Shortcuts in the app: key repeat (UI test `test_key_repeat`, X11)
@@ -71,7 +93,7 @@ Found by going through the open issues and looking at the code. None of these ha
 - [ ] Info and edit buttons disappear when an image fails to decode (#426). They depend on an image being loaded.
 - [ ] Next and previous sometimes did not update the view unless "Redraw every frame" was on (#776), same in zen mode (#642). The loader threads ask for a repaint now, check with large images.
 - [ ] Animations stop after 500 loops (#504), the player has a `for _ in 0..500`.
-- [ ] "Memory limit exceeded" on large files (#782). The generic loader uses the default limits of the image crate.
+- [x] "Memory limit exceeded" on large files (#782). Fixed, see Performance below; piperun's photo opens.
 - [ ] Histogram and info do not follow edits (#647), the size falls back when the edit panel is closed (#761), reset view ignores a resize (#644). The info is computed from the original image, not from the result of the edits.
 - [ ] EXIF rotation for files that are not JPEG (#601). The bracket keys only rotate JPEGs (#707).
 - [ ] Zen mode: the hamburger menu and the file scroll bar stay visible (#690, #691), the menu does not follow a window resize (#700).
@@ -133,7 +155,7 @@ Reported by reading the code, not checked yet:
 
 # Cleanup
 - [x] Dependencies updated to the newest versions, unused ones removed. `wgpu` was only used for the names of its texture formats and is replaced by `wgpu-types`. Cargo.lock went from 857 to 794 packages. Checked: all 67 test files load the same as before, all edit operations give the same pixels except blur (rounding) and perspective crop (edge pixels, new imageproc).
-- [ ] Not updated: `avif-decode` 3 needs Rust 1.98, `glow` 0.18 has to wait for an egui that uses it.
+- [ ] Not updated: `glow` 0.18 has to wait for an egui that uses it. (`avif-decode` 3 is in, it needs Rust 1.98.)
 - [ ] LUT on an image with transparency: keeps the alpha now, it made the image opaque before (new lutgen works on RGBA). Check that this is what we want.
 - [x] Update to latest egui
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
@@ -155,7 +177,7 @@ Reported by reading the code, not checked yet:
 - [x] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
 - [ ] Update dependencies: egui and helper libraries
 - [ ] Update image libraries step by step
-- [ ] What should happen to the image preview/zoom view in the info panel if it is resized?
+- [x] What should happen to the image preview/zoom view in the info panel if it is resized? It takes the width of the panel and stays square, the histogram follows the width too.
 - [x] When the app starts for the first time, iterate through the recent menu and remove all items that do not exist on disk
 - [x] Remove update functionality
 - [ ] Sign release binaries
