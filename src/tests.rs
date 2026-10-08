@@ -588,6 +588,29 @@ fn ci_avif_bit_depths() {
     }
 }
 
+/// The last box of an AVIF file may have the size 0, it then runs to the end of
+/// the file. Lightroom writes its AVIFs like that, and none of them opened.
+#[cfg(all(feature = "avif_native", not(feature = "dav1d")))]
+#[test]
+fn ci_avif_whose_last_box_runs_to_the_end() {
+    let original = "res/tests/red-at-12-oclock-with-color-profile-8bpc.avif";
+    let mut data = std::fs::read(original).unwrap();
+    let mdat = data.windows(4).position(|w| w == b"mdat").unwrap() - 4;
+    let size = u32::from_be_bytes(data[mdat..mdat + 4].try_into().unwrap()) as usize;
+    assert_eq!(mdat + size, data.len(), "the mdat is the last box");
+    data[mdat..mdat + 4].copy_from_slice(&0u32.to_be_bytes());
+    let path = std::env::temp_dir().join("oculante_test_mdat_to_end.avif");
+    std::fs::write(&path, data).unwrap();
+
+    let load = |path: &std::path::Path| {
+        let (frames, _) = load_all(path).unwrap();
+        frames.first().and_then(|f| f.get_image()).unwrap()
+    };
+    let image = load(&path);
+    std::fs::remove_file(&path).unwrap();
+    assert!(image.as_bytes() == load(std::path::Path::new(original)).as_bytes());
+}
+
 /// The image library refuses images that need more than 512 MiB unless told
 /// otherwise, which showed as "Memory limit exceeded" for photos of 200
 /// megapixels (#782). This one needs 537 MB. A QOI file of one colour is

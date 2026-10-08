@@ -212,3 +212,7 @@ harness = false
 # has no colr box. Fixed in tbraun96/heic-rs#7 and #8. Remove this once a
 # release contains both.
 heic-rs = { git = "https://github.com/woelper/heic-rs", branch = "oculante" }
+# avif-parse 2.1.0 refuses AVIFs whose last box has the size 0, which means it runs
+# to the end of the file. Lightroom writes its AVIF exports like that. Fixed in
+# kornelski/avif-parse#4, remove this once a release contains it.
+avif-parse = { git = "https://github.com/woelper/avif-parse", branch = "oculante" }
