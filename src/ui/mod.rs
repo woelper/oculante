@@ -717,6 +717,9 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
 
 /// An area that can be dragged by a user to move the window
 pub fn drag_area(ui: &mut Ui, state: &mut OculanteState) {
+    // There is no mouse position to move the window with
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
+    let _ = (ui, state);
     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
