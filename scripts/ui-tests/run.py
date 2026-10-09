@@ -773,6 +773,24 @@ def test_info_panel_resizes(binary):
         )
 
 
+def test_histogram_shows_values_on_hover(binary):
+    """Hovering over the histogram shows the channel, the value and the number of
+    pixels. egui_plot 0.37 shows them only with a label formatter, they were gone."""
+    with start(binary, "histogram_hover", image("moss.jpg")) as app:
+        app.key("i")
+        app.settle(1.5)
+        app.scroll_down(120, 300, 12)  # down to the histogram
+        app.move(60, 470)  # the "Pixels" row above it
+        app.settle(0.8)
+        above = app.shot("above")
+        app.move(60, 540)  # on the histogram, near the lines
+        app.settle(0.8)
+        hover = app.shot("hover")
+    # right of the pointer: the tooltip, or only the line of the crosshair
+    changed = changed_pixels_in(above, hover, (70, 480, 180, 80))
+    assert changed > 1500, f"no values next to the pointer ({changed} pixels changed)"
+
+
 def test_saved_edits_come_back(binary):
     """Edits saved with "Save edits" are applied again when the image is opened later."""
     folder = folder_of("saved_edits_images", [("moss.jpg", "moss.jpg")])
@@ -969,6 +987,7 @@ TESTS = [
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,
+    test_histogram_shows_values_on_hover,
     test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,

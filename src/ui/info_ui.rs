@@ -6,7 +6,7 @@ use crate::filebrowser::browse_for_image_path;
 use crate::glow_renderer::{self, GlowRenderer, GlowTile, Quad};
 use crate::icons::*;
 use crate::utils::*;
-use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
+use egui_plot::{HoverPosition, Line, Plot, PlotPoint, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
@@ -245,6 +245,11 @@ pub fn info_ui(
 
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
+                    // The slider fills the row, its value is at the right edge like the
+                    // others. The value takes 40 points.
+                    let spacing = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().slider_width =
+                        (ui.available_width() - 40. - 2. * spacing).at_least(40.);
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
@@ -361,7 +366,20 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             .show_axes(false)
             .show_grid(false)
             .width(ui.available_width())
-            .view_aspect(2.0)
+            // the height that is left, but not flatter than 2:1
+            .height(ui.available_height().max(ui.available_width() / 2.))
+            // egui_plot shows the values under the pointer only with a formatter
+            .label_formatter(|position| match position {
+                HoverPosition::NearDataPoint {
+                    plot_name,
+                    position,
+                    ..
+                } => Some(format!(
+                    "{plot_name}: {:.0}\n{:.0} pixels",
+                    position.x, position.y
+                )),
+                HoverPosition::Elsewhere { .. } => None,
+            })
             .show(ui, |plot_ui| {
                 plot_ui.line(line("red", &info.red_histogram, Color32::RED));
                 plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));
