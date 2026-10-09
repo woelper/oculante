@@ -173,6 +173,7 @@ Reported by reading the code, not checked yet:
   - There is a pure Rust decoder now, `heic-rs`. It is the default feature `heif_native`: a plain build opens HEIC, on Linux too, with nothing to install. If `heif` is enabled as well, libheif is used (the Mac and Windows release builds).
   - **Before the next release:** Cargo.toml patches in a fork of heic-rs with tbraun96/heic-rs#7 and #8. Without them photos from phones come out with wrong contrast and colour. A crate published to crates.io does not get the patch, and the git source in Cargo.lock is a problem for packagers who take all crates from crates.io (pkgsrc). Either upstream releases both fixes, or the fork is published under its own name.
   - Open: drop libheif from the Mac bundles (most of `scripts/build_mac.sh` and `scripts/build_mac_intel.sh` exists for it) and the step that builds libheif in the Linux release job, it is not used there. Not decoded by heic-rs: 4:2:2 and 4:4:4 (Canon HIF, #710), image sequences (#777).
+- [ ] A double-click on the edge of a panel brings back its default width, a double-click on a slider its default value (Stoppedpuma in #799). After the release; egui reports the double-click on the handle of a panel, the sliders of the edit operations each need their default value.
 - [ ] Painting should not be a mode but rather a normal operator
 - [x] When entering a directory in the file browser and there is a search filter, the filter should be cleared when entering a directory
 - [ ] Update dependencies: egui and helper libraries
