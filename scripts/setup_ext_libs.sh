@@ -1,3 +1,6 @@
+current_dir=$PWD
+cd $(git rev-parse --show-toplevel)
+
 rm -rf libheif
 git clone https://github.com/strukturag/libheif.git
 cd libheif
@@ -22,3 +25,5 @@ make
 # ./bootstrap-vcpkg.bat
 # ./vcpkg integrate install
 # ./vcpkg install libheif
+
+cd $current_dir

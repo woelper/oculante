@@ -1,33 +1,34 @@
 use crate::appstate::OculanteState;
 use crate::comparelist::CompareItem;
+use crate::filebrowser::BrowserDir;
 #[cfg(feature = "file_open")]
 use crate::filebrowser::browse_for_image_path;
-use crate::filebrowser::BrowserDir;
+use crate::glow_renderer::{self, GlowRenderer, GlowTile, Quad};
 use crate::icons::*;
 use crate::utils::*;
-use egui_plot::{Line, Plot, PlotPoints};
+use egui_plot::{HoverPosition, Line, Plot, PlotPoint, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
-use notan::{
-    egui::{self, *},
-    prelude::Graphics,
-};
+use egui::{self, *};
 
 use super::*;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub fn info_ui(
-    app: &mut App,
-    ctx: &Context,
+    ui: &mut egui::Ui,
     state: &mut OculanteState,
-    _gfx: &mut Graphics,
+    renderer: Option<&GlowRenderer>,
+    image_tiles: &[GlowTile],
+    image_format: glow_renderer::TexFormat,
 ) -> (Pos2, Pos2) {
+    let ctx_owned = ui.ctx().clone();
+    let ctx = &ctx_owned;
     let mut color_type = ColorType::Rgba8;
     let mut bbox_tl: Pos2 = Default::default();
     let mut bbox_br: Pos2 = Default::default();
     let mut uv_center: (f64, f64) = Default::default();
-    let mut uv_size: (f64, f64) = Default::default();
 
     if let Some(img) = &state.current_image {
         color_type = img.color();
@@ -40,118 +41,76 @@ pub fn info_ui(
         };
 
         // don't do this every frame for performance reasons
-        if ctx.cumulative_pass_nr() % 5 == 0 {
-            if let Some(p) = get_pixel_checked(
+        if ctx.cumulative_pass_nr().is_multiple_of(5)
+            && let Some(p) = get_pixel_checked(
                 img,
                 state.cursor_relative.x as u32,
                 state.cursor_relative.y as u32,
-            ) {
-                state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
-            }
+            )
+        {
+            state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
         }
     }
 
-    egui::SidePanel::left("info")
-    .show_separator_line(false)
-    .exact_width(PANEL_WIDTH)
-    .resizable(false)
-    .frame(egui::Frame::central_panel(&ctx.style()).corner_radius(0).fill(Color32::TRANSPARENT))
-    .show(ctx, |ui| {
-        egui::ScrollArea::vertical().auto_shrink([false,true])
+    egui::Panel::left("info")
+    .show_separator_line(true)
+    .default_size(PANEL_WIDTH)
+    .size_range(MIN_WIDTH..=MAX_WIDTH)
+    .resizable(true)
+    .show(ui, |ui| {
+        egui::ScrollArea::vertical()
+            .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
             .show(ui, |ui| {
 
-            // Force-expand to prevent spacing issue with scroll bar
-            // ui.allocate_space(egui::Vec2::new(1000., 0.));
-
-            if let Some(texture) = &state.current_texture.get() {
-                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
-                let scale = (desired_width / 8.) / texture.size().0 as f64;
+            // SECTION 1: Info grid
+            if state.current_image.is_some() {
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
-                egui::Grid::new("info")
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                    ui.label_i(format!("{ARROWS_OUT} Size",));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{}x{}",
-                            state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
-                        ))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{ARROWS_OUT} Size")), format!(
+                    "{}x{}",
+                    state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
+                ));
 
-                    if let Some(path) = &state.current_path {
-                        // make sure we truncate filenames
-                        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(format!("{} File", IMAGE));
-                        let path_label = egui::Label::new(
-                            RichText::new(file_name)
-                        ).truncate();
-                        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                            ui.add(path_label)
-                            .on_hover_text(format!("{}", path.display()));
-                        });
-                        ui.end_row();
-                    }
+                if let Some(path) = &state.current_path {
+                    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                    info_row(ui, |ui| ui.label_i(format!("{IMAGE} File")), file_name)
+                        .on_hover_text(format!("{}", path.display()));
+                }
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col(state.sampled_color))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col_norm(state.sampled_color, 255.))
-                    );
-                    ui.end_row();
+                let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
+                info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
+                    "{:.0},{:.0}",
+                    state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
+                ));
+                info_row(ui, |ui| ui.label_i(format!("{INTERSECT} UV")), format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1));
 
-                    ui.label_i(format!("{PALETTE} HEX"));
-                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
-                    ui.label_right(
-                        RichText::new(hex)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{PALETTE} Color"));
-                    ui.label_right(
-                        format!("{:?}", color_type)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{MOVE} Pos"));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{:.0},{:.0}",
-                            state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
-                        ))
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{INTERSECT} UV"));
-                    ui.label_right(
-                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                    );
-                    ui.end_row();
-                });
-
-                // make sure aspect ratio is compensated for the square preview
-                let ratio = texture.size().0 as f64 / texture.size().1 as f64;
-                uv_size = (scale, scale * ratio);
+                // SECTION 2: Zoom preview, as wide as the panel and square
                 ui.add_space(10.);
-
-                let preview_rect = egui::Rect::from_min_size(ui.cursor().left_top(), egui::Vec2::splat(desired_width as f32));
-
-
-                // Rendering a placeholder rectangle
-                ui.painter().rect(preview_rect, ROUNDING, egui::Color32::TRANSPARENT, egui::Stroke::NONE, egui::StrokeKind::Middle);
+                let preview_size = ui.available_width();
+                let preview_rect = egui::Rect::from_min_size(
+                    ui.cursor().left_top(),
+                    egui::Vec2::splat(preview_size),
+                );
                 bbox_tl = preview_rect.left_top();
                 bbox_br = preview_rect.right_bottom();
+
+                // Draw magnified pixel preview
+                if let Some(renderer) = renderer {
+                    zoom_preview(ui, state, preview_rect, renderer, image_tiles, image_format);
+                }
+
                 ui.advance_cursor_after_rect(preview_rect);
-            }
+            } // end if current_image
+
+            // SECTION 3: Compare
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
@@ -159,11 +118,13 @@ pub fn info_ui(
                     if state.persistent_settings.max_cache == 0 {
                         ui.label("Warning! Set your cache to more than 0 in settings for this to be fast.");
                     }
+                    ui.styled_checkbox(&mut state.persistent_settings.compare_keep_view, "Persistent zoom")
+                        .on_hover_text("Keep the current zoom and pan when switching between images in this list.");
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
                             let browser_button = ui.button(format!("{FOLDER} Open another image..."));
                             if browser_button.clicked() {
-                                state.filebrowser_last_dir = if app.keyboard.shift() {
+                                state.filebrowser_last_dir = if ui.ctx().input(|i| i.modifiers.shift) {
                                     BrowserDir::CurrentImageDir
                                 } else {
                                     BrowserDir::LastOpenDir
@@ -185,7 +146,7 @@ pub fn info_ui(
                                     );
                                     ui.ctx()
                                         .data_mut(|w| w.insert_temp(Id::new("FBPATH"), path_override));
-                                    ui.ctx().memory_mut(|w| w.open_popup(Id::new("OPEN")));
+                                    crate::ui::open_popup(ui.ctx(), Id::new("OPEN"));
                                 }
 
                                 state.is_loaded = false;
@@ -194,14 +155,12 @@ pub fn info_ui(
                             }
 
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
-                                && state.is_loaded && !state.reset_image {
-                                    if let Some(path) = &state.current_path {
+                                && state.is_loaded && !state.reset_image
+                                    && let Some(path) = &state.current_path {
                                         state.compare_list.insert(CompareItem::new(path, state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
-                                }
 
-                            // let compare_list = state.compare_list.iter().cloned().collect();
                             let mut to_remove = None;
                             for CompareItem {path, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
@@ -209,7 +168,7 @@ pub fn info_ui(
                                         to_remove = Some(path.to_owned());
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.selectable_label(state.current_path.as_ref() == Some(path), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).clicked(){
+                                        if ui.add(egui::Button::new(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).selected(state.current_path.as_ref() == Some(path))).clicked(){
                                             state
                                                 .player
                                                 .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
@@ -242,7 +201,8 @@ pub fn info_ui(
                 });
             });
 
-            if state.current_texture.get().is_some() {
+            // SECTION 4: Alpha tools + palette + measure + tiling
+            if state.current_image.is_some() {
                 ui.styled_collapsing("Alpha tools", |ui| {
                     ui.vertical_centered_justified(|ui| {
                         dark_panel(ui, |ui| {
@@ -285,11 +245,16 @@ pub fn info_ui(
 
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
-                    ui.style_mut().spacing.slider_width = ui.available_width() - 16.;
+                    // The slider fills the row, its value is at the right edge like the
+                    // others. The value takes 40 points.
+                    let spacing = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().slider_width =
+                        (ui.available_width() - 40. - 2. * spacing).at_least(40.);
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
 
+            // SECTION 5: Advanced (stats, EXIF, DICOM, histogram)
             advanced_ui(ui, state);
 
         });
@@ -297,23 +262,46 @@ pub fn info_ui(
     (bbox_tl, bbox_br)
 }
 
+/// The narrowest and widest the info panel can be dragged to. While its edge is
+/// dragged, the panel is cut off at the dragged width, so the narrowest has to fit
+/// what is in the panel, like the slider for tiling. Narrower, the cut off part
+/// showed the background of the canvas until the panel was let go.
+const MIN_WIDTH: f32 = 240.;
+const MAX_WIDTH: f32 = 640.;
+
+/// A row of the info panel: the label, and the value right-aligned in the space
+/// that is left. A value that does not fit is cut short, it ran over the label.
+fn info_row(
+    ui: &mut Ui,
+    label: impl FnOnce(&mut Ui) -> egui::Response,
+    value: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.horizontal(|ui| {
+        label(ui);
+        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+            ui.add(egui::Label::new(value).truncate())
+        })
+        .inner
+    })
+    .inner
+}
+
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_metadata {
-        egui::Grid::new("extended").num_columns(2).show(ui, |ui| {
-            ui.label("Number of colors");
-            ui.label_right(format!("{}", info.num_colors));
-            ui.end_row();
-
-            ui.label("Fully transparent");
-            ui.label_right(format!(
+        info_row(
+            ui,
+            |ui| ui.label("Number of colors"),
+            format!("{}", info.num_colors),
+        );
+        info_row(
+            ui,
+            |ui| ui.label("Fully transparent"),
+            format!(
                 "{:.2}%",
                 (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
-            ));
-            ui.end_row();
-            ui.label("Pixels");
-            ui.label_right(format!("{}", info.num_pixels));
-            ui.end_row();
-        });
+            ),
+        );
+        info_row(ui, |ui| ui.label("Pixels"), format!("{}", info.num_pixels));
 
         if !info.exif.is_empty() {
             ui.styled_collapsing("EXIF", |ui| {
@@ -361,43 +349,208 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             });
         }
 
-        let red_vals = Line::new(
-            info.red_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::RED);
+        let line = |name: &str, histogram: &[(i32, u64)], color: Color32| {
+            Line::new(
+                name,
+                histogram
+                    .iter()
+                    .map(|(k, v)| [*k as f64, *v as f64])
+                    .collect::<PlotPoints>(),
+            )
+            .color(color)
+        };
 
-        let green_vals = Line::new(
-            info.green_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::GREEN);
-
-        let blue_vals = Line::new(
-            info.blue_histogram
-                .iter()
-                .map(|(k, v)| [*k as f64, *v as f64])
-                .collect::<PlotPoints>(),
-        )
-        .fill(0.)
-        .color(Color32::BLUE);
-
-        Plot::new("histogram")
+        let plot = Plot::new("histogram")
             .allow_zoom(false)
             .allow_drag(false)
             .show_axes(false)
             .show_grid(false)
-            .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
+            .width(ui.available_width())
+            // the height that is left, but not flatter than 2:1
+            .height(ui.available_height().max(ui.available_width() / 2.))
+            // egui_plot shows the values under the pointer only with a formatter
+            .label_formatter(|position| match position {
+                HoverPosition::NearDataPoint {
+                    plot_name,
+                    position,
+                    ..
+                } => Some(format!(
+                    "{plot_name}: {:.0}\n{:.0} pixels",
+                    position.x, position.y
+                )),
+                HoverPosition::Elsewhere { .. } => None,
+            })
             .show(ui, |plot_ui| {
-                plot_ui.line(red_vals);
-                plot_ui.line(green_vals);
-                plot_ui.line(blue_vals);
+                plot_ui.line(line("red", &info.red_histogram, Color32::RED));
+                plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));
+                plot_ui.line(line("blue", &info.blue_histogram, Color32::BLUE));
             });
+
+        // The areas below the lines. The plot's own fill does not add colors up, here
+        // red and green give yellow, and all three channels a neutral gray.
+        let painter = ui.painter().with_clip_rect(plot.response.rect);
+        let base_y = plot
+            .transform
+            .position_from_point(&PlotPoint::new(0.0, 0.0))
+            .y;
+        const FILL: u8 = 70;
+        for (histogram, color) in [
+            (&info.red_histogram, Color32::from_rgb_additive(FILL, 0, 0)),
+            (
+                &info.green_histogram,
+                Color32::from_rgb_additive(0, FILL, 0),
+            ),
+            (&info.blue_histogram, Color32::from_rgb_additive(0, 0, FILL)),
+        ] {
+            let mut mesh = Mesh::default();
+            for (i, (k, v)) in histogram.iter().enumerate() {
+                let top = plot
+                    .transform
+                    .position_from_point(&PlotPoint::new(*k as f64, *v as f64));
+                mesh.colored_vertex(top, color);
+                mesh.colored_vertex(pos2(top.x, base_y), color);
+                if i > 0 {
+                    let n = (2 * i) as u32;
+                    mesh.add_triangle(n - 2, n - 1, n);
+                    mesh.add_triangle(n - 1, n, n + 1);
+                }
+            }
+            painter.add(mesh);
+        }
     }
+}
+
+/// Renders a magnified, pixel-perfect view by reusing existing image tiles.
+/// No image conversion or texture upload — just draws UV-cropped quads from
+/// the tiles already on the GPU.
+fn zoom_preview(
+    ui: &mut Ui,
+    state: &OculanteState,
+    rect: egui::Rect,
+    renderer: &GlowRenderer,
+    tiles: &[GlowTile],
+    image_format: glow_renderer::TexFormat,
+) {
+    if tiles.is_empty() {
+        return;
+    }
+
+    let img_w = state.image_geometry.dimensions.0 as f32;
+    let img_h = state.image_geometry.dimensions.1 as f32;
+    if img_w < 1.0 || img_h < 1.0 {
+        return;
+    }
+
+    // Snap to integer pixel coordinates so the preview locks to pixel grid
+    let cx = state.cursor_relative.x.floor();
+    let cy = state.cursor_relative.y.floor();
+
+    // How many source pixels the preview spans in each direction
+    let radius: f32 = 16.0;
+    let src_size = radius * 2.0 + 1.0;
+
+    // Source region in image pixel coordinates
+    let src_left = cx - radius;
+    let src_top = cy - radius;
+    let src_right = cx + radius + 1.0;
+    let src_bottom = cy + radius + 1.0;
+
+    // How many screen pixels per source pixel
+    let px_per_src = rect.width() / src_size;
+
+    // Fill background for out-of-bounds areas
+    ui.painter().rect_filled(rect, 0.0, Color32::from_gray(30));
+
+    // Collect the part of each tile that overlaps the source region
+    let mut quads = Vec::new();
+    for tile in tiles {
+        let tx = tile.x as f32;
+        let ty = tile.y as f32;
+        let tw = tile.texture.width as f32;
+        let th = tile.texture.height as f32;
+        let tile_right = tx + tw;
+        let tile_bottom = ty + th;
+
+        // Check overlap between source region and this tile
+        let overlap_left = src_left.max(tx);
+        let overlap_top = src_top.max(ty);
+        let overlap_right = src_right.min(tile_right);
+        let overlap_bottom = src_bottom.min(tile_bottom);
+
+        if overlap_left >= overlap_right || overlap_top >= overlap_bottom {
+            continue; // No overlap
+        }
+
+        // UV coordinates within this tile for the overlapping region
+        let uv_left = (overlap_left - tx) / tw;
+        let uv_top = (overlap_top - ty) / th;
+        let uv_right = (overlap_right - tx) / tw;
+        let uv_bottom = (overlap_bottom - ty) / th;
+
+        // Screen position for this overlap region within the preview rect
+        let screen_left = rect.left() + (overlap_left - src_left) * px_per_src;
+        let screen_top = rect.top() + (overlap_top - src_top) * px_per_src;
+        let screen_right = rect.left() + (overlap_right - src_left) * px_per_src;
+        let screen_bottom = rect.top() + (overlap_bottom - src_top) * px_per_src;
+
+        quads.push(Quad {
+            texture: tile.texture.texture,
+            pos: [screen_left, screen_top],
+            size: [screen_right - screen_left, screen_bottom - screen_top],
+            uv_offset: [uv_left, uv_top],
+            uv_scale: [uv_right - uv_left, uv_bottom - uv_top],
+        });
+    }
+
+    // Draw them with GL, clipped to the preview rect. Texels are snapped so the
+    // preview stays crisp even if the image is displayed interpolated.
+    let shader = renderer.image_shader();
+    let (swizzle_mat, color_offset) =
+        glow_renderer::get_swizzle_mat_vec(state.persistent_settings.current_channel, image_format);
+    let swizzle_mat = swizzle_mat.to_cols_array();
+    let color_offset = color_offset.to_array();
+    let cb = egui_glow::CallbackFn::new(move |info, painter| {
+        glow_renderer::paint_quads(
+            painter.gl(),
+            shader,
+            &info,
+            &swizzle_mat,
+            &color_offset,
+            true,
+            &quads,
+        );
+    });
+    ui.painter().with_clip_rect(rect).add(egui::PaintCallback {
+        rect,
+        callback: Arc::new(cb),
+    });
+
+    // Crosshair
+    let center_x = rect.left() + radius * px_per_src;
+    let center_y = rect.top() + radius * px_per_src;
+    let stroke = egui::Stroke::new(7.0, Color32::from_rgba_unmultiplied(128, 128, 128, 128));
+    ui.painter().line_segment(
+        [
+            egui::pos2(center_x + px_per_src / 2.0, rect.top()),
+            egui::pos2(center_x + px_per_src / 2.0, rect.bottom()),
+        ],
+        stroke,
+    );
+    ui.painter().line_segment(
+        [
+            egui::pos2(rect.left(), center_y + px_per_src / 2.0),
+            egui::pos2(rect.right(), center_y + px_per_src / 2.0),
+        ],
+        stroke,
+    );
+    let center_rect = egui::Rect::from_min_size(
+        egui::pos2(center_x, center_y),
+        egui::vec2(px_per_src, px_per_src),
+    );
+    ui.painter().rect_stroke(
+        center_rect,
+        0.0,
+        egui::Stroke::new(1.0, Color32::from_gray(40)),
+        egui::StrokeKind::Inside,
+    );
 }

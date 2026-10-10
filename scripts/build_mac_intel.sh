@@ -2,6 +2,8 @@
 # Used by the release workflow and by the workflow that tests signing.
 set -e
 
+cd $(git rev-parse --show-toplevel)
+
 # Room in the header of the binary for the library paths that are rewritten
 # below. Without it install_name_tool fails once the new paths no longer fit.
 export RUSTFLAGS="-C link-arg=-Wl,-headerpad_max_install_names"
@@ -11,7 +13,7 @@ brew install libheif
 # x265 changes its library name with every release, so look it up
 X265=$(basename /usr/local/opt/x265/lib/libx265.[0-9]*.dylib)
 cargo install cargo-bundle
-cargo bundle --release --features "notan/shaderc heif"
+cargo bundle --release --features "heif"
 otool -L target/release/bundle/osx/oculante.app/Contents/MacOS/oculante
 mkdir target/release/bundle/osx/oculante.app/Contents/Frameworks/
 cp /usr/local/opt/libheif/lib/libheif.1.dylib target/release/bundle/osx/oculante.app/Contents/Frameworks/

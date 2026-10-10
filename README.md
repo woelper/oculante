@@ -1,5 +1,3 @@
-### Oculante is currently in maintenance mode. We will only be accepting bug fixes and minor improvements to existing features until we complete our rewrite. More details can be seen [here](https://github.com/woelper/oculante/issues/#746). Progress can be seen on the oculante-next branch.
-
 <h1 align="center">
     <img alt="banner" src="res/banner.avif">
 </h1>
@@ -108,8 +106,6 @@ pkg install oculante
 pkgin install oculante
 ```
 
-###### NetBSD builds currently use glsl-to-spirv instead of shaderc ######
-
 ### Windows
 
 - Scoop
@@ -129,7 +125,6 @@ Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
 
 Mac:
 `brew install nasm cmake`
-###### You may need this variable when building Oculante on macOS: `export SHADERC_LIB_DIR=/opt/homebrew/lib` ######
 
 ## Updates
 
@@ -146,7 +141,6 @@ To uninstall Oculante, simply delete the executable file and the data folder. Yo
 ## Roadmap
 
 You can see what we're currently working on in our [Release Plan](https://github.com/users/woelper/projects/2/views/1), or our [Milestones](https://github.com/woelper/oculante/milestones)!
-
 
 ## Features
 
@@ -177,7 +171,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - jxl (JPEG XL, via `jxl-oxide`)
 - avif
 - tiff (via `tiff` with additional float/half support)
-- webp (via `libwebp-sys` - `image` had _very_ limited format support)
+- webp
 - farbfeld
 - DDS (DXT1-5, via `dds-rs`)
 - DICOM (via dicom-rs) - Some metadata supported, too.
@@ -246,12 +240,6 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 - `turbo` (on by default), the turbojpeg library will not be used to open jpeg images. You won't need Nasm to be installed.
 
 - `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
-
-- `notan_glsl-to-spirv` uses the spirv shader compiler
-
-- `notan/shaderc` (on by default) uses shaderc as a shader compiler. Longer build time.
-
-- `update` (on by default) enable app updating.
 
 - `heif` HEIF format support.
 
@@ -387,9 +375,13 @@ Oculante can support some additional languages such as Arabic, Chinese, Japanese
 
 <kbd>LControl</kbd> + <kbd>C</kbd> = Copy
 
+<kbd>LControl</kbd> + <kbd>LShift</kbd> + <kbd>C</kbd> = CopyPath
+
 <kbd>LControl</kbd> + <kbd>V</kbd> = Paste
 
 <kbd>LControl</kbd> + <kbd>O</kbd> = Browse
+
+<kbd>S</kbd> = ScrubBar
 
 <kbd>Q</kbd> = Quit
 

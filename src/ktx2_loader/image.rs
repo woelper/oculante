@@ -4,7 +4,7 @@ use super::{basis::basis_buffer_to_image, ktx2_buffer_to_image};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 // use thiserror::Error;
-use wgpu::{Extent3d, TextureDimension, TextureFormat};
+use wgpu_types::{Extent3d, TextureDimension, TextureFormat};
 
 pub const TEXTURE_ASSET_INDEX: u64 = 0;
 pub const SAMPLER_ASSET_INDEX: u64 = 1;
@@ -45,7 +45,8 @@ impl ImageFormat {
 pub struct Image {
     pub data: Vec<u8>,
     // TODO: this nesting makes accessing Image metadata verbose. Either flatten out descriptor or add accessors
-    pub texture_descriptor: wgpu::TextureDescriptor<'static>,
+    pub texture_descriptor:
+        wgpu_types::TextureDescriptor<Option<&'static str>, &'static [TextureFormat]>,
 }
 
 impl Default for Image {
@@ -55,7 +56,7 @@ impl Default for Image {
         let data = vec![255; format.pixel_size()];
         Image {
             data,
-            texture_descriptor: wgpu::TextureDescriptor {
+            texture_descriptor: wgpu_types::TextureDescriptor {
                 size: Extent3d {
                     width: 1,
                     height: 1,
@@ -66,7 +67,8 @@ impl Default for Image {
                 label: None,
                 mip_level_count: 1,
                 sample_count: 1,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu_types::TextureUsages::TEXTURE_BINDING
+                    | wgpu_types::TextureUsages::COPY_DST,
                 view_formats: &[],
             },
         }
@@ -144,7 +146,7 @@ impl Image {
         self.texture_descriptor.size.height
     }
 
-    /// Returns the aspect ratio (width / height) of a 2D image.
+    // /// Returns the aspect ratio (width / height) of a 2D image.
     // #[inline]
     // pub fn aspect_ratio(&self) -> AspectRatio {
     //     AspectRatio::from_pixels(self.width(), self.height())
@@ -209,14 +211,14 @@ impl Image {
         });
     }
 
-    /// Convert a texture from a format to another. Only a few formats are
-    /// supported as input and output:
-    /// - `TextureFormat::R8Unorm`
-    /// - `TextureFormat::Rg8Unorm`
-    /// - `TextureFormat::Rgba8UnormSrgb`
-    ///
-    /// To get [`Image`] as a [`image::DynamicImage`] see:
-    /// [`Image::try_into_dynamic`].
+    // /// Convert a texture from a format to another. Only a few formats are
+    // /// supported as input and output:
+    // /// - `TextureFormat::R8Unorm`
+    // /// - `TextureFormat::Rg8Unorm`
+    // /// - `TextureFormat::Rgba8UnormSrgb`
+    // ///
+    // /// To get [`Image`] as a [`image::DynamicImage`] see:
+    // /// [`Image::try_into_dynamic`].
     // pub fn convert(&self, new_format: TextureFormat) -> Option<Self> {
     //     self.clone()
     //         .try_into_dynamic()
@@ -275,13 +277,13 @@ impl Image {
         let format_description = self.texture_descriptor.format;
         format_description
             .required_features()
-            .contains(wgpu::Features::TEXTURE_COMPRESSION_ASTC)
+            .contains(wgpu_types::Features::TEXTURE_COMPRESSION_ASTC)
             || format_description
                 .required_features()
-                .contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
+                .contains(wgpu_types::Features::TEXTURE_COMPRESSION_BC)
             || format_description
                 .required_features()
-                .contains(wgpu::Features::TEXTURE_COMPRESSION_ETC2)
+                .contains(wgpu_types::Features::TEXTURE_COMPRESSION_ETC2)
     }
 }
 
@@ -385,15 +387,15 @@ bitflags::bitflags! {
 }
 
 impl CompressedImageFormats {
-    pub fn from_features(features: wgpu::Features) -> Self {
+    pub fn from_features(features: wgpu_types::Features) -> Self {
         let mut supported_compressed_formats = Self::default();
-        if features.contains(wgpu::Features::TEXTURE_COMPRESSION_ASTC) {
+        if features.contains(wgpu_types::Features::TEXTURE_COMPRESSION_ASTC) {
             supported_compressed_formats |= Self::ASTC_LDR;
         }
-        if features.contains(wgpu::Features::TEXTURE_COMPRESSION_BC) {
+        if features.contains(wgpu_types::Features::TEXTURE_COMPRESSION_BC) {
             supported_compressed_formats |= Self::BC;
         }
-        if features.contains(wgpu::Features::TEXTURE_COMPRESSION_ETC2) {
+        if features.contains(wgpu_types::Features::TEXTURE_COMPRESSION_ETC2) {
             supported_compressed_formats |= Self::ETC2;
         }
         supported_compressed_formats

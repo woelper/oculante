@@ -28,7 +28,7 @@ jobs:
       #   run: rustup update
 
       - name: build heif
-        run: ./build_deps_linux.sh
+        run: ./scripts/build_deps_linux.sh
 
       - name: install heif
         run: cd libheif/build && sudo make install
@@ -37,8 +37,8 @@ jobs:
       #   run: cargo build
 
       - name: cargo check without default features
-        run: cargo check --no-default-features --features notan/shaderc
+        run: cargo check --no-default-features
 
       # - name: cargo check with heif
-        # run: PKG_CONFIG_PATH=libheif/build cargo check --features heif --features notan_glsl-to-spirv
+        # run: PKG_CONFIG_PATH=libheif/build cargo check --features heif
 

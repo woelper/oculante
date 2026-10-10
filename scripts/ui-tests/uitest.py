@@ -12,9 +12,14 @@ import subprocess
 import time
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-IMAGES = os.path.join(REPO, "tests")
+IMAGES = os.path.join(REPO, "res", "tests")
 OUT = os.path.join(REPO, "target", "ui-tests")
 SCREEN = (1400, 900)
+WINDOW_MANAGER = "openbox"
+
+
+def has_window_manager():
+    return shutil.which(WINDOW_MANAGER) is not None
 
 
 def image(name):
@@ -24,19 +29,37 @@ def image(name):
 class App:
     """One running instance of the app on its own display."""
 
-    def __init__(self, binary, name, args, display=":97", stdin=subprocess.DEVNULL, settings=None):
+    def __init__(
+        self,
+        binary,
+        name,
+        args,
+        display=":97",
+        stdin=subprocess.DEVNULL,
+        settings=None,
+        env=None,
+        pointer=None,
+        window_manager=False,
+        cwd=None,
+    ):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
         os.makedirs(self.out)
+        # a display left behind by a test that died would swallow the keys of this one
+        subprocess.run(["pkill", "-f", f"^Xvfb {display} "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.3)
         self.xvfb = subprocess.Popen(
             ["Xvfb", display, "-screen", "0", f"{SCREEN[0]}x{SCREEN[1]}x24", "-nolisten", "tcp"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         time.sleep(1.0)
+        self.display = display
+        extra_env = env or {}
         env = dict(os.environ)
         env.pop("WAYLAND_DISPLAY", None)
         env.update(DISPLAY=display, RUST_LOG="oculante=debug", RUST_BACKTRACE="1", LIBGL_ALWAYS_SOFTWARE="1")
+        env.update(extra_env)
         # never touch the settings of whoever runs the tests
         for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
             env[var] = os.path.join(self.out, var.lower())
@@ -48,9 +71,18 @@ class App:
             with open(os.path.join(settings_dir, "config.json"), "w") as f:
                 json.dump(settings, f)
         self.env = env
+        self.wm = None
+        if window_manager:
+            # Without one nothing draws a title bar, moves a window or makes it fullscreen
+            self.wm = subprocess.Popen([WINDOW_MANAGER], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.8)
+        if pointer is not None:
+            # place the pointer before the app starts, so no input reaches the app later
+            subprocess.run(["xdotool", "mousemove", str(pointer[0]), str(pointer[1])], env=env)
         self.logfile = open(os.path.join(self.out, "app.log"), "w")
+        self.started = time.time()
         self.app = subprocess.Popen(
-            [binary] + args, env=env, stdin=stdin, stdout=self.logfile, stderr=subprocess.STDOUT, cwd=REPO
+            [binary] + args, env=env, stdin=stdin, stdout=self.logfile, stderr=subprocess.STDOUT, cwd=cwd or REPO
         )
         self.win = None
         self.geom = None
@@ -72,11 +104,24 @@ class App:
             ids = self.x("xdotool", "search", "--onlyvisible", "--name", "culante").stdout.split()
             if ids:
                 self.win = ids[-1]
-                shell = self.x("xdotool", "getwindowgeometry", "--shell", self.win).stdout
-                self.geom = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", shell)}
+                self.update_geometry()
                 return
             time.sleep(0.3)
         raise RuntimeError(f"the window never appeared:\n{self.log()[-800:]}")
+
+    def update_geometry(self):
+        """Read position and size of the window again, after it was moved or resized."""
+        shell = self.x("xdotool", "getwindowgeometry", "--shell", self.win).stdout
+        self.geom = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", shell)}
+        return self.geom
+
+    def frame_extents(self):
+        """Width of what the window manager draws around the window: left, right, top, bottom."""
+        out = self.x("xprop", "-id", self.win, "_NET_FRAME_EXTENTS").stdout
+        return [int(v) for v in re.findall(r"\d+", out.split("=")[1])] if "=" in out else None
+
+    def running(self):
+        return self.app.poll() is None
 
     def settle(self, seconds=0.6):
         """The app only redraws on events, so nudge the pointer and wait."""
@@ -140,12 +185,13 @@ class App:
             return f.read()
 
     def matched_shortcuts(self, since=0):
-        """Shortcuts the app reported as triggered, e.g. `InfoMode / "I"`."""
-        return [l.split("Matched ")[1].strip() for l in self.log()[since:].splitlines() if "Matched " in l]
+        """Names of the shortcuts the app reported as triggered, e.g. `InfoMode`."""
+        marker = "Matched shortcut "
+        return [l.split(marker)[1].strip() for l in self.log()[since:].splitlines() if marker in l]
 
     def close(self):
-        for proc in (self.app, self.xvfb):
-            if proc.poll() is None:
+        for proc in (self.app, self.wm, self.xvfb):
+            if proc is not None and proc.poll() is None:
                 proc.terminate()
                 try:
                     proc.wait(timeout=5)
@@ -158,6 +204,17 @@ def changed_pixels(a, b):
     """Number of pixels that differ between two screenshots."""
     result = subprocess.run(["compare", "-metric", "AE", a, b, "null:"], capture_output=True, text=True)
     return int(float(result.stderr.strip().split()[0]))
+
+
+def changed_pixels_in(a, b, box):
+    """Number of pixels that differ inside box (x, y, w, h) of two screenshots."""
+    x, y, w, h = box
+    crops = []
+    for path in (a, b):
+        crop = path[:-4] + "_crop.png"
+        subprocess.run(["convert", path, "-crop", f"{w}x{h}+{x}+{y}", "+repage", crop], check=True)
+        crops.append(crop)
+    return changed_pixels(*crops)
 
 
 def _pixels(path, box):
@@ -178,6 +235,36 @@ def _close(color, rgb, tolerance):
 def region_has_color(path, box, rgb, tolerance=40):
     """Whether any pixel inside box (x, y, w, h) of a screenshot is close to rgb."""
     return any(_close(color, rgb, tolerance) for _, _, color in _pixels(path, box))
+
+
+def find_slider(path, box, rgb, tolerance=40, min_fill=40):
+    """The filled part of a slider inside box: (right end, y), or None. A row counts
+    if at least min_fill pixels in it are close to rgb, which leaves out icons."""
+    rows = {}
+    for x, y, color in _pixels(path, box):
+        if _close(color, rgb, tolerance):
+            rows.setdefault(y, []).append(x)
+    filled = sorted(y for y, xs in rows.items() if len(xs) >= min_fill)
+    if not filled:
+        return None
+    middle = filled[len(filled) // 2]
+    return max(rows[middle]), middle
+
+
+def count_color(path, box, rgb, tolerance=40):
+    """Number of pixels inside box (x, y, w, h) of a screenshot close to rgb."""
+    return sum(1 for _, _, color in _pixels(path, box) if _close(color, rgb, tolerance))
+
+
+def panel_edge(path, x_range=(100, 900), rows=(80, 160, 240, 320, 400, 480, 560)):
+    """The x of the right edge of a panel on the left: the rightmost column with the
+    same color in all the rows. The image right of the panel differs from row to row."""
+    colors = {}
+    for y in rows:
+        for x, _, color in _pixels(path, (x_range[0], y, x_range[1] - x_range[0], 1)):
+            colors.setdefault(x, set()).add(color)
+    constant = [x for x, seen in colors.items() if len(seen) == 1]
+    return max(constant) if constant else None
 
 
 def rightmost_x(path, box, rgb, tolerance=40):

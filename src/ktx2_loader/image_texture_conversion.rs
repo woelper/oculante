@@ -5,7 +5,7 @@ use crate::ktx2_loader::Image;
 use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgba32FImage};
 use log::debug;
-use wgpu::TextureFormat;
+use wgpu_types::TextureFormat;
 
 impl Image {
     /// Convert a [`Image`] to a [`DynamicImage`]. Useful for editing image
@@ -45,7 +45,7 @@ impl Image {
             TextureFormat::Bgra8UnormSrgb | TextureFormat::Bgra8Unorm => {
                 ImageBuffer::from_raw(self.width(), self.height(), {
                     let mut data = self.data;
-                    for bgra in data.chunks_exact_mut(4) {
+                    for bgra in data.as_chunks_mut::<4>().0 {
                         bgra.swap(0, 2);
                     }
                     data
@@ -55,7 +55,9 @@ impl Image {
             TextureFormat::Rgba16Float => {
                 let d = self
                     .data
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .flat_map(|c| [f16::from_le_bytes(c[0..=1].try_into().unwrap()).to_f32()])
                     .collect::<Vec<_>>();
                 Rgba32FImage::from_vec(self.width(), self.height(), d)
@@ -64,7 +66,9 @@ impl Image {
             TextureFormat::Rgba32Float => {
                 let d = self
                     .data
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .flat_map(|c| [f32::from_le_bytes(c[0..=3].try_into().unwrap())])
                     .map(|p| p.powf(2.2))
                     .map(|p| p.powf(1.0 / 2.2).clamp(0.0, 1.0))

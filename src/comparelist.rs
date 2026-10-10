@@ -14,6 +14,8 @@ pub struct CompareList {
 
 impl CompareList {
     /// Cycle through [`CompareItem`]s.
+    // Not an iterator, it wraps around and never ends
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&CompareItem> {
         (self.index + 1).checked_rem(self.list.len()).and_then(|i| {
             self.index = i;

@@ -1,0 +1,176 @@
+{
+  "ui_scale": 1.0,
+  "accent_color": [
+    255,
+    0,
+    75
+  ],
+  "background_color": [
+    30,
+    30,
+    30
+  ],
+  "vsync": true,
+  "force_redraw": false,
+  "shortcuts": {
+    "AlwaysOnTop": [
+      "T"
+    ],
+    "Fullscreen": [
+      "F"
+    ],
+    "InfoMode": [
+      "I"
+    ],
+    "EditMode": [
+      "E"
+    ],
+    "NextImage": [
+      "Right"
+    ],
+    "FirstImage": [
+      "Home"
+    ],
+    "LastImage": [
+      "End"
+    ],
+    "PreviousImage": [
+      "Left"
+    ],
+    "RedChannel": [
+      "R"
+    ],
+    "GreenChannel": [
+      "G"
+    ],
+    "BlueChannel": [
+      "B"
+    ],
+    "AlphaChannel": [
+      "A"
+    ],
+    "RGBChannel": [
+      "U"
+    ],
+    "RGBAChannel": [
+      "C"
+    ],
+    "ResetView": [
+      "V"
+    ],
+    "ZoomOut": [
+      "Minus"
+    ],
+    "ZoomIn": [
+      "Equals"
+    ],
+    "ZoomActualSize": [
+      "Key1"
+    ],
+    "ZoomDouble": [
+      "Key2"
+    ],
+    "ZoomThree": [
+      "Key3"
+    ],
+    "ZoomFour": [
+      "Key4"
+    ],
+    "ZoomFive": [
+      "Key5"
+    ],
+    "CompareNext": [
+      "C",
+      "LShift"
+    ],
+    "PanLeft": [
+      "LShift",
+      "Left"
+    ],
+    "PanRight": [
+      "LShift",
+      "Right"
+    ],
+    "PanUp": [
+      "LShift",
+      "Up"
+    ],
+    "PanDown": [
+      "Down",
+      "LShift"
+    ],
+    "DeleteFile": [
+      "Delete"
+    ],
+    "ClearImage": [
+      "Delete",
+      "LShift"
+    ],
+    "LosslessRotateRight": [
+      "RBracket"
+    ],
+    "LosslessRotateLeft": [
+      "LBracket"
+    ],
+    "Copy": [
+      "C",
+      "LControl"
+    ],
+    "Paste": [
+      "LControl",
+      "V"
+    ],
+    "Browse": [
+      "LControl",
+      "O"
+    ],
+    "Quit": [
+      "Q"
+    ],
+    "ZenMode": [
+      "Z"
+    ]
+  },
+  "keep_view": false,
+  "max_cache": 30,
+  "max_recents": 12,
+  "show_scrub_bar": false,
+  "wrap_folder": true,
+  "keep_edits": false,
+  "title_format": "{APP} | {VERSION} | {FULLPATH}",
+  "info_enabled": true,
+  "edit_enabled": false,
+  "show_checker_background": false,
+  "show_minimap": false,
+  "show_frame": false,
+  "svg_scale": 1.0,
+  "zen_mode": false,
+  "theme": "Dark",
+  "linear_mag_filter": false,
+  "linear_min_filter": true,
+  "use_mipmaps": true,
+  "fit_image_on_window_resize": false,
+  "zoom_multiplier": 1.0,
+  "auto_scale": false,
+  "borderless": false,
+  "min_window_size": [
+    100,
+    100
+  ],
+  "experimental_features": false,
+  "decoders": {
+    "heif": {
+      "image_size_pixels": "Default",
+      "number_of_tiles": "Default",
+      "bayer_pattern_pixels": "Default",
+      "items": "Default",
+      "color_profile_size": "Default",
+      "memory_block_size": "Default",
+      "components": "Default",
+      "iloc_extents_per_item": "Default",
+      "size_entity_group": "Default",
+      "children_per_box": "Default",
+      "override_all": false
+    }
+  }
+}

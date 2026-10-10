@@ -8,7 +8,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   MACOS_DEPLOYMENT_TARGET: 11
-  SHADERC_LIB_DIR: /opt/homebrew/lib
 
 jobs:
   release_job:
@@ -61,13 +60,13 @@ jobs:
 
     - name: Cross-compile armv7
       run: |
-        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features --features notan_glsl-to-spirv
+        cross build --release --target armv7-unknown-linux-gnueabihf --no-default-features
         zip -r oculante_armv7_minimal.zip target/armv7-unknown-linux-gnueabihf/release/oculante
       if: matrix.os == 'ubuntu-latest'
 
     # - name: Cross-compile arm64
     #   run: |
-    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features --features notan/shaderc
+    #     cross build --release --target aarch64-unknown-linux-gnu --no-default-features
     #     zip -r oculante_aarch64_minimal.zip target/aarch64-unknown-linux-gnu/release/oculante
     #   if: matrix.os == 'ubuntu-latest'
 
@@ -75,10 +74,6 @@ jobs:
       run: cargo install cargo-bundle
       if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
 
-    - name: Install shaderc
-      run: brew install shaderc
-      if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
-      
     - name: Install cargo deb
       run: cargo install cargo-deb
       if: matrix.os == 'ubuntu-24.04'
@@ -89,7 +84,7 @@ jobs:
 
     - name: Install libheif for ubuntu
       run: |
-        ./build_deps_linux.sh
+        ./scripts/build_deps_linux.sh
         cd libheif/build && sudo make install
       if: matrix.os == 'ubuntu-24.04'
 
@@ -105,13 +100,13 @@ jobs:
       if: matrix.os == 'windows-2025'
 
     - name: Build Windows Application
-      run: cargo build --release --features heif --features notan/shaderc
+      run: cargo build --release --features heif
       if: matrix.os == 'windows-2025'
 
 
     - name: Build Linux classic Application
       run: |
-        cargo build --release --no-default-features --features notan/shaderc
+        cargo build --release --no-default-features
         zip -r oculante_linux_minimal.zip target/release/oculante
         cargo build --release
         zip -r oculante_linux.zip target/release/oculante
@@ -121,7 +116,7 @@ jobs:
 
 
     - name: Build Mac Silicon Bundle
-      run: ./build_mac.sh
+      run: ./scripts/build_mac.sh
       if: matrix.os == 'macos-latest'
 
     # Signs with the Developer ID certificate and notarises the app, so it opens
@@ -144,7 +139,7 @@ jobs:
       if: matrix.os == 'macos-latest'
 
     - name: Build Mac Intel Bundle
-      run: ./build_mac_intel.sh
+      run: ./scripts/build_mac_intel.sh
       if: matrix.os == 'macos-15-intel'
 
     # Signs with the Developer ID certificate and notarises the app, so it opens

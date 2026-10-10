@@ -4,15 +4,13 @@ use crate::{
     image_editing::EditState,
     scrubber::Scrubber,
     settings::{PersistentSettings, VolatileSettings},
-    texture_wrapper::TextureWrapperManager,
     thumbnails::Thumbnails,
+    toasts::{Anchor, Toasts},
     utils::{ExtendedImageInfo, Frame, Player},
 };
 
-use egui_notify::Toasts;
 use image::DynamicImage;
 use nalgebra::Vector2;
-use notan::{prelude::Texture, AppState};
 use std::{
     path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
@@ -49,7 +47,6 @@ impl Message {
 }
 
 /// The state of the application
-#[derive(AppState)]
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: CompareList,
@@ -62,21 +59,20 @@ pub struct OculanteState {
     pub cursor_relative: Vector2<f32>,
     pub sampled_color: [f32; 4],
     pub mouse_delta: Vector2<f32>,
-    /// Scroll distance the UI has not been given yet, see `precise_scroll_remainder`
-    pub scroll_remainder: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
     pub message_channel: (Sender<Message>, Receiver<Message>),
     /// Channel to load images from
     pub load_channel: (Sender<PathBuf>, Receiver<PathBuf>),
-    /// File names piped in through stdin, once they have been read
-    pub piped_paths: Option<Receiver<Vec<PathBuf>>>,
-    pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
+    pub extended_info_channel: crate::utils::ExtendedInfoChannel,
+    /// Changes whenever the pixels of the current image change: a new image,
+    /// or edits applied to it. The info panel computes its numbers once for
+    /// every version.
+    pub image_version: u64,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
-    //pub current_texture: Option<TexWrap>,
-    pub current_texture: TextureWrapperManager,
     pub current_path: Option<PathBuf>,
-    pub current_image: Option<DynamicImage>,
+    /// Shared with the cache and the threads that look at the image
+    pub current_image: Option<std::sync::Arc<DynamicImage>>,
     pub settings_enabled: bool,
     pub image_metadata: Option<ExtendedImageInfo>,
     pub tiling: usize,
@@ -89,12 +85,13 @@ pub struct OculanteState {
     pub volatile_settings: VolatileSettings,
     pub always_on_top: bool,
     pub network_mode: bool,
+    /// File names piped in at startup, they arrive from a background thread
+    pub piped_paths: Option<std::sync::mpsc::Receiver<Vec<std::path::PathBuf>>>,
     /// how long the toast message appears
     /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
-    pub checker_texture: Option<Texture>,
     pub redraw: bool,
     pub first_start: bool,
     pub toasts: Toasts,
@@ -139,6 +136,9 @@ impl Default for OculanteState {
     fn default() -> OculanteState {
         let persistent_settings = PersistentSettings::load().unwrap_or_default();
 
+        let mut volatile_settings = VolatileSettings::load().unwrap_or_default();
+        volatile_settings.remove_missing_recents();
+
         let tx_channel = mpsc::channel();
         let msg_channel = mpsc::channel();
         let meta_channel = mpsc::channel();
@@ -164,11 +164,9 @@ impl Default for OculanteState {
             texture_channel: tx_channel,
             message_channel: msg_channel,
             load_channel: mpsc::channel(),
-            piped_paths: None,
             extended_info_channel: meta_channel,
+            image_version: 0,
             mouse_delta: Default::default(),
-            scroll_remainder: Default::default(),
-            current_texture: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
             settings_enabled: Default::default(),
@@ -179,16 +177,16 @@ impl Default for OculanteState {
             edit_state: Default::default(),
             pointer_over_ui: Default::default(),
             persistent_settings: PersistentSettings::load().unwrap_or_default(),
-            volatile_settings: VolatileSettings::load().unwrap_or_default(),
+            volatile_settings,
             always_on_top: Default::default(),
             network_mode: Default::default(),
+            piped_paths: None,
             window_size: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
-            checker_texture: Default::default(),
             redraw: Default::default(),
             first_start: true,
-            toasts: Toasts::default().with_anchor(egui_notify::Anchor::BottomLeft),
+            toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             filebrowser_id: None,
             filebrowser_last_dir: Default::default(),
             thumbnails: Default::default(),

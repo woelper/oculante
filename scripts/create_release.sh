@@ -8,10 +8,13 @@ then
     exit
 fi
 
+current_dir=$PWD
+cd $(git rev-parse --show-toplevel)
+
 echo "You are on $branch, releasing!"
 cargo install cargo-bump
 cargo install cargo-get
-cargo check --no-default-features --features notan/shaderc
+cargo check --no-default-features
 cargo test shortcuts
 cargo bump patch
 cargo build
@@ -36,3 +39,5 @@ echo "Tag $VERSION is pushed. The release workflow builds it and publishes it as
 echo "Test those builds. Then mark the release as latest on GitHub and publish to crates.io,"
 echo "which can not be undone:"
 echo "    cargo publish"
+
+cd $current_dir
