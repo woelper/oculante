@@ -33,7 +33,7 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
         .collapsible(false)
         .open(&mut open)
         .resizable(true)
-        .default_width(822.)
+        .default_width(830.)
         .default_height(600.)
         .show(ctx, |ui| {
             browse(
