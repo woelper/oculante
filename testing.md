@@ -1,6 +1,9 @@
 # Release checklist: no regression over 0.9.6
 Written on 2026-10-08. All of it before a release, and nothing goes to crates.io before the human tests are through, a published version stays there. The human tests run on pre-release binaries, not on a crates.io version. Each platform is compared with 0.9.6 on the same machine: no worse than before.
 
+Regressions found by measuring:
+- [ ] GPU memory: the kernel counts more for large images than on master just before 0.9.6, a 144 MP JPEG 1162 -> 2027 MB (scripts/perf, 2026-10-04, GPU through VirtualGL). But 886 MB of that is purgeable, a reserve the driver gives up when memory gets tight (63 MB on master). Without the reserve this branch holds the same or less: 144 MP 1098 -> 1140 MB, 24 MP 272 -> 172 MB, 64 MP gray 136 -> 132 MB. Find out what fills the reserve (RGB uploads that the driver converts through temporary buffers?) and whether to avoid it. Main memory is about half of 0.9.6.
+
 Human tests:
 - [ ] macOS, Apple Silicon (Stoppedpuma, Johann): "Open with" and a double click in Finder, with Oculante closed and already running, a file dropped on the app icon, several files at once, a file as argument in the terminal (opened once, not twice). Zoom speed with the trackpad on the image, scroll speed in the panels. The signed and notarised bundle starts without a warning.
 - [ ] macOS, Intel: starts and opens a file. Low priority.
