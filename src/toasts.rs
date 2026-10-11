@@ -1,6 +1,5 @@
 use egui::{
-    Align2, Area, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense, Stroke,
-    Style, TextStyle, Ui, Vec2, pos2, vec2,
+    Align2, Area, Color32, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense, Stroke, Style, TextStyle, Ui, Vec2, pos2, vec2
 };
 use std::time::Duration;
 
@@ -18,6 +17,7 @@ pub enum Anchor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ToastLevel {
     Info,
+    // Success is a placeholder in case we ever want to use it for things like exports or something
     Success,
     Warning,
     Error,
@@ -229,6 +229,14 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
 
     let mut close_clicked = false;
 
+
+    let icon_colour = match toast.level {
+        ToastLevel::Info => Color32::from_rgb(57, 181, 255),
+        ToastLevel::Success => accent,
+        ToastLevel::Warning => Color32::from_rgb(255, 204, 0),
+        ToastLevel::Error => Color32::from_rgb(255, 77, 77),
+    };
+
     Frame::new()
         .fill(bg)
         .corner_radius(CornerRadius::same(8))
@@ -257,7 +265,7 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                 Align2::CENTER_CENTER,
                 toast.level.icon(),
                 FontId::new(ICON_SIZE, font.family.clone()),
-                accent,
+                icon_colour,
             );
 
             ui.painter().galley(
