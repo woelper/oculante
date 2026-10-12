@@ -100,7 +100,6 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
 
 #[derive(Debug, Clone, Default)]
 pub struct DicomData {
-    pub physical_size: (f32, f32),
     pub dicom_data: HashMap<String, String>,
 }
 
@@ -165,31 +164,14 @@ impl ExtendedImageInfo {
                     dicom_data.insert(name.to_string(), s.to_string());
                 }
             }
-            self.dicom = Some(DicomData {
-                physical_size: (0.0, 0.0),
-                dicom_data,
-            })
+            self.dicom = Some(DicomData { dicom_data })
         }
 
         Ok(())
     }
 
-    pub fn from_image(img: &RgbaImage) -> Self {
-        Self::from_bands(img.height(), |y, rows, counts| {
-            let row = img.width() as usize * 4;
-            let band = &img.as_raw()[y as usize * row..(y + rows) as usize * row];
-            counts.add(
-                band.as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|p| [p[0], p[1], p[2], p[3]]),
-            );
-        })
-    }
-
-    /// Like `from_image`, but reads 8 bit images in the layout they have, and
-    /// converts others band by band, instead of converting the whole image to
-    /// RGBA first.
+    /// Reads 8 bit images in the layout they have, and converts others band by
+    /// band, instead of converting the whole image to RGBA first.
     pub fn from_dynamic_image(img: &DynamicImage) -> Self {
         let width = img.width() as usize;
         // the samples of the rows from y on
@@ -556,10 +538,6 @@ pub enum Frame {
 }
 
 impl Frame {
-    pub fn new(source: Frame) -> Frame {
-        source
-    }
-
     pub fn new_reset(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
         Frame::AnimationStart(buffer.into())
     }

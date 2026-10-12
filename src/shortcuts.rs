@@ -115,27 +115,6 @@ impl Shortcut {
         }
         parts.join(" + ")
     }
-
-    /// Markdown version for documentation
-    pub fn to_markdown(&self) -> String {
-        let mut parts = Vec::new();
-        if self.modifiers.ctrl {
-            parts.push("<kbd>Ctrl</kbd>".to_string());
-        }
-        if self.modifiers.mac_cmd || self.modifiers.command {
-            parts.push("<kbd>Cmd</kbd>".to_string());
-        }
-        if self.modifiers.alt {
-            parts.push("<kbd>Alt</kbd>".to_string());
-        }
-        if self.modifiers.shift {
-            parts.push("<kbd>Shift</kbd>".to_string());
-        }
-        for k in &self.keys {
-            parts.push(format!("<kbd>{k:?}</kbd>"));
-        }
-        parts.join(" + ")
-    }
 }
 
 pub type Shortcuts = BTreeMap<InputEvent, Shortcut>;

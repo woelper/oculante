@@ -275,13 +275,6 @@ pub enum MeasureShape {
 }
 
 impl MeasureShape {
-    pub fn new_line(points: Vec<(u32, u32)>) -> Self {
-        Self::Line {
-            points,
-            color: [255, 255, 255, 255],
-            width: 1,
-        }
-    }
     pub fn new_rect(points: Vec<(u32, u32)>) -> Self {
         Self::Rect {
             points,

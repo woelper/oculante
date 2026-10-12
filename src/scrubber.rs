@@ -32,10 +32,6 @@ impl Scrubber {
         }
     }
 
-    pub fn has_next(&self) -> bool {
-        self.entries.len() > self.index
-    }
-
     /// Move scrubber forward
     // Not an iterator, this is the counterpart of `prev`
     #[allow(clippy::should_implement_trait)]
