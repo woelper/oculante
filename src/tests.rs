@@ -668,7 +668,7 @@ fn ci_jpeg_that_libjpeg_turbo_refuses() {
 /// A Krita file is a zip with the picture in it as mergedimage.png. No test file
 /// covered it.
 #[test]
-fn ci_load_krita() {
+fn ci_load_krita_and_openraster() {
     use std::io::Write;
     let rgba = image::RgbaImage::from_fn(7, 5, |x, y| {
         image::Rgba([(x * 30) as u8, (y * 40) as u8, 90, 255])
@@ -677,23 +677,25 @@ fn ci_load_krita() {
     image::DynamicImage::ImageRgba8(rgba.clone())
         .write_to(&mut png, image::ImageFormat::Png)
         .unwrap();
-    let path = std::env::temp_dir().join("oculante_test_krita.kra");
-    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
-    let stored =
-        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    zip.start_file("mimetype", stored).unwrap();
-    zip.write_all(b"application/x-krita").unwrap();
-    let deflated = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-    zip.start_file("mergedimage.png", deflated).unwrap();
-    zip.write_all(png.get_ref()).unwrap();
-    zip.finish().unwrap();
+    for (extension, mimetype) in [("kra", "application/x-krita"), ("ora", "image/openraster")] {
+        let path = std::env::temp_dir().join(format!("oculante_test_merged.{extension}"));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("mimetype", stored).unwrap();
+        zip.write_all(mimetype.as_bytes()).unwrap();
+        let deflated = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("mergedimage.png", deflated).unwrap();
+        zip.write_all(png.get_ref()).unwrap();
+        zip.finish().unwrap();
 
-    let (frames, warnings) = load_all(&path).unwrap();
-    std::fs::remove_file(&path).unwrap();
-    let image = frames.first().and_then(|f| f.get_image()).unwrap();
-    assert_eq!(image.to_rgba8(), rgba);
-    assert!(warnings.is_empty(), "{warnings:?}");
+        let (frames, warnings) = load_all(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let image = frames.first().and_then(|f| f.get_image()).unwrap();
+        assert_eq!(image.to_rgba8(), rgba, "{extension}");
+        assert!(warnings.is_empty(), "{extension}: {warnings:?}");
+    }
 }
 
 /// The size a file name gives, like 600x300 in "600x300_float.exr"

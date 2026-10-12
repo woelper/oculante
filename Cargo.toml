@@ -122,7 +122,15 @@ arboard = { version = "3.6", features = ["wayland-data-control"] }
 clap = "4.6"                                                                                                             # DO NOT UPDATE unless you test extensively on mac. This will break the mac app.
 dirs = "7.0"
 num-integer = "0.1.46"
-image-extras = "0.1.1"
+# dds, icns and ora are read by Oculante itself
+image-extras = { version = "0.1.1", default-features = false, features = [
+  "otb",
+  "pcx",
+  "sgi",
+  "wbmp",
+  "xbm",
+  "xpm",
+] }
 
 [features]
 default = ["turbo", "avif_native", "j2k", "jxlcms", "heif_native"]

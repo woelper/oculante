@@ -44,7 +44,7 @@ pub fn open_image(
     );
 
     // These are detected incorrectly, for example svg is xml etc
-    let unchecked_extensions = ["svg", "kra", "tga", "dng"];
+    let unchecked_extensions = ["svg", "kra", "ora", "tga", "dng"];
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
@@ -532,8 +532,8 @@ pub fn open_image(
             }
             return Ok(receiver);
         }
-        "kra" => {
-            let i = load_kra(&img_location)?;
+        "kra" | "ora" => {
+            let i = load_merged_image(&img_location)?;
             _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
@@ -1208,10 +1208,12 @@ where
     target
 }
 
-fn load_kra(path: &Path) -> Result<DynamicImage> {
+/// Krita and OpenRaster files are zips with a copy of all layers in one picture
+fn load_merged_image(path: &Path) -> Result<DynamicImage> {
     let f = File::open(path)?;
     let mut archive = zip::ZipArchive::new(f)?;
     // https://docs.krita.org/en/general_concepts/file_formats/file_kra.html
+    // https://www.openraster.org/baseline/file-layout-spec.html
     let mut merged_image = archive.by_name("mergedimage.png")?;
     let mut image_bytes = Vec::<u8>::new();
     merged_image.read_to_end(&mut image_bytes)?;
