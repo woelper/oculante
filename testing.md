@@ -140,11 +140,11 @@ Open:
 
 Simplifications found (read and spot checked, nothing changed yet):
 - [x] Done on 2026-10-12, about 1100 lines: the modules only the crate uses are `pub(crate)` now, so the compiler reports unused code in them, and what it reported is gone (44 icons, most of the KTX2 code from Bevy, two texture formats, unused functions). Was: About 1100 lines can go without a change in behaviour: src/ktx2_loader/dds.rs and image_loader.rs are in no mod and could not compile, about 300 lines of unused KTX2 code, about 200 lines of functions nobody calls (image_ui, label_i_selected, rotate_rgbaimage, solo_channel, unpremult, LegacyEditState is used again now), unused Frame constructors, the fields redraw, first_start and name, src/input.rs (only comments), commented out code. Every module is `pub mod`, so rustc does not warn; `pub(crate)` would show the next batch.
-- [ ] One `load()` and `reload()` for about 15 copies of `is_loaded = false; player.load(..); current_path = ..`.
+- [x] Done on 2026-10-12. One `load()` and `reload()` for about 15 copies of `is_loaded = false; player.load(..); current_path = ..`.
 - [x] `Frame::ImageCollectionMember` behaves like `Still` everywhere. Removed.
 - [ ] Mark the texture dirty directly instead of sending `Frame::UpdateTexture` through the channel from the main thread.
 - [ ] Compare mode: pass the stored geometry instead of a dummy `CompareResult` frame and `transmute`. Removes reset_after_upload, compare_geometry and last_frame_was_compared_image.
-- [ ] "Save as..." with the file_open feature saves with the image crate defaults instead of the encoder settings.
+- [ ] "Save as..." with the file_open feature saves with the image crate defaults instead of the encoder settings. Also in 0.9.6, after the release.
 
 Tests to add:
 - [x] Exact output of every edit operation on a small image. Found and fixed: results were cut instead of rounded (Invert off by one for 159 of 256 values), Contrast was a multiplication, Desaturate had red and green weights swapped, resize in other layouts than RGBA used the width as the height, the color conversion did nothing on RGBA, 3x3 filters left a black frame.
