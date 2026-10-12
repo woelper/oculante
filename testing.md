@@ -14,11 +14,17 @@ Human tests:
 - [ ] The settings of a long used 0.9.6 carry over: shortcuts, recent files, colors, panel states.
 
 Before tagging:
-- [ ] heic-rs: tbraun96/heic-rs#7 and #8 released, or the fork published under its own name. A crate on crates.io does not get the patch in Cargo.toml, photos from phones would come out with the wrong contrast and colour.
+- [ ] heic-rs: tbraun96/heic-rs#7 and #8 released, or the fork published under its own name. A crate on crates.io does not get the patch in Cargo.toml, photos from phones would come out with the wrong contrast and colour. On 2026-10-12 both PRs were rebased onto upstream 0.1.4 (they conflicted with it), and the fork's `oculante` branch is 0.1.4 with both fixes: 0.1.2 to 0.1.4 fix panics on malformed files found by fuzzing. The test photos decode to the same pixels.
 - [ ] avif-parse: kornelski/avif-parse#4 released, or the patch dropped for the release. 0.9.6 can not open those files either, without the patch nothing gets worse.
 - [x] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build. Checked: builds with 1.98.0.
 - [ ] A dry run of the release workflow with a pre-release tag: all binaries build, the Mac bundles are signed and notarised, the plist is up to date (file associations).
 - [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build.
+
+Regressions found on 2026-10-12, from Stoppedpuma's list in #799, fixed:
+- [x] `-c` was refused, 0.9.6 accepted it (it relaunched itself with it on macOS). Accepted again, hidden. UI test `test_chainload_option_is_accepted`.
+- [x] Images were fitted to the whole window and went under the panels, 0.9.6 fitted them into the space the panels leave. UI test `test_image_is_fitted_next_to_the_panels`.
+- [x] Not a regression: edits on animations. 0.9.6 showed every frame unedited too; this branch had it for a while. After the release.
+- [x] macOS did not offer Oculante for HEIC in "Open with" (#775), also in 0.9.6: the plist declared `public.images`. Fixed, needs the check on a Mac above.
 
 Not regressions, also in 0.9.6, can come after the release: the open issues further down (#460, #400, #426, #504, #647, #761, #644, #601, #707, zen mode), always on top on Wayland, 16 bit and broken APNGs, WebP speed, AVIF grids, HDR (#746), prefetching, memory for long animations, the simplifications.
 
@@ -131,9 +137,9 @@ Open:
 - [ ] Not worth it, measured: decoding a JPEG at a reduced size first. libjpeg-turbo at 1/8 is only 10-40% faster.
 
 Simplifications found (read and spot checked, nothing changed yet):
-- [ ] About 1100 lines can go without a change in behaviour: src/ktx2_loader/dds.rs and image_loader.rs are in no mod and could not compile, about 300 lines of unused KTX2 code, about 200 lines of functions nobody calls (image_ui, label_i_selected, rotate_rgbaimage, solo_channel, unpremult, LegacyEditState is used again now), unused Frame constructors, the fields redraw, first_start and name, src/input.rs (only comments), commented out code. Every module is `pub mod`, so rustc does not warn; `pub(crate)` would show the next batch.
+- [x] Done on 2026-10-12, about 1100 lines: the modules only the crate uses are `pub(crate)` now, so the compiler reports unused code in them, and what it reported is gone (44 icons, most of the KTX2 code from Bevy, two texture formats, unused functions). Was: About 1100 lines can go without a change in behaviour: src/ktx2_loader/dds.rs and image_loader.rs are in no mod and could not compile, about 300 lines of unused KTX2 code, about 200 lines of functions nobody calls (image_ui, label_i_selected, rotate_rgbaimage, solo_channel, unpremult, LegacyEditState is used again now), unused Frame constructors, the fields redraw, first_start and name, src/input.rs (only comments), commented out code. Every module is `pub mod`, so rustc does not warn; `pub(crate)` would show the next batch.
 - [ ] One `load()` and `reload()` for about 15 copies of `is_loaded = false; player.load(..); current_path = ..`.
-- [ ] `Frame::ImageCollectionMember` behaves like `Still` everywhere.
+- [x] `Frame::ImageCollectionMember` behaves like `Still` everywhere. Removed.
 - [ ] Mark the texture dirty directly instead of sending `Frame::UpdateTexture` through the channel from the main thread.
 - [ ] Compare mode: pass the stored geometry instead of a dummy `CompareResult` frame and `transmute`. Removes reset_after_upload, compare_geometry and last_frame_was_compared_image.
 - [ ] "Save as..." with the file_open feature saves with the image crate defaults instead of the encoder settings.
@@ -159,6 +165,7 @@ Reported by reading the code, not checked yet:
 # Cleanup
 - [x] Dependencies updated to the newest versions, unused ones removed. `wgpu` was only used for the names of its texture formats and is replaced by `wgpu-types`. Cargo.lock went from 857 to 794 packages. Checked: all 67 test files load the same as before, all edit operations give the same pixels except blur (rounding) and perspective crop (edge pixels, new imageproc).
 - [ ] Not updated: `glow` 0.18 has to wait for an egui that uses it. (`avif-decode` 3 is in, it needs Rust 1.98.)
+- [x] 2026-10-12: compatible updates of 26 crates, zip 9 without its default features (AES, bzip2, lzma, xz, ppmd and zstd with its C library were only there for it, 28 crates), the links open with `open` instead of `webbrowser` (26 crates): Cargo.lock 800 -> 746. CI no longer builds libheif for Linux, nothing used it.
 - [ ] LUT on an image with transparency: keeps the alpha now, it made the image opaque before (new lutgen works on RGBA). Check that this is what we want.
 - [x] Update to latest egui
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
