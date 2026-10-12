@@ -15,6 +15,7 @@ mod edit_ui;
 pub use edit_ui::edit_ui;
 mod theme;
 pub use theme::*;
+#[cfg_attr(feature = "file_open", allow(dead_code))]
 mod thumbnail_rendering;
 pub use thumbnail_rendering::*;
 
@@ -85,6 +86,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    #[cfg_attr(feature = "file_open", allow(dead_code))]
     fn styled_selectable_label(&mut self, _active: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
