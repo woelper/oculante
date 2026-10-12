@@ -20,7 +20,7 @@ Before tagging:
 - [ ] avif-parse: kornelski/avif-parse#4 released, or the patch dropped for the release. 0.9.6 can not open those files either, without the patch nothing gets worse.
 - [x] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build. Checked: builds with 1.98.0.
 - [ ] A dry run of the release workflow with a pre-release tag: all binaries build, the Mac bundles are signed and notarised, the plist is up to date (file associations).
-- [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build.
+- [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build. Since 2026-10-07: planar TIFFs open (only red before), ORA files without the "Extension mismatch" warning, faster TIFF above 8 bit (and much less memory), EXR and Radiance HDR, images above 512 MB open (#782), JPEGs libjpeg-turbo refuses fall back to the image crate.
 
 Regressions found on 2026-10-12, from Stoppedpuma's list in #799, fixed:
 - [x] `-c` was refused, 0.9.6 accepted it (it relaunched itself with it on macOS). Accepted again, hidden. UI test `test_chainload_option_is_accepted`.
