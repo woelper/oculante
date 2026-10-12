@@ -22,6 +22,8 @@ name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
 version = "0.9.6"
+# avif-decode 3 needs it, checked with 1.98.0
+rust-version = "1.98"
 
 [package.metadata.bundle]
 icon = ["res/icons/icon.ico"]
