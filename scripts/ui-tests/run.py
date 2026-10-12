@@ -341,6 +341,20 @@ def test_relative_file_name(binary):
         assert shown_file(app) == "c.png", f"after b.png came {shown_file(app)}"
 
 
+def test_several_files_as_arguments(binary):
+    """Several files given on the command line are opened as a list (#382): the first
+    is shown, the next key goes to the second."""
+    with App(binary, "several_files", [image("test.png"), image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the first image never loaded"
+        app.settle(1.0)
+        assert shown_file(app) == "test.png", f"the first file is not shown: {shown_file(app)}"
+        app.key("Right")
+        app.settle(1.5)
+        assert shown_file(app) == "moss.jpg", f"the next key did not go to the second file: {shown_file(app)}"
+
+
 def test_chainload_option_is_accepted(binary):
     """0.9.6 took -c, it relaunched itself with it on macOS. The option was gone and
     the app refused to start when it was given."""
@@ -1061,6 +1075,7 @@ TESTS = [
     test_measure_draws_rectangle,
     test_key_repeat,
     test_relative_file_name,
+    test_several_files_as_arguments,
     test_chainload_option_is_accepted,
     test_delete,
     test_lossless_rotation_keys_and_quit,

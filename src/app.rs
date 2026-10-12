@@ -422,10 +422,7 @@ impl OculanteApp {
 
         // Update scrubber on new images
         // Also match Animation if an AnimationStart was drained
-        if matches!(
-            &frame,
-            Frame::AnimationStart(_) | Frame::Still(_) | Frame::ImageCollectionMember(_)
-        ) {
+        if matches!(&frame, Frame::AnimationStart(_) | Frame::Still(_)) {
             if let Some(path) = &self.state.current_path {
                 if self.state.scrubber.has_folder_changed(path) && !self.state.scrubber.fixed_paths
                 {
@@ -486,9 +483,7 @@ impl OculanteApp {
         }
 
         match frame {
-            Frame::Still(img)
-            | Frame::CompareResult(img, _)
-            | Frame::ImageCollectionMember(img) => {
+            Frame::Still(img) | Frame::CompareResult(img, _) => {
                 debug!("Received image {}x{}", img.width(), img.height());
 
                 // Insert into cache for fast back/forth navigation
@@ -1082,7 +1077,6 @@ impl eframe::App for OculanteApp {
                 } else {
                     BrowserDir::LastOpenDir
                 };
-                state.redraw = true;
                 #[cfg(feature = "file_open")]
                 browse_for_image_path(state);
                 #[cfg(not(feature = "file_open"))]

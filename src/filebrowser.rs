@@ -716,7 +716,6 @@ pub enum BrowserDir {
 pub fn browse_for_image_path(state: &mut OculanteState) {
     let start_directory = state.filebrowser_path();
     let load_sender = state.load_channel.0.clone();
-    state.redraw = true;
     std::thread::spawn(move || {
         let uppercase_lowercase_ext = [
             crate::utils::SUPPORTED_EXTENSIONS

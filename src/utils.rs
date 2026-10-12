@@ -114,12 +114,10 @@ pub struct ExtendedImageInfo {
     pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
     pub dicom: Option<DicomData>,
-    pub name: String,
 }
 
 impl ExtendedImageInfo {
     pub fn with_exif(&mut self, image_path: &Path) -> Result<()> {
-        self.name = image_path.to_string_lossy().to_string();
         if image_path.extension() == Some(OsStr::new("gif")) {
             return Ok(());
         }
@@ -138,7 +136,6 @@ impl ExtendedImageInfo {
     }
 
     pub fn with_dicom(&mut self, image_path: &Path) -> Result<()> {
-        self.name = image_path.to_string_lossy().to_string();
         if is_dicom(image_path) {
             let obj = dicom_object::open_file(image_path)?;
             let mut dicom_data = HashMap::new();
@@ -284,7 +281,6 @@ impl ExtendedImageInfo {
             blue_histogram: histogram(&counts.histograms[2]),
             green_histogram: histogram(&counts.histograms[1]),
             red_histogram: histogram(&counts.histograms[0]),
-            name: Default::default(),
             exif: Default::default(),
             dicom: Default::default(),
         }
@@ -557,8 +553,6 @@ pub enum Frame {
     AnimationEnd(Option<u32>),
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
     CompareResult(Arc<DynamicImage>, ImageGeometry),
-    /// A member of a custom image collection, for example when dropping many files or opening the app with more than one file as argument
-    ImageCollectionMember(Arc<DynamicImage>),
 }
 
 impl Frame {
@@ -587,14 +581,12 @@ impl Frame {
             | Frame::Animation(img, _)
             | Frame::AnimationStart(img)
             | Frame::EditResult(img)
-            | Frame::CompareResult(img, _)
-            | Frame::ImageCollectionMember(img) => match forced_variant {
+            | Frame::CompareResult(img, _) => match forced_variant {
                 Frame::Still(ref mut image_buffer)
                 | Frame::Animation(ref mut image_buffer, _)
                 | Frame::AnimationStart(ref mut image_buffer)
                 | Frame::EditResult(ref mut image_buffer)
-                | Frame::CompareResult(ref mut image_buffer, _)
-                | Frame::ImageCollectionMember(ref mut image_buffer) => *image_buffer = img.clone(),
+                | Frame::CompareResult(ref mut image_buffer, _) => *image_buffer = img.clone(),
                 Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
             },
             Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
@@ -609,8 +601,7 @@ impl Frame {
             | Frame::Still(img)
             | Frame::EditResult(img)
             | Frame::CompareResult(img, _)
-            | Frame::Animation(img, _)
-            | Frame::ImageCollectionMember(img) => Some(DynamicImage::clone(img)),
+            | Frame::Animation(img, _) => Some(DynamicImage::clone(img)),
             _ => None,
         }
     }
@@ -941,18 +932,12 @@ pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
             if let Ok(first) = find_first_image_in_directory(location) {
                 state.is_loaded = false;
                 state.current_path = Some(first.clone());
-                state.player.load_advanced(
-                    &first,
-                    Some(Frame::ImageCollectionMember(Default::default())),
-                );
+                state.player.load(&first);
             }
         } else {
             state.is_loaded = false;
             state.current_path = Some(location.clone());
-            state.player.load_advanced(
-                location,
-                Some(Frame::ImageCollectionMember(Default::default())),
-            );
+            state.player.load(location);
         }
         state.scrubber.fixed_paths = paths_to_open.iter().all(|p| p.is_file());
         state.scrubber.entries = paths_to_open;

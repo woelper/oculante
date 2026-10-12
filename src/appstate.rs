@@ -92,8 +92,6 @@ pub struct OculanteState {
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
-    pub redraw: bool,
-    pub first_start: bool,
     pub toasts: Toasts,
     pub filebrowser_id: Option<String>,
     pub filebrowser_last_dir: BrowserDir,
@@ -184,8 +182,6 @@ impl Default for OculanteState {
             window_size: Default::default(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
-            redraw: Default::default(),
-            first_start: true,
             toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             filebrowser_id: None,
             filebrowser_last_dir: Default::default(),
