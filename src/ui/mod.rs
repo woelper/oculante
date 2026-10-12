@@ -65,11 +65,6 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    #[allow(unused)]
-    fn label_i_selected(&mut self, _selected: bool, _text: impl Into<WidgetText>) -> Response {
-        unimplemented!()
-    }
-
     fn styled_slider<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
@@ -344,36 +339,6 @@ impl EguiExt for Ui {
             .show_unindented(self, add_contents)
     }
 
-    /// Draw a justified icon from a string starting with an emoji
-    fn label_i_selected(&mut self, selected: bool, text: impl Into<WidgetText>) -> Response {
-        let text: WidgetText = text.into();
-        let text = text.text();
-
-        let (icon, description) = parse_icon_plus_text(text);
-        let icon = icon.unwrap_or_default();
-
-        // let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.horizontal(|ui| {
-            let mut r = ui.add_sized(
-                egui::Vec2::new(30., ui.available_height()),
-                egui::Button::new(RichText::new(icon)).selected(selected),
-            );
-            if ui
-                .add_sized(
-                    egui::Vec2::new(ui.available_width(), ui.available_height()),
-                    egui::Button::new(RichText::new(description)).selected(selected),
-                )
-                .clicked()
-            {
-                // r.flags.insert(egui::response::Flags::CLICKED);
-                r.flags.insert(egui::response::Flags::CLICKED);
-                // r.clicked = true;
-            }
-            r
-        })
-        .inner
-    }
-
     fn styled_slider<Num: emath::Numeric>(
         &mut self,
         value: &mut Num,
@@ -520,46 +485,6 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
     // 3) No icon found
     (None, trimmed.to_owned())
-}
-
-/// Proof-of-concept funtion to draw texture completely with egui
-#[allow(unused)]
-pub fn image_ui(ctx: &Context, state: &mut OculanteState) {
-    if let Some(_img) = &state.current_image {
-        let image_rect = Rect::from_center_size(
-            Pos2::new(
-                state.image_geometry.offset.x
-                    + state.image_geometry.dimensions.0 as f32 / 2. * state.image_geometry.scale,
-                state.image_geometry.offset.y
-                    + state.image_geometry.dimensions.1 as f32 / 2. * state.image_geometry.scale,
-            ),
-            vec2(
-                state.image_geometry.dimensions.0 as f32,
-                state.image_geometry.dimensions.1 as f32,
-            ) * state.image_geometry.scale,
-        );
-
-        /*egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
-            tex_id.id,
-            image_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );*/
-    }
-
-    // state.image_geometry.scale;
-
-    // let preview_rect = ui
-    // .add(
-    //     egui::Image::new(tex_id)
-    //     .maintain_aspect_ratio(false)
-    //     .fit_to_exact_size(egui::Vec2::splat(desired_width))
-    //     .uv(egui::Rect::from_x_y_ranges(
-    //         uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-    //         uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-    //     )),
-    // )
-    // .rect;
 }
 
 fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {

@@ -1216,19 +1216,6 @@ where
     target
 }
 
-#[allow(unused)]
-pub fn rotate_rgbaimage(di: &RgbaImage, path: &Path) -> Result<RgbaImage> {
-    let mut decoder = ImageReader::open(path)?.into_decoder()?;
-    let orientation = decoder.orientation()?;
-    if orientation != image::metadata::Orientation::NoTransforms {
-        let mut dynimage = DynamicImage::ImageRgba8(di.clone());
-        dynimage.apply_orientation(orientation);
-        Ok(dynimage.to_rgba8())
-    } else {
-        bail!("This image needs no rotation.")
-    }
-}
-
 fn load_kra(path: &Path) -> Result<DynamicImage> {
     let f = File::open(path)?;
     let mut archive = zip::ZipArchive::new(f)?;

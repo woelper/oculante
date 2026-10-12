@@ -5,7 +5,6 @@ pub mod comparelist;
 pub mod glow_renderer;
 pub mod image_editing;
 pub mod image_loader;
-pub mod input;
 pub mod ktx2_loader;
 pub mod settings;
 pub mod shortcuts;

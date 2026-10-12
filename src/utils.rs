@@ -574,16 +574,6 @@ impl Frame {
         Frame::Animation(buffer.into(), delay_ms)
     }
 
-    #[allow(dead_code)]
-    pub fn new_edit(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
-        Frame::EditResult(buffer.into())
-    }
-
-    #[allow(dead_code)]
-    pub fn new_empty_edit() -> Frame {
-        Frame::UpdateTexture
-    }
-
     pub fn new_still(buffer: impl Into<Arc<DynamicImage>>) -> Frame {
         Frame::Still(buffer.into())
     }
@@ -732,26 +722,6 @@ pub fn is_ext_compatible(fname: &Path) -> bool {
             .to_lowercase()
             .as_str(),
     )
-}
-
-pub fn solo_channel(img: &DynamicImage, channel: usize) -> DynamicImage {
-    let mut updated_img = img.to_rgba8();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        pixel[0] = pixel[channel];
-        pixel[1] = pixel[channel];
-        pixel[2] = pixel[channel];
-        pixel[3] = 255;
-    });
-    DynamicImage::ImageRgba8(updated_img)
-}
-
-pub fn unpremult(img: &DynamicImage) -> DynamicImage {
-    // FIXME: Respect previous image format
-    let mut updated_img = img.to_rgba8();
-    updated_img.par_chunks_mut(4).for_each(|pixel| {
-        pixel[3] = 255;
-    });
-    DynamicImage::ImageRgba8(updated_img)
 }
 
 /// Mark pixels with no alpha but color info
