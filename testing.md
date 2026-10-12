@@ -169,7 +169,7 @@ Reported by reading the code, not checked yet:
 # Cleanup
 - [x] Dependencies updated to the newest versions, unused ones removed. `wgpu` was only used for the names of its texture formats and is replaced by `wgpu-types`. Cargo.lock went from 857 to 794 packages. Checked: all 67 test files load the same as before, all edit operations give the same pixels except blur (rounding) and perspective crop (edge pixels, new imageproc).
 - [ ] Not updated: `glow` 0.18 has to wait for an egui that uses it. (`avif-decode` 3 is in, it needs Rust 1.98.)
-- [x] 2026-10-12: compatible updates of 26 crates, zip 9 without its default features (AES, bzip2, lzma, xz, ppmd and zstd with its C library were only there for it, 28 crates), the links open with `open` instead of `webbrowser` (26 crates): Cargo.lock 800 -> 746. CI no longer builds libheif for Linux, nothing used it.
+- [x] 2026-10-12: compatible updates of 26 crates, zip without its default features (AES, bzip2, lzma, xz, ppmd and zstd with its C library were only there for it, 28 crates; zip 9.0.2 does not build on NetBSD and the other BSDs, a `u16` cast of `mode_t`, so 8.6), the links open with `open` instead of `webbrowser` (26 crates): Cargo.lock 800 -> 746. CI no longer builds libheif for Linux, nothing used it.
 - [ ] LUT on an image with transparency: keeps the alpha now, it made the image opaque before (new lutgen works on RGBA). Check that this is what we want.
 - [x] Update to latest egui
 - [ ] Some functionality was added in the past due to the fact that Notan and egui were running in different parts of the loop and could not exchange data easily. For example the drawe() function and other draw code. This should be cleaned up.
