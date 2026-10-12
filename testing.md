@@ -10,7 +10,8 @@ Human tests:
 - [ ] macOS, Intel: starts and opens a file. Low priority.
 - [ ] Windows 10 and 11 (piperun): starts on a real GPU, display scaling 100 and 150 %, opening files from the explorer and the file dialog, drag and drop, copy and paste, a photo of 200 megapixels from a Samsung phone (#782).
 - [ ] Linux, Wayland with GNOME, KDE and Sway (Stoppedpuma for Sway): transparency (#342), borderless mode and moving the window (#733), drag and drop (#781), no keys stuck after the window lost the focus (#374), a loaded image shows without moving the mouse (#776).
-- [ ] Linux, X11: the UI tests cover it, and a session on a real display.
+- [ ] Linux, X11: the UI tests cover it, and a session on a real display. The window class is ("", "oculante"), 0.9.6 had ("oculante", "oculante"): egui-winit gives winit the app id with an empty instance. Desktops match the class, a window manager rule on the instance (i3 `instance="oculante"`) would not match any more. Small; a one line change in egui-winit, or after the release.
+- [ ] All platforms: the window comes to the front when started from a terminal or a file manager. 0.9.6 opened it "always on top" and switched that off in the first frame, this branch does not.
 - [ ] NetBSD (0323pin): builds and runs. Done for the branch on 2026-10-08, again for the release candidate.
 - [ ] The settings of a long used 0.9.6 carry over: shortcuts, recent files, colors, panel states.
 
