@@ -98,7 +98,6 @@ rgb = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 strum = { version = "0.28", features = ["derive"] }
-webbrowser = "1.2"
 thiserror = "2.0"
 img-parts = "0.4"                                                                                                        # for exif saving
 trash = "5.2"

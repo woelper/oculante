@@ -224,7 +224,7 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
                                     configuration_item_ui("Visit GitHub Repository", "Check out the source code, request a feature, submit a bug, or leave a star if you like it!", |ui| {
                                         if ui.link("Check it out!").on_hover_text("https://github.com/woelper/oculante").clicked() {
-                                            _ = webbrowser::open("https://github.com/woelper/oculante");
+                                            _ = open::that("https://github.com/woelper/oculante");
                                         }
                                     }, ui);
 

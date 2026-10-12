@@ -533,7 +533,7 @@ impl ImageOperation {
                             .on_hover_text("You can find more interesting LUTs here to use")
                             .clicked()
                         {
-                            _ = webbrowser::open("https://github.com/cedeber/hald-clut");
+                            _ = open::that("https://github.com/cedeber/hald-clut");
                         }
                     });
                     x
