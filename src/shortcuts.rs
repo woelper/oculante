@@ -330,7 +330,3 @@ pub fn lookup(shortcuts: &Shortcuts, command: &InputEvent) -> String {
 pub fn keypresses_as_string(shortcut: &Shortcut) -> String {
     shortcut.to_string_pretty()
 }
-
-pub fn keypresses_as_markdown(shortcut: &Shortcut) -> String {
-    shortcut.to_markdown()
-}

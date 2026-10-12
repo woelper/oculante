@@ -6,7 +6,6 @@ use crate::settings::VolatileSettings;
 use crate::thumbnails::{THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails};
 use crate::ui::{BUTTON_HEIGHT_LARGE, EguiExt, render_file_icon};
 
-use dirs;
 use egui::{self, *};
 use log::debug;
 use std::{

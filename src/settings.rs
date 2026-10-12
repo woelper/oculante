@@ -384,6 +384,8 @@ impl HeifLimits {
 /// The default values of [`SecurityLimits`] can only be fetched from libheif itself. Therefore, we
 /// need a way to store preferences regardless if the `heif` feature is enabled.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+// NoLimit is the name in the settings files
+#[allow(clippy::enum_variant_names)]
 pub enum Limit {
     #[default]
     Default,

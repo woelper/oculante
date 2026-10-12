@@ -61,10 +61,6 @@ pub trait EguiExt {
         unimplemented!()
     }
 
-    fn label_right(&mut self, _text: impl Into<WidgetText>) -> Response {
-        unimplemented!()
-    }
-
     fn styled_slider<Num: emath::Numeric>(
         &mut self,
         _value: &mut Num,
@@ -316,14 +312,6 @@ impl EguiExt for Ui {
             self.style().visuals.selection.bg_fill,
         );
         r
-    }
-
-    /// Draw a right justified label
-    fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
-        self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-            ui.label(text);
-        })
-        .response
     }
 
     fn styled_collapsing<R>(

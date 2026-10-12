@@ -14,8 +14,6 @@ pub enum TexFormat {
     /// Gray with alpha: gray in the red, alpha in the green channel
     Rg8,
     R8,
-    Rgba32F,
-    SRgba8,
 }
 
 /// A GPU texture handle with metadata
@@ -157,24 +155,6 @@ impl GlowRenderer {
         }
     }
 
-    /// Upload a new texture from raw bytes.
-    pub fn create_texture(
-        &self,
-        gl: &glow::Context,
-        bytes: &[u8],
-        width: u32,
-        height: u32,
-        format: TexFormat,
-        filter: TexFilter,
-    ) -> GlowTexture {
-        let whole = Region {
-            row_length: width,
-            x: 0,
-            y: 0,
-        };
-        self.create_texture_from(gl, bytes, whole, width, height, format, filter)
-    }
-
     /// Upload a new texture from a region of a larger image. The region is read
     /// straight from the image, it is not copied first.
     #[allow(clippy::too_many_arguments)]
@@ -259,17 +239,6 @@ impl GlowRenderer {
                 fixed_mipmaps,
             }
         }
-    }
-
-    /// Update an existing texture's data (must be same dimensions and format).
-    /// Mipmaps are not regenerated, follow up with `set_filter` for that.
-    pub fn update_texture(&self, gl: &glow::Context, tex: &GlowTexture, bytes: &[u8]) {
-        let whole = Region {
-            row_length: tex.width,
-            x: 0,
-            y: 0,
-        };
-        self.update_texture_from(gl, tex, bytes, whole);
     }
 
     /// Update an existing texture from a region of a larger image, without copying it first.
@@ -635,22 +604,19 @@ unsafe fn set_unpack_region(gl: &glow::Context, region: Option<Region>) {
 
 fn bytes_per_pixel(format: TexFormat) -> usize {
     match format {
-        TexFormat::Rgba8 | TexFormat::SRgba8 => 4,
+        TexFormat::Rgba8 => 4,
         TexFormat::Rgb8 => 3,
         TexFormat::Rg8 => 2,
         TexFormat::R8 => 1,
-        TexFormat::Rgba32F => 16,
     }
 }
 
 fn gl_format(format: TexFormat) -> (u32, u32, u32) {
     match format {
         TexFormat::Rgba8 => (glow::RGBA8, glow::RGBA, glow::UNSIGNED_BYTE),
-        TexFormat::SRgba8 => (glow::SRGB8_ALPHA8, glow::RGBA, glow::UNSIGNED_BYTE),
         TexFormat::Rgb8 => (glow::RGB8, glow::RGB, glow::UNSIGNED_BYTE),
         TexFormat::Rg8 => (glow::RG8, glow::RG, glow::UNSIGNED_BYTE),
         TexFormat::R8 => (glow::R8, glow::RED, glow::UNSIGNED_BYTE),
-        TexFormat::Rgba32F => (glow::RGBA32F, glow::RGBA, glow::FLOAT),
     }
 }
 
@@ -740,9 +706,7 @@ pub fn get_swizzle_mat_vec(channel: ColorChannel, format: TexFormat) -> (Mat4, V
         TexFormat::R8 => get_swizzle_gray(channel),
         TexFormat::Rg8 => get_swizzle_gray_alpha(channel),
         // A texture without alpha is sampled with an alpha of one
-        TexFormat::Rgb8 | TexFormat::Rgba8 | TexFormat::SRgba8 | TexFormat::Rgba32F => {
-            get_swizzle_rgba(channel)
-        }
+        TexFormat::Rgb8 | TexFormat::Rgba8 => get_swizzle_rgba(channel),
     }
 }
 

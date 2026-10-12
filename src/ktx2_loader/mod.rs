@@ -1,4 +1,3 @@
-mod basis;
 #[allow(clippy::module_inception)]
 mod image;
 mod ktx2;
