@@ -723,9 +723,11 @@ def test_animation_plays_and_stops(binary):
     make_animation(os.path.join(folder, "00.gif"))
     with start(binary, "animation", os.path.join(folder, "00.gif")) as app:
         frames = []
-        for n in range(4):
+        # uneven pauses: a screenshot takes long under load, and shots that come once
+        # per loop of the 600 ms animation would all show the same frame
+        for n, pause in enumerate((0.1, 0.3, 0.2, 0)):
             frames.append(app.shot(f"frame_{n}"))
-            time.sleep(0.25)
+            time.sleep(pause)
         changes = [changed_pixels_in(a, b, IMAGE_AREA) for a, b in zip(frames, frames[1:])]
         assert max(changes) > 10_000, f"the animation does not play ({changes} pixels changed between frames)"
         app.key("Right")
