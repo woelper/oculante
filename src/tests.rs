@@ -712,11 +712,7 @@ fn size_in_name(name: &str) -> Option<(u32, u32)> {
 #[test]
 fn ci_load_every_test_file() {
     // not supported, or not an image
-    let mut expected_errors = vec![
-        "mp4_ex-signature.gif",
-        "test_R16G16B16_SFLOAT.ktx2",
-        "test_R32G32B32_SFLOAT.ktx2",
-    ];
+    let mut expected_errors = vec!["mp4_ex-signature.gif"];
     if cfg!(not(any(feature = "heif", feature = "heif_native"))) {
         expected_errors.push("orange.heic");
     }

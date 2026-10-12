@@ -174,6 +174,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - webp
 - farbfeld
 - DDS (DXT1-5, via `dds-rs`)
+- KTX2: Basis Universal and ASTC (via `basisu`), BC1-7, ETC2 and EAC (via `texture2ddecoder`), 8 and 16 bit, half and float formats
 - DICOM (via dicom-rs) - Some metadata supported, too.
 - psd (via `psd`)
 - svg (via `resvg`)

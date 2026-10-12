@@ -62,7 +62,8 @@ libheif-rs = { version = "3", default-features = false, features = [
 # HEIC and HEIF in pure Rust, nothing to install or link
 heic-rs = { version = "0.1.1", optional = true }
 ktx2 = "0.5"
-basis-universal = "0.3"
+basisu = "0.1"
+texture2ddecoder = "0.1"
 dds-rs = "0.7"
 exr = "1.74"
 gif = "0.14"
@@ -102,9 +103,7 @@ thiserror = "2.0"
 img-parts = "0.4"                                                                                                        # for exif saving
 trash = "5.2"
 flate2 = "1.1"                                                                                                           # for KTX
-bitflags = "2.13"                                                                                                         # for KTX
-wgpu-types = "30" # for KTX, the names of the texture formats
-ruzstd = "0.9"                                                                                                           # for KTX
+ruzstd = "0.7"                                                                                                           # for KTX
 mouse_position = "0.1.4"
 file-format = "0.29"
 # Krita files are read, they use deflate

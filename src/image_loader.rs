@@ -1,4 +1,3 @@
-use crate::ktx2_loader::CompressedImageFormats;
 use crate::settings::DecoderSettings;
 use crate::utils::{Frame, fit};
 use crate::{FONT, appstate::Message, ktx2_loader};
@@ -10,8 +9,8 @@ use dds::DDS;
 use exr::prelude as exrs;
 use exr::prelude::*;
 use image::{
-    AnimationDecoder, DynamicImage, EncodableLayout, GrayAlphaImage, GrayImage, ImageDecoder,
-    ImageReader, RgbImage, RgbaImage,
+    AnimationDecoder, DynamicImage, GrayAlphaImage, GrayImage, ImageDecoder, ImageReader, RgbImage,
+    RgbaImage,
 };
 use jxl_oxide::{JxlImage, PixelFormat};
 use quickraw::Export;
@@ -90,17 +89,8 @@ pub fn open_image(
             _ = sender.send(Frame::new_still(dynamic_image));
         }
         "ktx2" => {
-            // let file = File::open(img_location)?;
-            let data = std::fs::read(img_location)?;
-
-            let ktx = ktx2_loader::ktx2_buffer_to_image(
-                data.as_bytes(),
-                CompressedImageFormats::all(),
-                true,
-            )
-            .map_err(|e| anyhow!("{:?}", e))?;
-            let d = ktx.try_into_dynamic().map_err(|e| anyhow!("{:?}", e))?;
-            _ = sender.send(Frame::new_still(d));
+            let image = ktx2_loader::decode(&std::fs::read(img_location)?, 0)?;
+            _ = sender.send(Frame::new_still(image));
             return Ok(receiver);
         }
         #[cfg(feature = "dav1d")]
@@ -1248,7 +1238,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn autoscale_stretches_to_8_bit() {
+    fn ci_autoscale_stretches_to_8_bit() {
         use super::autoscale;
         // the lowest becomes 0, the highest 255
         let a = autoscale(&[1000u16, 2000, 3000], |p| p as f32, (0., 65535.));
@@ -1267,7 +1257,7 @@ mod tests {
     }
 
     #[test]
-    fn gamma_table_matches_powf() {
+    fn ci_gamma_table_matches_powf() {
         use super::{gamma_table, tonemap_f32, tonemap_f32_powf};
         let same = |bits: u32| {
             let f = f32::from_bits(bits);
