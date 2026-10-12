@@ -42,6 +42,14 @@ fn main() -> eframe::Result<()> {
                 .action(clap::ArgAction::SetTrue)
                 .help("Load data from STDIN"),
         )
+        // 0.9.6 relaunched itself with -c on macOS to open files from Finder, which is
+        // done differently now. Still accepted, so launchers that pass it keep working.
+        .arg(
+            Arg::new("chainload")
+                .short('c')
+                .action(clap::ArgAction::SetTrue)
+                .hide(true),
+        )
         .get_matches_from(args);
 
     let mut state = OculanteState {

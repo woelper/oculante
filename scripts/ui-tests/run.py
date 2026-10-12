@@ -340,6 +340,14 @@ def test_relative_file_name(binary):
         assert shown_file(app) == "c.png", f"after b.png came {shown_file(app)}"
 
 
+def test_chainload_option_is_accepted(binary):
+    """0.9.6 took -c, it relaunched itself with it on macOS. The option was gone and
+    the app refused to start when it was given."""
+    with App(binary, "chainload", ["-c", image("moss.jpg")]) as app:
+        app.wait_window()
+        assert app.wait_for_log("Received image 1000x750"), "the image given after -c was not opened"
+
+
 def test_delete(binary):
     """Delete asks first and moves the file to the trash, Cancel keeps it, and
     Shift+Delete only takes the image off the list."""
@@ -1015,6 +1023,7 @@ TESTS = [
     test_measure_draws_rectangle,
     test_key_repeat,
     test_relative_file_name,
+    test_chainload_option_is_accepted,
     test_delete,
     test_lossless_rotation_keys_and_quit,
     test_settings_of_0_9_6,
