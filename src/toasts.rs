@@ -1,5 +1,6 @@
 use egui::{
-    Align2, Area, Color32, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense, Stroke, Style, TextStyle, Ui, Vec2, pos2, vec2
+    Align2, Area, Color32, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense,
+    Stroke, Style, TextStyle, Ui, Vec2, pos2, vec2,
 };
 use std::time::Duration;
 
@@ -228,7 +229,6 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
     let fg = style.visuals.text_color();
 
     let mut close_clicked = false;
-
 
     let icon_colour = match toast.level {
         ToastLevel::Info => Color32::from_rgb(57, 181, 255),
