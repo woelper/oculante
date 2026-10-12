@@ -202,6 +202,9 @@ def test_image_layouts(binary):
 
 RAIL = (60, 60, 60)
 ACCENT = (255, 0, 75)
+# the icons of info and error messages (src/toasts.rs)
+INFO_ICON = (57, 181, 255)
+ERROR_ICON = (255, 77, 77)
 
 
 def open_edit_panel(app):
@@ -488,7 +491,9 @@ def test_zen_mode(binary):
         app.key("i")
         app.settle(1.0)
         bar = (0, 0, 1026, 34)
-        panel = (0, 40, 190, 540)
+        # the labels and the zoom preview, not the values: the colour under the pointer
+        # is sampled every few frames and can still change
+        panel = (0, 40, 160, 540)
         before = app.shot("before")
         app.key("z")
         app.settle(1.0)
@@ -651,7 +656,7 @@ def test_animation_plays_as_often_as_the_file_asks(binary):
         app.settle(0.5)
         end = app.shot("end")
         assert region_has_color(end, (460, 250, 100, 100), (0, 0, 255), 10), "the last frame is not shown"
-        assert region_has_color(end, TOAST_AREA, ACCENT, 30), "no message that the animation ended"
+        assert region_has_color(end, TOAST_AREA, INFO_ICON, 30), "no message that the animation ended"
         time.sleep(1.0)
         later = app.shot("later")
         assert changed_pixels_in(end, later, IMAGE_AREA) == 0, "the animation goes on after its last play"
@@ -791,6 +796,46 @@ def test_histogram_shows_values_on_hover(binary):
     assert changed > 1500, f"no values next to the pointer ({changed} pixels changed)"
 
 
+def test_mipmaps_switched_on_and_off(binary):
+    """Mipmaps can be switched on and off with an image on screen. A texture is
+    allocated once with all its mipmap levels or with none, so switching needs new
+    textures; one without levels that is asked for mipmaps draws black."""
+
+    def toggle_mipmaps(app, on):
+        app.click(1005, 18)  # the menu
+        app.settle(0.8)
+        app.click(940, 218)  # "Preferences"
+        app.settle(1.0)
+        # the list keeps its position when the preferences open again
+        app.move(480, 300)
+        for _ in range(12):
+            app.x("xdotool", "click", "4")
+        app.scroll_down(480, 300, 4)
+        app.click(752, 350)  # "Use mipmaps"
+        app.settle(0.8)
+        checked = region_has_color(app.shot(f"mipmaps_{on}"), (742, 340, 20, 20), ACCENT, 60)
+        assert checked == on, f"the mipmap setting is {'off' if on else 'on'}"
+        app.click(777, 32)  # close the preferences
+        app.move(300, 560)
+        app.settle(1.5)
+
+    area = (440, 250, 140, 100)  # inside the image after zooming out
+    with start(binary, "mipmaps", image("moss.jpg"), settings={"use_mipmaps": False}) as app:
+        app.scroll_down(512, 300, 1)  # zoom out, where mipmaps are used
+        app.move(300, 560)
+        app.settle(1.5)
+        plain = app.shot("plain")
+        toggle_mipmaps(app, True)
+        mipmapped = app.shot("mipmapped")
+        toggle_mipmaps(app, False)
+        again = app.shot("plain_again")
+    black = count_color(mipmapped, area, (0, 0, 0), tolerance=6)
+    assert black < 500, f"the image is black with mipmaps switched on ({black} pixels)"
+    assert changed_pixels_in(plain, mipmapped, area) > 0, "switching mipmaps on changed nothing"
+    changed = changed_pixels_in(plain, again, area)
+    assert changed == 0, f"the image differs after switching mipmaps off again ({changed} pixels)"
+
+
 def test_saved_edits_come_back(binary):
     """Edits saved with "Save edits" are applied again when the image is opened later."""
     folder = folder_of("saved_edits_images", [("moss.jpg", "moss.jpg")])
@@ -889,7 +934,7 @@ def test_load_error_shows_toast(binary):
         app.move(0.6, 0.6)
         app.settle(1.5)
         shot = app.shot("error")
-        assert region_has_color(shot, TOAST_AREA, ACCENT, 30), "no error toast is shown"
+        assert region_has_color(shot, TOAST_AREA, ERROR_ICON, 30), "no error toast is shown"
         assert app.running(), "the app quit on a broken file"
 
 
@@ -988,6 +1033,7 @@ TESTS = [
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,
     test_histogram_shows_values_on_hover,
+    test_mipmaps_switched_on_and_off,
     test_actual_size_is_pixel_exact,
     test_overtaken_load,
     test_load_error_shows_toast,

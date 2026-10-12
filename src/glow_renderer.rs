@@ -24,6 +24,9 @@ pub struct GlowTexture {
     pub width: u32,
     pub height: u32,
     pub format: TexFormat,
+    /// Allocated once with all its mipmap levels, or with only the full size one.
+    /// `None` for a texture that GL resizes when its mipmaps are made.
+    pub fixed_mipmaps: Option<bool>,
 }
 
 /// How a texture is sampled when it is scaled.
@@ -65,6 +68,10 @@ pub struct GlowRenderer {
     quad_vao: glow::VertexArray,
     /// Max texture size for this GPU
     pub max_texture_size: u32,
+    /// Textures can be allocated once with all their mipmap levels. Otherwise GL
+    /// reallocates a texture when its mipmaps are made, and the driver keeps the old
+    /// memory as a reserve: twice the GPU memory the kernel counts for a large image.
+    texture_storage: bool,
 }
 
 // The `#version` line is prepended in `compile_program`, depending on the GL flavour.
@@ -126,11 +133,19 @@ impl GlowRenderer {
         // Empty VAO for attribute-less rendering (we compute positions from gl_VertexID)
         let quad_vao = unsafe { gl.create_vertex_array().expect("Failed to create VAO") };
         let max_texture_size = unsafe { gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) } as u32;
+        let version = gl.version();
+        let texture_storage = if version.is_embedded {
+            version.major >= 3
+        } else {
+            (version.major, version.minor) >= (4, 2)
+        } || gl.supported_extensions().contains("GL_ARB_texture_storage");
+        log::debug!("Texture storage: {texture_storage}");
 
         Self {
             image_program,
             quad_vao,
             max_texture_size,
+            texture_storage,
         }
     }
 
@@ -180,17 +195,46 @@ impl GlowRenderer {
 
             let (internal, fmt, typ) = gl_format(format);
             set_unpack_region(gl, Some(region));
-            gl.tex_image_2d(
-                glow::TEXTURE_2D,
-                0,
-                internal as i32,
-                width as i32,
-                height as i32,
-                0,
-                fmt,
-                typ,
-                glow::PixelUnpackData::Slice(Some(bytes)),
-            );
+            let fixed_mipmaps = if self.texture_storage {
+                // All levels at once, so making the mipmaps does not reallocate it
+                let levels = if filter.mipmaps {
+                    32 - width.max(height).leading_zeros()
+                } else {
+                    1
+                };
+                gl.tex_storage_2d(
+                    glow::TEXTURE_2D,
+                    levels as i32,
+                    internal,
+                    width as i32,
+                    height as i32,
+                );
+                gl.tex_sub_image_2d(
+                    glow::TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    width as i32,
+                    height as i32,
+                    fmt,
+                    typ,
+                    glow::PixelUnpackData::Slice(Some(bytes)),
+                );
+                Some(filter.mipmaps)
+            } else {
+                gl.tex_image_2d(
+                    glow::TEXTURE_2D,
+                    0,
+                    internal as i32,
+                    width as i32,
+                    height as i32,
+                    0,
+                    fmt,
+                    typ,
+                    glow::PixelUnpackData::Slice(Some(bytes)),
+                );
+                None
+            };
             set_unpack_region(gl, None);
 
             gl.tex_parameter_i32(
@@ -212,6 +256,7 @@ impl GlowRenderer {
                 width,
                 height,
                 format,
+                fixed_mipmaps,
             }
         }
     }
@@ -317,6 +362,9 @@ impl GlowRenderer {
                     y: ty,
                 };
                 let texture = self.create_texture_from(gl, bytes, region, tw, th, format, filter);
+                if cols * rows > 1 {
+                    wait_for_upload(gl);
+                }
                 tiles.push(GlowTile {
                     texture,
                     x: tx,
@@ -342,6 +390,15 @@ impl GlowRenderer {
         filter: TexFilter,
     ) -> bool {
         if tiles.is_empty() || width == 0 || height == 0 || tiles[0].texture.format != format {
+            return false;
+        }
+        // A texture allocated with its levels keeps them, mipmaps switched on or off
+        // in the settings need new textures
+        if tiles[0]
+            .texture
+            .fixed_mipmaps
+            .is_some_and(|mipmaps| mipmaps != filter.mipmaps)
+        {
             return false;
         }
 
@@ -374,6 +431,9 @@ impl GlowRenderer {
             };
             self.update_texture_from(gl, &tile.texture, bytes, region);
             self.set_filter(gl, &tile.texture, filter);
+            if tiles.len() > 1 {
+                wait_for_upload(gl);
+            }
         }
 
         true
@@ -486,6 +546,14 @@ pub fn paint_quads(
         gl.use_program(None);
         gl.bind_vertex_array(None);
     }
+}
+
+/// Wait until the GPU has copied the last upload. The driver uploads through a
+/// buffer of its own as large as the texture and keeps it afterwards. While the GPU
+/// still copies from it, the next tile needs another one: a photo of 144 megapixels
+/// left ten of them, 570 MB of GPU memory. After waiting, the driver reuses one.
+fn wait_for_upload(gl: &glow::Context) {
+    unsafe { gl.finish() };
 }
 
 /// Set min/mag filter of the bound texture and (re)generate mipmaps if enabled.

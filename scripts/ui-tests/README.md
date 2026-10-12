@@ -64,6 +64,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_image_info_is_computed_when_shown` | The numbers of the info panel are computed only while it is open, once per image, not for every edit change, and again after edits are applied |
 | `test_info_panel_resizes` | The info panel follows when its edge is dragged: no black strip while dragging narrower, no jump back when let go, and the zoom preview grows with a wider panel. |
 | `test_histogram_shows_values_on_hover` | Hovering over the histogram shows the channel, the value and the number of pixels next to the pointer. |
+| `test_mipmaps_switched_on_and_off` | Mipmaps switched on and off in the preferences with an image on screen: the image is not black with them, and the same as before without them. |
 | `test_saved_edits_come_back` | Edits saved with "Save edits" are applied again when the image is opened the next time |
 | `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |
 | `test_actual_size_is_pixel_exact` | At 100% an image with an odd width and height shows exactly the pixels of the file, with linear and with nearest filtering |
