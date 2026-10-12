@@ -58,7 +58,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_key_repeat` | A key that is held down goes through the images of a folder |
 | `test_zen_mode` | Zen mode hides the bar and the info panel, leaving it brings both back |
 | `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |
-| `test_fullscreen` | The window fills the screen and returns to its place and size (needs a window manager) |
+| `test_fullscreen` | The window fills the screen and returns to its place and size, the pixel under the pointer stays under it, with F and with a double click (needs a window manager) |
 | `test_borderless` | Without a border there is no title bar, the app's own bar moves the window and its button closes it (needs a window manager) |
 | `test_compare_list` | An image from the compare list comes back at its stored zoom and position, or keeps the current view with "persistent zoom" |
 | `test_animation_plays_and_stops` | An animated GIF plays, and stops when the next image is shown |

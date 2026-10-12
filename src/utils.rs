@@ -696,31 +696,35 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
 
 pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
     let fullscreen = ctx.input(|i| i.viewport().fullscreen).unwrap_or(false);
-
-    if !fullscreen {
-        // Entering fullscreen: offset image by window position so the pixel
-        // under the cursor stays in the same screen location.
-        let window_pos = ctx
-            .input(|i| i.viewport().outer_rect)
-            .map(|r| (r.left(), r.top()))
-            .unwrap_or((0.0, 0.0));
-
-        // The menu bar offset: in fullscreen the top panel disappears in zen mode,
-        // but the available_rect shift covers that. We just need the window origin.
-        let offset = (window_pos.0 as i32, window_pos.1 as i32);
-
-        debug!("Entering fullscreen. Window pos: {:?}", offset);
-
-        state.image_geometry.offset.x += offset.0 as f32;
-        state.image_geometry.offset.y += offset.1 as f32;
-        state.fullscreen_offset = Some(offset);
-    } else if let Some(sf) = state.fullscreen_offset {
-        // Exiting fullscreen: reverse the offset
-        state.image_geometry.offset.x -= sf.0 as f32;
-        state.image_geometry.offset.y -= sf.1 as f32;
-        state.fullscreen_offset = None;
-    }
+    // Wayland does not tell where the window is, then the image stays where it is in the window
+    state.fullscreen_origin = ctx
+        .input(|i| i.viewport().inner_rect)
+        .map(|r| (r.min, std::time::Instant::now()));
     ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
+}
+
+/// The window's content moves on the screen when fullscreen is switched on or off.
+/// Move the image back by as much, so the pixel under the cursor stays under it. The
+/// window can take a few frames to get there, on macOS it is animated.
+pub fn follow_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
+    let Some((origin, moved_at)) = state.fullscreen_origin else {
+        return;
+    };
+    // After that the window was moved by hand
+    if moved_at.elapsed() > std::time::Duration::from_secs(2) {
+        state.fullscreen_origin = None;
+        return;
+    }
+    match ctx.input(|i| i.viewport().inner_rect) {
+        Some(inner) if inner.min != origin => {
+            let moved = origin - inner.min;
+            state.image_geometry.offset.x += moved.x;
+            state.image_geometry.offset.y += moved.y;
+            debug!("Fullscreen moved the window by {moved:?}");
+            state.fullscreen_origin = Some((inner.min, std::time::Instant::now()));
+        }
+        _ => ctx.request_repaint_after(std::time::Duration::from_millis(100)),
+    }
 }
 
 /// Determine if an enxtension is compatible with oculante

@@ -631,6 +631,7 @@ impl eframe::App for OculanteApp {
             self.state.reset_image = true;
         }
         self.state.window_size = window_size;
+        follow_fullscreen(ctx, &mut self.state);
 
         // Process channels
         self.process_load_channel();

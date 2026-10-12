@@ -1091,7 +1091,8 @@ def needs_window_manager():
 
 
 def test_fullscreen(binary):
-    """The window fills the screen in fullscreen and returns to where it was."""
+    """The window fills the screen in fullscreen and returns to where it was. The pixel
+    under the pointer stays under it, with the key and with a double click."""
     needs_window_manager()
     with App(binary, "fullscreen", [image("moss.jpg")], window_manager=True) as app:
         app.wait_window()
@@ -1099,15 +1100,28 @@ def test_fullscreen(binary):
         assert app.wait_for_log(LOADED), "the image never loaded"
         app.settle(1.0)
         start = dict(app.geom)
+        # what is around the pointer, on the screen
+        around = (start["X"] + int(0.6 * start["WIDTH"]) - 30, start["Y"] + int(0.6 * start["HEIGHT"]) - 30, 60, 60)
+        windowed = app.shot("windowed")
         app.key("f")
         app.settle(1.5)
         full = app.update_geometry()
         assert (full["X"], full["Y"], full["WIDTH"], full["HEIGHT"]) == (0, 0, *SCREEN), f"not fullscreen: {full}"
         shot = app.shot("fullscreen")
         assert not region_has_color(shot, (0, 0, 40, 40), (0, 0, 0), 4), "the window does not cover the screen"
+        moved = changed_pixels_in(windowed, shot, around)
+        assert moved < 20, f"{moved} pixels around the pointer changed going fullscreen"
         app.key("f")
         app.settle(1.5)
         assert app.update_geometry() == start, f"the window came back as {app.geom}, it was {start}"
+        moved = changed_pixels_in(windowed, app.shot("back"), around)
+        assert moved < 20, f"{moved} pixels around the pointer changed leaving fullscreen"
+        for label in ("double_click_in", "double_click_out"):
+            app.x("xdotool", "click", "--repeat", "2", "--delay", "80", "1")
+            app.settle(1.5)
+            moved = changed_pixels_in(windowed, app.shot(label), around)
+            assert moved < 20, f"{moved} pixels around the pointer changed after a double click ({label})"
+        assert app.update_geometry() == start, f"the window came back as {app.geom} after double clicks, it was {start}"
 
 
 def test_borderless(binary):

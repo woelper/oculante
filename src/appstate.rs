@@ -91,9 +91,9 @@ pub struct OculanteState {
     pub network_mode: bool,
     /// File names piped in at startup, they arrive from a background thread
     pub piped_paths: Option<std::sync::mpsc::Receiver<Vec<std::path::PathBuf>>>,
-    /// how long the toast message appears
-    /// data to transform image once fullscreen is entered/left
-    pub fullscreen_offset: Option<(i32, i32)>,
+    /// Where the window's content was on the screen while fullscreen is switched
+    /// on or off, and when it last moved, see `follow_fullscreen`
+    pub fullscreen_origin: Option<(egui::Pos2, std::time::Instant)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
     pub toasts: Toasts,
@@ -239,7 +239,7 @@ impl Default for OculanteState {
             network_mode: Default::default(),
             piped_paths: None,
             window_size: Default::default(),
-            fullscreen_offset: Default::default(),
+            fullscreen_origin: Default::default(),
             scrubber: Default::default(),
             toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             filebrowser_id: None,
