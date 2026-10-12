@@ -10,6 +10,17 @@ use exr::prelude::f16;
 use image::{DynamicImage, ImageBuffer, Rgb32FImage, Rgba32FImage, RgbaImage};
 use ktx2::{Format, Header, Reader, SupercompressionScheme};
 
+/// How many images a texture holds: array layers, cube faces and depth slices.
+/// The 80 bytes of the header are enough.
+pub fn image_count(bytes: &[u8]) -> Result<usize> {
+    let header = bytes
+        .get(..Header::LENGTH)
+        .and_then(|h| h.try_into().ok())
+        .context("Not a valid KTX2 file: too short")?;
+    let header = Header::from_bytes(header).map_err(|e| anyhow!("Not a valid KTX2 file: {e:?}"))?;
+    Ok(layers(&header) * faces(&header) * slices(&header))
+}
+
 /// One image of a texture. `index` goes through the slices of a face, the faces
 /// of a layer, then the layers, the order KTX2 stores them in.
 pub fn decode(bytes: &[u8], index: usize) -> Result<DynamicImage> {
@@ -313,13 +324,13 @@ fn unpack_e5b9g9r9(p: u32) -> [f32; 3] {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::decode;
+pub(crate) mod tests {
+    use super::{decode, image_count};
     use image::GenericImageView;
     use ktx2::Format;
 
     /// A KTX2 file with one level and a data format descriptor that is only its size
-    fn ktx2_file(
+    pub(crate) fn ktx2_file(
         format: Format,
         size: (u32, u32, u32),
         layers: u32,
@@ -382,6 +393,8 @@ mod tests {
             .flat_map(|layer| (0..6).flat_map(move |face| [red(layer, face), 0, 0, 255].repeat(4)))
             .collect();
         let file = ktx2_file(Format::R8G8B8A8_UNORM, (2, 2, 0), 2, 6, false, &level);
+        assert_eq!(image_count(&file).unwrap(), 12);
+        assert_eq!(image_count(&file[..80]).unwrap(), 12);
         for index in 0..12 {
             let image = decode(&file, index).unwrap();
             assert_eq!(
@@ -400,6 +413,7 @@ mod tests {
             false,
             &[[10; 4], [20; 4], [30; 4]].concat(),
         );
+        assert_eq!(image_count(&file).unwrap(), 3);
         assert_eq!(
             colors(&decode(&file, 2).unwrap()),
             vec![[30, 30, 30, 255]; 4]

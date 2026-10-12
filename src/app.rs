@@ -396,6 +396,14 @@ impl OculanteApp {
                 }
                 return;
             }
+            Frame::Item { path, item, count } => {
+                // only the newest load reports, but the file may have changed since
+                if self.state.current_path.as_ref() == Some(&path) {
+                    self.state.set_item(&path, item, Some(count));
+                    ctx.request_repaint();
+                }
+                return;
+            }
             Frame::AnimationEnd(plays) => {
                 if let Some(animation) = &mut self.animation {
                     animation.complete = true;
@@ -484,8 +492,10 @@ impl OculanteApp {
             Frame::Still(img) | Frame::CompareResult(img, _) => {
                 debug!("Received image {}x{}", img.width(), img.height());
 
-                // Insert into cache for fast back/forth navigation
+                // Insert into cache for fast back/forth navigation. The cache knows
+                // files, not their images, so only the first image of a file goes in.
                 if self.state.persistent_settings.max_cache != 0
+                    && self.state.current_item() == 0
                     && let Some(p) = self.state.current_path.clone()
                 {
                     self.state.player.cache.insert(&p, img.clone());
@@ -518,7 +528,7 @@ impl OculanteApp {
                 ctx.request_repaint();
             }
             // handled at the top
-            Frame::Animation(..) | Frame::AnimationEnd(_) => {}
+            Frame::Animation(..) | Frame::AnimationEnd(_) | Frame::Item { .. } => {}
         }
 
         // Update window title
@@ -974,6 +984,19 @@ impl eframe::App for OculanteApp {
             }
             if key_pressed(ctx, state, LastImage) {
                 last_image(state);
+            }
+            if key_pressed(ctx, state, NextItem)
+                && let Some(next) = state
+                    .sequence()
+                    .filter(|s| s.current + 1 < s.count)
+                    .map(|s| s.current + 1)
+            {
+                state.load_item(next);
+            }
+            if key_pressed(ctx, state, PreviousItem)
+                && let Some(previous) = state.sequence().and_then(|s| s.current.checked_sub(1))
+            {
+                state.load_item(previous);
             }
             if key_pressed(ctx, state, CompareNext) {
                 compare_next(state);

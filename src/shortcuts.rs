@@ -45,6 +45,9 @@ pub enum InputEvent {
     ZenMode,
     ScrubBar,
     CopyPath,
+    /// The next image of a file that holds several
+    NextItem,
+    PreviousItem,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -197,6 +200,8 @@ pub fn default_shortcuts() -> Shortcuts {
     s.insert(InputEvent::FirstImage, Shortcut::key(Home));
     s.insert(InputEvent::LastImage, Shortcut::key(End));
     s.insert(InputEvent::NextImage, Shortcut::key(ArrowRight));
+    s.insert(InputEvent::NextItem, Shortcut::key(ArrowDown));
+    s.insert(InputEvent::PreviousItem, Shortcut::key(ArrowUp));
     s.insert(InputEvent::ZoomIn, Shortcut::key(Equals));
     s.insert(InputEvent::ZoomOut, Shortcut::key(Minus));
     s.insert(InputEvent::ZoomActualSize, Shortcut::key(Num1));

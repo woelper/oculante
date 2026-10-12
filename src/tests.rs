@@ -26,7 +26,7 @@ fn assert_valid_image(frame: &Frame) {
                 "Image has zero dimensions"
             );
         }
-        Frame::UpdateTexture | Frame::AnimationEnd(_) => {
+        Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => {
             panic!("Expected an image frame, got {frame}")
         }
     }
@@ -1103,4 +1103,152 @@ fn ci_load_heic_native() {
             "mean color {mean:.1} is not near {expected}"
         );
     }
+}
+
+/// One image of a file that holds several
+fn load_item(path: &std::path::Path, item: usize) -> image::DynamicImage {
+    let receiver = crate::image_loader::open_image_item(path, item, None, None).unwrap();
+    let frame = receiver.recv_timeout(Duration::from_secs(60)).unwrap();
+    frame.get_image().unwrap()
+}
+
+/// The pages of a TIFF are counted and each can be shown, also when its strips
+/// are decoded in parallel, each thread at the right page
+#[test]
+fn ci_tiff_pages() {
+    use crate::image_loader::image_count;
+    use tiff::encoder::{TiffEncoder, colortype::RGB8};
+    let path = std::env::temp_dir().join("oculante_test_pages.tif");
+    let pages = [
+        ((8, 4), [200, 0, 0]),
+        ((5, 9), [0, 200, 0]),
+        ((64, 600), [0, 0, 200]),
+    ];
+    let mut encoder = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
+    for ((width, height), color) in pages {
+        let pixels = color.repeat((width * height) as usize);
+        let mut image = encoder.new_image::<RGB8>(width, height).unwrap();
+        image.rows_per_strip(16).unwrap();
+        image.write_data(&pixels).unwrap();
+    }
+    drop(encoder);
+    let mut decoder = tiff::decoder::Decoder::new(std::fs::File::open(&path).unwrap()).unwrap();
+    decoder.seek_to_image(2).unwrap();
+    assert!(
+        decoder.strip_count().unwrap() > 1,
+        "the last page has one strip"
+    );
+
+    assert_eq!(image_count(&path), 3);
+    for (page, ((width, height), color)) in pages.into_iter().enumerate() {
+        let image = load_item(&path, page);
+        assert_eq!(
+            (image.width(), image.height()),
+            (width, height),
+            "page {page}"
+        );
+        assert!(
+            image.to_rgb8().pixels().all(|p| p.0 == color),
+            "page {page}"
+        );
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// The images of a HEIF file, without its thumbnails and alpha planes. The file is
+/// made by libheif's heif-enc from three flat images, the third with half alpha.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_heic_images() {
+    let path = std::path::Path::new("res/tests/three_images.heic");
+    assert_eq!(crate::image_loader::image_count(path), 3);
+    for (item, size, color) in [
+        (0, (64, 48), [220, 30, 30, 255]),
+        (1, (64, 48), [30, 200, 40, 255]),
+        (2, (32, 80), [40, 60, 230, 128]),
+    ] {
+        let image = load_item(path, item).to_rgba8();
+        assert_eq!(image.dimensions(), size, "item {item}");
+        // HEVC is lossy, the colours come back a few values off
+        let close = |p: &image::Rgba<u8>| p.0.iter().zip(color).all(|(a, b)| a.abs_diff(b) <= 8);
+        assert!(
+            image.pixels().all(close),
+            "item {item}: {:?}",
+            image.get_pixel(0, 0)
+        );
+    }
+}
+
+/// The faces of a cube map
+#[test]
+fn ci_ktx2_cube_faces() {
+    use crate::ktx2_loader::tests::ktx2_file;
+    let level: Vec<u8> = (0..6u8)
+        .flat_map(|face| [face * 40, 0, 0, 255].repeat(4))
+        .collect();
+    let path = std::env::temp_dir().join("oculante_test_cube.ktx2");
+    std::fs::write(
+        &path,
+        ktx2_file(ktx2::Format::R8G8B8A8_UNORM, (2, 2, 0), 0, 6, false, &level),
+    )
+    .unwrap();
+    assert_eq!(crate::image_loader::image_count(&path), 6);
+    for face in 0..6 {
+        let image = load_item(&path, face as usize).to_rgba8();
+        assert!(
+            image.pixels().all(|p| p.0 == [face * 40, 0, 0, 255]),
+            "face {face}"
+        );
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// The frames of a DICOM file: three of 2x2 pixels, the bright pixel moves
+#[test]
+fn ci_dicom_frames() {
+    use dicom_core::{DataElement, PrimitiveValue, Tag, VR};
+    use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
+    let mut object = InMemDicomObject::new_empty();
+    let text = |group, element, vr, value: &str| {
+        DataElement::new(Tag(group, element), vr, PrimitiveValue::from(value))
+    };
+    let number = |group, element, value: u16| {
+        DataElement::new(Tag(group, element), VR::US, PrimitiveValue::from(value))
+    };
+    // secondary capture, made up instance
+    object.put(text(0x0008, 0x0016, VR::UI, "1.2.840.10008.5.1.4.1.1.7"));
+    object.put(text(0x0008, 0x0018, VR::UI, "1.2.3.4.5"));
+    object.put(number(0x0028, 0x0002, 1));
+    object.put(text(0x0028, 0x0004, VR::CS, "MONOCHROME2"));
+    object.put(text(0x0028, 0x0008, VR::IS, "3"));
+    object.put(number(0x0028, 0x0010, 2));
+    object.put(number(0x0028, 0x0011, 2));
+    object.put(number(0x0028, 0x0100, 8));
+    object.put(number(0x0028, 0x0101, 8));
+    object.put(number(0x0028, 0x0102, 7));
+    object.put(number(0x0028, 0x0103, 0));
+    let pixels = [[255, 0, 0, 0], [0, 255, 0, 0], [0, 0, 255, 0]].concat();
+    object.put(DataElement::new(
+        Tag(0x7FE0, 0x0010),
+        VR::OB,
+        PrimitiveValue::from(pixels),
+    ));
+    let file = object
+        .with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
+        .unwrap();
+    let path = std::env::temp_dir().join("oculante_test_frames.dcm");
+    file.write_to_file(&path).unwrap();
+
+    assert_eq!(crate::image_loader::image_count(&path), 3);
+    for frame in 0..3 {
+        let image = load_item(&path, frame).to_luma8();
+        let brightest = image
+            .pixels()
+            .enumerate()
+            .max_by_key(|(_, p)| p.0[0])
+            .unwrap()
+            .0;
+        assert_eq!(brightest, frame, "frame {frame}: {:?}", image.as_raw());
+    }
+    std::fs::remove_file(&path).unwrap();
 }

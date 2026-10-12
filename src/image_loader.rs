@@ -29,6 +29,62 @@ pub fn open_image(
     message_sender: Option<Sender<Message>>,
     decoder_opts: Option<DecoderSettings>,
 ) -> Result<Receiver<Frame>> {
+    open_image_item(img_location, 0, message_sender, decoder_opts)
+}
+
+/// How many images a file holds that are shown one at a time: the pages of a
+/// TIFF, the images of a HEIF file, the frames of a DICOM file, the layers, cube
+/// faces and slices of a KTX2 texture. 1 for all other files.
+pub fn image_count(path: &Path) -> usize {
+    let extension = canonical_extension(
+        path.extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default(),
+    );
+    let count = || -> Result<usize> {
+        Ok(match extension.as_str() {
+            "tif" | "tiff" => {
+                let mut decoder = tiff_decoder(path, 0)?;
+                let mut pages = 1;
+                while decoder.more_images() {
+                    decoder.next_image()?;
+                    pages += 1;
+                }
+                pages
+            }
+            "ktx2" => {
+                let mut header = [0; ktx2::Header::LENGTH];
+                File::open(path)?.read_exact(&mut header)?;
+                ktx2_loader::image_count(&header)?
+            }
+            "dcm" | "ima" => {
+                // the pixel data is not needed to count the frames
+                let header = dicom_object::OpenFileOptions::new()
+                    .read_until(dicom_object::Tag(0x7FE0, 0x0010))
+                    .open_file(path)?;
+                // Number of Frames, only there when there is more than one
+                header
+                    .element(dicom_object::Tag(0x0028, 0x0008))
+                    .ok()
+                    .and_then(|frames| frames.to_int::<usize>().ok())
+                    .unwrap_or(1)
+            }
+            #[cfg(feature = "heif_native")]
+            "heif" | "heic" => heic_rs::images(&std::fs::read(path)?)?.len(),
+            _ => 1,
+        })
+    };
+    count().unwrap_or(1).max(1)
+}
+
+/// Like `open_image`, for one of the images of a file, see `image_count`
+pub fn open_image_item(
+    img_location: &Path,
+    item: usize,
+    message_sender: Option<Sender<Message>>,
+    decoder_opts: Option<DecoderSettings>,
+) -> Result<Receiver<Frame>> {
     let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
     let img_location = (*img_location).to_owned();
 
@@ -84,12 +140,12 @@ pub fn open_image(
         "dcm" | "ima" => {
             use dicom_pixeldata::PixelDecoder;
             let obj = dicom_object::open_file(img_location)?;
-            let image = obj.decode_pixel_data()?;
+            let image = obj.decode_pixel_data_frame(item as u32)?;
             let dynamic_image = image.to_dynamic_image(0)?;
             _ = sender.send(Frame::new_still(dynamic_image));
         }
         "ktx2" => {
-            let image = ktx2_loader::decode(&std::fs::read(img_location)?, 0)?;
+            let image = ktx2_loader::decode(&std::fs::read(img_location)?, item)?;
             _ = sender.send(Frame::new_still(image));
             return Ok(receiver);
         }
@@ -185,7 +241,7 @@ pub fn open_image(
         // Without libheif, HEIC is decoded in pure Rust
         #[cfg(all(feature = "heif_native", not(feature = "heif")))]
         "heif" | "heic" => {
-            let i = load_heif_native(&img_location)?;
+            let i = load_heif_native(&img_location, item)?;
             _ = sender.send(Frame::new_still(i));
             return Ok(receiver);
         }
@@ -550,7 +606,7 @@ pub fn open_image(
 
             bail!("No valid icons in {}", img_location.display());
         }
-        "tif" | "tiff" => match load_tiff(&img_location) {
+        "tif" | "tiff" => match load_tiff(&img_location, item) {
             Ok(buf) => {
                 _ = sender.send(Frame::new_still(buf));
                 return Ok(receiver);
@@ -695,11 +751,14 @@ fn load_raw(img_location: &Path) -> Result<RgbaImage> {
     // Ok(DynamicImage::ImageRgb8(x).to_rgba8())
 }
 
-fn tiff_decoder(path: &Path) -> Result<tiff::decoder::Decoder<BufReader<File>>> {
-    Ok(
-        tiff::decoder::Decoder::new(BufReader::new(File::open(path)?))?
-            .with_limits(Limits::unlimited()),
-    )
+/// A decoder at a page of a TIFF, the first is 0
+fn tiff_decoder(path: &Path, page: usize) -> Result<tiff::decoder::Decoder<BufReader<File>>> {
+    let mut decoder = tiff::decoder::Decoder::new(BufReader::new(File::open(path)?))?
+        .with_limits(Limits::unlimited());
+    if page > 0 {
+        decoder.seek_to_image(page)?;
+    }
+    Ok(decoder)
 }
 
 /// The pixels of a TIFF image. The strips of a file are compressed one by one,
@@ -708,6 +767,7 @@ fn tiff_decoder(path: &Path) -> Result<tiff::decoder::Decoder<BufReader<File>>> 
 fn read_tiff_image(
     decoder: &mut tiff::decoder::Decoder<BufReader<File>>,
     path: &Path,
+    page: usize,
 ) -> Result<tiff::decoder::DecodingResult> {
     use rayon::prelude::*;
     use tiff::decoder::{ChunkType, DecodingResult};
@@ -769,7 +829,7 @@ fn read_tiff_image(
         return Ok(decoder.read_image()?);
     }
     pieces.into_par_iter().enumerate().try_for_each_init(
-        || tiff_decoder(path),
+        || tiff_decoder(path, page),
         |decoder, (strip, piece)| -> Result<()> {
             let decoder = decoder.as_mut().map_err(|e| anyhow!("{e}"))?;
             decoder.read_chunk_bytes(strip as u32, piece)?;
@@ -779,13 +839,13 @@ fn read_tiff_image(
     Ok(result)
 }
 
-fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
+fn load_tiff(img_location: &Path, page: usize) -> Result<DynamicImage> {
     use tiff::decoder::DecodingResult;
     // TODO: Probe if dng
-    let mut decoder = tiff_decoder(img_location)?;
+    let mut decoder = tiff_decoder(img_location, page)?;
     let dim = decoder.dimensions()?;
     debug!("Color type: {:?}", decoder.colortype());
-    let result = read_tiff_image(&mut decoder, img_location)?;
+    let result = read_tiff_image(&mut decoder, img_location, page)?;
     // A container for the low dynamic range image
     let ldr_img: Vec<u8> = match result {
         DecodingResult::U8(contents) => contents,
@@ -1048,11 +1108,16 @@ fn decode_apng<R: std::io::BufRead + std::io::Seek>(
 ///
 /// Rotation and mirroring stored in the file are applied by the decoder.
 #[cfg(feature = "heif_native")]
-pub fn load_heif_native(path: &Path) -> Result<DynamicImage> {
+/// One of the images of a HEIF file, 0 is the primary one
+pub fn load_heif_native(path: &Path, item: usize) -> Result<DynamicImage> {
     use heic_rs::PixelLayout;
 
     let bytes = std::fs::read(path)?;
-    let info = heic_rs::probe(&bytes).context("Can't read HEIF file")?;
+    let id = *heic_rs::images(&bytes)
+        .context("Can't read HEIF file")?
+        .get(item)
+        .with_context(|| format!("HEIF file has no image {item}"))?;
+    let info = heic_rs::probe_image(&bytes, id).context("Can't read HEIF file")?;
     let layout = match (info.bit_depth > 8, info.has_alpha) {
         (false, false) => PixelLayout::Rgb8,
         (false, true) => PixelLayout::Rgba8,
@@ -1063,7 +1128,7 @@ pub fn load_heif_native(path: &Path) -> Result<DynamicImage> {
         layout,
         ..Default::default()
     };
-    let img = heic_rs::decode(&bytes, &options).context("Can't decode HEIF image")?;
+    let img = heic_rs::decode_image(&bytes, id, &options).context("Can't decode HEIF image")?;
     let (w, h) = (img.width, img.height);
     // 16 bit samples come as pairs of bytes in the byte order of the machine
     let wide = || -> Vec<u16> {
@@ -1428,15 +1493,15 @@ mod tests {
 
         for (path, rows, bytes) in written {
             let name = path.file_name().unwrap().to_string_lossy().to_string();
-            let mut decoder = tiff_decoder(&path).unwrap();
+            let mut decoder = tiff_decoder(&path, 0).unwrap();
             assert_eq!(decoder.strip_count().unwrap(), h.div_ceil(rows), "{name}");
-            let mut serial = tiff_decoder(&path).unwrap().read_image().unwrap();
+            let mut serial = tiff_decoder(&path, 0).unwrap().read_image().unwrap();
             assert_eq!(
                 serial.as_buffer(0).as_bytes(),
                 &bytes[..],
                 "{name} as written"
             );
-            let mut parallel = read_tiff_image(&mut decoder, &path).unwrap();
+            let mut parallel = read_tiff_image(&mut decoder, &path, 0).unwrap();
             assert!(
                 parallel.as_buffer(0).as_bytes() == serial.as_buffer(0).as_bytes(),
                 "{name}: the strips decoded in parallel differ"
@@ -1521,13 +1586,14 @@ mod tests {
                     }
                 })
                 .collect();
-            let mut result = read_tiff_image(&mut tiff_decoder(&path).unwrap(), &path).unwrap();
+            let mut result =
+                read_tiff_image(&mut tiff_decoder(&path, 0).unwrap(), &path, 0).unwrap();
             assert!(
                 result.as_buffer(0).as_bytes() == &expected[..],
                 "{bits} bit"
             );
             if bits == 8 {
-                let image = load_tiff(&path).unwrap();
+                let image = load_tiff(&path, 0).unwrap();
                 assert!(image.as_bytes() == &expected[..], "8 bit, loaded");
             }
         }

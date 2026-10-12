@@ -25,7 +25,7 @@ use strum::EnumIter;
 
 use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
-use crate::image_loader::{open_image, rotate_dynimage};
+use crate::image_loader::{open_image_item, rotate_dynimage};
 use crate::scrubber::find_first_image_in_directory;
 use crate::settings::DecoderSettings;
 use crate::shortcuts::{InputEvent, Shortcuts, lookup};
@@ -328,6 +328,8 @@ pub struct Player {
     pub cache: Cache,
     watcher: HashMap<PathBuf, SystemTime>,
     decoder_opts: DecoderSettings,
+    /// Counts the loads, so a thread can tell that a newer load overtook it
+    loads: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Player {
@@ -346,6 +348,7 @@ impl Player {
             cache: Cache::new(cache_size),
             watcher: Default::default(),
             decoder_opts,
+            loads: Default::default(),
         }
     }
 
@@ -370,14 +373,23 @@ impl Player {
         }
     }
 
-    /// The main loading function of the player
-    pub fn load_advanced(&mut self, img_location: &Path, forced_frame_source: Option<Frame>) {
+    /// The main loading function of the player. `item` is one of the images of
+    /// a file that holds several, see `image_count`; only the first is cached.
+    pub fn load_advanced(
+        &mut self,
+        img_location: &Path,
+        item: usize,
+        forced_frame_source: Option<Frame>,
+    ) {
         debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
+        self.send_image_count(img_location, item);
 
-        if let Some(cached_image) = self.cache.get(img_location) {
+        if item == 0
+            && let Some(cached_image) = self.cache.get(img_location)
+        {
             debug!("Cache hit for {}", img_location.display());
 
             let frame = Frame::new_still(cached_image);
@@ -394,6 +406,7 @@ impl Player {
 
         send_image_threaded(
             img_location,
+            item,
             self.image_sender.clone(),
             self.message_sender.clone(),
             stop_receiver,
@@ -409,7 +422,30 @@ impl Player {
     }
 
     pub fn load(&mut self, img_location: &Path) {
-        self.load_advanced(img_location, None);
+        self.load_advanced(img_location, 0, None);
+    }
+
+    /// One of the images of a file that holds several
+    pub fn load_item(&mut self, img_location: &Path, item: usize) {
+        self.load_advanced(img_location, item, None);
+    }
+
+    /// Tell the app how many images the file holds, unless a newer load came first
+    fn send_image_count(&self, path: &Path, item: usize) {
+        use std::sync::atomic::Ordering;
+        let load = self.loads.fetch_add(1, Ordering::Relaxed) + 1;
+        let (loads, sender, path) = (
+            self.loads.clone(),
+            self.image_sender.clone(),
+            path.to_owned(),
+        );
+        thread::spawn(move || {
+            let count = crate::image_loader::image_count(&path);
+            if loads.load(Ordering::Relaxed) == load {
+                _ = sender.send(Frame::Item { path, item, count });
+                request_repaint();
+            }
+        });
     }
 
     pub fn stop(&self) {
@@ -435,6 +471,7 @@ pub fn request_repaint() {
 
 pub fn send_image_threaded(
     img_location: &Path,
+    item: usize,
     texture_sender: Sender<Frame>,
     message_sender: Sender<Message>,
     stop_receiver: Receiver<()>,
@@ -447,7 +484,7 @@ pub fn send_image_threaded(
     thread::spawn(move || {
         let timer = std::time::Instant::now();
 
-        match open_image(&loc, Some(message_sender.clone()), Some(decoder_opts)) {
+        match open_image_item(&loc, item, Some(message_sender.clone()), Some(decoder_opts)) {
             Ok(frame_receiver) => {
                 debug!("Got a frame receiver from opening image");
 
@@ -535,6 +572,12 @@ pub enum Frame {
     AnimationEnd(Option<u32>),
     /// TODO: Replace with edit result. A result of a compare operation. Image keeps transform.
     CompareResult(Arc<DynamicImage>, ImageGeometry),
+    /// The file holds `count` images, `item` of them is loaded
+    Item {
+        path: PathBuf,
+        item: usize,
+        count: usize,
+    },
 }
 
 impl Frame {
@@ -565,9 +608,9 @@ impl Frame {
                 | Frame::AnimationStart(ref mut image_buffer)
                 | Frame::EditResult(ref mut image_buffer)
                 | Frame::CompareResult(ref mut image_buffer, _) => *image_buffer = img.clone(),
-                Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
+                Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => (),
             },
-            Frame::UpdateTexture | Frame::AnimationEnd(_) => (),
+            Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => (),
         }
         forced_variant
     }
@@ -865,13 +908,15 @@ pub fn clear_image(state: &mut OculanteState) {
 /// Show the next image of the compare list at the position stored for it.
 pub fn compare_next(state: &mut OculanteState) {
     if let Some(item) = state.compare_list.next() {
-        let (path, geometry) = (item.path.clone(), item.geometry);
+        let (path, item, geometry) = (item.path.clone(), item.item, item.geometry);
         state.is_loaded = false;
+        state.current_path = Some(path.clone());
+        state.set_item(&path, item, None);
         state.player.load_advanced(
             &path,
+            item,
             Some(Frame::CompareResult(Default::default(), geometry)),
         );
-        state.current_path = Some(path);
     }
 }
 
@@ -971,6 +1016,10 @@ pub fn set_title(ctx: &egui::Context, state: &mut OculanteState) {
             ),
             10,
         );
+
+    if let Some(sequence) = state.sequence() {
+        title_string.push_str(&format!(" [{}/{}]", sequence.current + 1, sequence.count));
+    }
 
     if state.persistent_settings.zen_mode {
         title_string.push_str(&format!(

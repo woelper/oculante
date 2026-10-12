@@ -3,6 +3,7 @@ use crate::{
     filebrowser::BrowserDir,
     image_editing::EditState,
     scrubber::Scrubber,
+    sequence::Sequence,
     settings::{PersistentSettings, VolatileSettings},
     thumbnails::Thumbnails,
     toasts::{Anchor, Toasts},
@@ -50,6 +51,9 @@ impl Message {
 pub struct OculanteState {
     pub image_geometry: ImageGeometry,
     pub compare_list: CompareList,
+    /// The images of a file that holds several. Only meant for the file whose
+    /// path it has, use `sequence()`.
+    pub sequence: Option<Sequence>,
     pub drag_enabled: bool,
     pub reset_image: bool,
     /// Is the image fully loaded?
@@ -133,6 +137,11 @@ impl OculanteState {
     pub fn load(&mut self, path: &Path) {
         self.is_loaded = false;
         self.current_path = Some(path.to_owned());
+        if let Some(sequence) = &mut self.sequence
+            && sequence.path == path
+        {
+            sequence.current = 0;
+        }
         self.player.load(path);
     }
 
@@ -141,7 +150,40 @@ impl OculanteState {
         if let Some(path) = self.current_path.clone() {
             self.is_loaded = false;
             self.player.cache.clear();
-            self.player.load(&path);
+            self.player.load_item(&path, self.current_item());
+        }
+    }
+
+    /// The images of the file shown, when it holds more than one
+    pub fn sequence(&self) -> Option<&Sequence> {
+        self.sequence
+            .as_ref()
+            .filter(|s| s.count > 1 && self.current_path.as_deref() == Some(&s.path))
+    }
+
+    /// Which image of the file is shown, 0 for a file that holds one
+    pub fn current_item(&self) -> usize {
+        self.sequence().map_or(0, |s| s.current)
+    }
+
+    /// Show another image of the file
+    pub fn load_item(&mut self, item: usize) {
+        if let Some(path) = self.current_path.clone() {
+            self.is_loaded = false;
+            self.set_item(&path, item, None);
+            self.player.load_item(&path, item);
+        }
+    }
+
+    /// Remember which image of a file is shown, and how many it holds when that
+    /// is known
+    pub fn set_item(&mut self, path: &Path, item: usize, count: Option<usize>) {
+        match &mut self.sequence {
+            Some(sequence) if sequence.path == path => {
+                sequence.current = item;
+                sequence.count = count.unwrap_or(sequence.count);
+            }
+            _ => self.sequence = Some(Sequence::new(path, item, count.unwrap_or(item + 1))),
         }
     }
 }
@@ -163,6 +205,7 @@ impl Default for OculanteState {
                 dimensions: Default::default(),
             },
             compare_list: Default::default(),
+            sequence: None,
             drag_enabled: Default::default(),
             reset_image: Default::default(),
             is_loaded: Default::default(),

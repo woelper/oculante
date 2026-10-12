@@ -110,6 +110,14 @@ pub fn info_ui(
                 ui.advance_cursor_after_rect(preview_rect);
             } // end if current_image
 
+            // The images of a file that holds several
+            if state.sequence().is_some() {
+                ui.add_space(10.);
+                ui.vertical_centered_justified(|ui| {
+                    ui.styled_collapsing("Sequence", |ui| sequence_ui(ui, state));
+                });
+            }
+
             // SECTION 3: Compare
             ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
@@ -157,39 +165,51 @@ pub fn info_ui(
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
                                 && state.is_loaded && !state.reset_image
                                     && let Some(path) = &state.current_path {
-                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                        state.compare_list.insert(CompareItem::new(path, state.current_item(), state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
 
                             let mut to_remove = None;
-                            for CompareItem {path, geometry} in state.compare_list.iter() {
+                            let mut to_show = None;
+                            let shown = (state.current_path.clone(), state.current_item());
+                            for CompareItem {path, item, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
                                     if ui.button(X).clicked() {
-                                        to_remove = Some(path.to_owned());
+                                        to_remove = Some((path.to_owned(), *item));
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.add(egui::Button::new(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).selected(state.current_path.as_ref() == Some(path))).clicked(){
-                                            state
-                                                .player
-                                                .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
-                                            ui.ctx().request_repaint();
-                                            ui.ctx().request_repaint_after(Duration::from_millis(500));
-                                            state.current_path = Some(path.clone());
+                                        let mut name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+                                        if *item > 0 {
+                                            name.push_str(&format!(" ({})", item + 1));
+                                        }
+                                        let selected = shown.0.as_ref() == Some(path) && shown.1 == *item;
+                                        if ui.add(egui::Button::new(name).selected(selected)).clicked(){
+                                            to_show = Some((path.clone(), *item, *geometry));
                                         }
                                     });
                                 });
                             }
-                            if let Some(remove) = to_remove {
-                                state.compare_list.remove(remove);
+                            if let Some((path, item, geometry)) = to_show {
+                                state.current_path = Some(path.clone());
+                                state.set_item(&path, item, None);
+                                state
+                                    .player
+                                    .load_advanced(&path, item, Some(crate::utils::Frame::CompareResult(Default::default(), geometry)));
+                                ui.ctx().request_repaint();
+                                ui.ctx().request_repaint_after(Duration::from_millis(500));
+                            }
+                            if let Some((path, item)) = to_remove {
+                                state.compare_list.remove(path, item);
                             }
                             if let Some(path) = &state.current_path {
-                                if let Some(geo) = state.compare_list.get(path) {
+                                let item = state.current_item();
+                                if let Some(geo) = state.compare_list.get(path, item) {
                                     if state.image_geometry != geo
                                         && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
-                                                state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                                state.compare_list.insert(CompareItem::new(path, item, state.image_geometry));
                                         }
                                     } else if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                        state.compare_list.insert(CompareItem::new(path, item, state.image_geometry));
                                     }
                             }
                             if !state.compare_list.is_empty()
@@ -284,6 +304,85 @@ fn info_row(
         .inner
     })
     .inner
+}
+
+/// One row for every image of the file: a picture, its number and size, and a
+/// button to add it to the compare list. Only the rows in view are drawn, and
+/// their pictures decoded.
+fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
+    use crate::sequence::Thumbnail;
+    const ROW: f32 = 76.;
+    let (Some(path), geometry) = (state.current_path.clone(), state.image_geometry) else {
+        return;
+    };
+    let Some(sequence) = state.sequence.as_mut() else {
+        return;
+    };
+    let (mut show, mut compare) = (None, None);
+    // the accent color
+    let highlight = ui.visuals().selection.bg_fill;
+    // inside the scrolling panel the list would shrink to egui's smallest height
+    let row = ROW + ui.spacing().item_spacing.y;
+    let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);
+    egui::ScrollArea::vertical()
+        .id_salt("sequence")
+        .min_scrolled_height(height)
+        .max_height(height)
+        .show_rows(ui, ROW, sequence.count, |ui, rows| {
+            for item in rows {
+                ui.horizontal(|ui| {
+                    let (rect, response) =
+                        ui.allocate_exact_size(vec2(ROW * 4. / 3., ROW - 8.), Sense::click());
+                    let mut size = None;
+                    match sequence.thumbnail(ui.ctx(), item) {
+                        Some(Thumbnail::Done(texture, image_size)) => {
+                            size = Some(*image_size);
+                            let fit = texture.size_vec2()
+                                * (rect.size() / texture.size_vec2()).min_elem();
+                            let picture = Rect::from_center_size(rect.center(), fit);
+                            ui.painter().image(
+                                texture.id(),
+                                picture,
+                                Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)),
+                                Color32::WHITE,
+                            );
+                        }
+                        _ => {
+                            ui.painter()
+                                .rect_filled(rect, 4., ui.visuals().extreme_bg_color);
+                        }
+                    }
+                    if item == sequence.current {
+                        ui.painter().rect_stroke(
+                            rect,
+                            4.,
+                            Stroke::new(2., highlight),
+                            StrokeKind::Outside,
+                        );
+                    }
+                    if response.on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                        show = Some(item);
+                    }
+                    ui.vertical(|ui| {
+                        ui.label(format!("Item {}", item + 1));
+                        if let Some([width, height]) = size {
+                            ui.label(format!("{width}x{height}"));
+                        }
+                        if ui.button("Compare").clicked() {
+                            compare = Some(item);
+                        }
+                    });
+                });
+            }
+        });
+    if let Some(item) = show {
+        state.load_item(item);
+    }
+    if let Some(item) = compare {
+        state
+            .compare_list
+            .insert(CompareItem::new(&path, item, geometry));
+    }
 }
 
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {

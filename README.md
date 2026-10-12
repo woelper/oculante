@@ -145,6 +145,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 ## Features
 
 - Image info: pixel position, color info, color histogram.
+- Files with several images: the pages of a TIFF, the images of a HEIC, the frames of a DICOM file and the layers and cube faces of a KTX2 texture are listed in the info panel and shown one at a time, Up and Down go through them.
 - Non-destructive editing, painting, and operator stack.
 - Lossless JPEG editing: Crop, rotate, mirror without recompressing data.
 - Built-in File Manager: Bookmark directories, favorite and manage files.

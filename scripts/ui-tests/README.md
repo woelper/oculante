@@ -49,6 +49,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_relative_file_name` | Started in the folder of the image with only its file name, the next image is the one after it |
 | `test_several_files_as_arguments` | Two files given on the command line are opened as a list: the first is shown, the next key goes to the second (#382). |
 | `test_first_and_last_image` | End shows the last image of the folder, Home the first, and Home on the first image loads nothing again. |
+| `test_sequence_of_tiff_pages` | A TIFF with three pages: the title counts them, Down and Up go through them, and the Sequence list in the info panel shows a picture of each that shows the page on a click. |
 | `test_chainload_option_is_accepted` | The app starts with `-c`, which 0.9.6 accepted, and opens the image given after it. |
 | `test_delete` | Delete asks first and moves the file to the trash, Cancel keeps it, Shift+Delete only takes the image off the list |
 | `test_lossless_rotation_keys_and_quit` | `]` and `[` turn a JPEG on disk and the turned file is shown again, `q` quits |

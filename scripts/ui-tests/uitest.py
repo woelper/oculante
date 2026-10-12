@@ -268,6 +268,14 @@ def count_color(path, box, rgb, tolerance=40):
     return sum(1 for _, _, color in _pixels(path, box) if _close(color, rgb, tolerance))
 
 
+def color_center(path, box, rgb, tolerance=40):
+    """The middle (x, y) of the pixels inside box (x, y, w, h) close to rgb, or None."""
+    found = [(x, y) for x, y, color in _pixels(path, box) if _close(color, rgb, tolerance)]
+    if not found:
+        return None
+    return (sum(x for x, _ in found) // len(found), sum(y for _, y in found) // len(found))
+
+
 def panel_edge(path, x_range=(100, 900), rows=(80, 160, 240, 320, 400, 480, 560)):
     """The x of the right edge of a panel on the left: its separator line, the leftmost
     column with the same grey in all the rows, (60, 60, 60), or near white while the

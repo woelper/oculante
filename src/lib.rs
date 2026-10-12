@@ -21,6 +21,7 @@ pub(crate) mod icons;
 pub mod net;
 pub(crate) mod paint;
 pub(crate) mod scrubber;
+pub(crate) mod sequence;
 #[cfg_attr(feature = "file_open", allow(dead_code))]
 pub(crate) mod thumbnails;
 pub(crate) mod toasts;

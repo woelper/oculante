@@ -23,6 +23,7 @@ from uitest import (  # noqa: E402
     App,
     changed_pixels,
     changed_pixels_in,
+    color_center,
     count_color,
     mean_level,
     find_slider,
@@ -374,6 +375,55 @@ def test_first_and_last_image(binary):
         app.key("Home")
         app.settle(1.5)
         assert app.log().count(LOADED) == loads, "Home on the first image loaded it again"
+
+
+def test_sequence_of_tiff_pages(binary):
+    """A TIFF with three pages: the title counts them, the arrow keys go through them,
+    and the list in the info panel shows a picture of each that shows it on a click."""
+    folder = folder_of("sequence_images", [])
+    colors = [(220, 40, 40), (40, 180, 60), (50, 70, 220)]
+    pages = []
+    # next to the TIFF, a file of one image
+    subprocess.run(["convert", "-size", "50x50", "xc:white", os.path.join(folder, "single.png")], check=True)
+    for number, ((width, height), color) in enumerate(zip([(400, 300), (300, 400), (500, 250)], colors)):
+        pages.append(os.path.join(folder, f"{number}.png"))
+        subprocess.run(["convert", "-size", f"{width}x{height}", f"xc:rgb{color}", pages[-1]], check=True)
+    path = os.path.join(folder, "pages.tif")
+    subprocess.run(["convert", *pages, "-type", "TrueColor", "-depth", "8", path], check=True)
+
+    with App(binary, "sequence", [path], settings={"info_enabled": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the first page never loaded"
+        app.settle(1.5)
+        title = lambda: app.x("xdotool", "getwindowname", app.win).stdout.strip()
+        assert title().endswith("[1/3]"), f"the title does not count the pages: {title()!r}"
+        app.key("Down")
+        app.settle(1.5)
+        assert title().endswith("[2/3]"), f"Down did not go to the second page: {title()!r}"
+        canvas = (300, 100, 700, 400)
+        assert count_color(app.shot("second_page"), canvas, colors[1]) > 10000, "the second page is not shown"
+        app.key("Up")
+        app.settle(1.5)
+        assert title().endswith("[1/3]"), f"Up did not go back: {title()!r}"
+
+        # open the list, then scroll the panel down to it
+        app.click(60, 549)
+        app.settle(1.0)
+        app.scroll_down(120, 150, 6)
+        app.settle(2.5)
+        shot = app.shot("sequence_list")
+        panel = (0, 40, 250, 560)
+        for number, color in enumerate(colors):
+            assert count_color(shot, panel, color) > 500, f"no picture of page {number + 1} in the list"
+        app.click(*color_center(shot, panel, colors[2]))
+        app.settle(2.0)
+        assert title().endswith("[3/3]"), f"a click on the picture did not show the page: {title()!r}"
+        assert count_color(app.shot("third_page"), canvas, colors[2]) > 10000, "the third page is not shown"
+        # the next file has one image, the title counts no more
+        app.key("Right")
+        app.settle(1.5)
+        assert "[" not in title().split("|")[-1], f"the title still counts pages: {title()!r}"
 
 
 def test_chainload_option_is_accepted(binary):
@@ -1100,6 +1150,7 @@ TESTS = [
     test_relative_file_name,
     test_several_files_as_arguments,
     test_first_and_last_image,
+    test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
     test_delete,
     test_lossless_rotation_keys_and_quit,
