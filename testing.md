@@ -5,7 +5,7 @@ Regressions found by measuring:
 - [x] GPU memory: the kernel counted more for large images than on 0.9.6, a 144 MP JPEG 1162 -> 2027 MB, most of it a reserve the driver gives up when memory gets tight. Two causes: a texture was reallocated when its mipmaps were made, the old memory kept as a reserve (now allocated once with all levels, `tex_storage_2d`, where the GL has it), and the driver's upload buffers piled up for an image of several tiles (now it waits for each tile's upload). Measured on 2026-10-12 against 0.9.6: 24 MP 278 -> 271 MB, 64 MP gray 206 -> 151 MB, 144 MP 1161 -> 971 MB, the empty window 45 -> 31 MB. UI test `test_mipmaps_switched_on_and_off`.
 
 Human tests:
-- [ ] macOS, Apple Silicon (Stoppedpuma, Johann): "Open with" and a double click in Finder, with Oculante closed and already running, a file dropped on the app icon, several files at once, a file as argument in the terminal (opened once, not twice). Zoom speed with the trackpad on the image, scroll speed in the panels. The signed and notarised bundle starts without a warning.
+- [ ] macOS, Apple Silicon (Stoppedpuma, Johann): "Open with" and a double click in Finder, with Oculante closed and already running, a file dropped on the app icon, several files at once, a file as argument in the terminal (opened once, not twice). Oculante is offered in "Open with" for HEIC, TIFF and other images, not only the few listed by name (#775: the plists declared `public.images`, there is no such type, now `public.image`, `public.heic` and `public.heif`). Zoom speed with the trackpad on the image, scroll speed in the panels. The signed and notarised bundle starts without a warning.
 - [ ] macOS, Intel: starts and opens a file. Low priority.
 - [ ] Windows 10 and 11 (piperun): starts on a real GPU, display scaling 100 and 150 %, opening files from the explorer and the file dialog, drag and drop, copy and paste, a photo of 200 megapixels from a Samsung phone (#782).
 - [ ] Linux, Wayland with GNOME, KDE and Sway (Stoppedpuma for Sway): transparency (#342), borderless mode and moving the window (#733), drag and drop (#781), no keys stuck after the window lost the focus (#374), a loaded image shows without moving the mouse (#776).
@@ -16,7 +16,7 @@ Human tests:
 Before tagging:
 - [ ] heic-rs: tbraun96/heic-rs#7 and #8 released, or the fork published under its own name. A crate on crates.io does not get the patch in Cargo.toml, photos from phones would come out with the wrong contrast and colour.
 - [ ] avif-parse: kornelski/avif-parse#4 released, or the patch dropped for the release. 0.9.6 can not open those files either, without the patch nothing gets worse.
-- [ ] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build.
+- [x] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build. Checked: builds with 1.98.0.
 - [ ] A dry run of the release workflow with a pre-release tag: all binaries build, the Mac bundles are signed and notarised, the plist is up to date (file associations).
 - [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build.
 
