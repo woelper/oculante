@@ -790,6 +790,7 @@ fn read_tiff_image(
 }
 
 fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
+    use tiff::decoder::DecodingResult;
     // TODO: Probe if dng
     let mut decoder = tiff_decoder(img_location)?;
     let dim = decoder.dimensions()?;
@@ -797,91 +798,24 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
     let result = read_tiff_image(&mut decoder, img_location)?;
     // A container for the low dynamic range image
     let ldr_img: Vec<u8> = match result {
-        tiff::decoder::DecodingResult::U8(contents) => {
-            debug!("TIFF U8");
-            contents
+        DecodingResult::U8(contents) => contents,
+        DecodingResult::U16(contents) => autoscale(&contents, |p| p as f32, (0., u16::MAX as f32)),
+        DecodingResult::F16(contents) => autoscale(&contents, f32::from, (0., 1.)),
+        DecodingResult::U32(contents) => autoscale(&contents, |p| p as f32, (0., u32::MAX as f32)),
+        DecodingResult::U64(contents) => autoscale(&contents, |p| p as f32, (0., u64::MAX as f32)),
+        DecodingResult::F32(contents) => autoscale(&contents, |p| p, (0., 1.)),
+        DecodingResult::F64(contents) => autoscale(&contents, |p| p as f32, (0., 1.)),
+        DecodingResult::I8(contents) => {
+            autoscale(&contents, |p| p as f32, (i8::MIN as f32, i8::MAX as f32))
         }
-        tiff::decoder::DecodingResult::U16(contents) => {
-            debug!("TIFF U16");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (0., u16::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
+        DecodingResult::I16(contents) => {
+            autoscale(&contents, |p| p as f32, (i16::MIN as f32, i16::MAX as f32))
         }
-        tiff::decoder::DecodingResult::F16(contents) => {
-            debug!("TIFF F16");
-            let values = contents
-                .par_iter()
-                .map(|p| f32::from(*p))
-                .collect::<Vec<_>>();
-            autoscale(&values, (0., 1.))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
+        DecodingResult::I32(contents) => {
+            autoscale(&contents, |p| p as f32, (i32::MIN as f32, i32::MAX as f32))
         }
-        tiff::decoder::DecodingResult::U32(contents) => {
-            debug!("TIFF U32");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (0., u32::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::U64(contents) => {
-            debug!("TIFF U64");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (0., u64::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::F32(contents) => {
-            debug!("TIFF F32");
-            autoscale(&contents, (0., 1.))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::F64(contents) => {
-            debug!("TIFF F64");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (0., 1.))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::I8(contents) => {
-            debug!("TIFF I8");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (i8::MIN as f32, i8::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::I16(contents) => {
-            debug!("TIFF I16");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (i16::MIN as f32, i16::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::I32(contents) => {
-            debug!("TIFF I32");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (i32::MIN as f32, i32::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
-        }
-        tiff::decoder::DecodingResult::I64(contents) => {
-            debug!("TIFF I64");
-            let values = contents.par_iter().map(|p| *p as f32).collect::<Vec<_>>();
-            autoscale(&values, (i64::MIN as f32, i64::MAX as f32))
-                .par_iter()
-                .map(|x| *x as u8)
-                .collect()
+        DecodingResult::I64(contents) => {
+            autoscale(&contents, |p| p as f32, (i64::MIN as f32, i64::MAX as f32))
         }
     };
 
@@ -922,25 +856,32 @@ fn load_tiff(img_location: &Path) -> Result<DynamicImage> {
 /// Stretches the values from the lowest to the highest to 0 to 255. An image
 /// with a single value has nothing to stretch, it is shown at its level in the
 /// range of its sample type. It came out black, from a division by zero.
-fn autoscale(values: &Vec<f32>, type_range: (f32, f32)) -> Vec<f32> {
-    let mut lowest = f32::MAX;
-    let mut highest = f32::MIN;
-
-    for v in values {
-        if *v < lowest {
-            lowest = *v
-        }
-        if *v > highest {
-            highest = *v
-        }
-    }
+/// Stretch the values from the lowest to the highest over 8 bit. Straight from the samples
+/// and in parallel: the two float copies this made took 576 MB for a 24 MP 16 bit TIFF.
+fn autoscale<T: Copy + Send + Sync>(
+    values: &[T],
+    as_f32: impl Fn(T) -> f32 + Sync,
+    type_range: (f32, f32),
+) -> Vec<u8> {
+    // comparisons, not f32::min, so NaN never wins, as before
+    let lower = |a: f32, b: f32| if b < a { b } else { a };
+    let higher = |a: f32, b: f32| if b > a { b } else { a };
+    let (mut lowest, mut highest) = values
+        .par_iter()
+        .fold(
+            || (f32::MAX, f32::MIN),
+            |(low, high), v| (lower(low, as_f32(*v)), higher(high, as_f32(*v))),
+        )
+        .reduce(
+            || (f32::MAX, f32::MIN),
+            |a, b| (lower(a.0, b.0), higher(a.1, b.1)),
+        );
     if highest <= lowest {
         (lowest, highest) = type_range;
     }
-
     values
-        .iter()
-        .map(|v| fit(*v, lowest, highest, 0., 255.).clamp(0., 255.))
+        .par_iter()
+        .map(|v| fit(as_f32(*v), lowest, highest, 0., 255.).clamp(0., 255.) as u8)
         .collect()
 }
 
@@ -1303,6 +1244,25 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
 mod tests {
     #[cfg(feature = "heif")]
     use std::path::Path;
+
+    #[test]
+    fn autoscale_stretches_to_8_bit() {
+        use super::autoscale;
+        // the lowest becomes 0, the highest 255
+        let a = autoscale(&[1000u16, 2000, 3000], |p| p as f32, (0., 65535.));
+        assert_eq!(a, [0, 127, 255]);
+        // NaN does not count for the range and comes out as 0
+        assert_eq!(
+            autoscale(&[f32::NAN, 0.25, 0.75], |p| p, (0., 1.)),
+            [0, 0, 255]
+        );
+        // all the same: the range of the type
+        assert_eq!(autoscale(&[-1i8; 3], |p| p as f32, (-128., 127.)), [127; 3]);
+        // enough values to be split over threads, the lowest at the end
+        let many: Vec<u32> = (1000..201_000).rev().collect();
+        let a = autoscale(&many, |p| p as f32, (0., u32::MAX as f32));
+        assert_eq!((a[0], a[a.len() - 1]), (255, 0));
+    }
 
     #[test]
     fn gamma_table_matches_powf() {
