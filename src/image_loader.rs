@@ -20,6 +20,7 @@ use rgb::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
+use std::sync::OnceLock;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use tiff::decoder::Limits;
 
@@ -602,9 +603,59 @@ fn tonemap_rgba(px: [f32; 4]) -> [u8; 4] {
     ]
 }
 
+/// Gamma 2.2 of a linear value as 8 bit, from a table instead of a `powf` per channel,
+/// which took 560 ms of a 24 MP EXR. Gives the same byte as `tonemap_f32_powf` for every
+/// float but negative infinity, which is black here like the other negative values.
 pub fn tonemap_f32(px: f32) -> u8 {
+    if px >= 1.0 {
+        return 255;
+    }
+    // zero, negative and NaN
+    if px <= 0.0 || px.is_nan() {
+        return 0;
+    }
+    let table = gamma_table();
+    let mut value = table.start[(px.to_bits() >> 16) as usize];
+    while value < 255 && px >= table.steps[value as usize] {
+        value += 1;
+    }
+    value
+}
+
+fn tonemap_f32_powf(px: f32) -> u8 {
     (px.powf(1.0 / 2.2).clamp(0.0, 1.0) * 255.0) as u8
-    // (px.filmic() * 255.) as u8
+}
+
+struct GammaTable {
+    /// The value at the start of each run of floats that share their upper 16 bits
+    start: Vec<u8>,
+    /// `steps[k]` is the smallest float that gives k + 1
+    steps: [f32; 255],
+}
+
+fn gamma_table() -> &'static GammaTable {
+    static TABLE: OnceLock<GammaTable> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        // positive floats sort like their bits, so each step is a binary search over them
+        let one = 1f32.to_bits();
+        let mut steps = [0f32; 255];
+        for (k, step) in steps.iter_mut().enumerate() {
+            let (mut low, mut high) = (0, one);
+            while low < high {
+                let middle = low + (high - low) / 2;
+                if tonemap_f32_powf(f32::from_bits(middle)) as usize > k {
+                    high = middle;
+                } else {
+                    low = middle + 1;
+                }
+            }
+            *step = f32::from_bits(low);
+        }
+        let start = (0..=one >> 16)
+            .map(|i| tonemap_f32_powf(f32::from_bits(i << 16)))
+            .collect();
+        GammaTable { start, steps }
+    })
 }
 
 fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
@@ -1252,6 +1303,36 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
 mod tests {
     #[cfg(feature = "heif")]
     use std::path::Path;
+
+    #[test]
+    fn gamma_table_matches_powf() {
+        use super::{gamma_table, tonemap_f32, tonemap_f32_powf};
+        let same = |bits: u32| {
+            let f = f32::from_bits(bits);
+            assert_eq!(tonemap_f32(f), tonemap_f32_powf(f), "{f:?} ({bits:#x})");
+        };
+        // a spread over all floats, both signs, NaN and infinity
+        for bits in (0..=u32::MAX).step_by(4099) {
+            if bits != f32::NEG_INFINITY.to_bits() {
+                same(bits);
+            }
+        }
+        for bits in [
+            0,
+            1,
+            f32::INFINITY.to_bits(),
+            f32::NAN.to_bits(),
+            1f32.to_bits(),
+        ] {
+            same(bits);
+        }
+        // every float close to a step
+        for step in gamma_table().steps {
+            let bits = step.to_bits();
+            (bits.saturating_sub(256)..bits + 256).for_each(same);
+        }
+        assert_eq!(tonemap_f32(f32::NEG_INFINITY), 0);
+    }
 
     #[cfg(feature = "heif")]
     use crate::{
