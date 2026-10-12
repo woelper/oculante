@@ -794,7 +794,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
     // check if a new loaded image has been sent
     // Drain loop to get latest frame and prevent animation speedup on focus loss
-    let latest_frame = state.texture_channel.1.try_iter().last();
+    // An animation start that arrives together with later frames must not be
+    // dropped: it is what centers the new image and updates the scrubber.
+    let latest_frame = state
+        .texture_channel
+        .1
+        .try_iter()
+        .reduce(|earlier, later| match (earlier, later) {
+            (Frame::AnimationStart(_), Frame::Animation(img, _)) => Frame::AnimationStart(img),
+            (_, later) => later,
+        });
 
     if let Some(frame) = latest_frame {
         state.is_loaded = true;
