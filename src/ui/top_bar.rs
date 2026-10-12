@@ -445,7 +445,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                         });
 
                         if res.inner {
-                            load_image_from_path(r, state);
+                            state.load(r);
                             ui.close();
                         }
                     }

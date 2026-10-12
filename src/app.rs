@@ -371,13 +371,11 @@ impl OculanteApp {
 
     fn process_load_channel(&mut self) {
         if let Ok(p) = self.state.load_channel.1.try_recv() {
-            self.state.is_loaded = false;
             self.state.current_image = None;
-            self.state.player.load(&p);
+            self.state.load(&p);
             if let Some(dir) = p.parent() {
                 self.state.volatile_settings.last_open_directory = dir.to_path_buf();
             }
-            self.state.current_path = Some(p);
             self.state.scrubber.fixed_paths = false;
         }
     }
@@ -767,10 +765,8 @@ impl eframe::App for OculanteApp {
                 if let Some(ext) = path.extension()
                     && SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_lowercase().as_str())
                 {
-                    self.state.is_loaded = false;
                     self.state.current_image = None;
-                    self.state.player.load(path);
-                    self.state.current_path = Some(path.to_path_buf());
+                    self.state.load(path);
                 }
             }
         });
@@ -1089,18 +1085,14 @@ impl eframe::App for OculanteApp {
                 && let Some(p) = &state.current_path
                 && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot90)).is_ok()
             {
-                state.is_loaded = false;
-                state.player.cache.clear();
-                state.player.load(p);
+                state.reload();
             }
             #[cfg(feature = "turbo")]
             if key_pressed(ctx, state, LosslessRotateLeft)
                 && let Some(p) = &state.current_path
                 && lossless_tx(p, turbojpeg::Transform::op(turbojpeg::TransformOp::Rot270)).is_ok()
             {
-                state.is_loaded = false;
-                state.player.cache.clear();
-                state.player.load(p);
+                state.reload();
             }
         }
 

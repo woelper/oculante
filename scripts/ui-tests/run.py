@@ -355,6 +355,27 @@ def test_several_files_as_arguments(binary):
         assert shown_file(app) == "moss.jpg", f"the next key did not go to the second file: {shown_file(app)}"
 
 
+def test_first_and_last_image(binary):
+    """End shows the last image of the folder and Home the first; Home on the first
+    loads nothing again."""
+    folder = folder_of("first_last_images", [(f"{n:02}.png", "test.png") for n in range(5)])
+    with App(binary, "first_last", [os.path.join(folder, "02.png")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        app.key("End")
+        app.settle(1.5)
+        assert shown_file(app) == "04.png", f"End did not show the last image: {shown_file(app)}"
+        app.key("Home")
+        app.settle(1.5)
+        assert shown_file(app) == "00.png", f"Home did not show the first image: {shown_file(app)}"
+        loads = app.log().count(LOADED)
+        app.key("Home")
+        app.settle(1.5)
+        assert app.log().count(LOADED) == loads, "Home on the first image loaded it again"
+
+
 def test_chainload_option_is_accepted(binary):
     """0.9.6 took -c, it relaunched itself with it on macOS. The option was gone and
     the app refused to start when it was given."""
@@ -403,10 +424,12 @@ def test_lossless_rotation_keys_and_quit(binary):
 
     with start(binary, "rotation_keys", path) as app:
         assert size() == (1000, 750)
+        loads = app.log().count(LOADED)
         app.key("bracketright")
         app.settle(2.0)
         width, height = size()
         assert width < height, f"] did not turn the file: {width}x{height}"
+        assert app.log().count(LOADED) > loads, "the turned file was not shown again"
         app.key("bracketleft")
         app.settle(2.0)
         width, height = size()
@@ -1076,6 +1099,7 @@ TESTS = [
     test_key_repeat,
     test_relative_file_name,
     test_several_files_as_arguments,
+    test_first_and_last_image,
     test_chainload_option_is_accepted,
     test_delete,
     test_lossless_rotation_keys_and_quit,

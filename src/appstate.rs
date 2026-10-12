@@ -128,6 +128,22 @@ impl OculanteState {
                 .unwrap_or_else(|| self.volatile_settings.last_open_directory.clone()),
         }
     }
+
+    /// Start loading an image, it is shown when it arrives
+    pub fn load(&mut self, path: &Path) {
+        self.is_loaded = false;
+        self.current_path = Some(path.to_owned());
+        self.player.load(path);
+    }
+
+    /// Read the current image from its file again, for example after it was changed there
+    pub fn reload(&mut self) {
+        if let Some(path) = self.current_path.clone() {
+            self.is_loaded = false;
+            self.player.cache.clear();
+            self.player.load(&path);
+        }
+    }
 }
 
 impl Default for OculanteState {

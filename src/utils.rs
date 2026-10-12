@@ -847,33 +847,23 @@ pub fn clipboard_copy_path(path: &Path) {
     }
 }
 
-pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
-    state.is_loaded = false;
-    state.player.load(p);
-    state.current_path = Some(p.to_owned());
-}
-
 pub fn last_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
+    if let Some(img_location) = state.current_path.clone() {
         let last = state.scrubber.len().saturating_sub(1);
         let next_img = state.scrubber.set(last);
         // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state.player.load(img_location);
+        if next_img != img_location {
+            state.load(&next_img);
         }
     }
 }
 
 pub fn first_image(state: &mut OculanteState) {
-    if let Some(img_location) = state.current_path.as_mut() {
+    if let Some(img_location) = state.current_path.clone() {
         let next_img = state.scrubber.set(0);
         // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state.player.load(img_location);
+        if next_img != img_location {
+            state.load(&next_img);
         }
     }
 }
@@ -890,9 +880,7 @@ pub fn clear_image(state: &mut OculanteState) {
     }
     // prevent reload if at last or first
     if Some(&next_img) != state.current_path.as_ref() {
-        state.is_loaded = false;
-        state.current_path = Some(next_img.clone());
-        state.player.load(&next_img);
+        state.load(&next_img);
     }
 }
 
@@ -917,27 +905,19 @@ pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
         let location = paths_to_open.into_iter().next().unwrap();
         if location.is_dir() {
             if let Ok(first) = find_first_image_in_directory(&location) {
-                state.is_loaded = false;
-                state.player.load(&first);
-                state.current_path = Some(first);
+                state.load(&first);
             }
         } else {
-            state.is_loaded = false;
-            state.player.load(&location);
-            state.current_path = Some(location);
+            state.load(&location);
         }
     } else if paths_to_open.len() > 1 {
         let location = paths_to_open.first().unwrap();
         if location.is_dir() {
             if let Ok(first) = find_first_image_in_directory(location) {
-                state.is_loaded = false;
-                state.current_path = Some(first.clone());
-                state.player.load(&first);
+                state.load(&first);
             }
         } else {
-            state.is_loaded = false;
-            state.current_path = Some(location.clone());
-            state.player.load(location);
+            state.load(location);
         }
         state.scrubber.fixed_paths = paths_to_open.iter().all(|p| p.is_file());
         state.scrubber.entries = paths_to_open;
@@ -949,9 +929,7 @@ pub fn next_image(state: &mut OculanteState) {
     let next_img = state.scrubber.next();
     // prevent reload if at last or first
     if Some(&next_img) != state.current_path.as_ref() {
-        state.is_loaded = false;
-        state.current_path = Some(next_img.clone());
-        state.player.load(&next_img);
+        state.load(&next_img);
     }
 }
 
@@ -959,9 +937,7 @@ pub fn prev_image(state: &mut OculanteState) {
     let prev_img = state.scrubber.prev();
     // prevent reload if at last or first
     if Some(&prev_img) != state.current_path.as_ref() {
-        state.is_loaded = false;
-        state.current_path = Some(prev_img.clone());
-        state.player.load(&prev_img);
+        state.load(&prev_img);
     }
 }
 

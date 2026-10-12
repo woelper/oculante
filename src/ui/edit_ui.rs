@@ -401,15 +401,13 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
 
             ui.vertical_centered_justified(|ui| {
-                if let Some(path) = &state.current_path
+                if state.current_path.is_some()
                     && ui
                         .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
-                        state.is_loaded = false;
-                        state.player.cache.clear();
-                        state.player.load(path);
+                        state.reload();
                     }
 
 
@@ -1016,9 +1014,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 });
 
             if reload {
-                state.is_loaded = false;
-                state.player.cache.clear();
-                state.player.load(p);
+                state.reload();
             }
         });
     }
