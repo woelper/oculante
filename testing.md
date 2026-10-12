@@ -20,7 +20,7 @@ Before tagging:
 - [ ] avif-parse: kornelski/avif-parse#4 released, or the patch dropped for the release. 0.9.6 can not open those files either, without the patch nothing gets worse.
 - [x] `rust-version = "1.98"` in Cargo.toml, so an older Rust says why it does not build. Checked: builds with 1.98.0.
 - [ ] A dry run of the release workflow with a pre-release tag: all binaries build, the Mac bundles are signed and notarised, the plist is up to date (file associations).
-- [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build. Since 2026-10-07: planar TIFFs open (only red before), ORA files without the "Extension mismatch" warning, faster TIFF above 8 bit (and much less memory), EXR and Radiance HDR, images above 512 MB open (#782), JPEGs libjpeg-turbo refuses fall back to the image crate.
+- [ ] Release notes with the changes made on purpose: edits give different pixels than 0.9.6 (rounding, Contrast and Desaturate fixed), 16 bit PNG and AVIF stay 16 bit, HEIC opens without libheif, no update check, SVG scale 2 by default, the info panel opens at its set width, Rust 1.98 to build. Since 2026-10-07: planar TIFFs open (only red before), ORA files without the "Extension mismatch" warning, faster TIFF above 8 bit (and much less memory), EXR and Radiance HDR, images above 512 MB open (#782), JPEGs libjpeg-turbo refuses fall back to the image crate. New for 1.0: the sequence view (#777), KTX2 in all formats of the KTX-Software tests, Basis Universal without C++.
 
 Regressions found on 2026-10-12, from Stoppedpuma's list in #799, fixed:
 - [x] `-c` was refused, 0.9.6 accepted it (it relaunched itself with it on macOS). Accepted again, hidden. UI test `test_chainload_option_is_accepted`.
@@ -28,7 +28,11 @@ Regressions found on 2026-10-12, from Stoppedpuma's list in #799, fixed:
 - [x] Not a regression: edits on animations. 0.9.6 showed every frame unedited too; this branch had it for a while. After the release.
 - [x] macOS did not offer Oculante for HEIC in "Open with" (#775), also in 0.9.6: the plist declared `public.images`. Fixed, needs the check on a Mac above.
 
-Not regressions, also in 0.9.6, can come after the release: the open issues further down (#460, #400, #426, #504, #647, #761, #644, #601, #707, zen mode), always on top on Wayland, 16 bit and broken APNGs, WebP speed, AVIF grids, HDR (#746), prefetching, memory for long animations, the simplifications.
+Added for 1.0 on purpose (2026-10-12):
+- [ ] Sequence view (#777): the images of a file that holds several, listed in the info panel with a picture each, shown one at a time, Down and Up go through them, the title counts them ("[2/6]"), each can go into the compare list. TIFF pages, HEIC images (needs `images`/`decode_image` in heic-rs, on our fork's `feat/images`), DICOM frames, KTX2 layers, cube faces and slices. Only the first image of a file goes into the cache. Human test: a macOS dynamic wallpaper (HEIC), a scanned multi-page TIFF, a multi-frame DICOM, a KTX2 cube map; the list with hundreds of images (only the rows in view are decoded).
+- [x] KTX2 (#257, #405): 42 of 42 test files open (were 16), with basisu and texture2ddecoder instead of the loader from Bevy. Floats are shown clamped to 0..1 like before, without the gamma EXR and HDR get.
+
+Not regressions, also in 0.9.6, can come after the release: TIFFs with 1 bit samples (palette or RGB, ImageMagick writes them for images of few flat colours, the tiff crate refuses them), the open issues further down (#460, #400, #426, #504, #647, #761, #644, #601, #707, zen mode), always on top on Wayland, 16 bit and broken APNGs, WebP speed, AVIF grids, HDR (#746), prefetching, memory for long animations, the simplifications.
 
 
 # Testing steps after Notan removal
