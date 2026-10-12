@@ -64,6 +64,7 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
 | `test_image_info_is_computed_when_shown` | The numbers of the info panel are computed only while it is open, once per image, not for every edit change, and again after edits are applied |
 | `test_info_panel_resizes` | The info panel follows when its edge is dragged: no black strip while dragging narrower, no jump back when let go, and the zoom preview grows with a wider panel. |
+| `test_image_is_fitted_next_to_the_panels` | An image is fitted into the space the bar and the info panel leave, not under the panel. |
 | `test_histogram_shows_values_on_hover` | Hovering over the histogram shows the channel, the value and the number of pixels next to the pointer. |
 | `test_mipmaps_switched_on_and_off` | Mipmaps switched on and off in the preferences with an image on screen: the image is not black with them, and the same as before without them. |
 | `test_saved_edits_come_back` | Edits saved with "Save edits" are applied again when the image is opened the next time |

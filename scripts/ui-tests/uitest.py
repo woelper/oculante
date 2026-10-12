@@ -251,20 +251,37 @@ def find_slider(path, box, rgb, tolerance=40, min_fill=40):
     return max(rows[middle]), middle
 
 
+def mean_level(path, box):
+    """The mean of all channels inside box (x, y, w, h) of a screenshot, 0 to 255."""
+    x, y, w, h = box
+    out = subprocess.run(
+        ["convert", path, "-crop", f"{w}x{h}+{x}+{y}", "+repage", "-format", "%[fx:mean*255]", "info:"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return float(out)
+
+
 def count_color(path, box, rgb, tolerance=40):
     """Number of pixels inside box (x, y, w, h) of a screenshot close to rgb."""
     return sum(1 for _, _, color in _pixels(path, box) if _close(color, rgb, tolerance))
 
 
 def panel_edge(path, x_range=(100, 900), rows=(80, 160, 240, 320, 400, 480, 560)):
-    """The x of the right edge of a panel on the left: the rightmost column with the
-    same color in all the rows. The image right of the panel differs from row to row."""
+    """The x of the right edge of a panel on the left: its separator line, the leftmost
+    column with the same grey in all the rows, (60, 60, 60), or near white while the
+    pointer is on it. Right of an image the empty canvas has one colour in all rows too."""
     colors = {}
     for y in rows:
         for x, _, color in _pixels(path, (x_range[0], y, x_range[1] - x_range[0], 1)):
             colors.setdefault(x, set()).add(color)
-    constant = [x for x, seen in colors.items() if len(seen) == 1]
-    return max(constant) if constant else None
+    for x in sorted(colors):
+        if len(colors[x]) == 1:
+            r, g, b = next(iter(colors[x]))
+            if r == g == b and (abs(r - 60) <= 4 or r >= 180):
+                return x
+    return None
 
 
 def rightmost_x(path, box, rgb, tolerance=40):

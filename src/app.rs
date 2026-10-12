@@ -914,7 +914,9 @@ impl eframe::App for OculanteApp {
         if state.reset_image
             && let Some(current_image) = &state.current_image
         {
-            let draw_area = ctx.content_rect();
+            // the area the bar and the panels leave, as in 0.9.6: fitted to the whole
+            // window, the image went under them
+            let draw_area = canvas_rect;
             let window_size = Vector2::new(draw_area.width(), draw_area.height());
             let img_size = current_image.size_vec();
             let scaled_to_fit = window_size.component_div(&img_size).amin();
