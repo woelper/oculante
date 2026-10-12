@@ -106,7 +106,8 @@ wgpu-types = "30" # for KTX, the names of the texture formats
 ruzstd = "0.9"                                                                                                           # for KTX
 mouse_position = "0.1.4"
 file-format = "0.29"
-zip = "8.6"
+# Krita files are read, they use deflate
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sysinfo = "0.39"
 unicode-segmentation = "1.13.3"
 font-kit = "0.14"

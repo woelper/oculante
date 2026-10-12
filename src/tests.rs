@@ -666,6 +666,37 @@ fn ci_jpeg_that_libjpeg_turbo_refuses() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// A Krita file is a zip with the picture in it as mergedimage.png. No test file
+/// covered it.
+#[test]
+fn ci_load_krita() {
+    use std::io::Write;
+    let rgba = image::RgbaImage::from_fn(7, 5, |x, y| {
+        image::Rgba([(x * 30) as u8, (y * 40) as u8, 90, 255])
+    });
+    let mut png = std::io::Cursor::new(vec![]);
+    image::DynamicImage::ImageRgba8(rgba.clone())
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    let path = std::env::temp_dir().join("oculante_test_krita.kra");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let stored =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("mimetype", stored).unwrap();
+    zip.write_all(b"application/x-krita").unwrap();
+    let deflated = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    zip.start_file("mergedimage.png", deflated).unwrap();
+    zip.write_all(png.get_ref()).unwrap();
+    zip.finish().unwrap();
+
+    let (frames, warnings) = load_all(&path).unwrap();
+    std::fs::remove_file(&path).unwrap();
+    let image = frames.first().and_then(|f| f.get_image()).unwrap();
+    assert_eq!(image.to_rgba8(), rgba);
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
 /// The size a file name gives, like 600x300 in "600x300_float.exr"
 fn size_in_name(name: &str) -> Option<(u32, u32)> {
     name.split(|c: char| !c.is_ascii_alphanumeric())
