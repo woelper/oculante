@@ -12,11 +12,7 @@ Oculante is a free, open-source, bloat-free, and privacy-respecting image viewer
 
 [![](https://dcbadge.limes.pink/api/server/https://discord.gg/2Q6cF5ZWe7)](https://discord.gg/https://discord.gg/2Q6cF5ZWe7)
 ---
-[![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
-[![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
-[![Ubuntu](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml)
-[![Windows](https://github.com/woelper/oculante/actions/workflows/check_windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_windows.yml)
-[![ARM](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml)
+[![CI](https://github.com/woelper/oculante/actions/workflows/ci.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/ci.yml)
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)

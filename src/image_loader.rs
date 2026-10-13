@@ -641,6 +641,7 @@ fn gamma_table() -> &'static GammaTable {
     })
 }
 
+#[cfg(not(feature = "hdr"))]
 fn tonemap_rgb(px: [f32; 3]) -> [u8; 4] {
     let mut tm = tonemap_rgba([px[0], px[1], px[2], 1.0]);
     tm[3] = 255;
