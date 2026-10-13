@@ -327,7 +327,7 @@ impl fmt::Display for ImageOperation {
 pub const CANVAS_RECT: &str = "canvas_rect";
 
 /// The area of the window that shows the image, as of the last frame.
-fn canvas_rect(ctx: &egui::Context) -> Rect {
+pub fn canvas_rect(ctx: &egui::Context) -> Rect {
     ctx.data(|data| data.get_temp::<Rect>(Id::new(CANVAS_RECT)))
         .unwrap_or(Rect::EVERYTHING)
 }

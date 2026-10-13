@@ -882,6 +882,7 @@ impl eframe::App for OculanteApp {
         ctx.data_mut(|data| {
             data.insert_temp(Id::new(crate::image_editing::CANVAS_RECT), canvas_rect)
         });
+        follow_fullscreen_canvas(ctx, state, canvas_rect);
         let pointer_pos = ctx.input(|i| i.pointer.interact_pos());
         let over_floating_layer = pointer_pos
             .and_then(|p| ctx.layer_id_at(p))

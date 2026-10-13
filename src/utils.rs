@@ -23,7 +23,7 @@ use std::sync::{Arc, OnceLock};
 use strum::Display;
 use strum::EnumIter;
 
-use crate::appstate::{ImageGeometry, Message, OculanteState};
+use crate::appstate::{FullscreenAnchor, ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_loader::{open_image_item, rotate_dynimage};
 use crate::scrubber::find_first_image_in_directory;
@@ -686,10 +686,14 @@ pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
 
 pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
     let fullscreen = ctx.input(|i| i.viewport().fullscreen).unwrap_or(false);
-    // Wayland does not tell where the window is, then the image stays where it is in the window
-    state.fullscreen_origin = ctx
-        .input(|i| i.viewport().inner_rect)
-        .map(|r| (r.min, std::time::Instant::now()));
+    let anchor = match ctx.input(|i| i.viewport().inner_rect) {
+        Some(inner) => Some(FullscreenAnchor::Origin(inner.min)),
+        // Wayland does not tell where the window is
+        None => Some(crate::image_editing::canvas_rect(ctx))
+            .filter(|canvas| canvas.is_finite() && canvas.area() > 0.)
+            .map(FullscreenAnchor::Canvas),
+    };
+    state.fullscreen_origin = anchor.map(|anchor| (anchor, std::time::Instant::now()));
     ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(!fullscreen));
 }
 
@@ -697,7 +701,7 @@ pub fn toggle_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
 /// Move the image back by as much, so the pixel under the cursor stays under it. The
 /// window can take a few frames to get there, on macOS it is animated.
 pub fn follow_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
-    let Some((origin, moved_at)) = state.fullscreen_origin else {
+    let Some((FullscreenAnchor::Origin(origin), moved_at)) = state.fullscreen_origin else {
         return;
     };
     // After that the window was moved by hand
@@ -711,10 +715,59 @@ pub fn follow_fullscreen(ctx: &egui::Context, state: &mut OculanteState) {
             state.image_geometry.offset.x += moved.x;
             state.image_geometry.offset.y += moved.y;
             debug!("Fullscreen moved the window by {moved:?}");
-            state.fullscreen_origin = Some((inner.min, std::time::Instant::now()));
+            state.fullscreen_origin = Some((
+                FullscreenAnchor::Origin(inner.min),
+                std::time::Instant::now(),
+            ));
         }
         _ => ctx.request_repaint_after(std::time::Duration::from_millis(100)),
     }
+}
+
+/// Where the window is not known (Wayland), the image keeps its place in proportion
+/// to the area that shows it: centred stays centred, a third from the left stays a
+/// third from the left.
+pub fn follow_fullscreen_canvas(
+    ctx: &egui::Context,
+    state: &mut OculanteState,
+    canvas: egui::Rect,
+) {
+    let Some((FullscreenAnchor::Canvas(before), changed_at)) = state.fullscreen_origin else {
+        return;
+    };
+    // After that the window or a panel was resized by hand
+    if changed_at.elapsed() > std::time::Duration::from_secs(2) {
+        state.fullscreen_origin = None;
+        return;
+    }
+    if canvas == before || canvas.area() <= 0. {
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        return;
+    }
+    let fraction = keep_in_proportion(&mut state.image_geometry, before, canvas);
+    debug!(
+        "Fullscreen resized the canvas from {before:?} to {canvas:?}, the image stays at {fraction:?}"
+    );
+    state.fullscreen_origin = Some((FullscreenAnchor::Canvas(canvas), std::time::Instant::now()));
+}
+
+/// Moves the image from one canvas to another so its centre is at the same fraction of
+/// either. Gives that fraction.
+pub fn keep_in_proportion(
+    geometry: &mut ImageGeometry,
+    before: egui::Rect,
+    after: egui::Rect,
+) -> Vector2<f32> {
+    let centre = geometry.offset + geometry.dimensions.size_vec() * geometry.scale / 2.;
+    let fraction = Vector2::new(
+        (centre.x - before.min.x) / before.width(),
+        (centre.y - before.min.y) / before.height(),
+    );
+    geometry.offset += Vector2::new(
+        after.min.x + fraction.x * after.width(),
+        after.min.y + fraction.y * after.height(),
+    ) - centre;
+    fraction
 }
 
 /// Determine if an enxtension is compatible with oculante

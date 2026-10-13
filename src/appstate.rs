@@ -26,6 +26,16 @@ pub struct ImageGeometry {
     pub dimensions: (u32, u32),
 }
 
+/// What the image goes by while fullscreen is switched on or off, see `follow_fullscreen`
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FullscreenAnchor {
+    /// Where the window's content was on the screen
+    Origin(egui::Pos2),
+    /// Wayland does not tell where the window is. This is the area that showed the
+    /// image, the image keeps its place in proportion to it.
+    Canvas(egui::Rect),
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Info(String),
@@ -91,9 +101,9 @@ pub struct OculanteState {
     pub network_mode: bool,
     /// File names piped in at startup, they arrive from a background thread
     pub piped_paths: Option<std::sync::mpsc::Receiver<Vec<std::path::PathBuf>>>,
-    /// Where the window's content was on the screen while fullscreen is switched
-    /// on or off, and when it last moved, see `follow_fullscreen`
-    pub fullscreen_origin: Option<(egui::Pos2, std::time::Instant)>,
+    /// Where the image was while fullscreen is switched on or off, and when that
+    /// last changed, see `follow_fullscreen`
+    pub fullscreen_origin: Option<(FullscreenAnchor, std::time::Instant)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
     pub toasts: Toasts,

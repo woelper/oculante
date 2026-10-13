@@ -1252,3 +1252,40 @@ fn ci_dicom_frames() {
     }
     std::fs::remove_file(&path).unwrap();
 }
+
+/// Without a window position (Wayland) fullscreen keeps the image at the same fraction
+/// of the canvas, the area the panels leave for it
+#[test]
+fn ci_fullscreen_keeps_the_image_in_proportion() {
+    use crate::appstate::ImageGeometry;
+    use egui::{Rect, pos2, vec2};
+    use nalgebra::Vector2;
+
+    // 200 x 100 at twice the size, its centre at (300, 250): a fifth across a
+    // canvas that starts right of a panel 100 wide, half way down
+    let mut geometry = ImageGeometry {
+        scale: 2.0,
+        offset: Vector2::new(100., 150.),
+        dimensions: (200, 100),
+    };
+    let windowed = Rect::from_min_size(pos2(100., 0.), vec2(1000., 500.));
+    let fullscreen = Rect::from_min_size(pos2(100., 0.), vec2(2000., 1100.));
+    let fraction = crate::utils::keep_in_proportion(&mut geometry, windowed, fullscreen);
+    assert_eq!(fraction, Vector2::new(0.2, 0.5));
+    // the centre at (100 + 400, 550)
+    assert_eq!(geometry.offset, Vector2::new(300., 450.));
+    assert_eq!(geometry.scale, 2.0, "the zoom stays");
+
+    // and back
+    crate::utils::keep_in_proportion(&mut geometry, fullscreen, windowed);
+    assert_eq!(geometry.offset, Vector2::new(100., 150.));
+
+    // a centred image stays centred
+    let mut geometry = ImageGeometry {
+        scale: 1.0,
+        offset: Vector2::new(500., 200.),
+        dimensions: (200, 100),
+    };
+    crate::utils::keep_in_proportion(&mut geometry, windowed, fullscreen);
+    assert_eq!(geometry.offset, Vector2::new(1000., 500.));
+}
