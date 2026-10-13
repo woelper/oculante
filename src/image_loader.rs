@@ -189,57 +189,7 @@ pub fn open_image_item(
                 jpeg2k::ImagePixelData::Rgba16(_) => bail!("jpeg2k Rgba16 unsupported"),
             }
         }
-        #[cfg(feature = "heif")]
-        "heif" | "heic" => {
-            // Built on work in https://github.com/rsuu/rmg - thanks!
-            use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
-
-            let lib_heif = LibHeif::new();
-            let mut ctx = HeifContext::read_from_file(&img_location.to_string_lossy())?;
-            if let Ok(num_threads) = std::thread::available_parallelism() {
-                ctx.set_max_decoding_threads(num_threads.get() as u32);
-            }
-            if let Some(limits) = decoder_opts.and_then(|decoders| {
-                let DecoderSettings { heif, .. } = decoders;
-                heif.maybe_limits()
-            }) {
-                ctx.set_security_limits(&limits)?;
-            }
-            let handle = ctx.primary_image_handle()?;
-            let img = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)?;
-            let planes = img.planes();
-            let interleaved = planes
-                .interleaved
-                .context("Can't create interleaved plane")?;
-
-            let data = interleaved.data;
-            let width = interleaved.width;
-            let height = interleaved.height;
-            let stride = interleaved.stride;
-
-            let mut res: Vec<u8> = Vec::new();
-            for y in 0..height {
-                let mut step = y as usize * stride;
-
-                for _ in 0..width {
-                    res.extend_from_slice(&[
-                        data[step],
-                        data[step + 1],
-                        data[step + 2],
-                        data[step + 3],
-                    ]);
-                    step += 4;
-                }
-            }
-            let buf = image::ImageBuffer::from_vec(width, height, res)
-                .context("Can't create HEIC/HEIF ImageBuffer with given res")?;
-            let i = DynamicImage::ImageRgba8(buf);
-
-            _ = sender.send(Frame::new_still(i));
-            return Ok(receiver);
-        }
-        // Without libheif, HEIC is decoded in pure Rust
-        #[cfg(all(feature = "heif_native", not(feature = "heif")))]
+        #[cfg(feature = "heif_native")]
         "heif" | "heic" => {
             let i = load_heif_native(&img_location, item)?;
             _ = sender.send(Frame::new_still(i));
@@ -1299,9 +1249,6 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "heif")]
-    use std::path::Path;
-
     #[test]
     fn ci_autoscale_stretches_to_8_bit() {
         use super::autoscale;
@@ -1349,59 +1296,6 @@ mod tests {
             (bits.saturating_sub(256)..bits + 256).for_each(same);
         }
         assert_eq!(tonemap_f32(f32::NEG_INFINITY), 0);
-    }
-
-    #[cfg(feature = "heif")]
-    use crate::{
-        image_loader::open_image,
-        settings::{DecoderSettings, HeifLimits, Limit},
-    };
-
-    #[cfg(feature = "heif")]
-    use libheif_rs::{HeifError, HeifErrorCode, HeifErrorSubCode};
-
-    #[cfg(feature = "heif")]
-    #[test]
-    fn low_pixel_limit_doesnt_decode_heif() {
-        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("res/tests/orange.heic");
-        let decoder_opts = Some(DecoderSettings {
-            heif: HeifLimits {
-                image_size_pixels: Limit::U64(50),
-                ..Default::default()
-            },
-        });
-
-        let actual = open_image(&image_location, None, decoder_opts).unwrap_err();
-        let expected = format!(
-            "{:?}({:?})",
-            HeifErrorCode::MemoryAllocationError,
-            HeifErrorSubCode::SecurityLimitExceeded
-        );
-
-        // This looks a bit convoluted because it's hard to construct a libheif error.
-        // A low pixel maximum should cause libheif to fail to decode an image. This simulates
-        // trying to decode a large image with the default or low maximum.
-        assert!(
-            actual.to_string().starts_with(&expected),
-            "libheif should have raised a security error"
-        )
-    }
-
-    #[cfg(feature = "heif")]
-    #[test]
-    fn higher_pixel_limit_decodes_heif() {
-        let image_location = Path::new(env!("CARGO_MANIFEST_DIR")).join("res/tests/orange.heic");
-        let decoder_opts = Some(DecoderSettings {
-            heif: HeifLimits {
-                image_size_pixels: Limit::NoLimit,
-                ..Default::default()
-            },
-        });
-
-        open_image(&image_location, None, decoder_opts)
-            .expect("libheif should have decoded the image without raising a security error")
-            .recv()
-            .expect("Decoded image should be have sent");
     }
 
     /// The strips of a TIFF file are decoded in parallel. The pixels are the

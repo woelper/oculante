@@ -49,16 +49,10 @@ psd = "0.3"
 quickraw = "0.1.6"
 tiff = "0.11"
 jxl-oxide = "0.12"
-# Always build lcms2 (used by jxl-oxide) from source. Otherwise it links to the
-# system library where there is one, which is then missing in our bundles (#810).
-lcms2-sys = { version = "4", features = ["static"], optional = true }
 # These 3 need to be updated together
 resvg = "0.48"
 usvg = "0.48"
 tiny-skia = "0.12"
-libheif-rs = { version = "3", default-features = false, features = [
-    "v1_19",
-], optional = true }
 # HEIC and HEIF in pure Rust, nothing to install or link
 heic-rs = { version = "0.1.1", optional = true }
 ktx2 = "0.5"
@@ -110,7 +104,8 @@ file-format = "0.29"
 zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sysinfo = "0.39"
 unicode-segmentation = "1.13.3"
-font-kit = "0.14"
+# finds the fonts of the system, the same version as resvg uses
+fontdb = "0.24"
 open = "5.4"
 kamadak-exif = "0.6"
 lexical-sort = "0.3"
@@ -133,17 +128,18 @@ image-extras = { version = "0.1.1", default-features = false, features = [
 
 [features]
 default = ["turbo", "avif_native", "j2k", "jxlcms", "heif_native"]
-heif = ["libheif-rs"]
-# HEIC and HEIF without libheif, in pure Rust. This is what a plain build uses,
-# so Linux builds open these files without anything installed. If `heif` is
-# enabled as well, libheif is used.
+# HEIC and HEIF in pure Rust, on by default
 heif_native = ["dep:heic-rs"]
+# libheif was used with this one until 1.0. It stays so builds that ask for it
+# still work, and gives the same as heif_native.
+heif = ["heif_native"]
 avif_native = ["avif-decode", "bytemuck"]
 dav1d = ["libavif-image"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 j2k = ["jpeg2k"]
-jxlcms = ["jxl-oxide/lcms2", "dep:lcms2-sys"]
+# colour management for JPEG XL, in pure Rust (moxcms)
+jxlcms = ["jxl-oxide/moxcms"]
 hdr = []
 lang_support = []
 

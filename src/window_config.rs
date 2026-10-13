@@ -51,10 +51,6 @@ pub fn build_window_settings() -> WindowSettings {
                 )
             ));
         }
-
-        // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
-        #[cfg(feature = "heif")]
-        settings.decoders.heif.maybe_limits();
     }
 
     ws

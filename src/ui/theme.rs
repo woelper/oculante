@@ -2,9 +2,6 @@ use super::*;
 use crate::appstate::OculanteState;
 use egui::{Context, FontData, FontDefinitions};
 use epaint::FontFamily;
-use font_kit::{
-    family_name::FamilyName, handle::Handle, properties::Properties, source::SystemSource,
-};
 use log::warn;
 use std::{
     fs::read,
@@ -178,30 +175,37 @@ enum FontLookup {
     Missing,
 }
 
-fn load_font_family(family_names: &[&str], loaded_files: &mut Vec<PathBuf>) -> FontLookup {
-    let system_source = SystemSource::new();
+fn load_font_family(
+    system: &fontdb::Database,
+    family_names: &[&str],
+    loaded_files: &mut Vec<PathBuf>,
+) -> FontLookup {
     for &name in family_names {
-        let font_handle = system_source
-            .select_best_match(&[FamilyName::Title(name.to_string())], &Properties::new());
-        match font_handle {
-            Ok(h) => match &h {
-                Handle::Memory { bytes, .. } => {
-                    info!("Loaded {name} from memory.");
-                    return FontLookup::Loaded(bytes.to_vec());
+        let query = fontdb::Query {
+            families: &[fontdb::Family::Name(name)],
+            ..Default::default()
+        };
+        let Some(id) = system.query(&query) else {
+            debug!("Could not find {name}");
+            continue;
+        };
+        match system.face_source(id) {
+            Some((fontdb::Source::File(path) | fontdb::Source::SharedFile(path, _), _)) => {
+                if loaded_files.contains(&path) {
+                    debug!("{name} is in {path:?}, which is loaded already");
+                    return FontLookup::AlreadyLoaded;
                 }
-                Handle::Path { path, .. } => {
-                    if loaded_files.contains(path) {
-                        debug!("{name} is in {path:?}, which is loaded already");
-                        return FontLookup::AlreadyLoaded;
-                    }
-                    info!("Loaded {name} from path: {:?}", path);
-                    if let Ok(data) = read(path) {
-                        loaded_files.push(path.clone());
-                        return FontLookup::Loaded(data);
-                    }
+                info!("Loaded {name} from path: {:?}", path);
+                if let Ok(data) = read(&path) {
+                    loaded_files.push(path);
+                    return FontLookup::Loaded(data);
                 }
-            },
-            Err(e) => debug!("Could not load {}: {:?}", name, e),
+            }
+            Some((fontdb::Source::Binary(data), _)) => {
+                info!("Loaded {name} from memory.");
+                return FontLookup::Loaded((*data).as_ref().to_vec());
+            }
+            None => debug!("Could not load {name}"),
         }
     }
     FontLookup::Missing
@@ -210,7 +214,7 @@ fn load_font_family(family_names: &[&str], loaded_files: &mut Vec<PathBuf>) -> F
 pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
     debug!("Attempting to load sys fonts");
     // In this order, the first font that has a glyph is used
-    let fontdb = [
+    let regions = [
         (
             "simplified_chinese",
             vec![
@@ -249,11 +253,15 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
         ),
     ];
 
+    // the fonts the system has, from the folders and settings of fontconfig on Linux
+    let mut system = fontdb::Database::new();
+    system.load_system_fonts();
+
     // Several regions can end up with the same font file, the fonts for Chinese and
     // Japanese often are one. It is only loaded once.
     let mut loaded_files = Vec::new();
-    for (region, font_names) in fontdb {
-        match load_font_family(&font_names, &mut loaded_files) {
+    for (region, font_names) in regions {
+        match load_font_family(&system, &font_names, &mut loaded_files) {
             FontLookup::Loaded(font_data) => {
                 info!("Inserting font {region}");
                 fonts
