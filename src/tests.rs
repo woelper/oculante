@@ -1088,6 +1088,31 @@ fn ci_load_heic_native() {
     let img = frame.get_image().unwrap();
     // The file stores 4000x3000 and a rotation, which the decoder applies
     assert_eq!((img.width(), img.height()), (3000, 4000));
+    // What libheif gets for this file
+    assert_mean_rgb(&img, [162.0, 134.0, 104.0], 2.0);
+}
+
+/// Camera HIF is 4:2:2 (Canon, Sony), and 4:4:4 exists too. heic-rs 0.1.4 failed on
+/// both as soon as there was a photo in them (tbraun96/heic-rs#10 and #12). Made
+/// from moss.jpg with heif-enc.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_load_heic_422_and_444() {
+    // with what libheif gets for them
+    for (path, expected) in [
+        ("res/tests/moss_422.heic", [82.9, 83.8, 45.3]),
+        ("res/tests/moss_444.heic", [82.9, 83.8, 45.2]),
+    ] {
+        let frame = load_first_frame(path);
+        assert_valid_image(&frame);
+        let img = frame.get_image().unwrap();
+        assert_eq!((img.width(), img.height()), (1000, 701), "{path}");
+        assert_mean_rgb(&img, expected, 1.0);
+    }
+}
+
+#[cfg(feature = "heif_native")]
+fn assert_mean_rgb(img: &image::DynamicImage, expected: [f64; 3], tolerance: f64) {
     let rgb = img.to_rgb8();
     let pixels = (rgb.width() * rgb.height()) as f64;
     let mut sum = [0f64; 3];
@@ -1096,10 +1121,9 @@ fn ci_load_heic_native() {
             *total += channel as f64;
         }
     }
-    // What libheif gets for this file
-    for (mean, expected) in sum.iter().map(|s| s / pixels).zip([162.0, 134.0, 104.0]) {
+    for (mean, expected) in sum.iter().map(|s| s / pixels).zip(expected) {
         assert!(
-            (mean - expected).abs() < 2.0,
+            (mean - expected).abs() < tolerance,
             "mean color {mean:.1} is not near {expected}"
         );
     }

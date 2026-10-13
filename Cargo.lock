@@ -2376,7 +2376,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "heic-rs"
 version = "0.1.4"
-source = "git+https://github.com/woelper/heic-rs?branch=oculante#81abc146333f0112cb5f5dc0642ca1f031161645"
+source = "git+https://github.com/woelper/heic-rs?branch=oculante#5a8e7146aea6f216bff931ddd67ec4a77fe64384"
 dependencies = [
  "rayon",
 ]

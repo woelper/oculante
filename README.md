@@ -176,7 +176,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - exr (via `exr-rs`), tonemapped
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
-- HEIC/HEIF (via `heic-rs`, in pure Rust), with every image a file holds. Camera files in 4:2:2 or 4:4:4 (HIF) do not open yet.
+- HEIC/HEIF (via `heic-rs`, in pure Rust), with every image a file holds, camera HIF (4:2:2) included
 - qoi
 - kra (Krita files)
 - ora
