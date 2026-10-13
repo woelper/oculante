@@ -10,7 +10,8 @@ use log::debug;
 
 #[derive(Debug)]
 pub struct Cache {
-    pub data: HashMap<PathBuf, CachedImage>,
+    /// By file and by which of its images, see `image_loader::image_count`
+    pub data: HashMap<(PathBuf, usize), CachedImage>,
     /// How many images are kept at most
     pub cache_size: usize,
     /// How much memory the kept images may take, in bytes
@@ -33,17 +34,24 @@ impl Cache {
         }
     }
 
-    pub fn get(&self, path: &Path) -> Option<Arc<DynamicImage>> {
-        self.data.get(path).map(|c| c.data.clone())
+    pub fn get(&self, path: &Path, item: usize) -> Option<Arc<DynamicImage>> {
+        self.data
+            .get(&(path.to_owned(), item))
+            .map(|c| c.data.clone())
+    }
+
+    /// Forget all images of a file
+    pub fn remove(&mut self, path: &Path) {
+        self.data.retain(|(p, _), _| p != path);
     }
 
     pub fn clear(&mut self) {
         self.data.clear()
     }
 
-    pub fn insert(&mut self, path: &Path, img: Arc<DynamicImage>) {
+    pub fn insert(&mut self, path: &Path, item: usize, img: Arc<DynamicImage>) {
         self.data.insert(
-            path.into(),
+            (path.into(), item),
             CachedImage {
                 data: img,
                 created: std::time::Instant::now(),
@@ -55,7 +63,7 @@ impl Cache {
             && (self.data.len() > self.cache_size || self.bytes() > self.byte_budget)
         {
             let mut latest = std::time::Instant::now();
-            let mut key = PathBuf::new();
+            let mut key = Default::default();
 
             for (p, c) in &self.data {
                 if c.created < latest {
@@ -64,8 +72,9 @@ impl Cache {
                 }
             }
             debug!(
-                "Cache limit hit, deleting oldest: {}, {}s old",
-                key.display(),
+                "Cache limit hit, deleting oldest: {} ({}), {}s old",
+                key.0.display(),
+                key.1,
                 latest.elapsed().as_secs_f32()
             );
 
@@ -104,29 +113,45 @@ mod tests {
         let mut cache = Cache::new(10);
         cache.byte_budget = 100_000;
         for name in ["a", "b", "c"] {
-            cache.insert(Path::new(name), image());
+            cache.insert(Path::new(name), 0, image());
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert!(
-            cache.get(Path::new("a")).is_none(),
+            cache.get(Path::new("a"), 0).is_none(),
             "the oldest image was kept"
         );
-        assert!(cache.get(Path::new("b")).is_some() && cache.get(Path::new("c")).is_some());
+        assert!(cache.get(Path::new("b"), 0).is_some() && cache.get(Path::new("c"), 0).is_some());
 
         // an image larger than the budget is kept, it is the one shown
         cache.byte_budget = 10;
-        cache.insert(Path::new("d"), image());
+        cache.insert(Path::new("d"), 0, image());
         assert_eq!(cache.data.len(), 1);
-        assert!(cache.get(Path::new("d")).is_some());
+        assert!(cache.get(Path::new("d"), 0).is_some());
 
         // the count still limits it too
         let mut cache = Cache::new(2);
         for name in ["a", "b", "c"] {
-            cache.insert(Path::new(name), image());
+            cache.insert(Path::new(name), 0, image());
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         assert_eq!(cache.data.len(), 2);
-        assert!(cache.get(Path::new("a")).is_none());
+        assert!(cache.get(Path::new("a"), 0).is_none());
+    }
+
+    /// The images of a file that holds several are kept apart, and go together
+    #[test]
+    fn ci_cache_keeps_images_of_a_file_apart() {
+        let mut cache = Cache::new(10);
+        let small = Arc::new(DynamicImage::ImageRgba8(image::RgbaImage::new(10, 10)));
+        cache.insert(Path::new("a"), 0, image());
+        cache.insert(Path::new("a"), 2, small);
+        cache.insert(Path::new("b"), 0, image());
+        assert_eq!(cache.get(Path::new("a"), 2).map(|i| i.width()), Some(10));
+        assert_eq!(cache.get(Path::new("a"), 0).map(|i| i.width()), Some(100));
+        assert!(cache.get(Path::new("a"), 1).is_none());
+        cache.remove(Path::new("a"));
+        assert!(cache.get(Path::new("a"), 0).is_none() && cache.get(Path::new("a"), 2).is_none());
+        assert!(cache.get(Path::new("b"), 0).is_some());
     }
 
     #[test]

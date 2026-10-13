@@ -110,16 +110,15 @@ pub fn info_ui(
                 ui.advance_cursor_after_rect(preview_rect);
             } // end if current_image
 
+            ui.add_space(10.);
             // The images of a file that holds several
             if state.sequence().is_some() {
-                ui.add_space(10.);
                 ui.vertical_centered_justified(|ui| {
                     ui.styled_collapsing("Sequence", |ui| sequence_ui(ui, state));
                 });
             }
 
             // SECTION 3: Compare
-            ui.add_space(10.);
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
 
@@ -190,11 +189,7 @@ pub fn info_ui(
                                 });
                             }
                             if let Some((path, item, geometry)) = to_show {
-                                state.current_path = Some(path.clone());
-                                state.set_item(&path, item, None);
-                                state
-                                    .player
-                                    .load_advanced(&path, item, Some(crate::utils::Frame::CompareResult(Default::default(), geometry)));
+                                crate::utils::compare_show(state, &path, item, geometry);
                                 ui.ctx().request_repaint();
                                 ui.ctx().request_repaint_after(Duration::from_millis(500));
                             }
@@ -326,23 +321,28 @@ fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
     let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);
     egui::ScrollArea::vertical()
         .id_salt("sequence")
+        // as wide as the panel, the scroll bar at its edge
+        .auto_shrink([false, true])
         .min_scrolled_height(height)
         .max_height(height)
         .show_rows(ui, ROW, sequence.count, |ui, rows| {
             for item in rows {
                 ui.horizontal(|ui| {
-                    let (rect, response) =
+                    let (cell, response) =
                         ui.allocate_exact_size(vec2(ROW * 4. / 3., ROW - 8.), Sense::click());
+                    // room for the frame of the image that is shown, the list cuts off
+                    // anything drawn outside of it
+                    let mut rect = cell.shrink(3.);
                     let mut size = None;
                     match sequence.thumbnail(ui.ctx(), item) {
                         Some(Thumbnail::Done(texture, image_size)) => {
                             size = Some(*image_size);
                             let fit = texture.size_vec2()
                                 * (rect.size() / texture.size_vec2()).min_elem();
-                            let picture = Rect::from_center_size(rect.center(), fit);
+                            rect = Rect::from_center_size(rect.center(), fit);
                             ui.painter().image(
                                 texture.id(),
-                                picture,
+                                rect,
                                 Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)),
                                 Color32::WHITE,
                             );

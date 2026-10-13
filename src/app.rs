@@ -492,13 +492,12 @@ impl OculanteApp {
             Frame::Still(img) | Frame::CompareResult(img, _) => {
                 debug!("Received image {}x{}", img.width(), img.height());
 
-                // Insert into cache for fast back/forth navigation. The cache knows
-                // files, not their images, so only the first image of a file goes in.
+                // Insert into cache for fast back/forth navigation
                 if self.state.persistent_settings.max_cache != 0
-                    && self.state.current_item() == 0
                     && let Some(p) = self.state.current_path.clone()
                 {
-                    self.state.player.cache.insert(&p, img.clone());
+                    let item = self.state.current_item();
+                    self.state.player.cache.insert(&p, item, img.clone());
                 }
 
                 self.state.current_image = Some(img);

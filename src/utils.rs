@@ -368,13 +368,13 @@ impl Player {
                 modified, watched_mod
             );
 
-            self.cache.data.remove(path);
+            self.cache.remove(path);
             self.load(path);
         }
     }
 
     /// The main loading function of the player. `item` is one of the images of
-    /// a file that holds several, see `image_count`; only the first is cached.
+    /// a file that holds several, see `image_count`.
     pub fn load_advanced(
         &mut self,
         img_location: &Path,
@@ -387,10 +387,8 @@ impl Player {
         self.stop_sender = stop_sender;
         self.send_image_count(img_location, item);
 
-        if item == 0
-            && let Some(cached_image) = self.cache.get(img_location)
-        {
-            debug!("Cache hit for {}", img_location.display());
+        if let Some(cached_image) = self.cache.get(img_location, item) {
+            debug!("Cache hit for {} ({item})", img_location.display());
 
             let frame = Frame::new_still(cached_image);
             if let Some(fs) = forced_frame_source {
@@ -673,7 +671,7 @@ pub fn delete_file(state: &mut OculanteState) {
         }
         state.send_message_info(&format!("Deleted {name}"));
         // remove from cache so we don't suceed to load it agaim
-        state.player.cache.data.remove(&p);
+        state.player.cache.remove(&p);
     }
     clear_image(state);
 }
@@ -913,15 +911,20 @@ pub fn clear_image(state: &mut OculanteState) {
 pub fn compare_next(state: &mut OculanteState) {
     if let Some(item) = state.compare_list.next() {
         let (path, item, geometry) = (item.path.clone(), item.item, item.geometry);
-        state.is_loaded = false;
-        state.current_path = Some(path.clone());
-        state.set_item(&path, item, None);
-        state.player.load_advanced(
-            &path,
-            item,
-            Some(Frame::CompareResult(Default::default(), geometry)),
-        );
+        compare_show(state, &path, item, geometry);
     }
+}
+
+/// Show an image of the compare list at the position stored for it.
+pub fn compare_show(state: &mut OculanteState, path: &Path, item: usize, geometry: ImageGeometry) {
+    state.is_loaded = false;
+    state.current_path = Some(path.to_owned());
+    state.set_item(path, item, None);
+    state.player.load_advanced(
+        path,
+        item,
+        Some(Frame::CompareResult(Default::default(), geometry)),
+    );
 }
 
 /// Open the images or folders the app was started with.

@@ -379,7 +379,8 @@ def test_first_and_last_image(binary):
 
 def test_sequence_of_tiff_pages(binary):
     """A TIFF with three pages: the title counts them, the arrow keys go through them,
-    and the list in the info panel shows a picture of each that shows it on a click."""
+    a page seen before comes from the cache, and the list in the info panel shows a
+    picture of each that shows it on a click."""
     folder = folder_of("sequence_images", [])
     colors = [(220, 40, 40), (40, 180, 60), (50, 70, 220)]
     pages = []
@@ -406,6 +407,13 @@ def test_sequence_of_tiff_pages(binary):
         app.key("Up")
         app.settle(1.5)
         assert title().endswith("[1/3]"), f"Up did not go back: {title()!r}"
+        # the second page again, from the cache this time
+        app.key("Down")
+        app.settle(1.5)
+        assert "pages.tif (1)" in app.log().split("Cache hit for")[-1].splitlines()[0], "the second page was not taken from the cache"
+        assert count_color(app.shot("second_page_again"), canvas, colors[1]) > 10000, "the second page is not shown again"
+        app.key("Up")
+        app.settle(1.5)
 
         # open the list, then scroll the panel down to it
         app.click(60, 549)
