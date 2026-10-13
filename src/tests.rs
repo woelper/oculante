@@ -566,7 +566,7 @@ fn load_all(path: &std::path::Path) -> anyhow::Result<(Vec<Frame>, Vec<String>)>
 
 /// AVIF images of 10 and 12 bits stay 16 bit, and show the same picture as the
 /// one of 8 bits. They were cut to 8 bits before.
-#[cfg(all(feature = "avif_native", not(feature = "dav1d")))]
+#[cfg(feature = "avif_native")]
 #[test]
 fn ci_avif_bit_depths() {
     let load = |bits: u8| {
@@ -589,7 +589,7 @@ fn ci_avif_bit_depths() {
 
 /// The last box of an AVIF file may have the size 0, it then runs to the end of
 /// the file. Lightroom writes its AVIFs like that, and none of them opened.
-#[cfg(all(feature = "avif_native", not(feature = "dav1d")))]
+#[cfg(feature = "avif_native")]
 #[test]
 fn ci_avif_whose_last_box_runs_to_the_end() {
     let original = "res/tests/red-at-12-oclock-with-color-profile-8bpc.avif";

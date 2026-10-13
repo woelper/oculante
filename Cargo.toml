@@ -71,7 +71,6 @@ icns = "0.5"
 # dicom needs to be the same version
 dicom-pixeldata = { version = "0.10", features = ["image"] }
 dicom-object = "0.10"
-libavif-image = { version = "0.14", optional = true }
 gif-dispose = "6.0"
 
 # === FILTER CRATES
@@ -134,7 +133,9 @@ heif_native = ["dep:heic-rs"]
 # still work, and gives the same as heif_native.
 heif = ["heif_native"]
 avif_native = ["avif-decode", "bytemuck"]
-dav1d = ["libavif-image"]
+# libavif and libdav1d were used with this one until 1.0. It stays so builds that
+# ask for it still work, and gives the same as avif_native.
+dav1d = ["avif_native"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
 j2k = ["jpeg2k"]

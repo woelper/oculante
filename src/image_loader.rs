@@ -149,18 +149,6 @@ pub fn open_image_item(
             _ = sender.send(Frame::new_still(image));
             return Ok(receiver);
         }
-        #[cfg(feature = "dav1d")]
-        "avif" | "avifs" => {
-            use std::io::Read;
-            let mut file = File::open(img_location)?;
-            let mut buf = vec![];
-            file.read_to_end(&mut buf)?;
-            let i = libavif_image::read(buf.as_slice())?;
-            _ = sender.send(Frame::new_still(i));
-            return Ok(receiver);
-
-            // col.add_still(i.to_rgba8());
-        }
         #[cfg(feature = "j2k")]
         "jp2" => {
             let jp2_image = jpeg2k::Image::from_file(img_location)?;
@@ -196,7 +184,6 @@ pub fn open_image_item(
             return Ok(receiver);
         }
         #[cfg(feature = "avif_native")]
-        #[cfg(not(feature = "dav1d"))]
         "avif" => {
             let data = std::fs::read(&img_location)?;
             // 10 and 12 bit images stay 16 bit, as for PNG

@@ -245,7 +245,7 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 
 - `avif_native` (on by default) Rust AVIF decoder.
 
-- `dav1d` Tried and tested AVIF decoder, takes priority over `avif_native` if both are enabled.
+- `dav1d` used libdav1d and libavif until 1.0. It is a second name for `avif_native` now.
 
 - `jxlcms` (on by default) Colour management for JXL, in pure Rust.
 
