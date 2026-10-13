@@ -162,25 +162,28 @@ pub fn browse<F: FnMut(&PathBuf)>(
     }
 
     if state.drives.is_none() {
-        let mut disks: Vec<Disk> = sysinfo::Disks::new_with_refreshed_list()
-            .iter()
-            .inspect(|d| debug!("d {:?}", d))
-            .filter(|d| {
-                if cfg!(target_os = "windows") {
-                    true
-                } else {
-                    d.is_removable()
-                }
-            })
-            .map(|d| Disk {
-                name: if cfg!(target_os = "windows") {
-                    d.mount_point().to_string_lossy().to_string()
-                } else {
-                    d.name().to_string_lossy().to_string()
-                },
-                path: d.mount_point().to_path_buf(),
-            })
-            .collect();
+        // Only names and mount points are needed. Asking for the free space as
+        // well blocks on network mounts, an rclone mount can take seconds.
+        let mut disks: Vec<Disk> =
+            sysinfo::Disks::new_with_refreshed_list_specifics(sysinfo::DiskRefreshKind::nothing())
+                .iter()
+                .inspect(|d| debug!("d {:?}", d))
+                .filter(|d| {
+                    if cfg!(target_os = "windows") {
+                        true
+                    } else {
+                        d.is_removable()
+                    }
+                })
+                .map(|d| Disk {
+                    name: if cfg!(target_os = "windows") {
+                        d.mount_point().to_string_lossy().to_string()
+                    } else {
+                        d.name().to_string_lossy().to_string()
+                    },
+                    path: d.mount_point().to_path_buf(),
+                })
+                .collect();
         disks.sort();
         disks.dedup_by(|a, b| a.name == b.name);
         state.drives = Some(disks);
