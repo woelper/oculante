@@ -59,6 +59,7 @@ Not regressions, also in 0.9.6, can come after the release: TIFFs with 1 bit sam
 - [ ] Three broken APNGs of the conformance tests play although they are invalid (040 repeated acTL, 047 num_frames too low, 060 fdAT too large). The png crate does not notice, the spec asks to show the default image.
 - [x] At 100% an image with an odd width or height sat on a half pixel and was blurred. Fixed, UI test `test_actual_size_is_pixel_exact`.
 - [x] The > icons (carets) are off since the update to egui 0.36
+- [x] Icons sat 2 to 3 px below the text next to them ("Open another image...", the top bar), text 1.5 px above the middle of buttons and headers at 100 % scaling, so the > next to a header looked off (reported 2026-10-13, 0.9.6 had it too). The font offsets the old egui needed are gone, measured at scale 1 and 2: icons within 1 px of the text, text and > in the middle.
 - [x] The loaded image is always drawn in front on top of the ui
 - [x] Background color does not work
 - [x] Some or all settings don't seem to be saved / restored

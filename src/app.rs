@@ -5,7 +5,7 @@ use image::DynamicImage;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use egui::{Align, FontData, FontDefinitions, FontFamily, FontTweak, Id};
+use egui::{Align, FontData, FontDefinitions, FontFamily, Id};
 use image::GenericImageView;
 use log::{debug, info};
 use nalgebra::Vector2;
@@ -285,43 +285,26 @@ impl OculanteApp {
         let mut fonts = FontDefinitions::default();
         egui_extras::install_image_loaders(ctx);
 
-        let dpi = ctx.pixels_per_point();
         // Apply user UI scale on top of system DPI
         ctx.set_zoom_factor(self.state.persistent_settings.ui_scale);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
 
-        let offset = if dpi > 1.0 { 0.0 } else { -1.4 };
-
-        fonts.font_data.insert(
-            "inter".to_owned(),
-            Arc::new(FontData::from_static(FONT).tweak(FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: offset,
-                ..Default::default()
-            })),
-        );
+        // No offsets for text or icons, egui 0.36 centres both. The ones the old
+        // egui needed put text too high and icons too low.
+        fonts
+            .font_data
+            .insert("inter".to_owned(), Arc::new(FontData::from_static(FONT)));
         fonts.font_data.insert(
             "inter-bold".to_owned(),
-            Arc::new(FontData::from_static(BOLD_FONT).tweak(FontTweak {
-                scale: 1.0,
-                y_offset_factor: 0.0,
-                y_offset: offset,
-                ..Default::default()
-            })),
+            Arc::new(FontData::from_static(BOLD_FONT)),
         );
 
         // Icon font
         fonts.font_data.insert(
             "icons".to_owned(),
-            Arc::new(
-                FontData::from_static(include_bytes!("../res/fonts/icons.ttf")).tweak(FontTweak {
-                    scale: 1.0,
-                    y_offset_factor: 0.0,
-                    y_offset: 1.0,
-                    ..Default::default()
-                }),
-            ),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../res/fonts/icons.ttf"
+            ))),
         );
 
         // Font families: icons first, then inter (so icon codepoints resolve to icon font)
