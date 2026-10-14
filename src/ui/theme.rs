@@ -214,36 +214,57 @@ fn load_font_family(
 pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
     debug!("Attempting to load sys fonts");
     // In this order, the first font that has a glyph is used
+    // System fonts should be prioritised if they are high quality.
     let regions = [
         (
             "simplified_chinese",
             vec![
+                "PingFang SC", // macOS system font
                 "Heiti SC",
                 "Songti SC",
                 "Noto Sans CJK SC", // Good coverage for Simplified Chinese
                 "Noto Sans SC",
-                "WenQuanYi Zen Hei", // INcludes both Simplified and Traditional Chinese.
+                "WenQuanYi Zen Hei", // Includes both Simplified and Traditional Chinese.
                 "SimSun",
                 "Noto Sans SC",
-                "PingFang SC",
                 "Source Han Sans CN",
             ],
         ),
-        ("traditional_chinese", vec!["Source Han Sans HK"]),
+        (
+            "traditional_chinese",
+            vec![
+                "PingFang HK", // macOS system font
+                "Source Han Sans HK",
+            ],
+        ),
         (
             "japanese",
             vec![
+                "Hiragino Sans", // macOS system font
                 "Noto Sans JP",
                 "Noto Sans CJK JP",
                 "Source Han Sans JP",
                 "MS Gothic",
             ],
         ),
-        ("korean", vec!["Source Han Sans KR"]),
-        ("taiwanese", vec!["Source Han Sans TW"]),
+        (
+            "korean",
+            vec![
+                "Apple SD Gothic Neo", // macOS system font
+                "Source Han Sans KR",
+            ],
+        ),
+        (
+            "taiwanese",
+            vec![
+                "PingFang TC", // macOS system font
+                "Source Han Sans TW",
+            ],
+        ),
         (
             "arabic_fonts",
             vec![
+                "SF Arabic", // macOS system font
                 "Noto Sans Arabic",
                 "Amiri",
                 "Lateef",
