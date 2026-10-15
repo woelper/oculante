@@ -30,6 +30,15 @@ icon = ["res/icons/icon.ico"]
 identifier = "com.github.woelper.oculante"
 name = "oculante"
 
+[package.metadata.deb]
+section = "graphics"
+assets = [
+    ["target/release/oculante", "usr/bin/", "755"],
+    ["res/oculante.desktop", "usr/share/applications/", "644"],
+    ["res/icons/icon.png", "usr/share/icons/hicolor/256x256/apps/oculante.png", "644"],
+    ["README.md", "usr/share/doc/oculante/", "644"],
+]
+
 [dependencies]
 env_logger = "0.11"
 glam = "0.34"
@@ -109,6 +118,7 @@ open = "5.4"
 kamadak-exif = "0.6"
 lexical-sort = "0.3"
 log = "0.4"
+percent-encoding = "2"
 nalgebra = "0.35"
 anyhow = "1.0"
 arboard = { version = "3.6", features = ["wayland-data-control"] }

@@ -10,7 +10,7 @@ use log::{LevelFilter, error};
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
-use oculante::utils::{Frame, Player, open_paths, request_repaint};
+use oculante::utils::{Frame, Player, open_paths, path_from_arg, request_repaint};
 use oculante::window_config::build_window_settings;
 
 fn main() -> eframe::Result<()> {
@@ -68,7 +68,7 @@ fn main() -> eframe::Result<()> {
     let paths_to_open: Vec<PathBuf> = matches
         .remove_many::<String>("INPUT")
         .unwrap_or_default()
-        .map(PathBuf::from)
+        .map(|arg| path_from_arg(&arg))
         .collect();
 
     // File names can also be piped in. They are read in the background, so the
@@ -179,7 +179,7 @@ fn piped_paths(
             .flat_map(|line| {
                 line.unwrap_or_default()
                     .split_whitespace()
-                    .map(PathBuf::from)
+                    .map(path_from_arg)
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();

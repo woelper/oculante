@@ -1313,3 +1313,52 @@ fn ci_fullscreen_keeps_the_image_in_proportion() {
     crate::utils::keep_in_proportion(&mut geometry, windowed, fullscreen);
     assert_eq!(geometry.offset, Vector2::new(1000., 500.));
 }
+
+#[test]
+fn file_uri_args_become_paths() {
+    use crate::utils::path_from_arg;
+    // `Exec=oculante %U` makes file managers pass URIs
+    assert_eq!(path_from_arg("/tmp/a b.png"), PathBuf::from("/tmp/a b.png"));
+    assert_eq!(path_from_arg("rel/a.png"), PathBuf::from("rel/a.png"));
+    #[cfg(unix)]
+    {
+        assert_eq!(
+            path_from_arg("file:///tmp/a%20b%23.png"),
+            PathBuf::from("/tmp/a b#.png")
+        );
+        assert_eq!(
+            path_from_arg("file://localhost/tmp/a.png"),
+            PathBuf::from("/tmp/a.png")
+        );
+        assert_eq!(
+            path_from_arg("file:///tmp/%C3%BCber.jpg"),
+            PathBuf::from("/tmp/über.jpg")
+        );
+    }
+    #[cfg(windows)]
+    assert_eq!(
+        path_from_arg("file:///C:/Users/a%20b.png"),
+        PathBuf::from("C:/Users/a b.png")
+    );
+}
+
+/// The desktop entries must hand the file to the app, or double clicking an
+/// image starts an empty viewer.
+#[test]
+fn desktop_entries_pass_files() {
+    for entry in [
+        "res/oculante.desktop",
+        "res/flathub/io.github.woelper.Oculante.desktop",
+    ] {
+        let text = std::fs::read_to_string(entry).unwrap();
+        let exec = text
+            .lines()
+            .find_map(|l| l.strip_prefix("Exec="))
+            .unwrap_or_else(|| panic!("{entry} has no Exec line"));
+        assert!(
+            ["%f", "%F", "%u", "%U"].iter().any(|c| exec.contains(c)),
+            "{entry}: Exec={exec} does not pass the file"
+        );
+        assert!(text.contains("MimeType="), "{entry} claims no file types");
+    }
+}

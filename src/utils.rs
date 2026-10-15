@@ -972,6 +972,28 @@ pub fn compare_show(state: &mut OculanteState, path: &Path, item: usize, geometr
     );
 }
 
+/// Turn a command line argument into a path. Desktop launchers using `%U`
+/// pass `file://` URIs, which are decoded here; anything else is a plain path.
+pub fn path_from_arg(arg: &str) -> PathBuf {
+    let Some(rest) = arg.strip_prefix("file://") else {
+        return PathBuf::from(arg);
+    };
+    // Skip an optional host, such as `localhost`
+    let rest = &rest[rest.find('/').unwrap_or(rest.len())..];
+    let decoded = percent_encoding::percent_decode_str(rest);
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        PathBuf::from(OsStr::from_bytes(&decoded.collect::<Vec<u8>>()))
+    }
+    #[cfg(not(unix))]
+    {
+        let decoded = decoded.decode_utf8_lossy();
+        // `file:///C:/x` names `C:/x` on Windows
+        PathBuf::from(decoded.strip_prefix('/').unwrap_or(&decoded))
+    }
+}
+
 /// Open the images or folders the app was started with.
 pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
     debug!("Image is: {:?}", paths_to_open);
