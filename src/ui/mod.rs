@@ -806,6 +806,24 @@ impl Modal {
             return;
         }
         egui::Modal::new(self.id.clone().into()).show(&self.ctx, |ui| {
+            // Enter accepts and Escape cancels. The keys are consumed so they
+            // don't reach the shortcuts. A focused button keeps Enter for itself.
+            let button_focused = ui.memory(|m| m.focused().is_some());
+            let (accept, cancel) = ui.input_mut(|i| {
+                (
+                    !button_focused && i.consume_key(Modifiers::NONE, Key::Enter),
+                    i.consume_key(Modifiers::NONE, Key::Escape),
+                )
+            });
+            if accept {
+                ui.scope(add_contents);
+                self.close();
+                return;
+            }
+            if cancel {
+                self.close();
+                return;
+            }
             ui.set_width(MODAL_WIDTH);
             ui.set_min_height(MODAL_MIN_HEIGHT);
             ui.vertical_centered_justified(|ui| {

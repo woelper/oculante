@@ -1362,3 +1362,46 @@ fn desktop_entries_pass_files() {
         assert!(text.contains("MimeType="), "{entry} claims no file types");
     }
 }
+
+/// Run one frame of the confirmation modal with the given key pressed.
+/// Returns whether it accepted, and whether it is still open.
+fn modal_frame(ctx: &egui::Context, key: Option<egui::Key>) -> (bool, bool) {
+    use crate::ui::Modal;
+    let mut input = egui::RawInput::default();
+    if let Some(key) = key {
+        input.events.push(egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    let was_open = crate::ui::is_popup_open(ctx, egui::Id::new("test"));
+    let mut accepted = false;
+    let mut leaked = false;
+    let mut output = ctx.run_ui(input, |ui| {
+        Modal::new("test", ui.ctx()).show("Sure?", |_| accepted = true);
+        leaked = key.is_some_and(|k| ui.input(|i| i.key_pressed(k)));
+    });
+    output.textures_delta.clear();
+    // while open, a shortcut read after the modal must not see the key
+    assert!(!(was_open && leaked), "{key:?} reached the shortcuts");
+    let open = crate::ui::is_popup_open(ctx, egui::Id::new("test"));
+    (accepted, open)
+}
+
+#[test]
+fn confirmation_modal_keys() {
+    let ctx = egui::Context::default();
+    crate::ui::Modal::new("test", &ctx).open();
+    assert_eq!(modal_frame(&ctx, None), (false, true), "stays open");
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Escape)), (false, false));
+
+    crate::ui::Modal::new("test", &ctx).open();
+    _ = modal_frame(&ctx, None);
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Enter)), (true, false));
+
+    // closed, Enter does nothing
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Enter)), (false, false));
+}
