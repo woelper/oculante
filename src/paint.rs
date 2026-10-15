@@ -14,6 +14,7 @@ pub struct PaintStroke {
     pub brush_index: usize,
     /// For ui preview: if highlit, paint brush stroke differently
     pub highlight: bool,
+    /// Finished, and without the paint history it is no longer in the list of strokes
     pub committed: bool,
     pub flip_random: bool,
 }

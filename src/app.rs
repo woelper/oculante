@@ -488,6 +488,7 @@ impl OculanteApp {
             self.state.image_version += 1;
             self.state.edit_state.result_pixel_op = Default::default();
             self.state.edit_state.result_image_op = Default::default();
+            self.state.edit_state.paint_base = Default::default();
             if !self.state.persistent_settings.keep_edits {
                 self.state.edit_state = Default::default();
             }

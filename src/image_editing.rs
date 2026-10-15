@@ -40,6 +40,9 @@ pub struct EditState {
     #[serde(skip)]
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: DynamicImage,
+    #[serde(skip)]
+    /// While painting: the result with all strokes but the one that is being drawn
+    pub paint_base: DynamicImage,
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
@@ -135,6 +138,7 @@ impl Default for EditState {
         Self {
             result_pixel_op: Default::default(),
             result_image_op: Default::default(),
+            paint_base: Default::default(),
             painting: Default::default(),
             block_panning: false,
             non_destructive_painting: Default::default(),

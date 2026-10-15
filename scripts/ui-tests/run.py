@@ -612,7 +612,8 @@ def test_zen_mode(binary):
 
 
 def test_paint_mode(binary):
-    """In paint mode a drag over the image leaves a stroke."""
+    """In paint mode a drag over the image leaves a stroke. The next stroke leaves the
+    first one where it is."""
     with App(binary, "paint", [image("moss.jpg")]) as app:
         app.wait_window()
         app.move(0.6, 0.6)
@@ -632,6 +633,15 @@ def test_paint_mode(binary):
         assert changed > 500, f"the stroke changed only {changed} pixels of the image"
         # a drag that paints must not move the image as well
         assert changed_pixels_in(before, after, (130, 60, 150, 120)) == 0, "the drag moved the image"
+        app.drag(300, 120, 600, 120, steps=20)
+        app.move(40, 560)
+        app.settle(1.5)
+        second = app.shot("second_stroke")
+        changed = changed_pixels_in(after, second, (280, 100, 340, 40))
+        assert changed > 500, f"the second stroke changed only {changed} pixels of the image"
+        # left of the edit panel, which lists the strokes
+        gone = changed_pixels_in(after, second, (280, 230, 310, 190))
+        assert gone == 0, f"{gone} pixels of the first stroke changed with the second one"
 
 
 # the image area right of the info panel, free of anything that depends on the pointer

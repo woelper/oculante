@@ -32,6 +32,10 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
     // A flag to indicate that the image needs to be rebuilt
     let mut image_changed = false;
     let mut pixels_changed = false;
+    // Only the stroke that is being drawn changed
+    let mut stroke_changed = false;
+    // A stroke was finished, the next one is drawn on top of it
+    let mut stroke_finished = false;
 
     if state.current_image.is_some() {
         // Ensure that the edit results are filled, by the processing below
@@ -233,7 +237,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 egui::Grid::new("paint").show(ui, |ui| {
                     ui.label("📜 Keep history");
                     ui.styled_checkbox(&mut state.edit_state.non_destructive_painting, "")
-                        .on_hover_text("Keeps all paint history and allows edits to it. Slower.");
+                        .on_hover_text("Keeps all strokes in the list, to change or delete them later.");
                     ui.end_row();
 
                     if let Some(stroke) = state.edit_state.paint_strokes.last_mut()
@@ -357,7 +361,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                             (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                         );
                         current_stroke.points.push(uv);
-                        pixels_changed = true;
+                        stroke_changed = true;
                     } else if !current_stroke.is_empty() {
                         // clone last stroke to inherit settings
                         if let Some(last_stroke) = state.edit_state.paint_strokes.clone().last() {
@@ -366,6 +370,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 .paint_strokes
                                 .push(last_stroke.without_points());
                         }
+                        stroke_finished = true;
                     }
                 }
             }
@@ -591,13 +596,22 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         "Image changed. Finished evaluating in {}s",
                         stamp.elapsed().as_secs_f32()
                     );
-
-                    // tag strokes as uncommitted as they need to be rendered again
-                    for stroke in &mut state.edit_state.paint_strokes {
-                        stroke.committed = false;
-                    }
                 }
                 pixels_changed = true;
+            }
+
+            if stroke_finished {
+                state.edit_state.paint_base.clone_from(&state.edit_state.result_pixel_op);
+            }
+            // Without a base to draw the stroke on, everything is done again
+            if stroke_changed
+                && (state.edit_state.paint_base.width() == 0
+                    || state.edit_state.paint_base.dimensions() != state.edit_state.result_pixel_op.dimensions())
+            {
+                pixels_changed = true;
+            }
+            if !state.edit_state.painting {
+                state.edit_state.paint_base = DynamicImage::default();
             }
 
             if pixels_changed {
@@ -630,15 +644,21 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     stamp.elapsed().as_secs_f32()
                 );
 
-                // draw paint lines
-                for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed
-                        && let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                            stroke.render(
-                                compatible_buffer,
-                                &state.edit_state.brushes,
-                            );
+                // draw paint lines, all of them, the one that is being drawn last
+                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last() {
+                    if let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                        for stroke in finished.iter().filter(|s| !s.is_empty()) {
+                            stroke.render(buffer, &state.edit_state.brushes);
                         }
+                    }
+                    if state.edit_state.painting {
+                        state.edit_state.paint_base.clone_from(&state.edit_state.result_pixel_op);
+                    }
+                    if !current.is_empty()
+                        && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
+                    {
+                        current.render(buffer, &state.edit_state.brushes);
+                    }
                 }
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
@@ -646,36 +666,34 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
+            } else if stroke_changed {
+                // only the stroke that is being drawn is drawn again, on the rest
+                state.edit_state.result_pixel_op.clone_from(&state.edit_state.paint_base);
+                if let Some(current) = state.edit_state.paint_strokes.last()
+                    && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
+                {
+                    current.render(buffer, &state.edit_state.brushes);
+                }
+                state.send_frame(crate::utils::Frame::UpdateTexture);
             }
 
-            // render uncommitted strokes if destructive to speed up painting
-            if state.edit_state.painting {
-                // render previous strokes
-                if state
+            // without history, finished strokes leave the list
+            if state.edit_state.painting
+                && state
                     .edit_state
                     .paint_strokes
                     .iter()
                     .filter(|l| !l.points.is_empty())
                     .count()
                     > 1
-                    && !state.edit_state.non_destructive_painting
-                {
-                    let stroke_count = state.edit_state.paint_strokes.len();
+                && !state.edit_state.non_destructive_painting
+            {
+                let stroke_count = state.edit_state.paint_strokes.len();
 
-                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
-                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-
-                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                                stroke.render(
-                                    compatible_buffer,
-                                    &state.edit_state.brushes,
-                                );
-                            }
-
-
-                            stroke.committed = true;
-                            debug!("Committed stroke {}", i);
-                        }
+                for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
+                    if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
+                        stroke.committed = true;
+                        debug!("Committed stroke {}", i);
                     }
                 }
             }
