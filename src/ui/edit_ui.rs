@@ -360,8 +360,11 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                             state.cursor_relative.x / state.image_geometry.dimensions.0 as f32,
                             (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                         );
-                        current_stroke.points.push(uv);
-                        stroke_changed = true;
+                        // holding still adds nothing
+                        if current_stroke.points.last() != Some(&uv) {
+                            current_stroke.points.push(uv);
+                            stroke_changed = true;
+                        }
                     } else if !current_stroke.is_empty() {
                         // clone last stroke to inherit settings
                         if let Some(last_stroke) = state.edit_state.paint_strokes.clone().last() {
@@ -600,18 +603,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 pixels_changed = true;
             }
 
-            if stroke_finished {
-                state.edit_state.paint_base.clone_from(&state.edit_state.result_pixel_op);
-            }
-            // Without a base to draw the stroke on, everything is done again
-            if stroke_changed
-                && (state.edit_state.paint_base.width() == 0
-                    || state.edit_state.paint_base.dimensions() != state.edit_state.result_pixel_op.dimensions())
-            {
-                pixels_changed = true;
-            }
-            if !state.edit_state.painting {
-                state.edit_state.paint_base = DynamicImage::default();
+            // The next stroke starts anew
+            if stroke_finished || !state.edit_state.painting {
+                state.edit_state.stroke_drawing = Default::default();
             }
 
             if pixels_changed {
@@ -645,19 +639,15 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 );
 
                 // draw paint lines, all of them, the one that is being drawn last
-                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last() {
-                    if let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                        for stroke in finished.iter().filter(|s| !s.is_empty()) {
-                            stroke.render(buffer, &state.edit_state.brushes);
-                        }
+                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last()
+                    && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
+                {
+                    for stroke in finished.iter().filter(|s| !s.is_empty()) {
+                        stroke.render(buffer, &state.edit_state.brushes);
                     }
-                    if state.edit_state.painting {
-                        state.edit_state.paint_base.clone_from(&state.edit_state.result_pixel_op);
-                    }
-                    if !current.is_empty()
-                        && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
-                    {
-                        current.render(buffer, &state.edit_state.brushes);
+                    state.edit_state.stroke_drawing = Default::default();
+                    if !current.is_empty() {
+                        state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes);
                     }
                 }
 
@@ -666,15 +656,13 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
-            } else if stroke_changed {
-                // only the stroke that is being drawn is drawn again, on the rest
-                state.edit_state.result_pixel_op.clone_from(&state.edit_state.paint_base);
-                if let Some(current) = state.edit_state.paint_strokes.last()
-                    && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
-                {
-                    current.render(buffer, &state.edit_state.brushes);
-                }
-                state.send_frame(crate::utils::Frame::UpdateTexture);
+            } else if stroke_changed
+                && let Some(current) = state.edit_state.paint_strokes.last()
+                && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
+                // only what is new of the stroke that is being drawn
+                && let Some(area) = state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes)
+            {
+                state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }
 
             // without history, finished strokes leave the list

@@ -5,6 +5,7 @@
 use crate::utils::ColorChannel;
 use glam::{Mat4, Vec4};
 use glow::HasContext;
+use image::math::Rect;
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
@@ -265,15 +266,35 @@ impl GlowRenderer {
         region: Region,
         premultiply: bool,
     ) {
-        region.assert_inside(bytes, tex.width, tex.height, tex.format);
+        tex.premultiplied = premultiply;
+        let all = Rect {
+            x: 0,
+            y: 0,
+            width: tex.width,
+            height: tex.height,
+        };
+        self.update_texture_part(gl, tex, bytes, region, all);
+    }
+
+    /// Update a part of a texture, `part` in its pixels, from a region of a larger image
+    /// where that part starts. Its colors are multiplied by alpha if the texture's are.
+    fn update_texture_part(
+        &self,
+        gl: &glow::Context,
+        tex: &GlowTexture,
+        bytes: &[u8],
+        region: Region,
+        part: Rect,
+    ) {
+        assert!(part.x + part.width <= tex.width && part.y + part.height <= tex.height);
+        region.assert_inside(bytes, part.width, part.height, tex.format);
         let copy;
-        let (bytes, region) = if premultiply {
-            copy = premultiplied(bytes, region, tex.width, tex.height, tex.format);
-            (copy.as_slice(), Region::whole(tex.width))
+        let (bytes, region) = if tex.premultiplied {
+            copy = premultiplied(bytes, region, part.width, part.height, tex.format);
+            (copy.as_slice(), Region::whole(part.width))
         } else {
             (bytes, region)
         };
-        tex.premultiplied = premultiply;
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
             let (_internal, fmt, typ) = gl_format(tex.format);
@@ -281,10 +302,10 @@ impl GlowRenderer {
             gl.tex_sub_image_2d(
                 glow::TEXTURE_2D,
                 0,
-                0,
-                0,
-                tex.width as i32,
-                tex.height as i32,
+                part.x as i32,
+                part.y as i32,
+                part.width as i32,
+                part.height as i32,
                 fmt,
                 typ,
                 glow::PixelUnpackData::Slice(Some(bytes)),
@@ -395,6 +416,90 @@ impl GlowRenderer {
         filter: TexFilter,
         premultiply: bool,
     ) -> bool {
+        if !self.tiles_fit(tiles, width, height, format, filter) {
+            return false;
+        }
+
+        let several = tiles.len() > 1;
+        for tile in tiles {
+            let region = Region {
+                row_length: width,
+                x: tile.x,
+                y: tile.y,
+            };
+            self.update_texture_from(gl, &mut tile.texture, bytes, region, premultiply);
+            self.set_filter(gl, &tile.texture, filter);
+            if several {
+                wait_for_upload(gl);
+            }
+        }
+
+        true
+    }
+
+    /// Update only a part of the image, `area` in its pixels, in the tiles it is on. The
+    /// tiles keep whether their colors are multiplied by alpha. Returns `false` if they
+    /// do not fit the image (caller must upload all of it).
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_tiles_area(
+        &self,
+        gl: &glow::Context,
+        tiles: &[GlowTile],
+        bytes: &[u8],
+        width: u32,
+        height: u32,
+        format: TexFormat,
+        filter: TexFilter,
+        area: Rect,
+    ) -> bool {
+        if !self.tiles_fit(tiles, width, height, format, filter)
+            || area.x + area.width > width
+            || area.y + area.height > height
+        {
+            return false;
+        }
+
+        let several = tiles.len() > 1;
+        for tile in tiles {
+            // the part of the area on this tile
+            let x = area.x.max(tile.x);
+            let y = area.y.max(tile.y);
+            let right = (area.x + area.width).min(tile.x + tile.texture.width);
+            let bottom = (area.y + area.height).min(tile.y + tile.texture.height);
+            if x >= right || y >= bottom {
+                continue;
+            }
+            let region = Region {
+                row_length: width,
+                x,
+                y,
+            };
+            let part = Rect {
+                x: x - tile.x,
+                y: y - tile.y,
+                width: right - x,
+                height: bottom - y,
+            };
+            self.update_texture_part(gl, &tile.texture, bytes, region, part);
+            self.set_filter(gl, &tile.texture, filter);
+            if several {
+                wait_for_upload(gl);
+            }
+        }
+
+        true
+    }
+
+    /// Whether the tiles are laid out for an image of this size and format, and can be
+    /// updated in place
+    fn tiles_fit(
+        &self,
+        tiles: &[GlowTile],
+        width: u32,
+        height: u32,
+        format: TexFormat,
+        filter: TexFilter,
+    ) -> bool {
         if tiles.is_empty() || width == 0 || height == 0 || tiles[0].texture.format != format {
             return false;
         }
@@ -428,21 +533,6 @@ impl GlowRenderer {
                 return false;
             }
         }
-
-        let several = tiles.len() > 1;
-        for tile in tiles {
-            let region = Region {
-                row_length: width,
-                x: tile.x,
-                y: tile.y,
-            };
-            self.update_texture_from(gl, &mut tile.texture, bytes, region, premultiply);
-            self.set_filter(gl, &tile.texture, filter);
-            if several {
-                wait_for_upload(gl);
-            }
-        }
-
         true
     }
 

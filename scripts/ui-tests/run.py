@@ -613,7 +613,8 @@ def test_zen_mode(binary):
 
 def test_paint_mode(binary):
     """In paint mode a drag over the image leaves a stroke. The next stroke leaves the
-    first one where it is."""
+    first one where it is, a click leaves a dot, and a fading stroke fades. Drawn
+    again all at once, everything looks the same as drawn a bit at a time."""
     with App(binary, "paint", [image("moss.jpg")]) as app:
         app.wait_window()
         app.move(0.6, 0.6)
@@ -642,6 +643,82 @@ def test_paint_mode(binary):
         # left of the edit panel, which lists the strokes
         gone = changed_pixels_in(after, second, (280, 230, 310, 190))
         assert gone == 0, f"{gone} pixels of the first stroke changed with the second one"
+        # held down without moving
+        app.move(200, 480)
+        app.x("xdotool", "mousedown", "1")
+        app.settle(0.3)
+        app.x("xdotool", "mouseup", "1")
+        app.move(40, 560)
+        app.settle(1.5)
+        dot = app.shot("dot")
+        changed = changed_pixels_in(second, dot, (180, 460, 40, 40))
+        assert changed > 30, f"the click changed only {changed} pixels of the image"
+        app.click(733, 253)  # "Fade"
+        app.settle(0.5)
+        app.drag(160, 180, 560, 180, steps=20)
+        app.move(40, 560)
+        app.settle(1.5)
+        faded = app.shot("faded")
+        start = mean_level(faded, (150, 165, 60, 30)) - mean_level(dot, (150, 165, 60, 30))
+        end = mean_level(faded, (500, 165, 60, 30)) - mean_level(dot, (500, 165, 60, 30))
+        assert start > 20 and end < start / 3, f"the fading stroke is {start:.1f} brighter at its start and {end:.1f} at its end"
+        # all edits off and on again: everything is drawn again at once
+        app.click(617, 355)  # "Disable all edits"
+        app.move(40, 560)
+        app.settle(1.0)
+        off = app.shot("edits_off")
+        assert changed_pixels_in(faded, off, (140, 40, 455, 480)) > 1000, "the edits did not go off"
+        app.click(617, 355)
+        app.move(40, 560)
+        app.settle(1.5)
+        again = app.shot("drawn_again")
+        changed = changed_pixels_in(faded, again, (140, 40, 455, 480))
+        assert changed == 0, f"drawn again at once, {changed} pixels look different"
+
+
+def test_paint_on_transparency(binary):
+    """A stroke over transparent and opaque pixels shows on both, only its part of the
+    image is uploaded, with the colors multiplied by alpha as for all of it."""
+    folder = os.path.join(OUT, "paint_transparent_images")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    disc = os.path.join(folder, "disc.png")
+    subprocess.run(
+        ["convert", "-size", "800x800", "xc:rgba(255,255,255,0)", "-fill", "black",
+         "-draw", "circle 400,400 400,60", f"PNG32:{disc}"],
+        check=True,
+    )
+    with App(binary, "paint_transparent", [disc]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(896, 85)  # "Paint mode"
+        app.move(40, 560)
+        app.settle(1.0)
+        # the image starts at x 231, the disc at 273
+        app.drag(235, 250, 580, 250, steps=20)
+        app.move(40, 560)
+        app.settle(1.5)
+        painted = app.shot("painted")
+        # on the background that shows through and on black, a soft white brush is
+        # light gray: its dots add up to about 60 % alpha
+        for name, box in (("transparent", (232, 235, 38, 30)), ("opaque", (320, 235, 250, 30))):
+            light = count_color(painted, box, (160, 160, 160), 40)
+            assert light > 50, f"the stroke shows {light} light pixels on the {name} part"
+        # all edits off and on again: all of the image is uploaded
+        app.click(627, 307)  # "Disable all edits"
+        app.move(40, 560)
+        app.settle(1.0)
+        off = app.shot("edits_off")
+        assert changed_pixels_in(painted, off, (0, 40, 600, 480)) > 1000, "the edits did not go off"
+        app.click(627, 307)
+        app.move(40, 560)
+        app.settle(1.5)
+        again = app.shot("uploaded_again")
+        changed = changed_pixels_in(painted, again, (0, 40, 600, 480))
+        assert changed == 0, f"uploaded all at once, {changed} pixels look different"
 
 
 # the image area right of the info panel, free of anything that depends on the pointer
@@ -1223,6 +1300,7 @@ TESTS = [
     test_clipboard,
     test_zen_mode,
     test_paint_mode,
+    test_paint_on_transparency,
     test_fullscreen,
     test_borderless,
     test_compare_list,

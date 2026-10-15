@@ -557,6 +557,8 @@ pub enum Frame {
     EditResult(Arc<DynamicImage>),
     /// Only update the current texture.
     UpdateTexture,
+    /// Only this part of the current texture changed
+    UpdateTextureArea(image::math::Rect),
     /// All frames of the animation were sent. Holds how often the file asks to
     /// play it, `None` for forever.
     AnimationEnd(Option<u32>),
@@ -568,6 +570,17 @@ pub enum Frame {
         item: usize,
         count: usize,
     },
+}
+
+/// The smallest rectangle around both
+pub fn rect_union(a: image::math::Rect, b: image::math::Rect) -> image::math::Rect {
+    let (x, y) = (a.x.min(b.x), a.y.min(b.y));
+    image::math::Rect {
+        x,
+        y,
+        width: (a.x + a.width).max(b.x + b.width) - x,
+        height: (a.y + a.height).max(b.y + b.height) - y,
+    }
 }
 
 impl Frame {
@@ -598,9 +611,15 @@ impl Frame {
                 | Frame::AnimationStart(ref mut image_buffer)
                 | Frame::EditResult(ref mut image_buffer)
                 | Frame::CompareResult(ref mut image_buffer, _) => *image_buffer = img.clone(),
-                Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => (),
+                Frame::UpdateTexture
+                | Frame::UpdateTextureArea(_)
+                | Frame::AnimationEnd(_)
+                | Frame::Item { .. } => (),
             },
-            Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => (),
+            Frame::UpdateTexture
+            | Frame::UpdateTextureArea(_)
+            | Frame::AnimationEnd(_)
+            | Frame::Item { .. } => (),
         }
         forced_variant
     }

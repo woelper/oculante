@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::icons::*;
-use crate::paint::PaintStroke;
+use crate::paint::{PaintStroke, StrokeDrawing};
 use crate::settings::VolatileSettings;
 use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
@@ -41,8 +41,8 @@ pub struct EditState {
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: DynamicImage,
     #[serde(skip)]
-    /// While painting: the result with all strokes but the one that is being drawn
-    pub paint_base: DynamicImage,
+    /// While painting: how far the stroke that is being drawn is drawn
+    pub stroke_drawing: StrokeDrawing,
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
@@ -138,7 +138,7 @@ impl Default for EditState {
         Self {
             result_pixel_op: Default::default(),
             result_image_op: Default::default(),
-            paint_base: Default::default(),
+            stroke_drawing: Default::default(),
             painting: Default::default(),
             block_panning: false,
             non_destructive_painting: Default::default(),

@@ -26,7 +26,10 @@ fn assert_valid_image(frame: &Frame) {
                 "Image has zero dimensions"
             );
         }
-        Frame::UpdateTexture | Frame::AnimationEnd(_) | Frame::Item { .. } => {
+        Frame::UpdateTexture
+        | Frame::UpdateTextureArea(_)
+        | Frame::AnimationEnd(_)
+        | Frame::Item { .. } => {
             panic!("Expected an image frame, got {frame}")
         }
     }

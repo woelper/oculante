@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use egui::{Align, FontData, FontDefinitions, FontFamily, Id};
 use image::GenericImageView;
+use image::math::Rect;
 use log::{debug, info};
 use nalgebra::Vector2;
 
@@ -29,6 +30,8 @@ pub struct OculanteApp {
     first_frame: bool,
     /// Track if image needs re-upload to the GPU
     texture_dirty: bool,
+    /// Only this part of the image needs to be uploaded again
+    texture_area: Option<Rect>,
     /// Glow renderer for direct GL rendering (created on the first frame)
     renderer: Option<GlowRenderer>,
     /// Tiles covering the current image. One tile for images that fit in the
@@ -159,6 +162,7 @@ impl OculanteApp {
             state,
             first_frame: true,
             texture_dirty: false,
+            texture_area: None,
             renderer: None,
             image_tiles: Vec::new(),
             image_format: TexFormat::Rgba8,
@@ -293,6 +297,35 @@ impl OculanteApp {
         self.reset_after_upload = false;
 
         self.texture_dirty = false;
+        self.texture_area = None;
+    }
+
+    /// Upload only a part of the edit result, painting changes a little of it at a time
+    fn upload_area_to_glow(&mut self, gl: &glow::Context, area: Rect) {
+        let Some(renderer) = &self.renderer else {
+            return;
+        };
+        let img = &self.state.edit_state.result_pixel_op;
+        let (format, layout) = glow_renderer::texture_layout(img);
+        let filter = TexFilter {
+            linear_min: self.state.persistent_settings.linear_min_filter,
+            linear_mag: self.state.persistent_settings.linear_mag_filter,
+            mipmaps: self.state.persistent_settings.use_mipmaps,
+        };
+        let uploaded = self.animation.is_none()
+            && renderer.update_tiles_area(
+                gl,
+                &self.image_tiles,
+                layout.as_bytes(),
+                img.width(),
+                img.height(),
+                format,
+                filter,
+                area,
+            );
+        if !uploaded {
+            self.upload_image_to_glow(gl);
+        }
     }
 
     /// Whether the image is uploaded with its colors multiplied by alpha. Only then are
@@ -482,13 +515,16 @@ impl OculanteApp {
             }
         }
 
-        if !matches!(frame, Frame::EditResult(_) | Frame::UpdateTexture) {
+        if !matches!(
+            frame,
+            Frame::EditResult(_) | Frame::UpdateTexture | Frame::UpdateTextureArea(_)
+        ) {
             // a new image, its numbers are computed when the info panel shows them
             self.state.image_metadata = None;
             self.state.image_version += 1;
             self.state.edit_state.result_pixel_op = Default::default();
             self.state.edit_state.result_image_op = Default::default();
-            self.state.edit_state.paint_base = Default::default();
+            self.state.edit_state.stroke_drawing = Default::default();
             if !self.state.persistent_settings.keep_edits {
                 self.state.edit_state = Default::default();
             }
@@ -543,6 +579,13 @@ impl OculanteApp {
             Frame::UpdateTexture => {
                 debug!("received UpdateTexture");
                 self.texture_dirty = true;
+                ctx.request_repaint();
+            }
+            Frame::UpdateTextureArea(area) => {
+                self.texture_area = Some(
+                    self.texture_area
+                        .map_or(area, |before| rect_union(before, area)),
+                );
                 ctx.request_repaint();
             }
             // handled at the top
@@ -685,6 +728,10 @@ impl eframe::App for OculanteApp {
         {
             debug!("Texture was dirty. uploading");
             self.upload_image_to_glow(gl);
+        } else if let Some(area) = self.texture_area.take()
+            && let Some(gl) = frame.gl()
+        {
+            self.upload_area_to_glow(gl, area);
         }
 
         // The numbers of the info panel are computed when it shows them, once for
