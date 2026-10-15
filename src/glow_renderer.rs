@@ -5,6 +5,10 @@
 use crate::utils::ColorChannel;
 use glam::{Mat4, Vec4};
 use glow::HasContext;
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::{ParallelSlice, ParallelSliceMut},
+};
 
 /// Texture formats we support
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,6 +29,8 @@ pub struct GlowTexture {
     /// Allocated once with all its mipmap levels, or with only the full size one.
     /// `None` for a texture that GL resizes when its mipmaps are made.
     pub fixed_mipmaps: Option<bool>,
+    /// The colors are multiplied by alpha, see `premultiplied`
+    pub premultiplied: bool,
 }
 
 /// How a texture is sampled when it is scaled.
@@ -167,8 +173,16 @@ impl GlowRenderer {
         height: u32,
         format: TexFormat,
         filter: TexFilter,
+        premultiply: bool,
     ) -> GlowTexture {
         region.assert_inside(bytes, width, height, format);
+        let copy;
+        let (bytes, region) = if premultiply {
+            copy = premultiplied(bytes, region, width, height, format);
+            (copy.as_slice(), Region::whole(width))
+        } else {
+            (bytes, region)
+        };
         unsafe {
             let texture = gl.create_texture().expect("Failed to create texture");
             gl.bind_texture(glow::TEXTURE_2D, Some(texture));
@@ -237,6 +251,7 @@ impl GlowRenderer {
                 height,
                 format,
                 fixed_mipmaps,
+                premultiplied: premultiply,
             }
         }
     }
@@ -245,11 +260,20 @@ impl GlowRenderer {
     fn update_texture_from(
         &self,
         gl: &glow::Context,
-        tex: &GlowTexture,
+        tex: &mut GlowTexture,
         bytes: &[u8],
         region: Region,
+        premultiply: bool,
     ) {
         region.assert_inside(bytes, tex.width, tex.height, tex.format);
+        let copy;
+        let (bytes, region) = if premultiply {
+            copy = premultiplied(bytes, region, tex.width, tex.height, tex.format);
+            (copy.as_slice(), Region::whole(tex.width))
+        } else {
+            (bytes, region)
+        };
+        tex.premultiplied = premultiply;
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(tex.texture));
             let (_internal, fmt, typ) = gl_format(tex.format);
@@ -300,7 +324,9 @@ impl GlowRenderer {
     }
 
     /// Split a full-image buffer into tiles, uploading each as its own GPU texture.
-    /// The tiles are read straight from the buffer, nothing is copied per tile.
+    /// The tiles are read straight from the buffer, nothing is copied per tile, unless
+    /// the colors are to be multiplied by alpha.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_tiles(
         &self,
         gl: &glow::Context,
@@ -309,6 +335,7 @@ impl GlowRenderer {
         height: u32,
         format: TexFormat,
         filter: TexFilter,
+        premultiply: bool,
     ) -> Vec<GlowTile> {
         if width == 0 || height == 0 {
             return Vec::new();
@@ -330,7 +357,16 @@ impl GlowRenderer {
                     x: tx,
                     y: ty,
                 };
-                let texture = self.create_texture_from(gl, bytes, region, tw, th, format, filter);
+                let texture = self.create_texture_from(
+                    gl,
+                    bytes,
+                    region,
+                    tw,
+                    th,
+                    format,
+                    filter,
+                    premultiply,
+                );
                 if cols * rows > 1 {
                     wait_for_upload(gl);
                 }
@@ -351,12 +387,13 @@ impl GlowRenderer {
     pub fn update_tiles(
         &self,
         gl: &glow::Context,
-        tiles: &[GlowTile],
+        tiles: &mut [GlowTile],
         bytes: &[u8],
         width: u32,
         height: u32,
         format: TexFormat,
         filter: TexFilter,
+        premultiply: bool,
     ) -> bool {
         if tiles.is_empty() || width == 0 || height == 0 || tiles[0].texture.format != format {
             return false;
@@ -392,15 +429,16 @@ impl GlowRenderer {
             }
         }
 
+        let several = tiles.len() > 1;
         for tile in tiles {
             let region = Region {
                 row_length: width,
                 x: tile.x,
                 y: tile.y,
             };
-            self.update_texture_from(gl, &tile.texture, bytes, region);
+            self.update_texture_from(gl, &mut tile.texture, bytes, region, premultiply);
             self.set_filter(gl, &tile.texture, filter);
-            if tiles.len() > 1 {
+            if several {
                 wait_for_upload(gl);
             }
         }
@@ -431,6 +469,7 @@ impl GlowTile {
             ],
             uv_offset: [0.0, 0.0],
             uv_scale: [1.0, 1.0],
+            premultiplied: self.texture.premultiplied,
         }
     }
 }
@@ -444,6 +483,8 @@ pub struct Quad {
     pub size: [f32; 2],
     pub uv_offset: [f32; 2],
     pub uv_scale: [f32; 2],
+    /// The colors of the texture are multiplied by alpha
+    pub premultiplied: bool,
 }
 
 /// Draw textured quads from within an egui paint callback, with one
@@ -473,15 +514,6 @@ pub fn paint_quads(
     unsafe {
         gl.viewport(0, 0, screen_size_px[0] as i32, screen_size_px[1] as i32);
         gl.enable(glow::BLEND);
-        // Blend the color, but leave the alpha of the window untouched. Otherwise half
-        // transparent pixels make the window itself translucent on Wayland, and
-        // whatever is behind it shines through (#342).
-        gl.blend_func_separate(
-            glow::SRC_ALPHA,
-            glow::ONE_MINUS_SRC_ALPHA,
-            glow::ZERO,
-            glow::ONE,
-        );
 
         gl.use_program(Some(program));
         gl.bind_vertex_array(Some(vao));
@@ -505,6 +537,15 @@ pub fn paint_quads(
             set_uniform_2f(gl, program, "u_size", quad.size);
             set_uniform_2f(gl, program, "u_uv_offset", quad.uv_offset);
             set_uniform_2f(gl, program, "u_uv_scale", quad.uv_scale);
+            // Blend the color, but leave the alpha of the window untouched. Otherwise half
+            // transparent pixels make the window itself translucent on Wayland, and
+            // whatever is behind it shines through (#342).
+            let source = if quad.premultiplied {
+                glow::ONE
+            } else {
+                glow::SRC_ALPHA
+            };
+            gl.blend_func_separate(source, glow::ONE_MINUS_SRC_ALPHA, glow::ZERO, glow::ONE);
             gl.bind_texture(glow::TEXTURE_2D, Some(quad.texture));
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
         }
@@ -570,6 +611,15 @@ struct Region {
 }
 
 impl Region {
+    /// All of an image of this width
+    fn whole(width: u32) -> Self {
+        Self {
+            row_length: width,
+            x: 0,
+            y: 0,
+        }
+    }
+
     /// GL reads the region through a raw pointer, so make sure all of it is in the buffer.
     fn assert_inside(&self, bytes: &[u8], width: u32, height: u32, format: TexFormat) {
         if width == 0 || height == 0 {
@@ -583,6 +633,49 @@ impl Region {
             bytes.len()
         );
     }
+}
+
+/// Whether some pixels of an image are not opaque. Only those look different with
+/// their colors multiplied by alpha.
+pub fn has_transparency(bytes: &[u8], format: TexFormat) -> bool {
+    let channels = bytes_per_pixel(format);
+    match format {
+        TexFormat::Rgba8 | TexFormat::Rg8 => bytes
+            .par_chunks(channels * 4096)
+            .any(|run| run.chunks_exact(channels).any(|px| px[channels - 1] < 255)),
+        TexFormat::Rgb8 | TexFormat::R8 => false,
+    }
+}
+
+/// A copy of a region with the colors multiplied by alpha, the last channel. A texture
+/// is filtered when it is zoomed, and made smaller for its mipmaps: the colors of
+/// transparent pixels would otherwise mix into the edges next to them, white under
+/// transparency shows as a light fringe.
+fn premultiplied(
+    bytes: &[u8],
+    region: Region,
+    width: u32,
+    height: u32,
+    format: TexFormat,
+) -> Vec<u8> {
+    let channels = bytes_per_pixel(format);
+    let row = width as usize * channels;
+    let mut copy = vec![0; row * height as usize];
+    copy.par_chunks_mut(row.max(1))
+        .enumerate()
+        .for_each(|(y, out)| {
+            let start = ((region.y as usize + y) * region.row_length as usize + region.x as usize)
+                * channels;
+            out.copy_from_slice(&bytes[start..start + row]);
+            for px in out.chunks_exact_mut(channels) {
+                let (color, alpha) = px.split_at_mut(channels - 1);
+                let alpha = alpha[0] as u16;
+                for c in color {
+                    *c = ((*c as u16 * alpha + 127) / 255) as u8;
+                }
+            }
+        });
+    copy
 }
 
 /// Tell GL to read the next upload from a region of the buffer it is given, or
@@ -871,6 +964,38 @@ mod tests {
             std::panic::catch_unwind(|| region(0).assert_inside(&bytes, 8, 4, TexFormat::Rgb8))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn colors_are_multiplied_by_alpha() {
+        // gray with alpha, 3x2, of which the right 2x2 are uploaded
+        let bytes = [10, 255, 200, 0, 200, 128, 9, 9, 100, 255, 255, 51];
+        let region = Region {
+            row_length: 3,
+            x: 1,
+            y: 0,
+        };
+        assert_eq!(
+            premultiplied(&bytes, region, 2, 2, TexFormat::Rg8),
+            [0, 0, 100, 128, 100, 255, 51, 51]
+        );
+        let rgba = [255, 128, 0, 128, 7, 8, 9, 255];
+        assert_eq!(
+            premultiplied(&rgba, Region::whole(2), 2, 1, TexFormat::Rgba8),
+            [128, 64, 0, 128, 7, 8, 9, 255]
+        );
+    }
+
+    #[test]
+    fn transparency_is_found_anywhere() {
+        let mut rgba = vec![255; 4 * 10_000];
+        assert!(!has_transparency(&rgba, TexFormat::Rgba8));
+        rgba[4 * 9_999 + 3] = 254;
+        assert!(has_transparency(&rgba, TexFormat::Rgba8));
+        // without alpha nothing is transparent
+        assert!(!has_transparency(&[0; 6], TexFormat::Rgb8));
+        assert!(!has_transparency(&[0; 6], TexFormat::R8));
+        assert!(has_transparency(&[255, 255, 0, 0], TexFormat::Rg8));
     }
 
     #[test]

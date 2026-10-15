@@ -36,6 +36,8 @@ pub struct OculanteApp {
     image_tiles: Vec<GlowTile>,
     /// Format of the uploaded image (selects the channel swizzle)
     image_format: TexFormat,
+    /// Some pixels of the uploaded image are not opaque
+    image_transparent: bool,
     /// The animation that is playing, with its frames and its clock
     animation: Option<Animation>,
     /// Checker texture for transparency grid
@@ -160,6 +162,7 @@ impl OculanteApp {
             renderer: None,
             image_tiles: Vec::new(),
             image_format: TexFormat::Rgba8,
+            image_transparent: false,
             animation: None,
             checker_texture: None,
             reset_after_upload: false,
@@ -253,11 +256,23 @@ impl OculanteApp {
             mipmaps: self.state.persistent_settings.use_mipmaps,
         };
 
+        self.image_transparent = glow_renderer::has_transparency(bytes, format);
+        let premultiply = self.premultiply();
+
         // Update in place if the tile layout is unchanged, otherwise start over
-        if !renderer.update_tiles(gl, &self.image_tiles, bytes, w, h, format, filter) {
+        if !renderer.update_tiles(
+            gl,
+            &mut self.image_tiles,
+            bytes,
+            w,
+            h,
+            format,
+            filter,
+            premultiply,
+        ) {
             let old = std::mem::take(&mut self.image_tiles);
             renderer.delete_tiles(gl, old);
-            self.image_tiles = renderer.create_tiles(gl, bytes, w, h, format, filter);
+            self.image_tiles = renderer.create_tiles(gl, bytes, w, h, format, filter, premultiply);
         }
         self.image_format = format;
 
@@ -278,6 +293,26 @@ impl OculanteApp {
         self.reset_after_upload = false;
 
         self.texture_dirty = false;
+    }
+
+    /// Whether the image is uploaded with its colors multiplied by alpha. Only then are
+    /// its edges right when it is zoomed. A single channel shows the colors as they
+    /// are, also those under transparency.
+    fn premultiply(&self) -> bool {
+        self.image_transparent
+            && self.state.persistent_settings.current_channel == ColorChannel::Rgba
+    }
+
+    /// Upload the image again if it was uploaded for other channels than are shown now
+    fn upload_for_channels(&mut self, frame: &eframe::Frame) {
+        let Some(tile) = self.image_tiles.first() else {
+            return;
+        };
+        if tile.texture.premultiplied != self.premultiply()
+            && let Some(gl) = frame.gl()
+        {
+            self.upload_image_to_glow(gl);
+        }
     }
 
     fn first_frame_setup(&mut self, ctx: &egui::Context) {
@@ -827,6 +862,9 @@ impl eframe::App for OculanteApp {
                     main_menu(ui, state);
                 });
         }
+        // the menu switches the channels, before the image is drawn
+        self.upload_for_channels(frame);
+        let state = &mut self.state;
         if state.persistent_settings.zen_mode && state.persistent_settings.borderless {
             egui::Panel::top("menu_zen")
                 .min_size(40.)

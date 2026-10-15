@@ -1095,6 +1095,37 @@ def test_channel_view(binary):
         assert changed_pixels_in(rgba, back, IMAGE_AREA) == 0, "the full image did not come back"
 
 
+def test_transparent_edges_when_zoomed_out(binary):
+    """Zoomed out, the color under transparent pixels does not show at the edges of
+    what is opaque, with and without a color. A channel on its own still shows it."""
+    folder = os.path.join(OUT, "transparent_edges_images")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    # black on white that is fully transparent, as gray with alpha and as RGBA
+    for name, kind in (("gray", "PNG"), ("rgba", "PNG32")):
+        disc = os.path.join(folder, f"{name}.png")
+        subprocess.run(
+            ["convert", "-size", "800x800", "xc:rgba(255,255,255,0)", "-fill", "black",
+             "-draw", "circle 400,400 400,60", f"{kind}:{disc}"],
+            check=True,
+        )
+        with start(binary, f"transparent_edges_{name}", disc) as app:
+            app.scroll_down(512, 300, 1)  # zoom out, where mipmaps are used
+            app.move(40, 560)
+            app.settle(1.0)
+            # lighter than the background, which is (30, 30, 30)
+            light = count_color(app.shot("all_channels"), IMAGE_AREA, (255, 255, 255), 215)
+            assert light == 0, f"{light} pixels at the edges of the {name} image are lighter than the background"
+            app.key("u")
+            app.settle(1.0)
+            white = count_color(app.shot("colors"), IMAGE_AREA, (255, 255, 255), 4)
+            assert white > 1000, f"the colors of the {name} image without alpha show no white ({white} pixels)"
+            app.key("c")
+            app.settle(1.0)
+            light = count_color(app.shot("all_channels_again"), IMAGE_AREA, (255, 255, 255), 215)
+            assert light == 0, f"{light} pixels at the edges are lighter after showing all channels again ({name})"
+
+
 def needs_window_manager():
     if not has_window_manager():
         raise Skip(f"needs the window manager {WINDOW_MANAGER}")
@@ -1200,6 +1231,7 @@ TESTS = [
     test_overtaken_load,
     test_load_error_shows_toast,
     test_channel_view,
+    test_transparent_edges_when_zoomed_out,
 ]
 
 

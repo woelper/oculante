@@ -598,6 +598,7 @@ fn zoom_preview(
             size: [screen_right - screen_left, screen_bottom - screen_top],
             uv_offset: [uv_left, uv_top],
             uv_scale: [uv_right - uv_left, uv_bottom - uv_top],
+            premultiplied: tile.texture.premultiplied,
         });
     }
 
