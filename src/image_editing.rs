@@ -3,6 +3,7 @@ use std::fmt;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
+use crate::annotate::{AnnotateUi, Annotation};
 use crate::icons::*;
 use crate::paint::{PaintStroke, StrokeDrawing};
 use crate::settings::VolatileSettings;
@@ -43,6 +44,9 @@ pub struct EditState {
     #[serde(skip)]
     /// While painting: how far the stroke that is being drawn is drawn
     pub stroke_drawing: StrokeDrawing,
+    #[serde(skip)]
+    /// What the mouse and the keys do with annotations, and what of them is drawn
+    pub annotate: AnnotateUi,
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
@@ -127,9 +131,14 @@ impl EditState {
     /// conversion alone is cheap to do again, and keeping its result would hold
     /// a second copy of the image.
     pub fn keeps_image_op_result(&self) -> bool {
-        self.image_op_stack
-            .iter()
-            .any(|op| op.active && !matches!(op.operation, ImageOperation::ColorConverter(_)))
+        self.image_op_stack.iter().any(|op| {
+            op.active
+                && !matches!(
+                    op.operation,
+                    // annotations are drawn after everything else
+                    ImageOperation::ColorConverter(_) | ImageOperation::Annotate(_)
+                )
+        })
     }
 }
 
@@ -139,6 +148,7 @@ impl Default for EditState {
             result_pixel_op: Default::default(),
             result_image_op: Default::default(),
             stroke_drawing: Default::default(),
+            annotate: Default::default(),
             painting: Default::default(),
             block_panning: false,
             non_destructive_painting: Default::default(),
@@ -266,6 +276,8 @@ pub enum ImageOperation {
         shapes: Vec<MeasureShape>,
     },
     LUT(String),
+    /// Arrows, frames, text and more, on top of everything else
+    Annotate(Vec<Annotation>),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -325,6 +337,7 @@ impl fmt::Display for ImageOperation {
             Self::MDiv => write!(f, "Divide by alpha"),
             Self::LUT(_) => write!(f, "Apply Color LUT"),
             Self::Filter3x3(_) => write!(f, "3x3 Filter"),
+            Self::Annotate(_) => write!(f, "Annotate"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
@@ -353,7 +366,8 @@ impl ImageOperation {
                 | Self::Flip(_)
                 | Self::ChromaticAberration(_)
                 | Self::Filter3x3(_)
-                | Self::ScaleImageMinMax,
+                | Self::ScaleImageMinMax
+                | Self::Annotate(_),
         )
     }
 
@@ -1331,6 +1345,10 @@ impl ImageOperation {
             convert_color_type(dyn_img, t);
             return Ok(());
         }
+        // drawn after all edits, see `crate::annotate`
+        if let Self::Annotate(_) = self {
+            return Ok(());
+        }
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
@@ -1379,24 +1397,8 @@ impl ImageOperation {
                         *img = sub_img.to_image();
                     }
                     Self::CropPerspective { points, .. } => {
-                        use imageproc::geometric_transformations::{Border, Projection, warp_into};
-                        // The result is as large as the area the corners span. Taken from
-                        // the right corners less the left ones, the size went below zero
-                        // when they were dragged past each other.
-                        let span = |coord: fn(&(u32, u32)) -> u32| {
-                            let values = points.map(|p| coord(&p));
-                            values.iter().max().unwrap_or(&0) - values.iter().min().unwrap_or(&0)
-                        };
-                        let (width, height) = (span(|p| p.0), span(|p| p.1));
-                        let from = points.map(|p| (p.0 as f32, p.1 as f32));
-                        let to = [
-                            (0., 0.),
-                            (width as f32, 0.),
-                            (0., height as f32),
-                            (width as f32, height as f32),
-                        ];
-                        let projection = Projection::from_control_points(from, to)
-                            .filter(|_| width > 0 && height > 0)
+                        use imageproc::geometric_transformations::{Border, warp_into};
+                        let (projection, (width, height)) = perspective(points)
                             .context("The corners of the perspective crop are on one line")?;
                         // straight to the size, one resampling
                         let mut out = RgbaImage::new(width, height);
@@ -2246,6 +2248,31 @@ fn convert_color_type(image: &mut DynamicImage, t: &ColorTypeExt) {
             *image = DynamicImage::ImageRgba32F(image.to_rgba32f());
         }
     }
+}
+
+/// How a perspective crop with these corners maps the image, and how large the
+/// result is. `None` if the corners are on one line.
+pub(crate) fn perspective(
+    points: &[(u32, u32); 4],
+) -> Option<(imageproc::geometric_transformations::Projection, (u32, u32))> {
+    // The result is as large as the area the corners span. Taken from the right
+    // corners less the left ones, the size went below zero when they were dragged
+    // past each other.
+    let span = |coord: fn(&(u32, u32)) -> u32| {
+        let values = points.map(|p| coord(&p));
+        values.iter().max().unwrap_or(&0) - values.iter().min().unwrap_or(&0)
+    };
+    let (width, height) = (span(|p| p.0), span(|p| p.1));
+    let from = points.map(|p| (p.0 as f32, p.1 as f32));
+    let to = [
+        (0., 0.),
+        (width as f32, 0.),
+        (0., height as f32),
+        (width as f32, height as f32),
+    ];
+    imageproc::geometric_transformations::Projection::from_control_points(from, to)
+        .filter(|_| width > 0 && height > 0)
+        .map(|projection| (projection, (width, height)))
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.

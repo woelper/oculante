@@ -144,51 +144,9 @@ impl StrokeDrawing {
         // A fading stroke fades along all of its dots, every new one changes them all.
         // Drawn again where it is, on the image without it.
         let area = self.area()?;
-        self.keep_base(img, area);
-        let row = area.width as usize * 4;
-        let stride = img.width() as usize * 4;
-        let start = area.y as usize * stride + area.x as usize * 4;
-        let rows = start..start + (area.height as usize - 1) * stride + row;
-        img.as_mut()[rows.clone()]
-            .par_chunks_mut(stride)
-            .zip(self.base.as_raw()[rows].par_chunks(stride))
-            .for_each(|(out, base)| out[..row].copy_from_slice(&base[..row]));
+        keep_base(&mut self.base, &mut self.base_area, img, area);
+        restore(img, &self.base, area);
         self.draw_dots(stroke, img, 0)
-    }
-
-    /// Keep what is under the stroke where its area grew to `area`, before it is drawn there
-    fn keep_base(&mut self, img: &RgbaImage, area: Rect) {
-        if self.base.dimensions() != img.dimensions() {
-            // zeroed memory, only the part that is filled in is ever touched
-            self.base = RgbaImage::new(img.width(), img.height());
-            self.base_area = None;
-        }
-        let stride = img.width() as usize * 4;
-        for y in area.y..area.y + area.height {
-            let row = y as usize * stride;
-            let (left, right) = (
-                row + area.x as usize * 4,
-                row + (area.x + area.width) as usize * 4,
-            );
-            // the area only grows, what it was is kept already
-            let kept = self
-                .base_area
-                .filter(|kept| (kept.y..kept.y + kept.height).contains(&y))
-                .map(|kept| {
-                    (
-                        row + kept.x as usize * 4,
-                        row + (kept.x + kept.width) as usize * 4,
-                    )
-                });
-            let parts = match kept {
-                Some((kept_left, kept_right)) => [left..kept_left, kept_right..right],
-                None => [left..right, right..right],
-            };
-            for part in parts {
-                self.base.as_mut()[part.clone()].copy_from_slice(&img.as_raw()[part]);
-            }
-        }
-        self.base_area = Some(area);
     }
 
     /// Find the dots for the points that were added. Like egui's dotted line: a dot at
@@ -254,6 +212,58 @@ impl StrokeDrawing {
             union(area, dab_area(self.size, brush.dimensions(), *pos))
         })
     }
+}
+
+/// Keeps what is in the image where `base_area` grew to `area`, before something is
+/// drawn there. `area` holds the area that is kept already.
+pub(crate) fn keep_base(
+    base: &mut RgbaImage,
+    base_area: &mut Option<Rect>,
+    img: &RgbaImage,
+    area: Rect,
+) {
+    if base.dimensions() != img.dimensions() {
+        // zeroed memory, only the part that is filled in is ever touched
+        *base = RgbaImage::new(img.width(), img.height());
+        *base_area = None;
+    }
+    let stride = img.width() as usize * 4;
+    for y in area.y..area.y + area.height {
+        let row = y as usize * stride;
+        let (left, right) = (
+            row + area.x as usize * 4,
+            row + (area.x + area.width) as usize * 4,
+        );
+        // the area only grows, what it was is kept already
+        let kept = base_area
+            .filter(|kept| (kept.y..kept.y + kept.height).contains(&y))
+            .map(|kept| {
+                (
+                    row + kept.x as usize * 4,
+                    row + (kept.x + kept.width) as usize * 4,
+                )
+            });
+        let parts = match kept {
+            Some((kept_left, kept_right)) => [left..kept_left, kept_right..right],
+            None => [left..right, right..right],
+        };
+        for part in parts {
+            base.as_mut()[part.clone()].copy_from_slice(&img.as_raw()[part]);
+        }
+    }
+    *base_area = Some(area);
+}
+
+/// Puts what was kept back into a part of the image
+pub(crate) fn restore(img: &mut RgbaImage, base: &RgbaImage, area: Rect) {
+    let row = area.width as usize * 4;
+    let stride = img.width() as usize * 4;
+    let start = area.y as usize * stride + area.x as usize * 4;
+    let rows = start..start + (area.height as usize - 1) * stride + row;
+    img.as_mut()[rows.clone()]
+        .par_chunks_mut(stride)
+        .zip(base.as_raw()[rows].par_chunks(stride))
+        .for_each(|(out, base)| out[..row].copy_from_slice(&base[..row]));
 }
 
 /// Brushes at the sizes they were last drawn at, the newest first. Making a large one

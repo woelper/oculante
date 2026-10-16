@@ -721,6 +721,129 @@ def test_paint_on_transparency(binary):
         assert changed == 0, f"uploaded all at once, {changed} pixels look different"
 
 
+# where the filter search shows Annotate, the only filter that matches "annot"
+ANNOTATE_BUTTON = (790, 108, 210, 18)
+
+
+def test_annotate(binary):
+    """With experimental features on, Annotate draws an arrow, text and a redaction
+    on the image. Meanwhile the keys are for the annotations: Delete removes the one
+    that is selected, not the file, an arrow key moves it and no other image comes.
+    A selected arrow moves, the middle button still moves the image, Ctrl+C copies
+    it, and saved edits bring the annotations back."""
+    folder = folder_of("annotate_images", [("a.jpg", "moss.jpg"), ("b.png", "test.png")])
+    path = os.path.join(folder, "a.jpg")
+    # the image, above the frame counter of debug builds
+    image_box = (140, 40, 620, 480)
+    with App(binary, "annotate", [path], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(896, 50)  # "Filters"
+        app.click(896, 82)  # its search field
+        app.x("xdotool", "type", "--delay", "60", "annot")
+        app.settle(0.5)
+        found = count_color(app.shot("search"), ANNOTATE_BUTTON, (220, 220, 220), 50)
+        assert found > 20, "Annotate is not among the filters"
+        app.click(896, 119)  # "Annotate", it starts with the arrow
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        app.drag(250, 400, 450, 250, steps=15)
+        app.move(40, 560)
+        app.settle(1.0)
+        arrow = app.shot("arrow")
+        changed = changed_pixels_in(before, arrow, (240, 240, 220, 170))
+        assert changed > 1000, f"the arrow changed only {changed} pixels"
+        assert changed_pixels_in(before, arrow, (600, 420, 150, 90)) == 0, "the drag moved the image"
+        since = len(app.log())
+        app.key("Right")
+        assert not app.matched_shortcuts(since), "the arrow key went to the app, not to the arrow"
+        app.click(807, 206)  # "Select"
+        app.drag(350, 325, 350, 425, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        moved = app.shot("moved")
+        assert changed_pixels_in(before, moved, (240, 240, 220, 60)) == 0, "the arrow left a trace"
+        assert changed_pixels_in(arrow, moved, (240, 400, 220, 110)) > 1000, "the arrow did not move there"
+        # it is still selected
+        app.key("Delete")
+        app.move(40, 560)
+        app.settle(1.0)
+        gone = app.shot("gone")
+        assert os.path.exists(path), "Delete removed the file"
+        changed = changed_pixels_in(before, gone, image_box)
+        assert changed == 0, f"{changed} pixels of the removed arrow are left"
+        app.click(979, 206)  # "Text"
+        app.click(200, 100)
+        app.x("xdotool", "type", "--delay", "80", "Hello")
+        app.key("Return")
+        app.move(40, 560)
+        app.settle(1.0)
+        text = app.shot("text")
+        changed = changed_pixels_in(gone, text, (190, 80, 250, 70))
+        assert changed > 300, f"the text changed only {changed} pixels"
+        app.click(853, 236)  # "Redact"
+        app.drag(450, 300, 650, 450, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        redacted = app.shot("redacted")
+        changed = changed_pixels_in(text, redacted, (460, 310, 180, 130))
+        assert changed > 10000, f"the redaction changed only {changed} pixels"
+        if shutil.which("xclip"):
+            app.key("ctrl+c")
+            targets = app.x("xclip", "-selection", "clipboard", "-t", "TARGETS", "-o").stdout.split()
+            assert "image/png" in targets, f"Ctrl+C copied no image, the clipboard has {targets}"
+        # nothing selected, then no tool: the panel gets shorter, the image stays
+        app.key("Escape")
+        app.key("Escape")
+        app.move(40, 560)
+        app.settle(1.0)
+        saved = app.shot("saved")
+        app.scroll_down(890, 450, 6)
+        app.click(891, 555)  # "Save edits", at the bottom of the panel
+        assert os.path.exists(os.path.join(folder, "a.oculante")), "the edits were not saved"
+        app.click(865, 206 - 16)  # "Arrow", the panel is scrolled
+        app.move(300, 300)
+        app.x("xdotool", "mousedown", "2")
+        for i in range(1, 8):
+            app.move(300 + i * 10, 300 + i * 5)
+        app.x("xdotool", "mouseup", "2")
+        app.move(40, 560)
+        app.settle(1.0)
+        panned = app.shot("panned")
+        assert changed_pixels_in(saved, panned, image_box) > 50000, "the middle button did not move the image"
+    with App(binary, "annotate_reopened", [path]) as app:
+        app.wait_window()
+        app.move(40, 560)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(2.0)
+        reopened = app.shot("reopened")
+        # the edits open the panel, the image is placed differently than before. Its
+        # only edits that show are the annotations.
+        app.click(785, 391)  # "Disable all edits"
+        app.move(40, 560)
+        app.settle(1.0)
+        off = app.shot("edits_off")
+        changed = changed_pixels_in(reopened, off, (10, 40, 740, 460))
+        assert changed > 10000, f"the saved annotations change only {changed} pixels"
+    # without experimental features there is no Annotate to add
+    with App(binary, "annotate_not_offered", [os.path.join(folder, "b.png")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(896, 50)
+        app.click(896, 82)
+        app.x("xdotool", "type", "--delay", "60", "annot")
+        app.settle(0.5)
+        found = count_color(app.shot("search"), ANNOTATE_BUTTON, (220, 220, 220), 50)
+        assert found == 0, "Annotate is offered without experimental features"
+
+
 # the image area right of the info panel, free of anything that depends on the pointer
 # and above the frame counter a debug build draws at the bottom
 IMAGE_AREA = (290, 40, 720, 470)
@@ -1301,6 +1424,7 @@ TESTS = [
     test_zen_mode,
     test_paint_mode,
     test_paint_on_transparency,
+    test_annotate,
     test_fullscreen,
     test_borderless,
     test_compare_list,

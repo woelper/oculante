@@ -14,6 +14,7 @@ pub const BOLD_FONT: &[u8; 344152] = include_bytes!("../res/fonts/Inter-Bold.ttf
 pub(crate) mod file_encoder;
 // With file_open the system file dialog replaces the built-in browser, what only
 // the browser uses is unused then
+pub(crate) mod annotate;
 #[cfg_attr(feature = "file_open", allow(dead_code))]
 pub(crate) mod filebrowser;
 #[cfg_attr(feature = "file_open", allow(dead_code))]

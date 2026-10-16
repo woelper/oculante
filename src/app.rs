@@ -525,6 +525,7 @@ impl OculanteApp {
             self.state.edit_state.result_pixel_op = Default::default();
             self.state.edit_state.result_image_op = Default::default();
             self.state.edit_state.stroke_drawing = Default::default();
+            self.state.edit_state.annotate.new_image();
             if !self.state.persistent_settings.keep_edits {
                 self.state.edit_state = Default::default();
             }
@@ -788,8 +789,14 @@ impl eframe::App for OculanteApp {
             self.egui_started_press = false;
             self.state.drag_enabled = false;
         } else if !self.state.drag_enabled && !self.egui_started_press {
-            // Button just went down — check who owns it
-            if ctx.egui_is_using_pointer() || self.state.pointer_over_ui || self.state.mouse_grab {
+            // Button just went down — check who owns it. While annotating, the middle
+            // button still moves the image.
+            let annotating_pan =
+                middle_down && !primary_down && self.state.edit_state.annotate.grab;
+            if ctx.egui_is_using_pointer()
+                || self.state.pointer_over_ui
+                || (self.state.mouse_grab && !annotating_pan)
+            {
                 self.egui_started_press = true;
             }
         }
@@ -939,7 +946,8 @@ impl eframe::App for OculanteApp {
                 });
         }
 
-        // Edit panel
+        // Edit panel, the annotations take the mouse and the keys when it says so
+        state.edit_state.annotate.grab = false;
         if state.persistent_settings.edit_enabled
             && !state.settings_enabled
             && !state.persistent_settings.zen_mode
@@ -978,8 +986,10 @@ impl eframe::App for OculanteApp {
         state.mouse_grab = ctx.egui_is_using_pointer()
             || state.edit_state.painting
             || state.pointer_over_ui
-            || state.edit_state.block_panning;
-        state.key_grab = ctx.egui_wants_keyboard_input();
+            || state.edit_state.block_panning
+            || state.edit_state.annotate.grab;
+        // Delete would remove the file, the arrows go to another image
+        state.key_grab = ctx.egui_wants_keyboard_input() || state.edit_state.annotate.grab;
 
         // Reset image to fit window
         if state.reset_image

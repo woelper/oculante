@@ -51,7 +51,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
     }
 
     // TODO: Move these to image_editing
-    let mut ops = [
+    let mut ops = vec![
         // General Image Adjustments
         ImgOpItem::new(ImageOperation::Brightness(0)),
         ImgOpItem::new(ImageOperation::Contrast(0)),
@@ -114,6 +114,22 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             original_size: state.image_geometry.dimensions,
         }),
     ];
+    // one for all annotations
+    if state.persistent_settings.experimental_features
+        && !state
+            .edit_state
+            .image_op_stack
+            .iter()
+            .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
+    {
+        ops.push(ImgOpItem::new(ImageOperation::Annotate(vec![])));
+    }
+    let original = state
+        .current_image
+        .as_ref()
+        .map(|img| img.dimensions())
+        .unwrap_or_default();
+    state.edit_state.annotate.prepare(original);
 
     egui::Panel::right("editing")
         .default_size(PANEL_WIDTH)
@@ -163,6 +179,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                             continue;
                                         }
                                         if ui.button(name).clicked() {
+                                            if matches!(op.operation, ImageOperation::Annotate(_)) {
+                                                state.edit_state.annotate.tool = Some(crate::annotate::Tool::Arrow);
+                                            }
                                             if op.operation.is_per_pixel() {
                                                 state.edit_state.pixel_op_stack.push(op.clone());
                                             } else {
@@ -190,7 +209,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 .show(ui, |ui| {
 
                 ui.vertical_centered_justified(|ui| {
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings, &mut state.edit_state.annotate);
 
                     // draw a line between different operator types
                     if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
@@ -199,7 +218,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
-                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings, &mut state.edit_state.annotate
                     );
                 });
 
@@ -230,6 +249,8 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     }
                 } else if ui.button("Paint mode").clicked() {
                     state.edit_state.painting = true;
+                    // the mouse is for one of them
+                    state.edit_state.annotate.tool = None;
                 }
             });
 
@@ -566,6 +587,31 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
         }
 
 
+            // Annotations: the mouse and the keys while one of their tools is picked
+            if state.edit_state.annotate.tool.is_some() {
+                state.edit_state.painting = false;
+            }
+            let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
+            match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
+                Some(annotations) => {
+                    let copy = crate::annotate::canvas_ui(
+                        ctx,
+                        annotations,
+                        &mut state.edit_state.annotate,
+                        &mapping,
+                        &state.image_geometry,
+                        state.pointer_over_ui,
+                    );
+                    // the keys go to the annotations, copying the image works still
+                    if copy && let Some(img) = effective_image(state) {
+                        clipboard_copy(img);
+                        state.send_message_info("Image copied");
+                    }
+                }
+                None => state.edit_state.annotate.stop(),
+            }
+            let annotations = crate::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
+
             // Do the processing
             //
             if state.edit_state.skip_processing {
@@ -606,6 +652,11 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             // The next stroke starts anew
             if stroke_finished || !state.edit_state.painting {
                 state.edit_state.stroke_drawing = Default::default();
+            }
+
+            // a stroke goes below the annotations, all is drawn again
+            if stroke_changed && !state.edit_state.annotate.layer.is_empty() {
+                pixels_changed = true;
             }
 
             if pixels_changed {
@@ -651,6 +702,12 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     }
                 }
 
+                // the annotations on top of everything
+                state.edit_state.annotate.layer.reset();
+                if let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
+                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping);
+                }
+
                 state.send_frame(crate::utils::Frame::UpdateTexture);
                 debug!(
                     "Done updating tex after pixel; ops in {} s",
@@ -661,6 +718,14 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
                 // only what is new of the stroke that is being drawn
                 && let Some(area) = state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes)
+            {
+                state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
+            }
+
+            // only what changed of the annotations
+            if !pixels_changed
+                && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
+                && let Some(area) = state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
             {
                 state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }
@@ -796,6 +861,7 @@ fn modifier_stack_ui(
     geo: &ImageGeometry,
     mouse_grab: &mut bool,
     settings: &mut VolatileSettings,
+    annotate: &mut crate::annotate::AnnotateUi,
 ) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
@@ -875,7 +941,10 @@ fn modifier_stack_ui(
                     ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
 
                     ui.add_enabled_ui(operation.active, |ui| {
-                        if operation
+                        // a change of the annotations draws only them again
+                        if let ImageOperation::Annotate(annotations) = &mut operation.operation {
+                            crate::annotate::panel_ui(ui, annotations, annotate);
+                        } else if operation
                             .operation
                             .ui(ui, geo, mouse_grab, settings, operation.id)
                             .changed()
