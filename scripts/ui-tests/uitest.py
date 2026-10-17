@@ -41,6 +41,7 @@ class App:
         pointer=None,
         window_manager=False,
         cwd=None,
+        screen=SCREEN,
     ):
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
@@ -49,7 +50,7 @@ class App:
         subprocess.run(["pkill", "-f", f"^Xvfb {display} "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(0.3)
         self.xvfb = subprocess.Popen(
-            ["Xvfb", display, "-screen", "0", f"{SCREEN[0]}x{SCREEN[1]}x24", "-nolisten", "tcp"],
+            ["Xvfb", display, "-screen", "0", f"{screen[0]}x{screen[1]}x24", "-nolisten", "tcp"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -200,13 +201,15 @@ class App:
         self.logfile.close()
 
 
-def changed_pixels(a, b):
-    """Number of pixels that differ between two screenshots."""
-    result = subprocess.run(["compare", "-metric", "AE", a, b, "null:"], capture_output=True, text=True)
+def changed_pixels(a, b, fuzz=0):
+    """Number of pixels that differ between two screenshots, by more than fuzz percent."""
+    result = subprocess.run(
+        ["compare", "-fuzz", f"{fuzz}%", "-metric", "AE", a, b, "null:"], capture_output=True, text=True
+    )
     return int(float(result.stderr.strip().split()[0]))
 
 
-def changed_pixels_in(a, b, box):
+def changed_pixels_in(a, b, box, fuzz=0):
     """Number of pixels that differ inside box (x, y, w, h) of two screenshots."""
     x, y, w, h = box
     crops = []
@@ -214,7 +217,7 @@ def changed_pixels_in(a, b, box):
         crop = path[:-4] + "_crop.png"
         subprocess.run(["convert", path, "-crop", f"{w}x{h}+{x}+{y}", "+repage", crop], check=True)
         crops.append(crop)
-    return changed_pixels(*crops)
+    return changed_pixels(*crops, fuzz=fuzz)
 
 
 def _pixels(path, box):

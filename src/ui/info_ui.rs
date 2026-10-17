@@ -58,9 +58,17 @@ pub fn info_ui(
     .size_range(MIN_WIDTH..=MAX_WIDTH)
     .resizable(true)
     .show(ui, |ui| {
+        // The scroll bar keeps its room when it is hidden. The zoom preview and the
+        // histogram are as tall as they are wide: when the bar took its room, they
+        // got short enough to fit, the bar went away, they got taller again, and
+        // the panel flickered. The panel is as wide as what is in it, so the room
+        // stays a part of the scroll area.
+        let width = ui.available_width() - ui.spacing().scroll.allocated_width();
         egui::ScrollArea::vertical()
             .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+            .auto_shrink([false, true])
             .show(ui, |ui| {
+            ui.set_max_width(width);
 
             // SECTION 1: Info grid
             if state.current_image.is_some() {

@@ -932,9 +932,9 @@ def shown_file(app):
     return os.path.basename(found.group(1)) if found else title.strip()
 
 
-def start(binary, name, path, settings=None):
+def start(binary, name, path, settings=None, screen=SCREEN):
     """The app with an image on screen. Closes it if that fails, so nothing is left behind."""
-    app = App(binary, name, [path], settings=settings)
+    app = App(binary, name, [path], settings=settings, screen=screen)
     try:
         app.wait_window()
         app.move(0.6, 0.6)
@@ -1166,6 +1166,59 @@ def test_info_panel_resizes(binary):
         assert not region_has_color(released, (wide - 70, 340, 30, 20), panel_background, tolerance=4), (
             "the zoom preview did not grow with the panel"
         )
+
+
+def test_info_panel_holds_still(binary):
+    """The info panel holds still at every height of the window. The zoom preview
+    and the histogram are as tall as they are wide, and the scroll bar took width
+    when it came: at heights where that made them fit, the bar went away and came
+    back all the time and the panel flickered. With Measure, an experimental
+    feature, the panel was that tall on a 14" MacBook."""
+
+    def resize(app, height):
+        app.x("xdotool", "windowsize", app.win, str(app.geom["WIDTH"]), str(height))
+        app.settle(0.8)
+
+    def has_bar(shot, edge):
+        # the handle of the scroll bar, a few pixels left of the edge
+        return count_color(shot, (edge - 18, 60, 10, 300), (60, 60, 60), tolerance=3) > 300
+
+    settings = {"experimental_features": True}
+    # taller than the panel
+    with start(binary, "info_panel_holds_still", image("moss.jpg"), settings, screen=(1400, 1300)) as app:
+        app.key("i")
+        app.settle(1.5)
+        edge = panel_edge(app.shot("open"))
+        # the lowest window that shows all of the panel
+        low, high = 600, 1250
+        resize(app, low)
+        assert has_bar(app.shot("low"), edge), "no scroll bar in a low window"
+        resize(app, high)
+        assert not has_bar(app.shot("high"), edge), "a scroll bar in a window taller than the panel"
+        while high - low > 1:
+            middle = (low + high) // 2
+            resize(app, middle)
+            if has_bar(app.shot(f"search_{middle}"), edge):
+                low = middle
+            else:
+                high = middle
+        # around it nothing moves in the panel while the pointer rests
+        for height in range(high - 9, high + 7, 3):
+            resize(app, height)
+            first = app.shot(f"h{height}_a")
+            time.sleep(0.2)
+            second = app.shot(f"h{height}_b")
+            changed = changed_pixels_in(first, second, (0, 40, edge, height - 45))
+            assert changed == 0, f"the info panel keeps changing in a window {height} high ({changed} pixels)"
+        # and the bar does not change the size of what is in it
+        resize(app, high - 3)
+        with_bar = app.shot("with_bar")
+        resize(app, high + 3)
+        without_bar = app.shot("without_bar")
+        assert has_bar(with_bar, edge) and not has_bar(without_bar, edge), "the bar did not come and go"
+        # text is drawn a shade different at another height of the window
+        changed = changed_pixels_in(with_bar, without_bar, (0, 40, edge - 20, 560), fuzz=3)
+        assert changed == 0, f"the panel changed with the scroll bar ({changed} pixels)"
 
 
 def test_histogram_shows_values_on_hover(binary):
@@ -1500,6 +1553,7 @@ TESTS = [
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,
+    test_info_panel_holds_still,
     test_image_is_fitted_next_to_the_panels,
     test_histogram_shows_values_on_hover,
     test_mipmaps_switched_on_and_off,
