@@ -697,7 +697,7 @@ pub fn blank_icon(
 ) {
 }
 
-fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
+pub(crate) fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
     let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
             CARET_RIGHT.to_string(),
@@ -732,7 +732,7 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         });
 }
 
-fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+pub(crate) fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
     let panel_bg_color = match ui.style().visuals.dark_mode {
         true => Color32::from_gray(13),
         false => Color32::from_gray(217),

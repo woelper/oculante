@@ -5,6 +5,7 @@
 //! distance to the nearest corner, edge middle or the centre of the image, so it
 //! stays there on an image of another size. They are drawn after all other edits.
 
+use std::ops::RangeInclusive;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
@@ -38,6 +39,42 @@ pub struct Annotation {
     /// Mirrored left to right, top to bottom, at where it starts
     #[serde(default)]
     pub flip: [bool; 2],
+    /// A line this wide around what it draws, 0 for none
+    #[serde(default)]
+    pub outline: u32,
+    #[serde(default = "white")]
+    pub outline_color: [u8; 4],
+    /// How round the corners of a frame are
+    #[serde(default)]
+    pub radius: u32,
+    /// Of a text
+    #[serde(default)]
+    pub font: Font,
+    /// Kept in the list, but not drawn
+    #[serde(default)]
+    pub hidden: bool,
+}
+
+fn white() -> [u8; 4] {
+    [255; 4]
+}
+
+/// The font of a text
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+pub struct Font {
+    /// Empty for Inter
+    pub family: String,
+    /// 400 is regular, 700 bold
+    pub weight: u16,
+}
+
+impl Default for Font {
+    fn default() -> Self {
+        Self {
+            family: String::new(),
+            weight: 400,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -123,6 +160,11 @@ impl Annotation {
             offset: start,
             rotation: 0,
             flip: [false; 2],
+            outline: 0,
+            outline_color: white(),
+            radius: 0,
+            font: Font::default(),
+            hidden: false,
         }
     }
 
@@ -171,25 +213,46 @@ impl Annotation {
                 around(&[[0, 0], *size])
             }
             Shape::Pen(points) => around(points),
-            Shape::Text(text) => text_layout(text, self.width, self.color).map(|l| l.bounds),
+            Shape::Text(text) => text_layout(text, self).map(|l| l.bounds),
         }
     }
 
-    /// How far its lines reach out of its bounds, in its own coordinates
+    /// How far its lines and its outline reach out of its bounds, in its own
+    /// coordinates
     fn reach(&self) -> f32 {
         let half = self.line_width() / 2.;
+        let outline = self.outline_width();
         match &self.shape {
             Shape::Arrow(to) => {
                 let length = (to[0] as f32).hypot(to[1] as f32);
-                half.max(arrow_head(self.line_width(), length).1)
+                half.max(arrow_head(self.line_width(), length).1) + outline
             }
-            Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half,
-            Shape::Text(_) | Shape::Redact { .. } => 0.,
+            Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half + outline,
+            Shape::Text(_) => outline,
+            Shape::Redact { .. } => 0.,
         }
     }
 
     fn line_width(&self) -> f32 {
         self.width.max(1) as f32
+    }
+
+    /// A redaction has none
+    fn outline_width(&self) -> f32 {
+        match self.shape {
+            Shape::Redact { .. } => 0.,
+            _ => self.outline as f32,
+        }
+    }
+
+    /// Of a frame, at most half of its shorter side
+    fn corner_radius(&self) -> f32 {
+        match self.shape {
+            Shape::Rect(size) => (self.radius as f32)
+                .min(size[0].abs() as f32 / 2.)
+                .min(size[1].abs() as f32 / 2.),
+            _ => 0.,
+        }
     }
 
     /// Too small to be seen, or a text without any
@@ -441,6 +504,17 @@ static FONTS: LazyLock<Mutex<Arc<usvg::fontdb::Database>>> = LazyLock::new(|| {
     let mut fonts = usvg::fontdb::Database::new();
     fonts.load_font_data(crate::FONT.to_vec());
     fonts.load_font_data(crate::BOLD_FONT.to_vec());
+    // the bold one calls itself "Inter 18pt", here it is the bold of Inter
+    let bold: Vec<_> = fonts
+        .faces()
+        .filter(|face| face.families.iter().any(|(name, _)| name == "Inter 18pt"))
+        .cloned()
+        .collect();
+    for mut face in bold {
+        fonts.remove_face(face.id);
+        face.families = vec![("Inter".into(), usvg::fontdb::Language::English_UnitedStates)];
+        fonts.push_face_info(face);
+    }
     fonts.set_sans_serif_family("Inter");
     // tests draw with Inter only, the same on every machine
     if !cfg!(test) {
@@ -478,6 +552,9 @@ struct TextKey {
     text: String,
     size: u32,
     color: [u8; 4],
+    font: Font,
+    outline: u32,
+    outline_color: [u8; 4],
     fonts: u32,
 }
 
@@ -487,13 +564,17 @@ static TEXTS: Mutex<Vec<(TextKey, Arc<TextLayout>)>> = Mutex::new(Vec::new());
 /// Distance of the lines of a text, in sizes of the text
 const LINE_HEIGHT: f32 = 1.25;
 
-fn text_layout(text: &str, size: u32, color: [u8; 4]) -> Option<Arc<TextLayout>> {
+/// The text of an annotation, in its size, colors and font
+fn text_layout(text: &str, a: &Annotation) -> Option<Arc<TextLayout>> {
     // first, so the text is laid out with the fonts this key says
     let fonts = fonts();
     let key = TextKey {
         text: text.into(),
-        size,
-        color,
+        size: a.width,
+        color: a.color,
+        font: a.font.clone(),
+        outline: a.outline,
+        outline_color: a.outline_color,
         fonts: FONTS_VERSION.load(Ordering::Relaxed),
     };
     let mut texts = TEXTS.lock().ok()?;
@@ -503,26 +584,21 @@ fn text_layout(text: &str, size: u32, color: [u8; 4]) -> Option<Arc<TextLayout>>
         texts.insert(0, found);
         return Some(layout);
     }
-    let layout = Arc::new(lay_out(text, size, color, fonts)?);
+    let layout = Arc::new(lay_out(&key, fonts)?);
     texts.insert(0, (key, layout.clone()));
     texts.truncate(32);
     Some(layout)
 }
 
-fn lay_out(
-    text: &str,
-    size: u32,
-    color: [u8; 4],
-    fonts: Arc<usvg::fontdb::Database>,
-) -> Option<TextLayout> {
-    let size = size.max(1) as f32;
+fn lay_out(key: &TextKey, fonts: Arc<usvg::fontdb::Database>) -> Option<TextLayout> {
+    let size = key.size.max(1) as f32;
     let escape = |line: &str| {
         line.replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
     };
     let mut lines = String::new();
-    for (i, line) in text.split('\n').enumerate() {
+    for (i, line) in key.text.split('\n').enumerate() {
         let dy = if i == 0 { 0. } else { size * LINE_HEIGHT };
         // an empty line still takes its place
         let line = if line.is_empty() {
@@ -532,9 +608,29 @@ fn lay_out(
         };
         lines += &format!(r#"<tspan x="0" dy="{dy}">{line}</tspan>"#);
     }
-    let [r, g, b, a] = color;
+    let [r, g, b, a] = key.color;
+    // Inter where the font lacks a letter, or is not there
+    let family = key.font.family.replace(['\'', '"'], "");
+    let family = if family.is_empty() {
+        "Inter".into()
+    } else {
+        format!("'{}', Inter", escape(&family))
+    };
+    // half of it is under the letters
+    let outline = match key.outline {
+        0 => String::new(),
+        width => {
+            let [r, g, b, a] = key.outline_color;
+            format!(
+                r#" stroke="rgb({r},{g},{b})" stroke-opacity="{}" stroke-width="{}" stroke-linejoin="round" paint-order="stroke""#,
+                a as f32 / 255.,
+                width * 2
+            )
+        }
+    };
     let svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><text y="{size}" font-family="Inter" font-size="{size}" fill="rgb({r},{g},{b})" fill-opacity="{}" xml:space="preserve">{lines}</text></svg>"#,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><text y="{size}" font-family="{family}" font-weight="{}" font-size="{size}" fill="rgb({r},{g},{b})" fill-opacity="{}"{outline} xml:space="preserve">{lines}</text></svg>"#,
+        key.font.weight,
         a as f32 / 255.
     );
     let options = usvg::Options {
@@ -618,72 +714,116 @@ fn draw(img: &mut RgbaImage, a: &Annotation, t: Transform, area: Rect) {
         return;
     };
     let t = t.post_translate(-(area.x as f32), -(area.y as f32));
-    let mut paint = Paint::default();
-    let [r, g, b, alpha] = a.color;
-    paint.set_color_rgba8(r, g, b, alpha);
-    paint.anti_alias = true;
-    let mut stroke = tiny_skia::Stroke {
-        width: a.line_width(),
-        line_cap: LineCap::Round,
-        line_join: LineJoin::Round,
-        ..Default::default()
+    let paint = |[r, g, b, alpha]: [u8; 4]| {
+        let mut paint = Paint::default();
+        paint.set_color_rgba8(r, g, b, alpha);
+        paint.anti_alias = true;
+        paint
     };
-    match &a.shape {
-        Shape::Arrow(to) => {
-            if let Some((line, tip)) = arrow(*to, a.line_width()) {
-                layer.stroke_path(&line, &paint, &stroke, t, None);
-                layer.fill_path(&tip, &paint, FillRule::Winding, t, None);
-            }
-        }
-        Shape::Rect(size) => {
-            let (w, h) = (size[0] as f32, size[1] as f32);
-            let mut frame = PathBuilder::new();
-            frame.move_to(0., 0.);
-            frame.line_to(w, 0.);
-            frame.line_to(w, h);
-            frame.line_to(0., h);
-            frame.close();
-            stroke.line_join = LineJoin::Miter;
-            if let Some(frame) = frame.finish() {
-                layer.stroke_path(&frame, &paint, &stroke, t, None);
-            }
-        }
-        Shape::Ellipse(size) => {
-            let oval = tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
-                .and_then(PathBuilder::from_oval);
-            if let Some(oval) = oval {
-                layer.stroke_path(&oval, &paint, &stroke, t, None);
-            }
-        }
-        Shape::Pen(points) => {
-            if let [only] = points.as_slice() {
-                let dot =
-                    PathBuilder::from_circle(only[0] as f32, only[1] as f32, a.line_width() / 2.);
-                if let Some(dot) = dot {
-                    layer.fill_path(&dot, &paint, FillRule::Winding, t, None);
-                }
-            } else {
-                let mut line = PathBuilder::new();
-                for (i, p) in points.iter().enumerate() {
-                    if i == 0 {
-                        line.move_to(p[0] as f32, p[1] as f32);
-                    } else {
-                        line.line_to(p[0] as f32, p[1] as f32);
+    // the outline first, the annotation over it
+    let outline = a.outline_width();
+    let mut passes = vec![(paint(a.color), 0.)];
+    if outline > 0. {
+        passes.insert(0, (paint(a.outline_color), outline));
+    }
+    for (paint, outline) in passes {
+        let stroke = tiny_skia::Stroke {
+            width: a.line_width() + outline * 2.,
+            line_cap: LineCap::Round,
+            line_join: LineJoin::Round,
+            ..Default::default()
+        };
+        match &a.shape {
+            Shape::Arrow(to) => {
+                if let Some((line, tip)) = arrow(*to, a.line_width()) {
+                    layer.stroke_path(&line, &paint, &stroke, t, None);
+                    layer.fill_path(&tip, &paint, FillRule::Winding, t, None);
+                    if outline > 0. {
+                        let around = tiny_skia::Stroke {
+                            width: outline * 2.,
+                            ..stroke.clone()
+                        };
+                        layer.stroke_path(&tip, &paint, &around, t, None);
                     }
                 }
-                if let Some(line) = line.finish() {
+            }
+            Shape::Rect(size) => {
+                if let Some(frame) = frame_path(*size, a.corner_radius()) {
+                    let stroke = tiny_skia::Stroke {
+                        line_join: LineJoin::Miter,
+                        ..stroke
+                    };
+                    layer.stroke_path(&frame, &paint, &stroke, t, None);
+                }
+            }
+            Shape::Ellipse(size) => {
+                let oval = tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
+                    .and_then(PathBuilder::from_oval);
+                if let Some(oval) = oval {
+                    layer.stroke_path(&oval, &paint, &stroke, t, None);
+                }
+            }
+            Shape::Pen(points) => {
+                if let [only] = points.as_slice() {
+                    let dot =
+                        PathBuilder::from_circle(only[0] as f32, only[1] as f32, stroke.width / 2.);
+                    if let Some(dot) = dot {
+                        layer.fill_path(&dot, &paint, FillRule::Winding, t, None);
+                    }
+                } else if let Some(line) = polyline(points) {
                     layer.stroke_path(&line, &paint, &stroke, t, None);
                 }
             }
-        }
-        Shape::Text(text) => {
-            if let Some(layout) = text_layout(text, a.width, a.color) {
-                resvg::render(&layout.tree, t, &mut layer.as_mut());
+            // the outline of a text is a part of it
+            Shape::Text(text) if outline == 0. => {
+                if let Some(layout) = text_layout(text, a) {
+                    resvg::render(&layout.tree, t, &mut layer.as_mut());
+                }
             }
+            Shape::Text(_) | Shape::Redact { .. } => {}
         }
-        Shape::Redact { .. } => {}
     }
     blend(img, &layer, area);
+}
+
+/// A frame this large, its corners rounded by `radius`
+fn frame_path(size: [i32; 2], radius: f32) -> Option<Path> {
+    let (w, h) = (size[0] as f32, size[1] as f32);
+    let mut frame = PathBuilder::new();
+    if radius <= 0. {
+        frame.move_to(0., 0.);
+        frame.line_to(w, 0.);
+        frame.line_to(w, h);
+        frame.line_to(0., h);
+    } else {
+        // a quarter of a circle, as a curve
+        let r = radius;
+        let k = r * (1. - 0.552_284_8);
+        frame.move_to(r, 0.);
+        frame.line_to(w - r, 0.);
+        frame.cubic_to(w - k, 0., w, k, w, r);
+        frame.line_to(w, h - r);
+        frame.cubic_to(w, h - k, w - k, h, w - r, h);
+        frame.line_to(r, h);
+        frame.cubic_to(k, h, 0., h - k, 0., h - r);
+        frame.line_to(0., r);
+        frame.cubic_to(0., k, k, 0., r, 0.);
+    }
+    frame.close();
+    frame.finish()
+}
+
+/// A line through the points of a pen
+fn polyline(points: &[[i32; 2]]) -> Option<Path> {
+    let mut line = PathBuilder::new();
+    for (i, p) in points.iter().enumerate() {
+        if i == 0 {
+            line.move_to(p[0] as f32, p[1] as f32);
+        } else {
+            line.line_to(p[0] as f32, p[1] as f32);
+        }
+    }
+    line.finish()
 }
 
 /// Hides an area in blocks, each the average color of its pixels
@@ -859,7 +999,7 @@ pub fn visible(stack: &[ImgOpItem], state: &AnnotateUi) -> Vec<Annotation> {
             annotations
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| state.typing != Some(*i))
+                .filter(|(i, a)| state.typing != Some(*i) && !a.hidden)
                 .map(|(_, a)| a.clone())
                 .collect()
         })
@@ -932,11 +1072,12 @@ enum Icon {
     Fill,
 }
 
-/// Draws an icon in the middle of `rect`, in lines as thick as those of the icon font
-fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Color32) {
+/// Draws an icon in the middle of `rect`, in lines as thick as those of the icon
+/// font, `scale` times as large
+fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Color32, scale: f32) {
     // in a box of 16 by 16
-    let at = |x: f32, y: f32| rect.center() + egui::vec2(x - 8., y - 8.);
-    let stroke = Stroke::new(1.6, color);
+    let at = |x: f32, y: f32| rect.center() + egui::vec2(x - 8., y - 8.) * scale;
+    let stroke = Stroke::new(1.6 * scale, color);
     let square = egui::Rect::from_min_max(at(2.5, 3.5), at(13.5, 12.5));
     match icon {
         Icon::Arrow => {
@@ -951,12 +1092,16 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
             painter.rect_stroke(square, 1., stroke, egui::StrokeKind::Middle);
         }
         Icon::Circle => {
-            painter.circle_stroke(at(8., 8.), 5.8, stroke);
+            painter.circle_stroke(at(8., 8.), 5.8 * scale, stroke);
         }
         Icon::Text => {
-            let stroke = Stroke::new(1.9, color);
-            painter.line_segment([at(3., 3.), at(13., 3.)], stroke);
-            painter.line_segment([at(8., 3.), at(8., 14.)], stroke);
+            painter.text(
+                at(8., 8.),
+                egui::Align2::CENTER_CENTER,
+                "Aa",
+                egui::FontId::proportional(13. * scale),
+                color,
+            );
         }
         Icon::Pen => {
             painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
@@ -977,7 +1122,7 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
                     };
                     let min = at(2. + column as f32 * 4., 2. + row as f32 * 4.);
                     painter.rect_filled(
-                        egui::Rect::from_min_size(min, egui::vec2(4., 4.)),
+                        egui::Rect::from_min_size(min, egui::vec2(4., 4.) * scale),
                         0.,
                         shade,
                     );
@@ -1012,6 +1157,18 @@ pub struct AnnotateUi {
     /// For new text
     pub text_size: u32,
     pub redaction: Redaction,
+    /// The rest of what new annotations look like, as the one changed last
+    outline: u32,
+    outline_color: [u8; 4],
+    radius: u32,
+    font: Font,
+    /// Of new redactions
+    blocks: u32,
+    redact_color: [u8; 4],
+    /// The card in the panel the mouse is over
+    pointed_card: Option<usize>,
+    /// A list or a color picker was open when the frame began, Esc closes it
+    popup_open: bool,
     /// Indices of the selected annotations
     pub selected: Vec<usize>,
     drag: Option<Drag>,
@@ -1035,6 +1192,14 @@ impl Default for AnnotateUi {
             width: 0,
             text_size: 0,
             redaction: Redaction::Pixelate,
+            outline: 0,
+            outline_color: white(),
+            radius: 0,
+            font: Font::default(),
+            blocks: 0,
+            redact_color: [0, 0, 0, 255],
+            pointed_card: None,
+            popup_open: false,
             selected: vec![],
             drag: None,
             typing: None,
@@ -1054,7 +1219,60 @@ impl AnnotateUi {
         if self.width == 0 && original.0 > 0 && original.1 > 0 {
             self.width = (original.0.min(original.1) / 120).clamp(3, 80);
             self.text_size = self.width * 6;
+            self.blocks = (self.width * 3).max(8);
         }
+    }
+
+    /// A new annotation for the tool, at the top left of the image
+    fn template(&self, tool: Tool) -> Annotation {
+        let (shape, color, width) = match tool {
+            Tool::Arrow => (Shape::Arrow([0, 0]), self.color, self.width),
+            Tool::Frame => (Shape::Rect([0, 0]), self.color, self.width),
+            Tool::Circle => (Shape::Ellipse([0, 0]), self.color, self.width),
+            Tool::Pen => (Shape::Pen(vec![[0, 0]]), self.color, self.width),
+            Tool::Text => (Shape::Text(String::new()), self.color, self.text_size),
+            Tool::Redact => {
+                let style = self.redaction;
+                let shape = Shape::Redact {
+                    size: [0, 0],
+                    style,
+                };
+                return Annotation::new(shape, self.redact_color, self.blocks, [0, 0]);
+            }
+        };
+        let mut a = Annotation::new(shape, color, width, [0, 0]);
+        a.outline = self.outline;
+        a.outline_color = self.outline_color;
+        match tool {
+            Tool::Frame => a.radius = self.radius,
+            Tool::Text => a.font = self.font.clone(),
+            _ => {}
+        }
+        a
+    }
+
+    /// The next annotations look like this one
+    fn remember(&mut self, a: &Annotation) {
+        match &a.shape {
+            Shape::Redact { style, .. } => {
+                self.redaction = *style;
+                self.blocks = a.width;
+                self.redact_color = a.color;
+                return;
+            }
+            Shape::Text(_) => {
+                self.text_size = a.width;
+                self.font = a.font.clone();
+            }
+            Shape::Rect(_) => {
+                self.width = a.width;
+                self.radius = a.radius;
+            }
+            Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => self.width = a.width,
+        }
+        self.color = a.color;
+        self.outline = a.outline;
+        self.outline_color = a.outline_color;
     }
 
     /// A new image: nothing of it is drawn, selected or typed
@@ -1104,137 +1322,442 @@ impl AnnotateUi {
     }
 }
 
-/// The part of the edit panel for the annotations
-pub fn panel_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
-    ui.horizontal_wrapped(|ui| {
-        for tool in Tool::ALL {
-            if icon_button(ui, state.tool == Some(tool), tool.icon())
-                .on_hover_text(format!("{}\n{}", tool.name(), tool.hint()))
-                .clicked()
-            {
-                state.finish_typing(annotations);
-                state.tool = (state.tool != Some(tool)).then_some(tool);
-            }
-        }
-    });
-
-    // what is selected, or else what comes next
-    let selected = state.selected.clone();
-    ui.horizontal(|ui| {
-        let mut color = selected
-            .first()
-            .and_then(|i| annotations.get(*i))
-            .map_or(state.color, |a| a.color);
-        if ui
-            .color_edit_button_srgba_unmultiplied(&mut color)
-            .changed()
-        {
-            state.color = color;
-            for i in &selected {
-                if let Some(a) = annotations.get_mut(*i) {
-                    a.color = color;
+/// The annotations part of the edit panel: a tile for each tool, then a card for
+/// each annotation, the one in front first. Returns whether the edits changed.
+pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi) -> bool {
+    let mut changed = false;
+    state.pointed_card = None;
+    // before the lists of this frame are shown, which close on Esc
+    state.popup_open = egui::Popup::is_any_open(ui.ctx());
+    let mut picked = None;
+    ui.scope(|ui| {
+        ui.style_mut().visuals.collapsing_header_frame = true;
+        ui.style_mut().visuals.indent_has_left_vline = false;
+        egui::CollapsingHeader::new("Annotations")
+            .icon(crate::ui::caret_icon)
+            .show_unindented(ui, |ui| {
+                crate::ui::dark_panel(ui, |ui| {
+                    let spacing = ui.spacing().item_spacing.x;
+                    let width = ((ui.available_width() - spacing * 2.) / 3.).floor();
+                    for row in Tool::ALL.chunks(3) {
+                        ui.horizontal(|ui| {
+                            for &tool in row {
+                                let button = egui::Button::new("").min_size(egui::vec2(width, 40.));
+                                let response = lit(ui, state.tool == Some(tool), button);
+                                let color = ui.style().interact(&response).fg_stroke.color;
+                                paint_icon(ui.painter(), response.rect, tool.icon(), color, 1.5);
+                                if response
+                                    .on_hover_text(format!("{}\n{}", tool.name(), tool.hint()))
+                                    .clicked()
+                                {
+                                    picked = Some(tool);
+                                }
+                            }
+                        });
+                    }
+                });
+                if state.tool.is_some() {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.small(
+                            "Drag what you point at to move it, Shift+click selects more, double \
+                             click a text to change it. Del removes what is selected, Esc stops \
+                             annotating.",
+                        );
+                    });
                 }
-            }
-        }
-        let next = if state.tool == Some(Tool::Text) {
-            &mut state.text_size
-        } else {
-            &mut state.width
-        };
-        let mut size = selected
-            .first()
-            .and_then(|i| annotations.get(*i))
-            .map_or(*next, |a| a.width);
-        ui.label("Size");
-        if ui
-            .add(egui::DragValue::new(&mut size).range(1..=500))
-            .on_hover_text("Width of lines, size of text or of the blocks that hide")
-            .changed()
-        {
-            if selected.is_empty() {
-                *next = size;
-            }
-            for i in &selected {
-                if let Some(a) = annotations.get_mut(*i) {
-                    a.width = size;
-                }
-            }
-        }
+            });
     });
+    if let Some(tool) = picked {
+        let (annotations, created) = annotations_or_new(stack);
+        changed |= created;
+        state.finish_typing(annotations);
+        state.tool = (state.tool != Some(tool)).then_some(tool);
+    }
+    let Some(annotations) = annotations_mut(stack) else {
+        return changed;
+    };
 
-    let redactions: Vec<usize> = selected
-        .iter()
-        .copied()
-        .filter(|i| {
-            matches!(
-                annotations.get(*i).map(|a| &a.shape),
-                Some(Shape::Redact { .. })
-            )
-        })
-        .collect();
-    if state.tool == Some(Tool::Redact) || !redactions.is_empty() {
-        ui.horizontal(|ui| {
-            for (style, icon, name) in [
-                (Redaction::Pixelate, Icon::Pixelate, "Pixelate"),
-                (Redaction::Fill, Icon::Fill, "Fill with the color"),
-            ] {
-                if icon_button(ui, state.redaction == style, icon)
-                    .on_hover_text(name)
+    // what comes next, while nothing is selected
+    if let Some(tool) = state.tool
+        && state.selected.is_empty()
+        && state.typing.is_none()
+    {
+        let mut next = state.template(tool);
+        card(ui, |ui| {
+            ui.label(format!("Next {}", tool.name().to_lowercase()));
+            if options_ui(ui, &mut next, usize::MAX) {
+                state.remember(&next);
+            }
+        });
+    }
+
+    let names = names(annotations);
+    let count = annotations.len();
+    let mut swap = None;
+    let mut remove = None;
+    for i in (0..count).rev() {
+        let selected = state.selected.contains(&i);
+        let response = card(ui, |ui| {
+            ui.horizontal(|ui| {
+                let size = 10.;
+                let small = |text: &str| {
+                    egui::Button::new(egui::RichText::new(text).size(size)).frame(false)
+                };
+                // the list goes from the front to the back
+                ui.add_enabled_ui(i + 1 < count, |ui| {
+                    if ui
+                        .add(small(crate::icons::CHEVRON_UP))
+                        .on_hover_text("Bring forward")
+                        .clicked()
+                    {
+                        swap = Some((i, i + 1));
+                    }
+                });
+                ui.add_enabled_ui(i > 0, |ui| {
+                    if ui
+                        .add(small(crate::icons::CHEVRON_DOWN))
+                        .on_hover_text("Send backward")
+                        .clicked()
+                    {
+                        swap = Some((i - 1, i));
+                    }
+                });
+                let a = &mut annotations[i];
+                let eye = if a.hidden {
+                    crate::icons::EYEOFF
+                } else {
+                    crate::icons::EYE
+                };
+                if ui
+                    .add(small(eye))
+                    .on_hover_text(if a.hidden { "Show" } else { "Hide" })
                     .clicked()
                 {
-                    state.redaction = style;
-                    for i in &redactions {
-                        if let Some(Shape::Redact { style: s, .. }) =
-                            annotations.get_mut(*i).map(|a| &mut a.shape)
-                        {
-                            *s = style;
-                        }
-                    }
+                    a.hidden = !a.hidden;
                 }
-            }
-        });
-    }
-
-    let mut delete = None;
-    for (i, a) in annotations.iter().enumerate() {
-        ui.horizontal(|ui| {
-            if toggle(ui, state.selected.contains(&i), &a.label()).clicked() {
-                state.selected = vec![i];
-                // the selection lasts while annotating
-                state.tool.get_or_insert(Tool::Arrow);
-            }
-            if ui
-                .small_button(crate::icons::X)
-                .on_hover_text("Remove")
-                .clicked()
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new(crate::icons::X).size(size * 1.5))
+                            .frame(false),
+                    )
+                    .on_hover_text("Remove")
+                    .clicked()
+                {
+                    remove = Some(i);
+                }
+                ui.add_space(size / 2.);
+                let mut name = egui::RichText::new(&names[i]);
+                if selected {
+                    name = name.color(ui.visuals().selection.bg_fill);
+                } else if a.hidden {
+                    name = name.weak();
+                }
+                if ui
+                    .add(
+                        egui::Label::new(name)
+                            .truncate()
+                            .sense(egui::Sense::click()),
+                    )
+                    .on_hover_text("Select")
+                    .clicked()
+                {
+                    state.finish_typing(annotations);
+                    state.selected = vec![i];
+                    // the selection lasts while annotating
+                    state.tool.get_or_insert(Tool::Arrow);
+                }
+            });
+            if selected
+                && let Some(a) = annotations.get_mut(i)
+                && options_ui(ui, a, i)
             {
-                delete = Some(i);
+                state.remember(a);
             }
         });
+        if response.hovered() {
+            state.pointed_card = Some(i);
+        }
     }
-    if let Some(i) = delete {
+    if let Some((a, b)) = swap {
+        annotations.swap(a, b);
+        let other = |i: usize| match i {
+            i if i == a => b,
+            i if i == b => a,
+            i => i,
+        };
+        for s in &mut state.selected {
+            *s = other(*s);
+        }
+        state.typing = state.typing.map(other);
+    }
+    if let Some(i) = remove {
         state.remove(annotations, vec![i]);
     }
+    changed
+}
 
-    if state.tool.is_some() {
-        ui.horizontal_wrapped(|ui| {
-            ui.small(
-                "Drag what you point at to move it, Shift+click selects more, double click a \
-                 text to change it. Del removes what is selected, Esc stops annotating.",
-            );
-        });
+/// The annotations of the edits, which get them if they have none
+fn annotations_or_new(stack: &mut Vec<ImgOpItem>) -> (&mut Vec<Annotation>, bool) {
+    let found = stack
+        .iter()
+        .position(|op| matches!(op.operation, ImageOperation::Annotate(_)));
+    let created = found.is_none();
+    let i = found.unwrap_or_else(|| {
+        stack.push(ImgOpItem::new(ImageOperation::Annotate(vec![])));
+        stack.len() - 1
+    });
+    let op = &mut stack[i];
+    op.active = true;
+    match &mut op.operation {
+        ImageOperation::Annotate(annotations) => (annotations, created),
+        _ => unreachable!("found as one"),
     }
 }
 
-/// A button that is lit while `on`, as the one for paint mode
-fn toggle(ui: &mut Ui, on: bool, text: &str) -> egui::Response {
-    lit(ui, on, egui::Button::new(text))
+/// The names in the list, numbered for each kind
+fn names(annotations: &[Annotation]) -> Vec<String> {
+    let mut counts = std::collections::HashMap::new();
+    annotations
+        .iter()
+        .map(|a| match &a.shape {
+            Shape::Text(_) => a.label(),
+            _ => {
+                let label = a.label();
+                let n = counts.entry(label.clone()).or_insert(0);
+                *n += 1;
+                format!("{label} {n}")
+            }
+        })
+        .collect()
+}
+
+/// A card as those of the other edits
+fn card(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) -> egui::Response {
+    let fill = if ui.visuals().dark_mode {
+        Color32::from_gray(33)
+    } else {
+        Color32::from_gray(242)
+    };
+    egui::Frame::new()
+        .fill(fill)
+        .corner_radius(ui.visuals().widgets.active.corner_radius)
+        .inner_margin(egui::Margin::same(6))
+        .show(ui, |ui| {
+            ui.allocate_space(egui::vec2(ui.available_width(), 0.));
+            add_contents(ui);
+        })
+        .response
+}
+
+/// What can be set for an annotation: what only its kind has, a line, then its
+/// colors and outline. `id` keeps the lists of fonts of the cards apart. Returns
+/// whether it changed.
+fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
+    use crate::icons::{ARROWS_OUT, ARROWS_OUT_SIMPLE, PALETTE, PENCIL_SIMPLE_LINE};
+    let before = a.clone();
+    match &mut a.shape {
+        Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => {
+            slider_row(
+                ui,
+                format!("{PENCIL_SIMPLE_LINE} Width"),
+                &mut a.width,
+                1..=100,
+            );
+        }
+        Shape::Rect(_) => {
+            slider_row(
+                ui,
+                format!("{PENCIL_SIMPLE_LINE} Width"),
+                &mut a.width,
+                1..=100,
+            );
+            slider_row(
+                ui,
+                format!("{ARROWS_OUT_SIMPLE} Radius"),
+                &mut a.radius,
+                0..=100,
+            );
+        }
+        Shape::Text(_) => {
+            slider_row(
+                ui,
+                format!("{PENCIL_SIMPLE_LINE} Size"),
+                &mut a.width,
+                4..=400,
+            );
+            font_ui(ui, &mut a.font, id);
+        }
+        Shape::Redact { style, .. } => {
+            ui.horizontal(|ui| {
+                for (way, icon, name) in [
+                    (Redaction::Pixelate, Icon::Pixelate, "Pixelate"),
+                    (Redaction::Fill, Icon::Fill, "Fill with the color"),
+                ] {
+                    if icon_button(ui, *style == way, icon)
+                        .on_hover_text(name)
+                        .clicked()
+                    {
+                        *style = way;
+                    }
+                }
+            });
+            if *style == Redaction::Pixelate {
+                slider_row(
+                    ui,
+                    format!("{PENCIL_SIMPLE_LINE} Blocks"),
+                    &mut a.width,
+                    2..=100,
+                );
+            } else {
+                color_row(ui, format!("{PALETTE} Color"), &mut a.color);
+            }
+            return *a != before;
+        }
+    }
+    ui.separator();
+    slider_row(ui, format!("{ARROWS_OUT} Outline"), &mut a.outline, 0..=40);
+    color_row(ui, format!("{PALETTE} Color"), &mut a.color);
+    ui.add_enabled_ui(a.outline > 0, |ui| {
+        color_row(ui, format!("{PALETTE} Outline color"), &mut a.outline_color);
+    });
+    *a != before
+}
+
+/// The labels of the sliders take this much room, so the sliders line up
+const LABEL_WIDTH: f32 = 96.;
+
+fn slider_row(ui: &mut Ui, label: String, value: &mut u32, range: RangeInclusive<u32>) {
+    use crate::ui::EguiExt;
+    // a value set elsewhere stays in reach
+    let range = *range.start()..=(*range.end()).max(*value);
+    ui.horizontal(|ui| {
+        let height = ui.spacing().interact_size.y;
+        ui.allocate_ui_with_layout(
+            egui::vec2(LABEL_WIDTH, height),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| ui.label_i(label),
+        );
+        // the value takes 40 points at the right
+        let spacing = ui.spacing().item_spacing.x;
+        ui.spacing_mut().slider_width = (ui.available_width() - 40. - 2. * spacing).max(40.);
+        ui.styled_slider(value, range);
+    });
+}
+
+fn color_row(ui: &mut Ui, label: String, color: &mut [u8; 4]) {
+    use crate::ui::EguiExt;
+    ui.horizontal(|ui| {
+        ui.label_i(label);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.color_edit_button_srgba_unmultiplied(color);
+        });
+    });
+}
+
+/// The font and its weight
+fn font_ui(ui: &mut Ui, font: &mut Font, id: usize) {
+    let families = font_families();
+    let shown = |family: &str| {
+        if family.is_empty() {
+            "Inter".to_string()
+        } else {
+            family.to_string()
+        }
+    };
+    ui.label("Font");
+    egui::ComboBox::from_id_salt(("annotation font", id))
+        .selected_text(shown(&font.family))
+        .width(ui.available_width())
+        .show_ui(ui, |ui| {
+            for (family, _) in families.iter() {
+                // Inter is the one without a name
+                let value = if family == "Inter" {
+                    String::new()
+                } else {
+                    family.clone()
+                };
+                ui.selectable_value(&mut font.family, value, family);
+            }
+        });
+    let weights = families
+        .iter()
+        .find(|(family, _)| *family == shown(&font.family))
+        .map(|(_, weights)| weights.clone())
+        .unwrap_or_else(|| vec![400]);
+    ui.label("Weight");
+    egui::ComboBox::from_id_salt(("annotation weight", id))
+        .selected_text(weight_name(font.weight))
+        .width(ui.available_width())
+        .show_ui(ui, |ui| {
+            for weight in weights {
+                ui.selectable_value(&mut font.weight, weight, weight_name(weight));
+            }
+        });
+}
+
+fn weight_name(weight: u16) -> String {
+    match weight {
+        100 => "Thin".into(),
+        200 => "Extra light".into(),
+        300 => "Light".into(),
+        400 => "Regular".into(),
+        500 => "Medium".into(),
+        600 => "Semibold".into(),
+        700 => "Bold".into(),
+        800 => "Extra bold".into(),
+        900 => "Black".into(),
+        other => other.to_string(),
+    }
+}
+
+/// The families of the fonts with the weights each has, Inter first
+type Families = Arc<Vec<(String, Vec<u16>)>>;
+
+static FAMILIES: Mutex<Option<(u32, Families)>> = Mutex::new(None);
+
+fn font_families() -> Families {
+    let version = FONTS_VERSION.load(Ordering::Relaxed);
+    let fonts = fonts();
+    let Ok(mut known) = FAMILIES.lock() else {
+        return Default::default();
+    };
+    if let Some((v, families)) = &*known
+        && *v == version
+    {
+        return families.clone();
+    }
+    let mut weights = std::collections::BTreeMap::<String, Vec<u16>>::new();
+    for face in fonts.faces() {
+        if face.style != usvg::fontdb::Style::Normal {
+            continue;
+        }
+        if let Some((family, _)) = face.families.first() {
+            let list = weights.entry(family.clone()).or_default();
+            if !list.contains(&face.weight.0) {
+                list.push(face.weight.0);
+            }
+        }
+    }
+    let mut families: Vec<(String, Vec<u16>)> = weights
+        .into_iter()
+        .map(|(family, mut list)| {
+            list.sort_unstable();
+            (family, list)
+        })
+        .collect();
+    if let Some(i) = families.iter().position(|(family, _)| family == "Inter") {
+        let inter = families.remove(i);
+        families.insert(0, inter);
+    }
+    let families = Arc::new(families);
+    *known = Some((version, families.clone()));
+    families
 }
 
 fn icon_button(ui: &mut Ui, on: bool, icon: Icon) -> egui::Response {
     let response = lit(ui, on, egui::Button::new("").min_size(egui::vec2(28., 24.)));
     let color = ui.style().interact(&response).fg_stroke.color;
-    paint_icon(ui.painter(), response.rect, icon, color);
+    paint_icon(ui.painter(), response.rect, icon, color, 1.);
     response
 }
 
@@ -1328,7 +1851,8 @@ pub fn canvas_ui(
         let (delete, escape, shift) = ctx.input(|i| {
             (
                 i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
-                i.key_pressed(Key::Escape),
+                // that only closes a list
+                i.key_pressed(Key::Escape) && !std::mem::take(&mut state.popup_open),
                 i.modifiers.shift,
             )
         });
@@ -1400,7 +1924,7 @@ pub fn canvas_ui(
     let hit = |annotations: &[Annotation], p: [f32; 2]| {
         (0..annotations.len())
             .rev()
-            .find(|i| hits(&annotations[*i], mapping, p, slack))
+            .find(|i| !annotations[*i].hidden && hits(&annotations[*i], mapping, p, slack))
     };
     let is_text = |a: &Annotation| matches!(a.shape, Shape::Text(_));
 
@@ -1441,32 +1965,16 @@ pub fn canvas_ui(
                         });
                     }
                     None if tool == Tool::Text => {
-                        let mut a = Annotation::new(
-                            Shape::Text(String::new()),
-                            state.color,
-                            state.text_size,
-                            round(o),
-                        );
+                        let mut a = state.template(tool);
+                        a.offset = round(o);
                         a.stand_upright(mapping);
                         annotations.push(a);
                         state.start_typing(annotations.len() - 1);
                     }
                     None => {
-                        let (shape, color, width) = match tool {
-                            Tool::Arrow => (Shape::Arrow([0, 0]), state.color, state.width),
-                            Tool::Frame => (Shape::Rect([0, 0]), state.color, state.width),
-                            Tool::Circle => (Shape::Ellipse([0, 0]), state.color, state.width),
-                            Tool::Pen => (Shape::Pen(vec![[0, 0]]), state.color, state.width),
-                            Tool::Text | Tool::Redact => (
-                                Shape::Redact {
-                                    size: [0, 0],
-                                    style: state.redaction,
-                                },
-                                [0, 0, 0, 255],
-                                (state.width * 3).max(8),
-                            ),
-                        };
-                        annotations.push(Annotation::new(shape, color, width, round(o)));
+                        let mut a = state.template(tool);
+                        a.offset = round(o);
+                        annotations.push(a);
                         let index = annotations.len() - 1;
                         state.selected = vec![index];
                         state.drag = Some(Drag::Draw { index, from: o });
@@ -1562,9 +2070,15 @@ pub fn canvas_ui(
         _ => None,
     };
     for &i in &state.selected {
-        if state.typing != Some(i) && drawn != Some(i) {
+        if state.typing != Some(i) && drawn != Some(i) && !annotations[i].hidden {
             show(&annotations[i], true);
         }
+    }
+    // the one of the card the mouse is over in the panel
+    if let Some(i) = state.pointed_card.filter(|i| !state.selected.contains(i))
+        && let Some(a) = annotations.get(i).filter(|a| !a.hidden)
+    {
+        show(a, false);
     }
     copy
 }
@@ -1590,6 +2104,12 @@ fn text_ui(
     let size = (a.width as f32 * scale_of(t) * geo.scale).max(4.);
     let [r, g, b, alpha] = a.color;
     let color = Color32::from_rgba_unmultiplied(r, g, b, alpha.max(80));
+    // as the text will be, other fonts than Inter aside
+    let family = if a.font.weight >= 600 {
+        egui::FontFamily::Name("bold".into())
+    } else {
+        egui::FontFamily::Proportional
+    };
     let Shape::Text(text) = &mut a.shape else {
         return false;
     };
@@ -1607,7 +2127,7 @@ fn text_ui(
         .constrain(false)
         .show(ctx, |ui| {
             let edit = egui::TextEdit::multiline(text)
-                .font(egui::FontId::proportional(size))
+                .font(egui::FontId::new(size, family))
                 .text_color(color)
                 .frame(egui::Frame::NONE)
                 .margin(egui::Margin::ZERO)
@@ -1645,8 +2165,10 @@ fn text_ui(
 /// area it hides. `resolution` is how large it is on the screen.
 fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
     let w = a.line_width();
+    // around the outline it may have
+    let o = a.outline_width();
     let mut stroke = tiny_skia::Stroke {
-        width: w + gap * 2.,
+        width: w + (o + gap) * 2.,
         line_cap: LineCap::Round,
         line_join: LineJoin::Round,
         ..Default::default()
@@ -1678,36 +2200,33 @@ fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
                 arrow.line_to(-nx * cos + backx * sin, -ny * cos + backy * sin);
             }
             arrow.close();
-            stroke.width = gap * 2.;
+            stroke.width = (o + gap) * 2.;
             area = true;
             arrow.finish()
         }
         Shape::Rect(size) => {
-            stroke.line_join = LineJoin::Miter;
-            tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
-                .map(PathBuilder::from_rect)
+            if a.corner_radius() <= 0. {
+                stroke.line_join = LineJoin::Miter;
+            }
+            frame_path(*size, a.corner_radius())
         }
         Shape::Ellipse(size) => tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
             .and_then(PathBuilder::from_oval),
-        Shape::Pen(points) => {
-            let mut line = PathBuilder::new();
-            for (i, p) in points.iter().enumerate() {
-                if i == 0 {
-                    line.move_to(p[0] as f32, p[1] as f32);
-                } else {
-                    line.line_to(p[0] as f32, p[1] as f32);
-                }
-            }
-            if let [only] = points.as_slice() {
-                // a dot
-                line.line_to(only[0] as f32, only[1] as f32 + 0.01);
+        Shape::Pen(points) => match points.as_slice() {
+            // a dot
+            [only] => {
                 area = true;
+                let mut dot = PathBuilder::new();
+                dot.move_to(only[0] as f32, only[1] as f32);
+                dot.line_to(only[0] as f32, only[1] as f32 + 0.01);
+                dot.finish()
             }
-            line.finish()
-        }
+            points => polyline(points),
+        },
         Shape::Text(_) | Shape::Redact { .. } => {
             let Some(b) = a.bounds() else { return vec![] };
-            let (l, t, r, b) = (b[0] - gap, b[1] - gap, b[2] + gap, b[3] + gap);
+            let by = gap + o;
+            let (l, t, r, b) = (b[0] - by, b[1] - by, b[2] + by, b[3] + by);
             return vec![vec![[l, t], [r, t], [r, b], [l, b]]];
         }
     };
@@ -1871,6 +2390,8 @@ fn segment_distance(q: Point, a: Point, b: Point) -> f32 {
 
 /// Whether a point in the annotation's own coordinates is on it, or `slack` off it
 fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
+    // its outline is a part of it
+    let slack = slack + a.outline_width();
     let near = a.line_width() / 2. + slack;
     let point = |p: [i32; 2]| Point::from_xy(p[0] as f32, p[1] as f32);
     let to_line = |p0: [i32; 2], p1: [i32; 2]| segment_distance(q, point(p0), point(p1));
@@ -1896,8 +2417,18 @@ fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
         },
         Shape::Rect(size) => {
             let (w, h) = (size[0] as f32, size[1] as f32);
-            let inside = |by: f32| q.x >= -by && q.y >= -by && q.x <= w + by && q.y <= h + by;
-            inside(near) && !inside(-near)
+            let r = a.corner_radius();
+            if r <= 0. {
+                let inside = |by: f32| q.x >= -by && q.y >= -by && q.x <= w + by && q.y <= h + by;
+                return inside(near) && !inside(-near);
+            }
+            // from the line of a box with round corners, inside or outside
+            let (dx, dy) = (
+                (q.x - w / 2.).abs() - (w / 2. - r),
+                (q.y - h / 2.).abs() - (h / 2. - r),
+            );
+            let from_line = dx.max(0.).hypot(dy.max(0.)) + dx.max(dy).min(0.) - r;
+            from_line.abs() <= near
         }
         Shape::Ellipse(size) => {
             let (rx, ry) = (size[0] as f32 / 2., size[1] as f32 / 2.);
@@ -2076,6 +2607,19 @@ mod tests {
                 let first = a.remove(0);
                 a.push(first);
             }),
+            // outlines, round corners and a font
+            Box::new(|a| a[1].outline = 4),
+            Box::new(|a| {
+                a[0].radius = 20;
+                a[0].outline = 3;
+            }),
+            Box::new(|a| {
+                a[5].outline = 6;
+                a[5].outline_color = [255, 0, 255, 255];
+            }),
+            Box::new(|a| a[1].offset = [10, 10]),
+            Box::new(|a| a[1].font.weight = 700),
+            Box::new(|a| a[1].outline = 0),
         ];
         for (i, change) in changes.iter().enumerate() {
             change(&mut annotations);
@@ -2133,7 +2677,8 @@ mod tests {
 
     #[test]
     fn text_is_drawn_inside_its_box() {
-        let layout = text_layout("Hello", 40, [255, 255, 255, 255]).expect("Inter lays out text");
+        let hello = Annotation::new(Shape::Text("Hello".into()), [255; 4], 40, [0, 0]);
+        let layout = text_layout("Hello", &hello).expect("Inter lays out text");
         let [l, t, r, b] = layout.bounds;
         assert!(
             r - l > 60. && r - l < 140.,
@@ -2288,8 +2833,18 @@ mod tests {
                 style: Redaction::Fill,
             },
         ];
-        for shape in shapes {
-            let a = Annotation::new(shape, [0; 4], 6, [80, 40]);
+        let looks = [(0, 0), (4, 0), (0, 10), (4, 100)];
+        for (shape, (thick, radius)) in shapes
+            .into_iter()
+            .flat_map(|shape| looks.map(|look| (shape.clone(), look)))
+        {
+            // only frames have corners to round
+            if radius > 0 && !matches!(shape, Shape::Rect(_)) {
+                continue;
+            }
+            let mut a = Annotation::new(shape, [0; 4], 6, [80, 40]);
+            a.outline = thick;
+            a.radius = radius;
             let t = a.transform(&mapping);
             // 2 pixels around it in the edited image
             let gap = 2. / scale_of(t);
@@ -2344,13 +2899,199 @@ mod tests {
 
     #[test]
     fn saved_with_the_edits() {
+        let mut dressed = Annotation::new(Shape::Text("Hi".into()), [1, 2, 3, 4], 5, [6, 7]);
+        dressed.outline = 3;
+        dressed.outline_color = [9, 8, 7, 6];
+        dressed.radius = 4;
+        dressed.font = Font {
+            family: "Some 'font'".into(),
+            weight: 700,
+        };
+        dressed.hidden = true;
         let op = ImageOperation::Annotate(vec![
             arrow_at([1, 2], [3, 4]),
             Annotation::new(Shape::Ellipse([8, 9]), [1, 2, 3, 4], 5, [6, 7]),
             Annotation::new(Shape::Text("ü & <b>".into()), [1, 2, 3, 4], 5, [6, 7]),
+            dressed,
         ]);
         let json = serde_json::to_string(&op).expect("saved");
         let back: ImageOperation = serde_json::from_str(&json).expect("read");
         assert_eq!(op, back);
+    }
+
+    #[test]
+    fn edits_saved_before_outlines_still_load() {
+        let op = ImageOperation::Annotate(vec![arrow_at([1, 2], [3, 4])]);
+        let mut json = serde_json::to_value(&op).expect("saved");
+        let annotation = json["Annotate"][0].as_object_mut().expect("an annotation");
+        for newer in [
+            "rotation",
+            "flip",
+            "outline",
+            "outline_color",
+            "radius",
+            "font",
+            "hidden",
+        ] {
+            assert!(annotation.remove(newer).is_some(), "{newer} is saved");
+        }
+        let back: ImageOperation = serde_json::from_value(json).expect("read");
+        assert_eq!(op, back);
+    }
+
+    #[test]
+    fn outlines_go_around_what_is_drawn() {
+        let mapping = Mapping::new(&[], (200, 200));
+        let img = RgbaImage::from_pixel(200, 200, Rgba([0, 0, 0, 255]));
+        let (red, white, black) = ([255, 0, 0, 255], [255; 4], [0, 0, 0, 255]);
+        let mut frame = Annotation::new(Shape::Rect([100, 60]), red, 6, [50, 50]);
+        frame.outline = 4;
+        let drawn = drawn_at_once(&img, &[frame], &mapping);
+        // the line is 47 to 53, its outline 4 more on both sides
+        assert_eq!(drawn.get_pixel(100, 50).0, red, "on the line");
+        assert_eq!(drawn.get_pixel(100, 45).0, white, "the outline outside");
+        assert_eq!(drawn.get_pixel(100, 55).0, white, "the outline inside");
+        assert_eq!(drawn.get_pixel(100, 41).0, black, "past the outline");
+
+        let mut arrow = arrow_at([20, 100], [160, 0]);
+        arrow.outline = 3;
+        let drawn = drawn_at_once(&img, &[arrow], &mapping);
+        assert_eq!(drawn.get_pixel(100, 100).0, red, "on the line");
+        assert_eq!(drawn.get_pixel(100, 95).0, white, "the outline of the line");
+        assert_eq!(drawn.get_pixel(100, 92).0, black, "past it");
+        assert_eq!(drawn.get_pixel(181, 100).0, white, "the outline at the tip");
+        assert_eq!(drawn.get_pixel(185, 100).0, black, "past the tip");
+
+        let mut text = Annotation::new(Shape::Text("Hi".into()), red, 40, [20, 20]);
+        let plain = drawn_at_once(&img, &[text.clone()], &mapping);
+        text.outline = 3;
+        let outlined = drawn_at_once(&img, &[text.clone()], &mapping);
+        let count = |img: &RgbaImage, color: [u8; 4]| img.pixels().filter(|p| p.0 == color).count();
+        assert_eq!(count(&plain, white), 0);
+        assert!(count(&outlined, white) > 200, "the letters have an outline");
+        assert!(count(&outlined, red) > 200, "and are red inside");
+        assert_eq!(
+            text.bounds(),
+            {
+                text.outline = 0;
+                text.bounds()
+            },
+            "the box of the text stays"
+        );
+    }
+
+    #[test]
+    fn outlines_are_not_cut_off() {
+        let mapping = Mapping::new(&[], (300, 300));
+        let img = RgbaImage::from_pixel(300, 300, Rgba([0, 0, 0, 255]));
+        let whole = Rect {
+            x: 0,
+            y: 0,
+            width: 300,
+            height: 300,
+        };
+        let shapes = [
+            Shape::Arrow([120, -60]),
+            Shape::Rect([80, 50]),
+            Shape::Ellipse([80, 50]),
+            Shape::Pen(vec![[0, 0], [40, 30], [90, -10]]),
+            Shape::Pen(vec![[0, 0]]),
+            Shape::Text("Hi".into()),
+        ];
+        for shape in shapes {
+            let mut a = Annotation::new(shape, [255, 0, 0, 255], 6, [100, 100]);
+            a.outline = 5;
+            a.radius = 10;
+            let t = a.transform(&mapping);
+            let area = area(&a, t, (300, 300)).expect("an area");
+            let mut everywhere = img.clone();
+            draw(&mut everywhere, &a, t, whole);
+            for (x, y, p) in everywhere.enumerate_pixels() {
+                let inside = x >= area.x
+                    && y >= area.y
+                    && x < area.x + area.width
+                    && y < area.y + area.height;
+                assert!(
+                    inside || p.0 == [0, 0, 0, 255],
+                    "{:?} draws at {x},{y}, out of {area:?}",
+                    a.shape
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn frames_get_round_corners() {
+        let mapping = Mapping::new(&[], (200, 200));
+        let img = RgbaImage::from_pixel(200, 200, Rgba([0, 0, 0, 255]));
+        let red = [255, 0, 0, 255];
+        let mut frame = Annotation::new(Shape::Rect([100, 60]), red, 4, [50, 50]);
+        frame.radius = 20;
+        let drawn = drawn_at_once(&img, &[frame.clone()], &mapping);
+        assert_eq!(
+            drawn.get_pixel(50, 50).0,
+            [0, 0, 0, 255],
+            "the corner is round"
+        );
+        // halfway round the corner around 70,70
+        assert_eq!(drawn.get_pixel(55, 55).0, red, "on the curve");
+        assert_eq!(drawn.get_pixel(100, 50).0, red, "on the straight part");
+        // a click hits where it is drawn
+        assert!(touches(&frame, Point::from_xy(5.86, 5.86), 0.));
+        assert!(!touches(&frame, Point::zero(), 1.));
+        // no rounder than half of the shorter side
+        frame.radius = 500;
+        assert_eq!(frame.corner_radius(), 30.);
+    }
+
+    #[test]
+    fn text_in_its_font_and_weight() {
+        let mut text = Annotation::new(Shape::Text("Hello".into()), [255; 4], 40, [0, 0]);
+        let regular = text.bounds().expect("laid out");
+        text.font.weight = 700;
+        let bold = text.bounds().expect("laid out");
+        assert!(
+            bold[2] - bold[0] > regular[2] - regular[0] + 2.,
+            "bold is wider: {regular:?} {bold:?}"
+        );
+        // Inter, when the font is not there
+        text.font = Font {
+            family: "No such font".into(),
+            weight: 400,
+        };
+        assert_eq!(text.bounds(), Some(regular));
+        // Inter first, with its two weights
+        let families = font_families();
+        assert_eq!(
+            families.first(),
+            Some(&("Inter".to_string(), vec![400, 700]))
+        );
+    }
+
+    #[test]
+    fn hidden_ones_are_not_drawn() {
+        let mut hidden = arrow_at([1, 1], [50, 50]);
+        hidden.hidden = true;
+        let shown = arrow_at([5, 5], [60, 60]);
+        let stack = vec![item(ImageOperation::Annotate(vec![hidden, shown.clone()]))];
+        assert_eq!(visible(&stack, &AnnotateUi::default()), vec![shown]);
+    }
+
+    #[test]
+    fn new_ones_look_like_the_one_changed_last() {
+        let mut state = AnnotateUi::default();
+        state.prepare((800, 600));
+        let mut text = state.template(Tool::Text);
+        text.font.weight = 700;
+        text.outline = 3;
+        text.color = [0, 0, 255, 255];
+        state.remember(&text);
+        let frame = state.template(Tool::Frame);
+        assert_eq!((frame.outline, frame.color), (3, [0, 0, 255, 255]));
+        assert_eq!(frame.font, Font::default(), "only texts have a font");
+        assert_eq!(state.template(Tool::Text).font.weight, 700);
+        let redaction = state.template(Tool::Redact);
+        assert_eq!(redaction.outline, 0, "redactions have no outline");
+        assert_eq!(redaction.color, [0, 0, 0, 255]);
     }
 }

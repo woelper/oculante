@@ -114,16 +114,6 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             original_size: state.image_geometry.dimensions,
         }),
     ];
-    // one for all annotations
-    if state.persistent_settings.experimental_features
-        && !state
-            .edit_state
-            .image_op_stack
-            .iter()
-            .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
-    {
-        ops.push(ImgOpItem::new(ImageOperation::Annotate(vec![])));
-    }
     let original = state
         .current_image
         .as_ref()
@@ -179,9 +169,6 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                             continue;
                                         }
                                         if ui.button(name).clicked() {
-                                            if matches!(op.operation, ImageOperation::Annotate(_)) {
-                                                state.edit_state.annotate.tool = Some(crate::annotate::Tool::Arrow);
-                                            }
                                             if op.operation.is_per_pixel() {
                                                 state.edit_state.pixel_op_stack.push(op.clone());
                                             } else {
@@ -209,7 +196,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 .show(ui, |ui| {
 
                 ui.vertical_centered_justified(|ui| {
-                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings, &mut state.edit_state.annotate);
+                    modifier_stack_ui(&mut state.edit_state.image_op_stack, &mut image_changed, ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings);
 
                     // draw a line between different operator types
                     if !state.edit_state.image_op_stack.is_empty() && !state.edit_state.pixel_op_stack.is_empty() {
@@ -218,9 +205,24 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     modifier_stack_ui(
                         &mut state.edit_state.pixel_op_stack,
                         &mut pixels_changed,
-                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings, &mut state.edit_state.annotate
+                        ui, &state.image_geometry, &mut state.edit_state.block_panning, &mut state.volatile_settings
                     );
                 });
+
+            // the annotations have their own part, also when saved edits brought some
+            if state.persistent_settings.experimental_features
+                || state
+                    .edit_state
+                    .image_op_stack
+                    .iter()
+                    .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
+            {
+                ui.add_space(4.);
+                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate) {
+                    image_changed = true;
+                }
+                ui.add_space(4.);
+            }
 
 
             ui.vertical_centered_justified(|ui| {
@@ -861,14 +863,17 @@ fn modifier_stack_ui(
     geo: &ImageGeometry,
     mouse_grab: &mut bool,
     settings: &mut VolatileSettings,
-    annotate: &mut crate::annotate::AnnotateUi,
 ) {
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    let stack_len = stack.len();
+    // the annotations have their own part of the panel
+    let shown: Vec<usize> = (0..stack.len())
+        .filter(|i| !matches!(stack[*i].operation, ImageOperation::Annotate(_)))
+        .collect();
 
-    for (i, operation) in stack.iter_mut().enumerate() {
+    for (n, &i) in shown.iter().enumerate() {
+        let operation = &mut stack[i];
         let frame_color = if ui.style().visuals.dark_mode {
             Color32::from_hex("#212121").unwrap()
         } else {
@@ -881,8 +886,8 @@ fn modifier_stack_ui(
             .show(ui, |ui| {
                 ui.allocate_space(vec2(ui.available_width(), 0.0));
                 ui.horizontal(|ui| {
-                    let up = i != 0;
-                    let down = i != stack_len - 1;
+                    let up = n != 0;
+                    let down = n + 1 != shown.len();
                     let caret_size = 10.;
 
                     ui.add_enabled_ui(up, |ui| {
@@ -890,7 +895,7 @@ fn modifier_stack_ui(
                             egui::Button::new(RichText::new("").size(caret_size)).frame(false),
                         );
                         if ur.on_hover_text("Move up").clicked() {
-                            swap = Some(((i as i32 - 1).max(0) as usize, i));
+                            swap = Some((shown[n - 1], i));
                             *image_changed = true;
                         }
                     });
@@ -900,7 +905,7 @@ fn modifier_stack_ui(
                             egui::Button::new(RichText::new("").size(caret_size)).frame(false),
                         );
                         if dr.on_hover_text("Move down").clicked() {
-                            swap = Some((i, i + 1));
+                            swap = Some((i, shown[n + 1]));
                             *image_changed = true;
                         }
                     });
@@ -941,10 +946,7 @@ fn modifier_stack_ui(
                     ui.style_mut().spacing.slider_width = ui.available_width() * 0.8;
 
                     ui.add_enabled_ui(operation.active, |ui| {
-                        // a change of the annotations draws only them again
-                        if let ImageOperation::Annotate(annotations) = &mut operation.operation {
-                            crate::annotate::panel_ui(ui, annotations, annotate);
-                        } else if operation
+                        if operation
                             .operation
                             .ui(ui, geo, mouse_grab, settings, operation.id)
                             .changed()

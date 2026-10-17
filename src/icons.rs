@@ -5,6 +5,7 @@ pub const CARET_LEFT: &str = "\u{E902}";
 pub const CARET_RIGHT: &str = "\u{E903}";
 pub const CHECK: &str = "\u{E91E}";
 pub const CHEVRON_UP: &str = "\u{E91B}";
+pub const CHEVRON_DOWN: &str = "\u{E91C}";
 pub const COPY: &str = "\u{E916}";
 pub const DEBUG: &str = "\u{E90D}";
 pub const FILE: &str = "\u{E91A}";

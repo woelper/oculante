@@ -725,15 +725,18 @@ def test_paint_on_transparency(binary):
 ANNOTATE_BUTTON = (790, 108, 210, 18)
 # the line around what is selected or pointed at
 OUTLINE = (255, 200, 40)
-# the tools of Annotate in the edit panel, scrolled to the top
+# the header of the Annotations in the edit panel of moss.jpg, and the tiles of the
+# tools below it once it is open, scrolled to the top
+ANNOTATIONS_HEADER = (890, 167)
 ANNOTATE_TOOLS = {
-    name: (x, 206) for name, x in zip(("arrow", "frame", "circle", "text", "pen", "redact"), (795, 831, 866, 903, 938, 975))
+    name: (815 + 80 * (i % 3), 212 + 46 * (i // 3))
+    for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
 
 
 def test_annotate(binary):
-    """With experimental features on, Annotate draws an arrow, a circle, text and a
-    redaction on the image. Meanwhile the keys are for the annotations: Delete
+    """With experimental features on, the Annotations in the edit panel draw an
+    arrow, a circle, text and a redaction on the image. Meanwhile the keys are for the annotations: Delete
     removes the one that is selected, not the file, an arrow key moves it and no
     other image comes. What the mouse points at is outlined and moves with any tool,
     a double click changes a text, the middle button still moves the image, Ctrl+C
@@ -753,8 +756,18 @@ def test_annotate(binary):
         app.x("xdotool", "type", "--delay", "60", "annot")
         app.settle(0.5)
         found = count_color(app.shot("search"), ANNOTATE_BUTTON, (220, 220, 220), 50)
-        assert found > 20, "Annotate is not among the filters"
-        app.click(896, 119)  # "Annotate", it starts with the arrow
+        assert found == 0, "Annotate is among the filters, it has its own part of the panel"
+        app.click(896, 50)  # "Filters" closes
+        app.move(40, 560)
+        app.settle(0.8)
+        closed = app.shot("closed")
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(0.8)
+        tiles = (790, 185, 230, 100)
+        changed = changed_pixels_in(closed, app.shot("opened"), tiles)
+        assert changed > 3000, f"opening the Annotations shows no tools ({changed} pixels)"
+        app.click(*ANNOTATE_TOOLS["arrow"])
         app.move(40, 560)
         app.settle(1.0)
         before = app.shot("before")
@@ -887,25 +900,27 @@ def test_annotate(binary):
         reopened = app.shot("reopened")
         # the edits open the panel, the image is placed differently than before. Its
         # only edits that show are the annotations.
-        app.click(785, 360)  # "Disable all edits"
+        app.click(785, 327)  # "Disable all edits"
         app.move(40, 560)
         app.settle(1.0)
         off = app.shot("edits_off")
         changed = changed_pixels_in(reopened, off, (10, 40, 740, 460))
         assert changed > 10000, f"the saved annotations change only {changed} pixels"
-    # without experimental features there is no Annotate to add
-    with App(binary, "annotate_not_offered", [os.path.join(folder, "b.png")]) as app:
-        app.wait_window()
-        app.move(0.6, 0.6)
-        assert app.wait_for_log(LOADED), "the image never loaded"
-        app.key("e")
-        app.settle(1.0)
-        app.click(896, 50)
-        app.click(896, 82)
-        app.x("xdotool", "type", "--delay", "60", "annot")
-        app.settle(0.5)
-        found = count_color(app.shot("search"), ANNOTATE_BUTTON, (220, 220, 220), 50)
-        assert found == 0, "Annotate is offered without experimental features"
+    # without experimental features there are no Annotations, their header has
+    # one of the carets of the panel
+    carets = (775, 40, 25, 560)
+    counts = []
+    for experimental in (True, False):
+        settings = {"experimental_features": experimental}
+        with App(binary, "annotate_not_offered", [os.path.join(folder, "b.png")], settings=settings) as app:
+            app.wait_window()
+            app.move(0.6, 0.6)
+            assert app.wait_for_log(LOADED), "the image never loaded"
+            app.key("e")
+            app.move(40, 560)
+            app.settle(1.0)
+            counts.append(count_color(app.shot(f"panel_{experimental}"), carets, ACCENT, 40))
+    assert counts[0] > counts[1] + 15, f"the carets of the panel with and without experimental features: {counts}"
 
 
 # the image area right of the info panel, free of anything that depends on the pointer
@@ -1219,6 +1234,91 @@ def test_info_panel_holds_still(binary):
         # text is drawn a shade different at another height of the window
         changed = changed_pixels_in(with_bar, without_bar, (0, 40, edge - 20, 560), fuzz=3)
         assert changed == 0, f"the panel changed with the scroll bar ({changed} pixels)"
+
+
+def test_annotation_cards(binary):
+    """Each annotation has a card in the edit panel, the one in front first. What is
+    set while nothing is selected is for the next one, an outline here. A card sends
+    its annotation backward, hides it and removes it, and Esc closes a list of a card
+    without dropping the selection."""
+    white = (255, 255, 255)
+    frame_box = (470, 90, 140, 100)
+    with App(binary, "annotation_cards", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.click(*ANNOTATE_TOOLS["frame"])
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        # the outline of the next frame, on its card below the tools
+        app.drag(868, 484, 898, 484, steps=6)
+        app.drag(480, 100, 600, 180, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        frame = app.shot("frame")
+        outline = count_color(frame, frame_box, white, 10) - count_color(before, frame_box, white, 10)
+        assert outline > 1000, f"the frame has an outline of only {outline} pixels"
+        # a circle over it, then behind it
+        app.click(*ANNOTATE_TOOLS["circle"])
+        app.drag(500, 120, 640, 220, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        circle = app.shot("circle")
+        overlap = (500, 120, 100, 60)
+        app.click(803, 388)  # "Send backward" on the card of the circle
+        app.move(40, 560)
+        app.settle(1.0)
+        behind = app.shot("behind")
+        changed = changed_pixels_in(circle, behind, overlap)
+        assert changed > 200, f"sending the circle backward changed only {changed} pixels"
+        # the frame, now first, hides and comes back
+        corner = (470, 90, 25, 25)
+        app.click(822, 388)
+        app.move(40, 560)
+        app.settle(1.0)
+        hidden = app.shot("frame_hidden")
+        assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
+        app.click(822, 388)
+        app.move(40, 560)
+        app.settle(1.0)
+        assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
+        # the circle goes by its card, below and right of the frame it was alone
+        app.click(842, 436)
+        app.move(40, 560)
+        app.settle(1.0)
+        removed = app.shot("circle_removed")
+        for alone in [(622, 150, 30, 60), (520, 202, 80, 30)]:
+            assert changed_pixels_in(before, circle, alone) > 300, f"no circle at {alone}"
+            changed = changed_pixels_in(before, removed, alone)
+            assert changed == 0, f"{changed} pixels of the removed circle are left at {alone}"
+        # Esc closes the list of fonts of a text, which stays selected
+        app.click(*ANNOTATE_TOOLS["text"])
+        app.click(200, 300)
+        app.x("xdotool", "type", "--delay", "80", "Hi")
+        app.key("Return")
+        app.move(40, 560)
+        app.settle(1.0)
+        text_box = (170, 270, 90, 90)
+        text = app.shot("text")
+        app.click(980, 473)  # its font
+        app.settle(0.8)
+        listed = app.shot("list")
+        assert changed_pixels_in(text, listed, (790, 280, 230, 200)) > 1000, "no list of fonts"
+        app.key("Escape")
+        app.move(40, 560)
+        app.settle(1.0)
+        closed = app.shot("list_closed")
+        assert changed_pixels_in(text, closed, text_box) == 0, "Esc on the list dropped the selection"
+        # the next one does
+        app.key("Escape")
+        app.move(40, 560)
+        app.settle(1.0)
+        changed = changed_pixels_in(closed, app.shot("unselected"), text_box)
+        assert changed > 50, f"the outline of the selected text is only {changed} pixels"
 
 
 def test_histogram_shows_values_on_hover(binary):
@@ -1542,6 +1642,7 @@ TESTS = [
     test_paint_mode,
     test_paint_on_transparency,
     test_annotate,
+    test_annotation_cards,
     test_fullscreen,
     test_borderless,
     test_compare_list,
