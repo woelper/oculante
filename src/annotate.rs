@@ -654,28 +654,50 @@ fn text_bounds(group: &usvg::Group) -> Option<[f32; 4]> {
     })
 }
 
-/// The part of the edited image an annotation draws on
-fn area(a: &Annotation, t: Transform, size: (u32, u32)) -> Option<Rect> {
+/// Left, top, right and bottom in the edited image of its bounds, grown by `grow`
+/// in its own coordinates
+fn extent(a: &Annotation, t: Transform, grow: f32) -> Option<[f32; 4]> {
     let b = a.bounds()?;
-    let reach = a.reach();
     let mut corners = [
-        Point::from_xy(b[0] - reach, b[1] - reach),
-        Point::from_xy(b[2] + reach, b[1] - reach),
-        Point::from_xy(b[0] - reach, b[3] + reach),
-        Point::from_xy(b[2] + reach, b[3] + reach),
+        Point::from_xy(b[0] - grow, b[1] - grow),
+        Point::from_xy(b[2] + grow, b[1] - grow),
+        Point::from_xy(b[0] - grow, b[3] + grow),
+        Point::from_xy(b[2] + grow, b[3] + grow),
     ];
     t.map_points(&mut corners);
+    Some(
+        corners
+            .iter()
+            .fold([f32::MAX, f32::MAX, f32::MIN, f32::MIN], |e, c| {
+                [e[0].min(c.x), e[1].min(c.y), e[2].max(c.x), e[3].max(c.y)]
+            }),
+    )
+}
+
+/// The ones that are shown and lie wholly inside the box between two corners in the
+/// edited image, their lines not counted
+fn in_box(annotations: &[Annotation], mapping: &Mapping, a: [f32; 2], b: [f32; 2]) -> Vec<usize> {
+    let (left, top) = (a[0].min(b[0]), a[1].min(b[1]));
+    let (right, bottom) = (a[0].max(b[0]), a[1].max(b[1]));
+    (0..annotations.len())
+        .filter(|i| {
+            let x = &annotations[*i];
+            !x.hidden
+                && extent(x, x.transform(mapping), 0.)
+                    .is_some_and(|e| e[0] >= left && e[1] >= top && e[2] <= right && e[3] <= bottom)
+        })
+        .collect()
+}
+
+/// The part of the edited image an annotation draws on
+fn area(a: &Annotation, t: Transform, size: (u32, u32)) -> Option<Rect> {
+    let [left, top, right, bottom] = extent(a, t, a.reach())?;
     // smoothed edges reach a little further
     let smooth = if matches!(a.shape, Shape::Redact { .. }) {
         0.
     } else {
         2.
     };
-    let (mut left, mut top, mut right, mut bottom) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
-    for c in corners {
-        (left, top) = (left.min(c.x), top.min(c.y));
-        (right, bottom) = (right.max(c.x), bottom.max(c.y));
-    }
     let (left, top) = (
         (left - smooth).floor().max(0.),
         (top - smooth).floor().max(0.),
@@ -1008,6 +1030,8 @@ pub fn visible(stack: &[ImgOpItem], state: &AnnotateUi) -> Vec<Annotation> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
+    /// Selects and moves, draws nothing
+    Select,
     Arrow,
     Frame,
     Circle,
@@ -1017,6 +1041,7 @@ pub enum Tool {
 }
 
 impl Tool {
+    /// Those that draw, a tile each
     const ALL: [Tool; 6] = [
         Tool::Arrow,
         Tool::Frame,
@@ -1028,6 +1053,7 @@ impl Tool {
 
     fn name(self) -> &'static str {
         match self {
+            Tool::Select => "Select",
             Tool::Arrow => "Arrow",
             Tool::Frame => "Frame",
             Tool::Circle => "Circle",
@@ -1039,6 +1065,7 @@ impl Tool {
 
     fn hint(self) -> &'static str {
         match self {
+            Tool::Select => "Click what to change, drag a box around what to select",
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
             Tool::Frame => "Drag a frame around something, with Shift a square",
             Tool::Circle => "Drag a circle around something, with Shift a round one",
@@ -1050,6 +1077,7 @@ impl Tool {
 
     fn icon(self) -> Icon {
         match self {
+            Tool::Select => Icon::Pointer,
             Tool::Arrow => Icon::Arrow,
             Tool::Frame => Icon::Frame,
             Tool::Circle => Icon::Circle,
@@ -1063,6 +1091,7 @@ impl Tool {
 /// What the button of a tool or of a way to hide shows
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Icon {
+    Pointer,
     Arrow,
     Frame,
     Circle,
@@ -1080,6 +1109,19 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
     let stroke = Stroke::new(1.6 * scale, color);
     let square = egui::Rect::from_min_max(at(2.5, 3.5), at(13.5, 12.5));
     match icon {
+        Icon::Pointer => {
+            let tip = [
+                (4., 1.5),
+                (4., 13.5),
+                (7., 10.6),
+                (9.2, 14.8),
+                (11.1, 13.9),
+                (9., 9.8),
+                (13., 9.6),
+            ];
+            let points = tip.into_iter().map(|(x, y)| at(x, y)).collect();
+            painter.add(egui::Shape::closed_line(points, stroke));
+        }
         Icon::Arrow => {
             painter.line_segment([at(2.5, 13.5), at(10., 6.)], stroke);
             painter.add(egui::Shape::convex_polygon(
@@ -1144,6 +1186,9 @@ enum Drag {
         from: [f32; 2],
         starts: Vec<[i32; 2]>,
     },
+    /// A box from here in the edited image selects what is in it, besides what was
+    /// selected before
+    Select { from: [f32; 2], before: Vec<usize> },
 }
 
 /// What the mouse and the keys do with annotations
@@ -1151,6 +1196,9 @@ enum Drag {
 pub struct AnnotateUi {
     /// What a drag over the image does. With none, the image is moved as always.
     pub tool: Option<Tool>,
+    /// The tools are shown in the panel, while they are folded away there is no
+    /// annotating
+    open: bool,
     pub color: [u8; 4],
     /// For new lines and arrows, 0 until an image tells how wide
     pub width: u32,
@@ -1188,6 +1236,7 @@ impl Default for AnnotateUi {
     fn default() -> Self {
         Self {
             tool: None,
+            open: false,
             color: [235, 40, 40, 255],
             width: 0,
             text_size: 0,
@@ -1223,9 +1272,10 @@ impl AnnotateUi {
         }
     }
 
-    /// A new annotation for the tool, at the top left of the image
-    fn template(&self, tool: Tool) -> Annotation {
+    /// A new annotation for the tool, at the top left of the image, if it draws one
+    fn template(&self, tool: Tool) -> Option<Annotation> {
         let (shape, color, width) = match tool {
+            Tool::Select => return None,
             Tool::Arrow => (Shape::Arrow([0, 0]), self.color, self.width),
             Tool::Frame => (Shape::Rect([0, 0]), self.color, self.width),
             Tool::Circle => (Shape::Ellipse([0, 0]), self.color, self.width),
@@ -1237,7 +1287,12 @@ impl AnnotateUi {
                     size: [0, 0],
                     style,
                 };
-                return Annotation::new(shape, self.redact_color, self.blocks, [0, 0]);
+                return Some(Annotation::new(
+                    shape,
+                    self.redact_color,
+                    self.blocks,
+                    [0, 0],
+                ));
             }
         };
         let mut a = Annotation::new(shape, color, width, [0, 0]);
@@ -1248,7 +1303,7 @@ impl AnnotateUi {
             Tool::Text => a.font = self.font.clone(),
             _ => {}
         }
-        a
+        Some(a)
     }
 
     /// The next annotations look like this one
@@ -1322,23 +1377,31 @@ impl AnnotateUi {
     }
 }
 
-/// The annotations part of the edit panel: a tile for each tool in a box that folds
-/// away, then a card for each annotation, the one in front first. Like the cards of
-/// the filters they stay when it is folded, as they are still on the image. Returns
-/// whether the edits changed.
+/// The annotations part of the edit panel: a button to select and a tile for each
+/// tool in a box that folds away, then a card for each annotation, the one in front
+/// first. Like the cards of the filters they stay when it is folded, as they are
+/// still on the image. Returns whether the edits changed.
 pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi) -> bool {
     let mut changed = false;
     state.pointed_card = None;
     // before the lists of this frame are shown, which close on Esc
     state.popup_open = egui::Popup::is_any_open(ui.ctx());
+    let mut toggled = false;
     ui.scope(|ui| {
         ui.style_mut().visuals.collapsing_header_frame = true;
         ui.style_mut().visuals.indent_has_left_vline = false;
-        egui::CollapsingHeader::new("Annotations")
+        let header = egui::CollapsingHeader::new("Annotations")
             .icon(crate::ui::caret_icon)
+            .open(Some(state.open))
             .show_unindented(ui, |ui| {
                 crate::ui::dark_panel(ui, |ui| {
                     let mut picked = None;
+                    if select_button(ui, state.tool == Some(Tool::Select))
+                        .on_hover_text(Tool::Select.hint())
+                        .clicked()
+                    {
+                        picked = Some(Tool::Select);
+                    }
                     let spacing = ui.spacing().item_spacing.x;
                     let width = ((ui.available_width() - spacing * 2.) / 3.).floor();
                     for row in Tool::ALL.chunks(3) {
@@ -1364,19 +1427,74 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
                         state.tool = (state.tool != Some(tool)).then_some(tool);
                     }
                 });
-                if state.tool.is_some() {
-                    ui.small(
-                        "Drag what you point at to move it, Shift+click selects more, double \
-                         click a text to change it. Del removes what is selected, Esc stops \
-                         annotating.",
-                    );
+                match state.tool {
+                    Some(Tool::Select) => {
+                        ui.small(
+                            "Click to select, Shift+click selects more, drag a box around \
+                             what to select. Drag what you point at to move it, double click \
+                             a text to change it. Del removes what is selected, Esc stops \
+                             annotating.",
+                        );
+                    }
+                    Some(_) => {
+                        ui.small(
+                            "Drag what you point at to move it, Shift+click selects more, \
+                             double click a text to change it. Del removes what is selected, \
+                             Esc goes back to selecting.",
+                        );
+                    }
+                    None => {}
                 }
             });
+        toggled = header.header_response.clicked();
     });
+    if toggled {
+        state.open = !state.open;
+        ui.ctx().request_repaint();
+        let any = annotations_mut(stack).is_some_and(|a| !a.is_empty());
+        if !state.open {
+            state.tool = None;
+        } else if any {
+            // there is something to select
+            state.tool.get_or_insert(Tool::Select);
+        }
+    }
     if let Some(annotations) = annotations_mut(stack) {
         cards_ui(ui, annotations, state);
     }
     changed
+}
+
+/// As wide as the box of the tools, tinted while it is on
+fn select_button(ui: &mut Ui, on: bool) -> egui::Response {
+    let accent = ui.visuals().selection.bg_fill;
+    let mut text = egui::RichText::new(Tool::Select.name());
+    if on {
+        text = text.color(accent);
+    }
+    let mut button = egui::Button::new(text).min_size(egui::vec2(0., 32.));
+    if on {
+        button = button.fill(tint(ui));
+    }
+    // the text in the middle
+    let response = ui.vertical_centered_justified(|ui| ui.add(button)).inner;
+    let color = if on {
+        accent
+    } else {
+        ui.style().interact(&response).fg_stroke.color
+    };
+    let icon = egui::Rect::from_center_size(
+        egui::pos2(response.rect.left() + 22., response.rect.center().y),
+        egui::vec2(16., 16.),
+    );
+    paint_icon(ui.painter(), icon, Icon::Pointer, color, 1.2);
+    response
+}
+
+/// The color of the select button while it is on and of the cards of what is
+/// selected
+fn tint(ui: &Ui) -> Color32 {
+    card_fill(ui).lerp_to_gamma(ui.visuals().selection.bg_fill, 0.2)
 }
 
 /// The card of what comes next while nothing is selected, then one for each
@@ -1386,9 +1504,9 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
     if let Some(tool) = state.tool
         && state.selected.is_empty()
         && state.typing.is_none()
+        && let Some(mut next) = state.template(tool)
     {
-        let mut next = state.template(tool);
-        card(ui, |ui| {
+        card(ui, false, |ui| {
             ui.label(format!("Next {}", tool.name().to_lowercase()));
             if options_ui(ui, &mut next, usize::MAX) {
                 state.remember(&next);
@@ -1402,7 +1520,7 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
     let mut remove = None;
     for i in (0..count).rev() {
         let selected = state.selected.contains(&i);
-        let response = card(ui, |ui| {
+        let response = card(ui, selected, |ui| {
             ui.horizontal(|ui| {
                 let size = 10.;
                 let small = |text: &str| {
@@ -1469,7 +1587,8 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
                     state.finish_typing(annotations);
                     state.selected = vec![i];
                     // the selection lasts while annotating
-                    state.tool.get_or_insert(Tool::Arrow);
+                    state.tool.get_or_insert(Tool::Select);
+                    state.open = true;
                 }
             });
             if selected
@@ -1536,14 +1655,10 @@ fn names(annotations: &[Annotation]) -> Vec<String> {
 }
 
 /// A card as those of the other edits
-fn card(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) -> egui::Response {
-    let fill = if ui.visuals().dark_mode {
-        Color32::from_gray(33)
-    } else {
-        Color32::from_gray(242)
-    };
+/// Tinted for what is selected
+fn card(ui: &mut Ui, tinted: bool, add_contents: impl FnOnce(&mut Ui)) -> egui::Response {
     egui::Frame::new()
-        .fill(fill)
+        .fill(if tinted { tint(ui) } else { card_fill(ui) })
         .corner_radius(ui.visuals().widgets.active.corner_radius)
         .inner_margin(egui::Margin::same(6))
         .show(ui, |ui| {
@@ -1551,6 +1666,14 @@ fn card(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui)) -> egui::Response {
             add_contents(ui);
         })
         .response
+}
+
+fn card_fill(ui: &Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::from_gray(33)
+    } else {
+        Color32::from_gray(242)
+    }
 }
 
 /// What can be set for an annotation: what only its kind has, a line, then its
@@ -1867,7 +1990,8 @@ pub fn canvas_ui(
         }
         if escape {
             if state.selected.is_empty() {
-                state.tool = None;
+                // from drawing back to selecting, then no more annotating
+                state.tool = (tool != Tool::Select).then_some(Tool::Select);
             }
             state.selected.clear();
             state.drag = None;
@@ -1968,20 +2092,32 @@ pub fn canvas_ui(
                                 .collect(),
                         });
                     }
+                    // a box selects what is in it
+                    None if tool == Tool::Select => {
+                        let before = if shift {
+                            state.selected.clone()
+                        } else {
+                            vec![]
+                        };
+                        state.selected = before.clone();
+                        state.drag = Some(Drag::Select { from: p, before });
+                    }
                     None if tool == Tool::Text => {
-                        let mut a = state.template(tool);
-                        a.offset = round(o);
-                        a.stand_upright(mapping);
-                        annotations.push(a);
-                        state.start_typing(annotations.len() - 1);
+                        if let Some(mut a) = state.template(tool) {
+                            a.offset = round(o);
+                            a.stand_upright(mapping);
+                            annotations.push(a);
+                            state.start_typing(annotations.len() - 1);
+                        }
                     }
                     None => {
-                        let mut a = state.template(tool);
-                        a.offset = round(o);
-                        annotations.push(a);
-                        let index = annotations.len() - 1;
-                        state.selected = vec![index];
-                        state.drag = Some(Drag::Draw { index, from: o });
+                        if let Some(mut a) = state.template(tool) {
+                            a.offset = round(o);
+                            annotations.push(a);
+                            let index = annotations.len() - 1;
+                            state.selected = vec![index];
+                            state.drag = Some(Drag::Draw { index, from: o });
+                        }
                     }
                 }
             }
@@ -2021,6 +2157,15 @@ pub fn canvas_ui(
                         annotations[*i].set_start([start[0] + d[0], start[1] + d[1]], original);
                     }
                 }
+                Some(Drag::Select { from, before }) => {
+                    let mut selected = before.clone();
+                    for i in in_box(annotations, mapping, *from, p) {
+                        if !selected.contains(&i) {
+                            selected.push(i);
+                        }
+                    }
+                    state.selected = selected;
+                }
                 None => {}
             }
         }
@@ -2032,6 +2177,7 @@ pub fn canvas_ui(
                 Some(i) if tool == Tool::Text && is_text(&annotations[i]) => CursorIcon::Text,
                 Some(_) => CursorIcon::Move,
                 None if matches!(state.drag, Some(Drag::Move { .. })) => CursorIcon::Move,
+                None if tool == Tool::Select => CursorIcon::Default,
                 None if tool == Tool::Text => CursorIcon::Text,
                 None => CursorIcon::Crosshair,
             });
@@ -2039,6 +2185,22 @@ pub fn canvas_ui(
                 show(&annotations[i], false);
             }
         }
+    }
+
+    // the box that selects
+    if down
+        && let Some(Drag::Select { from, .. }) = &state.drag
+        && let Some(pos) = pointer
+    {
+        let accent = ctx.global_style().visuals.selection.bg_fill;
+        let corner = to_screen(Point::from_xy(from[0], from[1]));
+        painter.rect(
+            egui::Rect::from_two_pos(corner, pos),
+            0.,
+            accent.gamma_multiply(0.15),
+            Stroke::new(1., accent),
+            egui::StrokeKind::Inside,
+        );
     }
 
     if released && let Some(drag) = state.drag.take() {
@@ -2055,6 +2217,7 @@ pub fn canvas_ui(
                     annotations[i].reanchor(original);
                 }
             }
+            Drag::Select { .. } => {}
         }
     }
     // a double click changes a text
@@ -2533,6 +2696,38 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_box_selects_what_is_wholly_in_it() {
+        let mapping = Mapping::new(&[], (400, 300));
+        let mut annotations = vec![
+            arrow_at([10, 10], [40, 30]),
+            arrow_at([200, 100], [100, 100]),
+        ];
+        // around the first, over half of the second
+        assert_eq!(
+            in_box(&annotations, &mapping, [0., 0.], [250., 150.]),
+            vec![0]
+        );
+        // from any corner
+        assert_eq!(
+            in_box(&annotations, &mapping, [400., 300.], [0., 0.]),
+            vec![0, 1]
+        );
+        annotations[1].hidden = true;
+        assert_eq!(
+            in_box(&annotations, &mapping, [0., 0.], [400., 300.]),
+            vec![0]
+        );
+        // the box is in the edited image, here a quarter narrower on the left
+        annotations[1].hidden = false;
+        let crop = [item(ImageOperation::Crop([2500, 0, 0, 0]))];
+        let cropped = Mapping::new(&crop, (400, 300));
+        assert_eq!(
+            in_box(&annotations, &cropped, [90., 90.], [210., 210.]),
+            vec![1]
+        );
     }
 
     #[test]
@@ -3085,17 +3280,22 @@ mod tests {
     fn new_ones_look_like_the_one_changed_last() {
         let mut state = AnnotateUi::default();
         state.prepare((800, 600));
-        let mut text = state.template(Tool::Text);
+        let template = |state: &AnnotateUi, tool| state.template(tool).unwrap();
+        let mut text = template(&state, Tool::Text);
         text.font.weight = 700;
         text.outline = 3;
         text.color = [0, 0, 255, 255];
         state.remember(&text);
-        let frame = state.template(Tool::Frame);
+        let frame = template(&state, Tool::Frame);
         assert_eq!((frame.outline, frame.color), (3, [0, 0, 255, 255]));
         assert_eq!(frame.font, Font::default(), "only texts have a font");
-        assert_eq!(state.template(Tool::Text).font.weight, 700);
-        let redaction = state.template(Tool::Redact);
+        assert_eq!(template(&state, Tool::Text).font.weight, 700);
+        let redaction = template(&state, Tool::Redact);
         assert_eq!(redaction.outline, 0, "redactions have no outline");
         assert_eq!(redaction.color, [0, 0, 0, 255]);
+        assert!(
+            state.template(Tool::Select).is_none(),
+            "selecting draws nothing"
+        );
     }
 }

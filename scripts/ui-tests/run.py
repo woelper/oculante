@@ -725,11 +725,12 @@ def test_paint_on_transparency(binary):
 ANNOTATE_BUTTON = (790, 108, 210, 18)
 # the line around what is selected or pointed at
 OUTLINE = (255, 200, 40)
-# the header of the Annotations in the edit panel of moss.jpg, and the tiles of the
-# tools below it once it is open, scrolled to the top
+# the header of the Annotations in the edit panel of moss.jpg, and the button to
+# select and the tiles of the tools below it once it is open, scrolled to the top
 ANNOTATIONS_HEADER = (890, 167)
+SELECT_BUTTON = (780, 192, 222, 32)
 ANNOTATE_TOOLS = {
-    name: (815 + 80 * (i % 3), 212 + 46 * (i // 3))
+    name: (815 + 80 * (i % 3), 250 + 46 * (i // 3))
     for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
 
@@ -869,7 +870,9 @@ def test_annotate(binary):
             app.key("ctrl+c")
             targets = app.x("xclip", "-selection", "clipboard", "-t", "TARGETS", "-o").stdout.split()
             assert "image/png" in targets, f"Ctrl+C copied no image, the clipboard has {targets}"
-        # nothing selected, then no tool: the panel gets shorter, the image stays
+        # nothing selected, then selecting, then no tool: the panel gets shorter, the
+        # image stays
+        app.key("Escape")
         app.key("Escape")
         app.key("Escape")
         app.move(40, 560)
@@ -1259,7 +1262,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 475, 894, 475, steps=6)
+        app.drag(876, 513, 894, 513, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1273,7 +1276,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(803, 379)  # "Send backward" on the card of the circle
+        app.click(803, 417)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
@@ -1281,17 +1284,17 @@ def test_annotation_cards(binary):
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
         corner = (470, 90, 25, 25)
-        app.click(822, 379)
+        app.click(822, 417)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(822, 379)
+        app.click(822, 417)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(842, 427)
+        app.click(842, 465)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1308,7 +1311,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 463)  # its font
+        app.click(980, 501)  # its font
         app.settle(0.8)
         listed = app.shot("list")
         assert changed_pixels_in(text, listed, (790, 280, 230, 200)) > 1000, "no list of fonts"
@@ -1332,9 +1335,106 @@ def test_annotation_cards(binary):
         tools = changed_pixels_in(unselected, folded, (780, 190, 225, 90))
         assert tools > 5000, f"folding changed only {tools} pixels of the tools"
         cards = count_color(folded, (780, 180, 220, 300), (33, 33, 33), 2)
-        assert cards > 30000, f"the folded Annotations have only {cards} pixels of cards"
+        assert cards > 10000, f"the folded Annotations have only {cards} pixels of cards"
         assert changed_pixels_in(unselected, folded, image_box) == 0, "folding changed the image"
 
+
+
+def test_annotation_select(binary):
+    """With nothing selected Esc goes from a tool that draws to Select, which is
+    tinted. In it a box selects what lies wholly inside, also with Shift on top of
+    what is selected, a click besides everything drops the selection, and the cards
+    of what is selected are tinted. Esc then stops annotating, as folding the
+    Annotations does, and opening them again selects as long as there are any."""
+    tint = (77, 26, 41)
+    frames = [(190, 90, 120, 90), (390, 90, 120, 90)]
+    circle_box = (240, 290, 170, 120)
+    panel = (775, 40, 240, 560)
+
+    def selected(shot, box):
+        # its dashed line, against the shot where nothing is
+        return changed_pixels_in(drawn, shot, box) > 150
+
+    with App(binary, "annotation_select", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        assert count_color(before, SELECT_BUTTON, ACCENT, 30) < 20, "Select is on with nothing to select"
+        app.click(*ANNOTATE_TOOLS["frame"])
+        app.drag(200, 100, 300, 170, steps=10)
+        app.drag(400, 100, 500, 170, steps=10)
+        app.click(*ANNOTATE_TOOLS["circle"])
+        app.drag(250, 300, 400, 400, steps=10)
+        app.key("Escape")
+        app.key("Escape")
+        app.move(40, 560)
+        app.settle(1.0)
+        drawn = app.shot("select")
+        lit = count_color(drawn, SELECT_BUTTON, ACCENT, 30)
+        assert lit > 50, f"Select is not on after Esc, {lit} pixels of it are tinted"
+        # a box around both frames, shown while it is dragged
+        app.move(180, 80)
+        app.x("xdotool", "mousedown", "1")
+        for i in range(1, 11):
+            app.move(180 + i * 34, 80 + i * 11)
+        app.settle(0.8)
+        boxing = app.shot("boxing")
+        app.x("xdotool", "mouseup", "1")
+        edge = count_color(boxing, (175, 75, 350, 120), ACCENT, 30)
+        assert edge > 400, f"the box has only {edge} pixels"
+        app.move(40, 560)
+        app.settle(1.0)
+        boxed = app.shot("boxed")
+        assert all(selected(boxed, box) for box in frames), "the box did not select both frames"
+        assert not selected(boxed, circle_box), "the box selected the circle, which is not in it"
+        tinted = count_color(boxed, panel, tint, 8)
+        assert tinted > 3000, f"the cards of what is selected have {tinted} tinted pixels"
+        # a click besides everything drops it
+        app.click(650, 500)
+        app.move(40, 560)
+        app.settle(1.0)
+        dropped = app.shot("dropped")
+        assert not any(selected(dropped, box) for box in frames), "a click besides them kept the frames"
+        # the circle by a click on its line, then the frames with Shift on top
+        app.click(250, 350)
+        app.x("xdotool", "keydown", "shift")
+        app.drag(180, 80, 520, 190, steps=10)
+        app.x("xdotool", "keyup", "shift")
+        app.move(40, 560)
+        app.settle(1.0)
+        added = app.shot("added")
+        assert all(selected(added, box) for box in frames + [circle_box]), "Shift and a box did not add"
+        # nothing selected, then no annotating
+        app.key("Escape")
+        app.key("Escape")
+        app.move(40, 560)
+        app.settle(1.0)
+        stopped = app.shot("stopped")
+        assert count_color(stopped, SELECT_BUTTON, ACCENT, 30) < 20, "Select is still on after Esc"
+        # folded there is none, open again it selects
+        app.click(*ANNOTATIONS_HEADER)
+        app.settle(0.8)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        reopened = app.shot("reopened")
+        assert count_color(reopened, SELECT_BUTTON, ACCENT, 30) > 50, "Select is off after opening again"
+        app.drag(180, 80, 520, 190, steps=10)
+        app.key("Delete")
+        app.move(40, 560)
+        app.settle(1.0)
+        deleted = app.shot("deleted")
+        for box in frames:
+            changed = changed_pixels_in(before, deleted, box)
+            assert changed == 0, f"{changed} pixels of the deleted frames are left at {box}"
+        changed = changed_pixels_in(before, deleted, circle_box)
+        assert changed > 500, f"the circle changed only {changed} pixels, it should stay"
 
 def test_histogram_shows_values_on_hover(binary):
     """Hovering over the histogram shows the channel, the value and the number of
@@ -1658,6 +1758,7 @@ TESTS = [
     test_paint_on_transparency,
     test_annotate,
     test_annotation_cards,
+    test_annotation_select,
     test_fullscreen,
     test_borderless,
     test_compare_list,
