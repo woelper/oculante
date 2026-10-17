@@ -1,0 +1,80 @@
+{
+ "meta": {
+  "label": "anim-main2-gpu",
+  "date": "2026-10-06T10:36:30",
+  "binary_size_mb": 42.07432,
+  "runs": 3,
+  "idle_seconds": 10,
+  "image_set": 1,
+  "cpu": "12th Gen Intel(R) Core(TM) i7-12700T",
+  "cores": 20,
+  "rendering": "Mesa Intel(R) UHD Graphics 770 (ADL-S GT1), through VirtualGL",
+  "failures": []
+ },
+ "metrics": {
+  "animation.cpu_percent": {
+   "median": 10.499211740070116,
+   "values": [
+    10.499211740070116,
+    10.299360572458966,
+    10.598955343213348
+   ]
+  },
+  "animation.shown_fps": {
+   "median": 19.99849855251451,
+   "values": [
+    19.99849855251451,
+    19.998758393124206,
+    19.998028949459147
+   ]
+  },
+  "animation.gpu_percent": {
+   "median": 6.781825834008424,
+   "values": [
+    6.781825834008424,
+    6.7809627293672925,
+    6.802395800628438
+   ]
+  },
+  "animation.rss_mb": {
+   "median": 147.05078125,
+   "values": [
+    147.05078125,
+    147.1484375,
+    146.92578125
+   ]
+  },
+  "animation.pss_mb": {
+   "median": 120.1591796875,
+   "values": [
+    120.1591796875,
+    120.2734375,
+    120.0400390625
+   ]
+  },
+  "animation.peak_rss_mb": {
+   "median": 147.05078125,
+   "values": [
+    147.05078125,
+    147.1484375,
+    146.92578125
+   ]
+  },
+  "animation.gpu_mb": {
+   "median": 37.34375,
+   "values": [
+    35.33984375,
+    37.34375,
+    37.34375
+   ]
+  },
+  "animation.gpu_purgeable_mb": {
+   "median": 5.078125,
+   "values": [
+    3.07421875,
+    5.078125,
+    5.078125
+   ]
+  }
+ }
+}

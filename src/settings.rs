@@ -1,19 +1,11 @@
 use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
-use notan::egui::{Context, Visuals};
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "heif")]
-use std::sync::OnceLock;
-
-#[cfg(feature = "heif")]
-use libheif_rs::SecurityLimits;
-
 use std::{
     collections::{BTreeSet, HashSet, VecDeque},
-    fmt::{self, Display, Formatter},
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     path::PathBuf,
 };
 
@@ -40,15 +32,22 @@ pub struct PersistentSettings {
     pub ui_scale: f32,
     /// The UI accent color
     pub accent_color: [u8; 3],
+    /// Set once the user picks an accent color, so theme switches stop overriding it
+    pub accent_color_is_custom: bool,
     /// The BG color
     pub background_color: [u8; 3],
+    /// Set once the user picks a background color, so theme switches stop overriding it
+    pub background_color_is_custom: bool,
     /// Should we sync to monitor rate? This makes the app snappier, but also more resource intensive.
     pub vsync: bool,
     pub force_redraw: bool,
     /// Keyboard map to actions
+    #[serde(deserialize_with = "crate::shortcuts::deserialize_shortcuts")]
     pub shortcuts: Shortcuts,
     /// Do not reset view when receiving a new image
     pub keep_view: bool,
+    /// Do not reset view when switching between images in the compare list.  Unlike `keep_view`, this only applies to navigation within the compare list (e.g. clicking a compare list entry), not regular image browsing.
+    pub compare_keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
     /// How many recent images to keep track of
@@ -65,9 +64,9 @@ pub struct PersistentSettings {
     pub show_frame: bool,
     #[serde(skip)]
     pub current_channel: ColorChannel,
-    /// How much to scale SVG images when rendering
-    pub svg_scale: f32,
     pub zen_mode: bool,
+    pub zen_mode_cursor_timeout: f32,
+    pub show_zen_mode_notification: bool,
     pub theme: ColorTheme,
     pub linear_mag_filter: bool,
     pub linear_min_filter: bool,
@@ -88,11 +87,14 @@ impl Default for PersistentSettings {
         PersistentSettings {
             ui_scale: 1.0,
             accent_color: [255, 0, 75],
+            accent_color_is_custom: false,
             background_color: [30, 30, 30],
+            background_color_is_custom: false,
             vsync: true,
             force_redraw: false,
-            shortcuts: Shortcuts::default_keys(),
+            shortcuts: default_shortcuts(),
             keep_view: Default::default(),
+            compare_keep_view: Default::default(),
             max_cache: 30,
             max_recents: 12,
             show_scrub_bar: Default::default(),
@@ -105,8 +107,9 @@ impl Default for PersistentSettings {
             show_minimap: Default::default(),
             show_frame: Default::default(),
             current_channel: ColorChannel::Rgba,
-            svg_scale: 1.0,
             zen_mode: false,
+            zen_mode_cursor_timeout: 1.5,
+            show_zen_mode_notification: true,
             theme: ColorTheme::Dark,
             linear_mag_filter: false,
             linear_min_filter: true,
@@ -182,6 +185,7 @@ impl Default for VolatileSettings {
                     compressionlevel: crate::file_encoder::CompressionLevel::Default,
                 },
                 FileEncoder::Bmp,
+                FileEncoder::Avif,
             ]
             .into_iter()
             .collect(),
@@ -202,6 +206,16 @@ impl VolatileSettings {
         Ok(s)
     }
 
+    // Remove any entries from recent images that no longer exist on startup
+    pub fn remove_missing_recents(&mut self) {
+        let before = self.recent_images.len();
+        self.recent_images.retain(|p| p.exists());
+        let removed = before - self.recent_images.len();
+        if removed > 0 {
+            debug!("Removed {removed} recent image(s) that can no longer be found");
+        }
+    }
+
     pub fn save_blocking(&self) -> Result<()> {
         let local_dir = get_config_dir()?;
         if !local_dir.exists() {
@@ -216,154 +230,26 @@ impl VolatileSettings {
 }
 
 pub fn set_system_theme(ctx: &Context) {
-    if let Ok(mode) = dark_light::detect() {
-        match mode {
-            dark_light::Mode::Dark => ctx.set_visuals(Visuals::dark()),
-            dark_light::Mode::Light => ctx.set_visuals(Visuals::light()),
-            dark_light::Mode::Unspecified => ctx.set_visuals(Visuals::dark()),
-        }
+    match ctx.system_theme() {
+        Some(Theme::Dark) => ctx.set_visuals(Visuals::dark()),
+        Some(Theme::Light) => ctx.set_visuals(Visuals::light()),
+        None => ctx.set_visuals(Visuals::dark()),
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+/// SVGs are drawn at twice their nominal size, so they stay sharp when zoomed in
+pub const DEFAULT_SVG_SCALE: f32 = 2.0;
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DecoderSettings {
-    /// Settings for libheif
-    pub heif: HeifLimits,
+    pub svg_scale: f32,
 }
 
-/// Security limits for HEIF via libheif.
-///
-/// This is essentially a wrapper for [`SecurityLimits`] to support de/serialization
-/// while still working if the Oculante is built without libheif support.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct HeifLimits {
-    pub image_size_pixels: Limit,
-    pub number_of_tiles: Limit,
-    pub bayer_pattern_pixels: Limit,
-    pub items: Limit,
-    pub color_profile_size: Limit,
-    pub memory_block_size: Limit,
-    pub components: Limit,
-    pub iloc_extents_per_item: Limit,
-    pub size_entity_group: Limit,
-    pub children_per_box: Limit,
-    pub override_all: bool,
-}
-
-#[cfg(feature = "heif")]
-impl From<HeifLimits> for SecurityLimits {
-    fn from(limits: HeifLimits) -> Self {
-        let mut context = SecurityLimits::new();
-
-        match limits.image_size_pixels {
-            Limit::NoLimit => context.set_max_image_size_pixels(0),
-            Limit::U64(max) => context.set_max_image_size_pixels(max),
-            _ => (),
-        }
-
-        match limits.number_of_tiles {
-            Limit::NoLimit => context.set_max_number_of_tiles(0),
-            Limit::U64(max) => context.set_max_number_of_tiles(max),
-            _ => (),
-        }
-
-        match limits.bayer_pattern_pixels {
-            Limit::NoLimit => context.set_max_bayer_pattern_pixels(0),
-            Limit::U32(max) => context.set_max_bayer_pattern_pixels(max),
-            _ => (),
-        }
-
-        match limits.items {
-            Limit::NoLimit => context.set_max_items(0),
-            Limit::U32(max) => context.set_max_items(max),
-            _ => (),
-        }
-
-        match limits.color_profile_size {
-            Limit::NoLimit => context.set_max_color_profile_size(0),
-            Limit::U32(max) => context.set_max_color_profile_size(max),
-            _ => (),
-        }
-
-        match limits.memory_block_size {
-            Limit::NoLimit => context.set_max_memory_block_size(0),
-            Limit::U64(max) => context.set_max_memory_block_size(max),
-            _ => (),
-        }
-
-        match limits.components {
-            Limit::NoLimit => context.set_max_components(0),
-            Limit::U32(max) => context.set_max_components(max),
-            _ => (),
-        }
-
-        match limits.iloc_extents_per_item {
-            Limit::NoLimit => context.set_max_iloc_extents_per_item(0),
-            Limit::U32(max) => context.set_max_iloc_extents_per_item(max),
-            _ => (),
-        }
-
-        match limits.size_entity_group {
-            Limit::NoLimit => context.set_max_size_entity_group(0),
-            Limit::U32(max) => context.set_max_size_entity_group(max),
-            _ => (),
-        }
-
-        match limits.children_per_box {
-            Limit::NoLimit => context.set_max_children_per_box(0),
-            Limit::U32(max) => context.set_max_children_per_box(max),
-            _ => (),
-        }
-
-        context
-    }
-}
-
-impl HeifLimits {
-    /// Return [`SecurityLimits`] if not overridden by LIBHEIF_SECURITY_LIMITS or the settings.
-    #[cfg(feature = "heif")]
-    pub fn maybe_limits(self) -> Option<SecurityLimits> {
-        static OVERRIDE_ALL: OnceLock<bool> = OnceLock::new();
-
-        (!OVERRIDE_ALL.get_or_init(|| {
-            // Override settings if the var was set by the time this function is called or use the
-            // setting if undefined.
-            let override_all = std::env::var("LIBHEIF_SECURITY_LIMITS")
-                .ok()
-                .as_deref()
-                .map(|var| var.eq_ignore_ascii_case("on"))
-                .unwrap_or(self.override_all);
-            std::env::set_var(
-                "LIBHEIF_SECURITY_LIMITS",
-                if override_all { "off" } else { "on" },
-            );
-
-            override_all
-        }))
-        .then(|| self.into())
-    }
-}
-
-/// Limit to specifically store in the config.
-///
-/// The default values of [`SecurityLimits`] can only be fetched from libheif itself. Therefore, we
-/// need a way to store preferences regardless if the `heif` feature is enabled.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub enum Limit {
-    #[default]
-    Default,
-    NoLimit,
-    U64(u64),
-    U32(u32),
-}
-
-impl Display for Limit {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::Default => write!(f, ""),
-            Self::NoLimit => write!(f, "0"),
-            Self::U64(v) => write!(f, "{v}"),
-            Self::U32(v) => write!(f, "{v}"),
+impl Default for DecoderSettings {
+    fn default() -> Self {
+        Self {
+            svg_scale: DEFAULT_SVG_SCALE,
         }
     }
 }

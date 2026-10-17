@@ -1,11 +1,16 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use oculante::image_editing::*;
 use oculante::image_loader::*;
-use std::hint::black_box;
 use std::path::PathBuf;
 
-fn process_pixel_ops() {
-    let ops = vec![
+/// In RGBA, as the editor has it
+fn moss() -> image::DynamicImage {
+    let f = open_image(&PathBuf::from("res/tests/moss.jpg"), None, None).unwrap();
+    image::DynamicImage::ImageRgba8(f.recv().unwrap().get_image().unwrap().to_rgba8())
+}
+
+fn pixel_ops() -> Vec<ImageOperation> {
+    vec![
         ImageOperation::Brightness(10),
         ImageOperation::Contrast(10),
         ImageOperation::Exposure(20),
@@ -17,42 +22,37 @@ fn process_pixel_ops() {
             amt: 50,
             mono: false,
         },
-        ImageOperation::ChromaticAberration(30),
-    ];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-
-    let mut buffer = f.recv().unwrap().get_image().unwrap();
-    _ = process_pixels(&mut buffer, &ops);
-}
-
-fn blur() {
-    let ops = vec![ImageOperation::Blur(200)];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-    let mut buffer = f.recv().unwrap().get_image().unwrap();
-    _ = process_pixels(&mut buffer, &ops);
-}
-
-fn resize() {
-    let ops = vec![ImageOperation::Resize {
-        dimensions: (300, 300),
-        aspect: true,
-        filter: ScaleFilter::Bilinear,
-    }];
-    let f = open_image(&PathBuf::from("tests/moss.jpg"), None).unwrap();
-    let mut buffer = f.recv().unwrap().get_image().unwrap();
-    process_pixels(&mut buffer, &ops);
+    ]
 }
 
 fn load_webp() {
-    let f = open_image(&PathBuf::from("tests/mohsen-karimi.webp"), None).unwrap();
+    let f = open_image(&PathBuf::from("res/tests/mohsen-karimi.webp"), None, None).unwrap();
     let _buffer = f.recv().unwrap().get_image().unwrap();
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("pixel ops", |b| b.iter(|| process_pixel_ops()));
-    c.bench_function("blur", |b| b.iter(|| blur()));
-    c.bench_function("resize", |b| b.iter(|| resize()));
-    c.bench_function("load WebP", |b| b.iter(|| load_webp()));
+    // the image is loaded once, a run starts from a copy of it
+    let image = moss();
+    let ops = pixel_ops();
+    c.bench_function("pixel ops", |b| {
+        b.iter(|| process_pixels(&mut image.clone(), &ops))
+    });
+    // whole-image operations, process_pixels skips them
+    for (name, op) in [
+        ("blur", ImageOperation::Blur(200)),
+        (
+            "resize",
+            ImageOperation::Resize {
+                dimensions: (300, 300),
+                aspect: true,
+                filter: ScaleFilter::Bilinear,
+            },
+        ),
+        ("color fringe", ImageOperation::ChromaticAberration(30)),
+    ] {
+        c.bench_function(name, |b| b.iter(|| op.process_image(&mut image.clone())));
+    }
+    c.bench_function("load WebP", |b| b.iter(load_webp));
 }
 
 // criterion_group!(benches, criterion_benchmark);

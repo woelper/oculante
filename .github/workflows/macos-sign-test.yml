@@ -21,16 +21,15 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            build: ./build_mac.sh
+            build: ./scripts/build_mac.sh
             name: silicon
           - os: macos-15-intel
-            build: ./build_mac_intel.sh
+            build: ./scripts/build_mac_intel.sh
             name: intel
     runs-on: ${{ matrix.os }}
     # as in the release workflow
     env:
       MACOS_DEPLOYMENT_TARGET: 11
-      SHADERC_LIB_DIR: /opt/homebrew/lib
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/setup-nasm@v1
@@ -40,9 +39,6 @@ jobs:
 
       - name: Install cargo bundle
         run: cargo install cargo-bundle
-
-      - name: Install shaderc
-        run: brew install shaderc
 
       - name: Build the bundle
         run: ${{ matrix.build }}

@@ -1,31 +1,35 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
+use std::sync::{Arc, LazyLock, Mutex};
 
+use crate::annotate::{AnnotateUi, Annotation};
 use crate::icons::*;
-use crate::paint::PaintStroke;
+use crate::paint::{PaintStroke, StrokeDrawing};
 use crate::settings::VolatileSettings;
 use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
-use anyhow::{bail, Result};
+use anyhow::{Context as _, Result, bail};
+use egui::epaint::PathShape;
+use egui::{
+    self, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke, StrokeKind,
+    Ui, Vec2, lerp, vec2,
+};
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::{imageops, ColorType, DynamicImage, Rgba, RgbaImage};
+use image::{ColorType, DynamicImage, Rgba, RgbaImage, imageops};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
-use notan::egui::epaint::PathShape;
-use notan::egui::{
-    self, lerp, vec2, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Sense, Stroke,
-    StrokeKind, Vec2,
-};
-use notan::egui::{Response, Ui};
 use num_integer::gcd;
-use palette::{rgb::Rgb, Hsl, IntoColor};
-use rand::{thread_rng, Rng};
-use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
+use palette::{Hsl, IntoColor, rgb::Rgb};
+use rand::RngExt;
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::{ParallelSlice, ParallelSliceMut},
+};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter, IntoEnumIterator};
 
@@ -37,9 +41,18 @@ pub struct EditState {
     #[serde(skip)]
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: DynamicImage,
+    #[serde(skip)]
+    /// While painting: how far the stroke that is being drawn is drawn
+    pub stroke_drawing: StrokeDrawing,
+    #[serde(skip)]
+    /// What the mouse and the keys do with annotations, and what of them is drawn
+    pub annotate: AnnotateUi,
     pub painting: bool,
     #[serde(skip)]
     pub block_panning: bool,
+    /// Whether to completely bypass processing the edit stack
+    #[serde(skip)]
+    pub skip_processing: bool,
     pub non_destructive_painting: bool,
     pub paint_strokes: Vec<PaintStroke>,
     pub paint_fade: bool,
@@ -79,11 +92,63 @@ impl LegacyEditState {
     }
 }
 
+/// Edits saved with "Save edits" next to an image, or with "Save directory
+/// edits" for all images of a folder, with a message for the user. `None` if
+/// there are none, an error if the file of the image can not be read.
+pub fn saved_edits(image_path: &Path) -> Option<Result<(EditState, &'static str), String>> {
+    let own = image_path.with_extension("oculante");
+    if own.is_file() {
+        let loaded = "Edits have been loaded for this image.";
+        let text = match std::fs::read_to_string(&own) {
+            Ok(text) => text,
+            Err(e) => return Some(Err(format!("Edits could not be loaded: {e}"))),
+        };
+        if let Ok(edit_state) = serde_json::from_str::<EditState>(&text) {
+            return Some(Ok((edit_state, loaded)));
+        }
+        // Edits saved by older versions are upgraded, and saved again that way
+        if let Ok(legacy) = serde_json::from_str::<LegacyEditState>(&text) {
+            let edit_state = legacy.upgrade();
+            if let Ok(file) = std::fs::File::create(&own) {
+                _ = serde_json::to_writer_pretty(file, &edit_state);
+            }
+            return Some(Ok((edit_state, loaded)));
+        }
+        return Some(Err("Edits could not be loaded.".into()));
+    }
+    let folder = image_path.parent()?.join(".oculante");
+    let edit_state =
+        serde_json::from_str::<EditState>(&std::fs::read_to_string(folder).ok()?).ok()?;
+    Some(Ok((
+        edit_state,
+        "Directory edits have been loaded for this image.",
+    )))
+}
+
+impl EditState {
+    /// The result of the image operations is kept when that saves work: when
+    /// there is an operation other than the conversion of the color type. The
+    /// conversion alone is cheap to do again, and keeping its result would hold
+    /// a second copy of the image.
+    pub fn keeps_image_op_result(&self) -> bool {
+        self.image_op_stack.iter().any(|op| {
+            op.active
+                && !matches!(
+                    op.operation,
+                    // annotations are drawn after everything else
+                    ImageOperation::ColorConverter(_) | ImageOperation::Annotate(_)
+                )
+        })
+    }
+}
+
 impl Default for EditState {
     fn default() -> Self {
         Self {
             result_pixel_op: Default::default(),
             result_image_op: Default::default(),
+            stroke_drawing: Default::default(),
+            annotate: Default::default(),
             painting: Default::default(),
             block_panning: false,
             non_destructive_painting: Default::default(),
@@ -92,6 +157,7 @@ impl Default for EditState {
             brushes: default_brushes(),
             pixel_op_stack: vec![],
             image_op_stack: vec![],
+            skip_processing: false,
             export_extension: "png".into(),
         }
     }
@@ -149,7 +215,7 @@ pub struct ImgOpItem {
 impl ImgOpItem {
     pub fn new(op: ImageOperation) -> Self {
         Self {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random(),
             active: true,
             operation: op,
         }
@@ -210,6 +276,8 @@ pub enum ImageOperation {
         shapes: Vec<MeasureShape>,
     },
     LUT(String),
+    /// Arrows, frames, text and more, on top of everything else
+    Annotate(Vec<Annotation>),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -227,13 +295,6 @@ pub enum MeasureShape {
 }
 
 impl MeasureShape {
-    pub fn new_line(points: Vec<(u32, u32)>) -> Self {
-        Self::Line {
-            points,
-            color: [255, 255, 255, 255],
-            width: 1,
-        }
-    }
     pub fn new_rect(points: Vec<(u32, u32)>) -> Self {
         Self::Rect {
             points,
@@ -276,9 +337,20 @@ impl fmt::Display for ImageOperation {
             Self::MDiv => write!(f, "Divide by alpha"),
             Self::LUT(_) => write!(f, "Apply Color LUT"),
             Self::Filter3x3(_) => write!(f, "3x3 Filter"),
+            Self::Annotate(_) => write!(f, "Annotate"),
             // _ => write!(f, "Not implemented Display"),
         }
     }
+}
+
+/// Name under which the app stores the area of the window that shows the image,
+/// the part that no panel covers.
+pub const CANVAS_RECT: &str = "canvas_rect";
+
+/// The area of the window that shows the image, as of the last frame.
+pub fn canvas_rect(ctx: &egui::Context) -> Rect {
+    ctx.data(|data| data.get_temp::<Rect>(Id::new(CANVAS_RECT)))
+        .unwrap_or(Rect::EVERYTHING)
 }
 
 impl ImageOperation {
@@ -293,9 +365,9 @@ impl ImageOperation {
                 | Self::ColorConverter(_)
                 | Self::Flip(_)
                 | Self::ChromaticAberration(_)
-                | Self::LUT(_)
                 | Self::Filter3x3(_)
-                | Self::ScaleImageMinMax,
+                | Self::ScaleImageMinMax
+                | Self::Annotate(_),
         )
     }
 
@@ -383,8 +455,18 @@ impl ImageOperation {
                 });
                 x
             }
-            Self::Posterize(val) => ui.styled_slider(val, 1..=255),
-            Self::Expression(expr) => ui.text_edit_singleline(expr),
+            Self::Posterize(val) => ui.styled_slider(val, 2..=255),
+            Self::Expression(expr) => {
+                let r = ui.text_edit_singleline(expr);
+                // Until it works it is left out, here is why. Some mistakes only show
+                // when it runs, `r =` parses, so it runs once on a gray pixel.
+                let check = build_operator_tree::<DefaultNumericTypes>(expr)
+                    .and_then(|tree| PixelVariables::new().run(&tree, &mut Vector4::repeat(0.5)));
+                if let Err(e) = check {
+                    ui.colored_label(ui.visuals().error_fg_color, e.to_string());
+                }
+                r
+            }
             Self::LUT(lut_name) => {
                 ui.scope(|ui| {
                     let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
@@ -397,14 +479,14 @@ impl ImageOperation {
                         egui::ComboBox::from_label("")
                             .selected_text(lut_fname)
                             .show_ui(ui, |ui| {
-                                let lut_names = builtin_luts();
-                                let mut lut_names = lut_names.keys().collect::<Vec<_>>();
+                                let mut lut_names =
+                                    builtin_luts().iter().map(|l| l.0).collect::<Vec<_>>();
                                 lut_names.sort();
                                 for lut in lut_names {
                                     if ui
                                         .selectable_value(
                                             lut_name,
-                                            lut.clone(),
+                                            lut.to_string(),
                                             Path::new(lut)
                                                 .file_name()
                                                 .unwrap_or_default()
@@ -420,10 +502,10 @@ impl ImageOperation {
                         #[cfg(not(feature = "file_open"))]
                         {
                             if ui.button("Load lut").clicked() {
-                                ui.ctx().memory_mut(|w| w.open_popup(Id::new("LUT")));
+                                crate::ui::open_popup(ui.ctx(), Id::new("LUT"));
                             }
 
-                            if ui.ctx().memory(|w| w.is_popup_open(Id::new("LUT"))) {
+                            if crate::ui::is_popup_open(ui.ctx(), Id::new("LUT")) {
                                 filebrowser::browse_modal(
                                     false,
                                     SUPPORTED_EXTENSIONS,
@@ -433,6 +515,7 @@ impl ImageOperation {
                                         x.mark_changed();
                                     },
                                     ui.ctx(),
+                                    Id::new("LUT"),
                                 );
                             }
                         }
@@ -474,7 +557,7 @@ impl ImageOperation {
                             .on_hover_text("You can find more interesting LUTs here to use")
                             .clicked()
                         {
-                            _ = webbrowser::open("https://github.com/cedeber/hald-clut");
+                            _ = open::that("https://github.com/cedeber/hald-clut");
                         }
                     });
                     x
@@ -696,7 +779,7 @@ impl ImageOperation {
 
                     // Make sure points are monotonic ascending by position
 
-                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+                    pts.sort_by_key(|a| a.pos);
 
                     response
                 })
@@ -745,14 +828,14 @@ impl ImageOperation {
                     .collect::<Vec<_>>();
                 // create a fake response to alter
                 let mut r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // The crop is drawn over the whole window, like the image it belongs to.
-                // The ui's own painter would clip it to the panel. The handles and the
-                // outline go on top of the panels, so they can always be seen and grabbed.
-                let painter = ui.ctx().layer_painter(egui::LayerId::background());
-                let handle_painter = ui.ctx().layer_painter(egui::LayerId::new(
-                    egui::Order::Middle,
-                    Id::new("crop_handles").with(item_id),
-                ));
+                // The crop is drawn over the image, not into the panel this ui belongs to,
+                // whose painter would clip it away. The darkening stays on the image area,
+                // the handles and the outline go on top of the panels as well, so they can
+                // always be seen and grabbed.
+                let layer =
+                    egui::LayerId::new(egui::Order::Middle, Id::new("crop_overlay").with(item_id));
+                let handle_painter = ui.ctx().layer_painter(layer);
+                let painter = handle_painter.with_clip_rect(canvas_rect(ui.ctx()));
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
                     if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
@@ -775,6 +858,7 @@ impl ImageOperation {
                         geo.scale,
                     );
 
+                    let mut handles = vec![];
                     for (i, pt) in points_transformed.iter().enumerate() {
                         let maxdist = 20.;
                         let d = Pos2::new(pt.0, pt.1).distance(cursor_abs);
@@ -804,11 +888,7 @@ impl ImageOperation {
                         //     format!("X"),
                         // );
 
-                        handle_painter.rect_filled(
-                            Rect::from_center_size(Pos2::new(pt.0, pt.1), Vec2::splat(15.)),
-                            2.,
-                            col,
-                        );
+                        handles.push((Pos2::new(pt.0, pt.1), col));
                     }
 
                     // egui shape needs these in a different order
@@ -819,7 +899,7 @@ impl ImageOperation {
                         Pos2::new(points_transformed[2].0, points_transformed[2].1),
                     ];
 
-                    // make a black background covering everything
+                    // make a black background covering the image area
                     painter.rect_filled(
                         Rect::EVERYTHING,
                         0.,
@@ -832,6 +912,13 @@ impl ImageOperation {
                         Stroke::new(1., Color32::GOLD),
                     );
                     handle_painter.add(shape);
+                    for (center, color) in handles {
+                        handle_painter.rect_filled(
+                            Rect::from_center_size(center, Vec2::splat(15.)),
+                            2.,
+                            color,
+                        );
+                    }
 
                     if let Some(pt) = ui.ctx().data(|r| r.get_temp::<usize>(dragged_point_id)) {
                         points[pt].0 = cursor_relative.x as u32;
@@ -853,21 +940,15 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
-                // The shapes are drawn over the image, not into the panel this ui belongs
-                // to. Use a painter for the area the panels leave free, the ui's own
-                // painter would clip them away.
-                let mut image_area = ui.ctx().available_rect();
-                // the panel this ui is in still counts as free while it is being built
-                let panel = ui.clip_rect();
-                if panel.left() <= image_area.left() {
-                    image_area.min.x = image_area.min.x.max(panel.right());
-                }
+                // Draw on the middle layer, above the image (CentralPanel), and keep it
+                // off the side panels
                 let painter = ui
                     .ctx()
-                    .layer_painter(egui::LayerId::background())
-                    .with_clip_rect(image_area);
-                // enable this if this is used to draw
-                // let id = Id::new("shapes");
+                    .layer_painter(egui::LayerId::new(
+                        egui::Order::Middle,
+                        Id::new("measure_overlay"),
+                    ))
+                    .with_clip_rect(canvas_rect(ui.ctx()));
 
                 // let cursor_abs = ui.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
@@ -924,27 +1005,28 @@ impl ImageOperation {
                                 })
                                 .collect::<Vec<_>>();
 
-                            let rect = Rect {
-                                min: Pos2::new(points_transformed[0].0, points_transformed[0].1),
-                                max: Pos2::new(points_transformed[1].0, points_transformed[1].1),
-                            };
+                            // the drag can go in any direction
+                            let rect = Rect::from_two_pos(
+                                Pos2::new(points_transformed[0].0, points_transformed[0].1),
+                                Pos2::new(points_transformed[1].0, points_transformed[1].1),
+                            );
 
-                            let rect_orig = Rect {
-                                min: Pos2::new(points[0].0 as f32, points[0].1 as f32),
-                                max: Pos2::new(points[1].0 as f32, points[1].1 as f32),
-                            };
+                            let rect_orig = Rect::from_two_pos(
+                                Pos2::new(points[0].0 as f32, points[0].1 as f32),
+                                Pos2::new(points[1].0 as f32, points[1].1 as f32),
+                            );
 
                             painter.rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32 / 2., Color32::WHITE),
+                                Stroke::new(*width as f32, Color32::BLACK),
                                 StrokeKind::Inside,
                             );
 
                             painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
+                                Color32::from_rgba_unmultiplied(0, 0, 0, 80),
                             );
 
                             painter.text(
@@ -1258,142 +1340,122 @@ impl ImageOperation {
 
     /// Process all image operators (All things that modify the image and are not "per pixel")
     pub fn process_image(&self, dyn_img: &mut DynamicImage) -> Result<()> {
+        // the same for every layout
+        if let Self::ColorConverter(t) = self {
+            convert_color_type(dyn_img, t);
+            return Ok(());
+        }
+        // drawn after all edits, see `crate::annotate`
+        if let Self::Annotate(_) = self {
+            return Ok(());
+        }
         match dyn_img {
             DynamicImage::ImageRgba8(img) => {
                 match self {
-                    Self::Blur(amt) => {
-                        if *amt != 0 {
-                            let i = img.clone();
-                            let mut data = i.into_raw();
-                            libblur::stack_blur(
-                                data.as_mut_slice(),
-                                img.width() * 4,
-                                img.width(),
-                                img.height(),
-                                (*amt as u32).clamp(2, 254),
-                                libblur::FastBlurChannels::Channels4,
-                                libblur::ThreadingPolicy::Adaptive,
-                            );
-                            use anyhow::Context;
-                            *img = RgbaImage::from_raw(img.width(), img.height(), data)
-                                .context("Can't construct image from blur result")?;
+                    Self::Blur(amt) if *amt != 0 => {
+                        let (width, height) = img.dimensions();
+                        // Blurred as they are, transparent pixels give their color, mostly
+                        // black, to the ones around them: a dark fringe. With the color
+                        // multiplied by the alpha first they have none to give.
+                        let transparent = img.as_raw().par_chunks(4).any(|px| px[3] < 255);
+                        if transparent {
+                            premultiply(img);
+                        }
+                        // blurs the pixels in place
+                        let mut pixels = libblur::BlurImageMut::borrow(
+                            img,
+                            width,
+                            height,
+                            libblur::FastBlurChannels::Channels4,
+                        );
+                        libblur::stack_blur(
+                            &mut pixels,
+                            libblur::AnisotropicRadius::new((*amt as u32).clamp(2, 254)),
+                            libblur::ThreadingPolicy::Adaptive,
+                        )
+                        .map_err(|e| anyhow::anyhow!("Can't blur the image: {e}"))?;
+                        if transparent {
+                            unpremultiply(img);
                         }
                     }
                     Self::Filter3x3(amt) => {
-                        let kernel = amt.iter().map(|a| *a as f32 / 100.).collect::<Vec<_>>();
-                        *img = imageops::filter3x3(img, &kernel);
+                        *img = filter3x3(img, &amt.map(|a| a as f32 / 100.));
                     }
+                    // Edits saved before the LUT became a pixel operation have it here
                     Self::LUT(lut_name) => {
-                        use lutgen::identity::correct_image;
-                        let mut external_image = DynamicImage::ImageRgba8(img.clone()).to_rgb8();
-                        if let Some(lut_data) = builtin_luts().get(lut_name) {
-                            let lut_img = image::load_from_memory(lut_data).unwrap().to_rgb8();
-                            correct_image(&mut external_image, &lut_img);
-                        } else if let Ok(lut_img) = image::open(lut_name) {
-                            correct_image(&mut external_image, &lut_img.to_rgb8());
-                        }
-                        *img = DynamicImage::ImageRgb8(external_image).to_rgba8();
+                        let lut = hald_clut(lut_name)?;
+                        img.par_chunks_mut(4).for_each(|px| {
+                            let rgb = lut.map([px[0], px[1], px[2]]);
+                            px[..3].copy_from_slice(&rgb);
+                        });
                     }
-                    Self::Crop(dim) => {
-                        if *dim != [0, 0, 0, 0] {
-                            let window = cropped_range(dim, &(img.width(), img.height()));
-                            let sub_img = image::imageops::crop_imm(
-                                img, window[0], window[1], window[2], window[3],
-                            );
-                            *img = sub_img.to_image();
-                        }
+                    Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
+                        let window = cropped_range(dim, &(img.width(), img.height()));
+                        let sub_img = image::imageops::crop_imm(
+                            img, window[0], window[1], window[2], window[3],
+                        );
+                        *img = sub_img.to_image();
                     }
                     Self::CropPerspective { points, .. } => {
-                        let img_dim = img.dimensions();
-
-                        let max_width = points[1].0.max(points[3].0);
-                        let min_width = points[0].0.min(points[2].0);
-                        let max_height = points[2].1.max(points[3].1);
-                        let min_height = points[0].1.min(points[1].1);
-                        let x = max_width - min_width;
-                        let y = max_height - min_height;
-
-                        let from = [
-                            (points[0].0 as f32, points[0].1 as f32),
-                            (points[1].0 as f32, points[1].1 as f32),
-                            (points[2].0 as f32, points[2].1 as f32),
-                            (points[3].0 as f32, points[3].1 as f32),
-                        ];
-
-                        let to = [
-                            (0 as f32, 0 as f32),
-                            (img_dim.0 as f32, 0 as f32),
-                            (0 as f32, img_dim.1 as f32),
-                            (img_dim.0 as f32, img_dim.1 as f32),
-                        ];
-
-                        if let Some(proj) =
-                            imageproc::geometric_transformations::Projection::from_control_points(
-                                from, to,
-                            )
-                        {
-                            let default_p: Rgba<u8> = [0, 0, 0, 0].into();
-
-                            *img = imageproc::geometric_transformations::warp(
-                                img,
-                                &proj,
-                                Interpolation::Bicubic,
-                                default_p,
-                            );
-
-                            *img = imageops::resize(img, x, y, imageops::FilterType::CatmullRom);
-                        } else {
-                            error!("Projection failed")
-                        }
+                        use imageproc::geometric_transformations::{Border, warp_into};
+                        let (projection, (width, height)) = perspective(points)
+                            .context("The corners of the perspective crop are on one line")?;
+                        // straight to the size, one resampling
+                        let mut out = RgbaImage::new(width, height);
+                        warp_into(
+                            img,
+                            projection,
+                            Interpolation::Bicubic,
+                            Border::Constant(Rgba([0, 0, 0, 0])),
+                            &mut out,
+                        );
+                        *img = out;
                     }
                     Self::Resize {
                         dimensions, filter, ..
-                    } => {
-                        if *dimensions != Default::default() {
-                            let filter = match filter {
-                                ScaleFilter::Box => fr::FilterType::Box,
-                                ScaleFilter::Bilinear => fr::FilterType::Bilinear,
-                                ScaleFilter::Hamming => fr::FilterType::Hamming,
-                                ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
-                                ScaleFilter::Mitchell => fr::FilterType::Mitchell,
-                                ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
-                            };
+                    } if *dimensions != Default::default() => {
+                        let filter = match filter {
+                            ScaleFilter::Box => fr::FilterType::Box,
+                            ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                            ScaleFilter::Hamming => fr::FilterType::Hamming,
+                            ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                            ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                            ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
+                        };
 
-                            let src_image = fr::images::Image::from_vec_u8(
-                                img.width(),
-                                img.height(),
-                                img.clone().into_raw(),
-                                fr::PixelType::U8x4,
-                            )?;
+                        let src_image = fr::images::ImageRef::new(
+                            img.width(),
+                            img.height(),
+                            img.as_raw(),
+                            fr::PixelType::U8x4,
+                        )?;
 
-                            // Create container for data of destination image
-                            let mut dst_image = fr::images::Image::new(
+                        // Create container for data of destination image
+                        let mut dst_image = fr::images::Image::new(
+                            dimensions.0,
+                            dimensions.1,
+                            src_image.pixel_type(),
+                        );
+
+                        let mut resizer = fr::Resizer::new();
+
+                        resizer.resize(
+                            &src_image,
+                            &mut dst_image,
+                            Some(
+                                &ResizeOptions::new()
+                                    .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                            ),
+                        )?;
+
+                        *img = anyhow::Context::context(
+                            image::RgbaImage::from_raw(
                                 dimensions.0,
                                 dimensions.1,
-                                src_image.pixel_type(),
-                            );
-
-                            let mut resizer = fr::Resizer::new();
-
-                            resizer.resize(
-                                &src_image,
-                                &mut dst_image,
-                                Some(
-                                    &ResizeOptions::new().resize_alg(
-                                        fast_image_resize::ResizeAlg::Convolution(filter),
-                                    ),
-                                ),
-                            )?;
-
-                            *img = anyhow::Context::context(
-                                image::RgbaImage::from_raw(
-                                    dimensions.0,
-                                    dimensions.1,
-                                    dst_image.into_vec(),
-                                ),
-                                "Can't create RgbaImage",
-                            )?;
-                        }
+                                dst_image.into_vec(),
+                            ),
+                            "Can't create RgbaImage",
+                        )?;
                     }
                     Self::Rotate(angle) => match angle {
                         90 => *img = image::imageops::rotate90(img),
@@ -1411,18 +1473,11 @@ impl ImageOperation {
                     }
                     Self::ScaleImageMinMax => {
                         //Step 0: Get color channel min and max values
-                        let mut min = 255u8;
-                        let mut max = 0u8;
-
-                        img.chunks_mut(4).for_each(|px| {
-                            min = std::cmp::min(min, px[0]);
-                            min = std::cmp::min(min, px[1]);
-                            min = std::cmp::min(min, px[2]);
-
-                            max = std::cmp::max(max, px[0]);
-                            max = std::cmp::max(max, px[1]);
-                            max = std::cmp::max(max, px[2]);
-                        });
+                        let (min, max) = img
+                            .as_raw()
+                            .par_chunks(4)
+                            .map(|px| (px[0].min(px[1]).min(px[2]), px[0].max(px[1]).max(px[2])))
+                            .reduce(|| (255, 0), |a, b| (a.0.min(b.0), a.1.max(b.1)));
                         let min_f = min as f64;
                         let max_f = max as f64;
 
@@ -1447,20 +1502,28 @@ impl ImageOperation {
                     Self::ChromaticAberration(amt) => {
                         let center = (img.width() as i32 / 2, img.height() as i32 / 2);
                         let img_c = img.clone();
+                        let row_len = img.width() as usize * 4;
 
-                        for (x, y, p) in img.enumerate_pixels_mut() {
-                            let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
-                            let dist_to_center = (
-                                (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
-                                (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
-                            );
-                            if let Some(l) = img_c.get_pixel_checked(
-                                (x as i32 + dist_to_center.0 as i32).max(0) as u32,
-                                (y as i32 + dist_to_center.1 as i32).max(0) as u32,
-                            ) {
-                                p[0] = l[0];
-                            }
-                        }
+                        // row by row in parallel
+                        img.par_chunks_mut(row_len.max(1))
+                            .enumerate()
+                            .for_each(|(y, row)| {
+                                for (x, p) in row.chunks_mut(4).enumerate() {
+                                    let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
+                                    let dist_to_center = (
+                                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32
+                                            / 10.,
+                                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32
+                                            / 10.,
+                                    );
+                                    if let Some(l) = img_c.get_pixel_checked(
+                                        (x as i32 + dist_to_center.0 as i32).max(0) as u32,
+                                        (y as i32 + dist_to_center.1 as i32).max(0) as u32,
+                                    ) {
+                                        p[0] = l[0];
+                                    }
+                                }
+                            });
                     }
 
                     _ => (),
@@ -1471,38 +1534,6 @@ impl ImageOperation {
                 info!("Proc with color type {:?}", dyn_img.color());
 
                 match self {
-                    Self::ColorConverter(t) => match t {
-                        ColorTypeExt::L8 => {
-                            *dyn_img = DynamicImage::ImageLuma8(dyn_img.to_luma8());
-                        }
-                        ColorTypeExt::La8 => {
-                            *dyn_img = DynamicImage::ImageLumaA8(dyn_img.to_luma_alpha8());
-                        }
-                        ColorTypeExt::Rgb8 => {
-                            *dyn_img = DynamicImage::ImageRgb8(dyn_img.to_rgb8());
-                        }
-                        ColorTypeExt::Rgba8 => {
-                            *dyn_img = DynamicImage::ImageRgba8(dyn_img.to_rgba8());
-                        }
-                        ColorTypeExt::L16 => {
-                            *dyn_img = DynamicImage::ImageLuma16(dyn_img.to_luma16());
-                        }
-                        ColorTypeExt::La16 => {
-                            *dyn_img = DynamicImage::ImageLumaA16(dyn_img.to_luma_alpha16());
-                        }
-                        ColorTypeExt::Rgb16 => {
-                            *dyn_img = DynamicImage::ImageRgb16(dyn_img.to_rgb16());
-                        }
-                        ColorTypeExt::Rgba16 => {
-                            *dyn_img = DynamicImage::ImageRgba16(dyn_img.to_rgba16());
-                        }
-                        ColorTypeExt::Rgb32F => {
-                            *dyn_img = DynamicImage::ImageRgb32F(dyn_img.to_rgb32f());
-                        }
-                        ColorTypeExt::Rgba32F => {
-                            *dyn_img = DynamicImage::ImageRgba32F(dyn_img.to_rgba32f());
-                        }
-                    },
                     Self::Flip(vert) => {
                         if *vert {
                             *dyn_img = dyn_img.flipv();
@@ -1530,7 +1561,9 @@ impl ImageOperation {
                             ScaleFilter::Lanczos3 => imageops::FilterType::Lanczos3,
                             _ => imageops::FilterType::Gaussian,
                         };
-                        *dyn_img = dyn_img.resize(dimensions.0, dimensions.0, filter);
+                        if *dimensions != Default::default() {
+                            *dyn_img = dyn_img.resize_exact(dimensions.0, dimensions.1, filter);
+                        }
                     }
                     _ => {
                         bail!("This color type is unsupported: {:?}", dyn_img.color())
@@ -1542,18 +1575,13 @@ impl ImageOperation {
         Ok(())
     }
 
-    /// Process a single pixel.
-    pub fn process_pixel(&self, p: &mut Vector4<f32>) -> Result<()> {
+    /// Process a single pixel, for the operations that need nothing worked out
+    /// beforehand. The others are in [`PixelOp`].
+    fn process_pixel(&self, p: &mut Vector4<f32>) {
         match self {
             Self::Brightness(amt) => {
                 let amt = *amt as f32 / 255.;
                 *p += Vector4::new(amt, amt, amt, 0.0);
-            }
-            Self::Exposure(amt) => {
-                let amt = (*amt as f32 / 100.) * 4.;
-                p[0] *= (2_f32).powf(amt);
-                p[1] *= (2_f32).powf(amt);
-                p[2] *= (2_f32).powf(amt);
             }
             Self::Equalize(bounds) => {
                 let bounds = (bounds.0 as f32 / 255., bounds.1 as f32 / 255.);
@@ -1589,55 +1617,6 @@ impl ImageOperation {
                 p[0] = res[0] as f32 / 255.;
                 p[1] = res[1] as f32 / 255.;
                 p[2] = res[2] as f32 / 255.;
-            }
-            Self::Expression(expr) => {
-                let mut context: HashMapContext<DefaultNumericTypes> = context_map! {
-                    "r" => float p[0],
-                    "g" => float p[1],
-                    "b" => float p[2],
-                    "a" => float p[3],
-                }?;
-
-                if eval_empty_with_context_mut(expr, &mut context).is_ok() {
-                    if let Some(r) = context.get_value("r") {
-                        if let Ok(r) = r.as_float() {
-                            p[0] = r as f32
-                        }
-                    }
-                    if let Some(g) = context.get_value("g") {
-                        if let Ok(g) = g.as_float() {
-                            p[1] = g as f32
-                        }
-                    }
-                    if let Some(b) = context.get_value("b") {
-                        if let Ok(b) = b.as_float() {
-                            p[2] = b as f32
-                        }
-                    }
-                    if let Some(a) = context.get_value("a") {
-                        if let Ok(a) = a.as_float() {
-                            p[3] = a as f32
-                        }
-                    }
-                }
-            }
-            Self::Posterize(levels) => {
-                p[0] = (p[0] * *levels as f32).round() / *levels as f32;
-                p[1] = (p[1] * *levels as f32).round() / *levels as f32;
-                p[2] = (p[2] * *levels as f32).round() / *levels as f32;
-                // 0.65 * 10.0 = 6.5 / 10
-            }
-            Self::Noise { amt, mono } => {
-                let amt = *amt as f32 / 100.;
-
-                let mut rng = thread_rng();
-                let n_r: f32 = rng.gen();
-                let n_g: f32 = if *mono { n_r } else { rng.gen() };
-                let n_b: f32 = if *mono { n_r } else { rng.gen() };
-
-                p[0] = egui::lerp(p[0]..=n_r, amt);
-                p[1] = egui::lerp(p[1]..=n_g, amt);
-                p[2] = egui::lerp(p[2]..=n_b, amt);
             }
             Self::Fill(col) => {
                 let target =
@@ -1685,145 +1664,615 @@ impl ImageOperation {
                 p[2] *= p[3];
             }
             Self::MDiv => {
-                p[0] /= p[3];
-                p[1] /= p[3];
-                p[2] /= p[3];
+                // without alpha there is no color to get back, it stays
+                if p[3] > 0. {
+                    p[0] /= p[3];
+                    p[1] /= p[3];
+                    p[2] /= p[3];
+                }
             }
             Self::Contrast(val) => {
                 let factor: f32 = (1.015_686_3 * (*val as f32 / 255. + 1.0))
                     / (1.0 * (1.015_686_3 - *val as f32 / 255.));
-                p[0] = (factor * p[0] - 0.5) + 0.5;
-                p[1] = (factor * p[1] - 0.5) + 0.5;
-                p[2] = (factor * p[2] - 0.5) + 0.5;
+                // away from the middle, or towards it
+                p[0] = factor * (p[0] - 0.5) + 0.5;
+                p[1] = factor * (p[1] - 0.5) + 0.5;
+                p[2] = factor * (p[2] - 0.5) + 0.5;
             }
             _ => (),
         }
-        Ok(())
     }
 }
 
 pub fn desaturate(p: &mut Vector4<f32>, factor: f32) {
     // G*.59+R*.3+B*.11
-    let val = p[0] * 0.59 + p[1] * 0.3 + p[2] * 0.11;
+    // the luma, green counts most
+    let val = p[0] * 0.299 + p[1] * 0.587 + p[2] * 0.114;
     p[0] = egui::lerp(p[0]..=val, factor);
     p[1] = egui::lerp(p[1]..=val, factor);
     p[2] = egui::lerp(p[2]..=val, factor);
 }
-pub fn builtin_luts() -> HashMap<String, Vec<u8>> {
-    let mut luts = HashMap::new();
-    luts.insert(
-        "Fuji Superia 1600 2".to_string(),
-        include_bytes!("../res/LUT/Fuji Superia 1600 2.png").to_vec(),
+/// The LUTs that come with Oculante, by name
+static BUILTIN_LUTS: [(&str, &[u8]); 4] = [
+    (
+        "Fuji Superia 1600 2",
+        include_bytes!("../res/LUT/Fuji Superia 1600 2.png") as &[u8],
+    ),
+    (
+        "Lomography Redscale 100",
+        include_bytes!("../res/LUT/Lomography Redscale 100.png") as &[u8],
+    ),
+    (
+        "Lomography X-Pro Slide 200",
+        include_bytes!("../res/LUT/Lomography X-Pro Slide 200.png") as &[u8],
+    ),
+    (
+        "Polaroid Polachrome",
+        include_bytes!("../res/LUT/Polaroid Polachrome.png") as &[u8],
+    ),
+];
+
+pub fn builtin_luts() -> &'static [(&'static str, &'static [u8])] {
+    &BUILTIN_LUTS
+}
+
+/// A Hald CLUT, checked and decoded
+struct HaldClut {
+    image: image::RgbImage,
+    level: u8,
+}
+
+impl HaldClut {
+    fn new(image: image::RgbImage) -> Result<Self> {
+        let (w, h) = image.dimensions();
+        // square, with the cube of the level as its side: 8, 27, 64 ... 512 ... 1728
+        let level = (w as f64).cbrt().round() as u32;
+        if w != h || !(2..=255).contains(&level) || level.pow(3) != w {
+            bail!(
+                "This is not a Hald CLUT: a {w}x{h} image, it has to be square with a side of 64, 512 or 1728 pixels or the like"
+            );
+        }
+        Ok(Self {
+            image,
+            level: level as u8,
+        })
+    }
+
+    fn map(&self, rgb: [u8; 3]) -> [u8; 3] {
+        lutgen::identity::correct_pixel(&rgb, &self.image, self.level)
+    }
+}
+
+/// Hald CLUTs, decoded once: a builtin one by its name, one from disk by its path
+/// and when it was changed. A few at most, they are 9 MB each.
+static HALD_CLUTS: LazyLock<Mutex<HashMap<String, Arc<HaldClut>>>> =
+    LazyLock::new(Default::default);
+
+/// A builtin LUT by its name, or a LUT from disk by its path
+fn hald_clut(name: &str) -> Result<Arc<HaldClut>> {
+    let builtin = BUILTIN_LUTS.iter().find(|l| l.0 == name).map(|l| l.1);
+    let key = match builtin {
+        Some(_) => name.to_string(),
+        None => format!(
+            "{name} {:?}",
+            std::fs::metadata(name).and_then(|m| m.modified()).ok()
+        ),
+    };
+    let cached = HALD_CLUTS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&key)
+        .cloned();
+    if let Some(lut) = cached {
+        return Ok(lut);
+    }
+    let image = match builtin {
+        Some(data) => image::load_from_memory(data),
+        None => image::open(name),
+    }
+    .with_context(|| format!("Can't load the LUT {name}"))?;
+    let lut = Arc::new(HaldClut::new(image.into_rgb8())?);
+    let mut cache = HALD_CLUTS.lock().unwrap_or_else(|e| e.into_inner());
+    if cache.len() >= 4 {
+        cache.clear();
+    }
+    cache.insert(key, lut.clone());
+    Ok(lut)
+}
+
+/// sRGB encoded to linear light
+fn srgb_to_linear(v: f32) -> f32 {
+    if v <= 0.04045 {
+        v / 12.92
+    } else {
+        ((v + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// Linear light to sRGB encoded
+fn linear_to_srgb(v: f32) -> f32 {
+    if v <= 0.003_130_8 {
+        v * 12.92
+    } else {
+        1.055 * v.powf(1. / 2.4) - 0.055
+    }
+}
+
+/// An exposure: sRGB to linear light, times the factor, and back
+fn exposure(v: f32, factor: f32) -> f32 {
+    linear_to_srgb(srgb_to_linear(v) * factor)
+}
+
+/// A function of a channel from 0 to 1, worked out once in 4096 steps and
+/// interpolated between them. Much faster than its powers for every pixel, and
+/// off by less than a hundredth of a step of 8 bits for an exposure.
+struct Curve(Vec<f32>);
+
+impl Curve {
+    const STEPS: usize = 4096;
+
+    fn new(f: impl Fn(f32) -> f32) -> Self {
+        Self(
+            (0..=Self::STEPS)
+                .map(|i| f(i as f32 / Self::STEPS as f32))
+                .collect(),
+        )
+    }
+
+    /// The function at `v`. Outside of 0 to 1 the curve does not know it, `exact`
+    /// works it out.
+    fn at(&self, v: f32, exact: impl Fn(f32) -> f32) -> f32 {
+        if !(0.0..=1.0).contains(&v) {
+            return exact(v);
+        }
+        let x = v * Self::STEPS as f32;
+        let i = (x as usize).min(Self::STEPS - 1);
+        self.0[i] + (self.0[i + 1] - self.0[i]) * (x - i as f32)
+    }
+}
+
+/// A number from 0 to 1 that looks random, but is the same for the same pixel,
+/// channel and seed every time (SplitMix64)
+fn noise(pixel: u64, channel: u64, seed: u64) -> f32 {
+    let mut x = (pixel.wrapping_mul(4) + channel) ^ seed.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^= x >> 31;
+    (x >> 40) as f32 / (1u64 << 24) as f32
+}
+
+/// What an expression sees: r, g, b and a of the pixel, and the variables it sets
+/// itself. Unlike in evalexpr's HashMapContext a variable can change its type,
+/// `r = 1` works as `r = 1.0` does.
+struct PixelVariables {
+    rgba: [Value<DefaultNumericTypes>; 4],
+    own: Vec<(String, Value<DefaultNumericTypes>)>,
+}
+
+impl PixelVariables {
+    fn new() -> Self {
+        Self {
+            rgba: std::array::from_fn(|_| Value::Float(0.)),
+            own: vec![],
+        }
+    }
+
+    /// Runs the expression on the pixel, which keeps its color if it fails
+    fn run(
+        &mut self,
+        expression: &Node<DefaultNumericTypes>,
+        p: &mut Vector4<f32>,
+    ) -> EvalexprResult<Value<DefaultNumericTypes>, DefaultNumericTypes> {
+        for c in 0..4 {
+            self.rgba[c] = Value::Float(p[c] as f64);
+        }
+        // nothing carries over from the pixel before
+        self.own.clear();
+        let result = expression.eval_with_context_mut(self);
+        if result.is_ok() {
+            for c in 0..4 {
+                if let Ok(v) = self.rgba[c].as_number() {
+                    p[c] = v as f32;
+                }
+            }
+        }
+        result
+    }
+}
+
+impl Context for PixelVariables {
+    type NumericTypes = DefaultNumericTypes;
+
+    fn get_value(&self, identifier: &str) -> Option<&Value<DefaultNumericTypes>> {
+        match identifier {
+            "r" => Some(&self.rgba[0]),
+            "g" => Some(&self.rgba[1]),
+            "b" => Some(&self.rgba[2]),
+            "a" => Some(&self.rgba[3]),
+            _ => self.own.iter().find(|v| v.0 == identifier).map(|v| &v.1),
+        }
+    }
+
+    fn call_function(
+        &self,
+        identifier: &str,
+        _argument: &Value<DefaultNumericTypes>,
+    ) -> EvalexprResult<Value<DefaultNumericTypes>, DefaultNumericTypes> {
+        // only the builtin ones
+        Err(EvalexprError::FunctionIdentifierNotFound(
+            identifier.to_string(),
+        ))
+    }
+
+    fn are_builtin_functions_disabled(&self) -> bool {
+        false
+    }
+
+    fn set_builtin_functions_disabled(
+        &mut self,
+        disabled: bool,
+    ) -> EvalexprResult<(), DefaultNumericTypes> {
+        if disabled {
+            Err(EvalexprError::BuiltinFunctionsCannotBeDisabled)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl ContextWithMutableVariables for PixelVariables {
+    fn set_value(
+        &mut self,
+        identifier: String,
+        value: Value<DefaultNumericTypes>,
+    ) -> EvalexprResult<(), DefaultNumericTypes> {
+        let slot = match identifier.as_str() {
+            "r" => &mut self.rgba[0],
+            "g" => &mut self.rgba[1],
+            "b" => &mut self.rgba[2],
+            "a" => &mut self.rgba[3],
+            _ => match self.own.iter().position(|v| v.0 == identifier) {
+                Some(i) => &mut self.own[i].1,
+                None => {
+                    self.own.push((identifier, value));
+                    return Ok(());
+                }
+            },
+        };
+        *slot = value;
+        Ok(())
+    }
+}
+
+/// A pixel operation made ready for a run over a whole image: what it needs is
+/// parsed, decoded or worked out once, not for every pixel.
+enum PixelOp<'a> {
+    /// Needs nothing beforehand
+    Plain(&'a ImageOperation),
+    /// The factor for the light, 2 for one stop more, and the curve it makes
+    Exposure {
+        factor: f32,
+        curve: Curve,
+    },
+    /// Steps from black to white, one less than the levels
+    Posterize(f32),
+    Expression(Node<DefaultNumericTypes>),
+    Lut(Arc<HaldClut>),
+    Noise {
+        amount: f32,
+        mono: bool,
+        seed: u64,
+    },
+    /// Left out: an expression that does not parse yet, or a LUT that can't be
+    /// loaded
+    Nothing,
+}
+
+impl<'a> PixelOp<'a> {
+    /// `index` is the place of the operation in the stack
+    fn new(op: &'a ImageOperation, index: usize) -> Result<Self> {
+        Ok(match op {
+            ImageOperation::Exposure(amt) => {
+                let factor = 2_f32.powf(*amt as f32 / 25.);
+                Self::Exposure {
+                    factor,
+                    curve: Curve::new(|v| exposure(v, factor)),
+                }
+            }
+            ImageOperation::Posterize(levels) => Self::Posterize((*levels).max(2) as f32 - 1.),
+            // the panel says why it does not parse
+            ImageOperation::Expression(expr) => build_operator_tree(expr)
+                .map(Self::Expression)
+                .unwrap_or(Self::Nothing),
+            ImageOperation::LUT(name) => Self::Lut(hald_clut(name)?),
+            // two noise operations give different noise
+            ImageOperation::Noise { amt, mono } => Self::Noise {
+                amount: *amt as f32 / 100.,
+                mono: *mono,
+                seed: index as u64,
+            },
+            op => Self::Plain(op),
+        })
+    }
+
+    /// `pixel` is the number of the pixel in the image, for noise that stays the
+    /// same from one run to the next
+    fn apply(&self, p: &mut Vector4<f32>, pixel: u64, variables: &mut PixelVariables) {
+        match self {
+            Self::Plain(op) => op.process_pixel(p),
+            // in linear light, where one stop is twice the light
+            Self::Exposure { factor, curve } => {
+                for c in 0..3 {
+                    p[c] = curve.at(p[c], |v| exposure(v, *factor));
+                }
+            }
+            Self::Posterize(steps) => {
+                for c in 0..3 {
+                    p[c] = (p[c] * steps).round() / steps;
+                }
+            }
+            Self::Expression(expression) => {
+                _ = variables.run(expression, p);
+            }
+            Self::Lut(lut) => {
+                let rgb = lut.map([0, 1, 2].map(|c| (p[c] * 255.).round() as u8));
+                for c in 0..3 {
+                    p[c] = rgb[c] as f32 / 255.;
+                }
+            }
+            Self::Noise { amount, mono, seed } => {
+                for c in 0..3 {
+                    let n = noise(pixel, if *mono { 0 } else { c as u64 }, *seed);
+                    p[c] = egui::lerp(p[c]..=n, *amount);
+                }
+            }
+            Self::Nothing => (),
+        }
+    }
+}
+
+/// Multiplies the color of every pixel by its alpha
+fn premultiply(img: &mut RgbaImage) {
+    img.par_chunks_mut(4).for_each(|px| {
+        let a = px[3] as u32;
+        for c in &mut px[..3] {
+            *c = ((*c as u32 * a + 127) / 255) as u8;
+        }
+    });
+}
+
+/// Undoes [`premultiply`], as far as 8 bits allow
+fn unpremultiply(img: &mut RgbaImage) {
+    img.par_chunks_mut(4).for_each(|px| {
+        let a = px[3] as u32;
+        for c in &mut px[..3] {
+            // without alpha the color stays 0
+            if let Some(v) = (*c as u32 * 255 + a / 2).checked_div(a) {
+                *c = v.min(255) as u8;
+            }
+        }
+    });
+}
+
+/// Filters the color of an image with a 3x3 kernel, row by row in parallel. The
+/// weights are divided by their sum, unless that is 0. Alpha stays as it is, so an
+/// edge filter does not make the image transparent, and so do the outermost
+/// pixels, which lack neighbours.
+fn filter3x3(img: &RgbaImage, kernel: &[f32; 9]) -> RgbaImage {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    let mut out = img.clone();
+    if w < 3 || h < 3 {
+        return out;
+    }
+    let sum: f32 = kernel.iter().sum();
+    let scale = if sum == 0. { 1. } else { 1. / sum };
+    let src = img.as_raw();
+    let stride = w * 4;
+    out.par_chunks_mut(stride)
+        .enumerate()
+        .skip(1)
+        .take(h - 2)
+        .for_each(|(y, row)| {
+            let rows = [
+                &src[(y - 1) * stride..y * stride],
+                &src[y * stride..(y + 1) * stride],
+                &src[(y + 1) * stride..(y + 2) * stride],
+            ];
+            for x in 1..w - 1 {
+                for c in 0..3 {
+                    let mut t = 0.;
+                    for (ky, r) in rows.iter().enumerate() {
+                        for kx in 0..3 {
+                            t += kernel[ky * 3 + kx] * r[(x + kx - 1) * 4 + c] as f32;
+                        }
+                    }
+                    // `as` keeps it from 0 to 255
+                    row[x * 4 + c] = (t * scale).round() as u8;
+                }
+            }
+        });
+    out
+}
+
+/// The luma of a color, with the weights the image crate takes for gray
+fn luma(p: &Vector4<f32>) -> f32 {
+    p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722
+}
+
+/// 0 to 1 as 0 to 255. `as` keeps it in that range, and makes NaN 0.
+fn to_u8(v: f32) -> u8 {
+    (v * 255.).round() as u8
+}
+
+/// Runs the operations over every pixel of `data`, in parallel. `load` makes RGBA
+/// of a pixel and `store` writes it back.
+fn run_pixel_ops<T: Send>(
+    data: &mut [T],
+    channels: usize,
+    ops: &[PixelOp],
+    load: impl Fn(&[T]) -> Vector4<f32> + Sync,
+    store: impl Fn(Vector4<f32>, &mut [T]) + Sync,
+) {
+    data.par_chunks_mut(channels).enumerate().for_each_init(
+        PixelVariables::new,
+        |variables, (i, px)| {
+            let mut p = load(px);
+            for op in ops {
+                op.apply(&mut p, i as u64, variables);
+            }
+            store(p, px);
+        },
     );
-    luts.insert(
-        "Lomography Redscale 100".to_string(),
-        include_bytes!("../res/LUT/Lomography Redscale 100.png").to_vec(),
-    );
-    luts.insert(
-        "Lomography X-Pro Slide 200".to_string(),
-        include_bytes!("../res/LUT/Lomography X-Pro Slide 200.png").to_vec(),
-    );
-    luts.insert(
-        "Polaroid Polachrome".to_string(),
-        include_bytes!("../res/LUT/Polaroid Polachrome.png").to_vec(),
-    );
-    luts
 }
 
 pub fn process_pixels(dynimage: &mut DynamicImage, operators: &Vec<ImageOperation>) -> Result<()> {
+    // Made ready once. An operation that can't be is left out, the others run,
+    // and the error is returned after.
+    let mut problem = None;
+    let ops = operators
+        .iter()
+        .enumerate()
+        .map(|(i, op)| {
+            PixelOp::new(op, i).unwrap_or_else(|e| {
+                problem.get_or_insert(e);
+                PixelOp::Nothing
+            })
+        })
+        .collect::<Vec<_>>();
+
     match dynimage {
-        DynamicImage::ImageRgb8(buffer) => {
-            buffer.par_chunks_mut(3).for_each(|px| {
-                let mut float_pixel =
-                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 1.0) / 255.;
-                // run pixel operations
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
+        DynamicImage::ImageRgb8(buffer) => run_pixel_ops(
+            buffer,
+            3,
+            &ops,
+            |px| Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, 255.) / 255.,
+            |p, px| {
+                for c in 0..3 {
+                    px[c] = to_u8(p[c]);
                 }
-                float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
-                px[2] = (float_pixel[2]) as u8;
-            });
-        }
-        DynamicImage::ImageRgba8(buffer) => {
-            buffer.par_chunks_mut(4).for_each(|px| {
-                let mut float_pixel =
-                    Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.;
-                // run pixel operations
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
+            },
+        ),
+        DynamicImage::ImageRgba8(buffer) => run_pixel_ops(
+            buffer,
+            4,
+            &ops,
+            |px| Vector4::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32) / 255.,
+            |p, px| {
+                for c in 0..4 {
+                    px[c] = to_u8(p[c]);
                 }
-                float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
-                px[2] = (float_pixel[2]) as u8;
-                px[3] = (float_pixel[3]) as u8;
-            });
-        }
-        DynamicImage::ImageLuma8(buffer) => {
-            buffer.par_chunks_mut(1).for_each(|px| {
-                let mut float_pixel = Vector4::new(px[0] as f32, 0.0, 0.0, 0.0) / 255.;
-                // run pixel operations
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
-                }
-                float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-            });
-        }
-        DynamicImage::ImageLumaA8(buffer) => {
-            buffer.par_chunks_mut(2).for_each(|px| {
-                let mut float_pixel = Vector4::new(px[0] as f32, 0.0, 0.0, px[1] as f32) / 255.;
-                // run pixel operations
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
-                }
-                float_pixel *= 255.;
-                px[0] = (float_pixel[0]) as u8;
-                px[1] = (float_pixel[1]) as u8;
-            });
-        }
-        DynamicImage::ImageRgb32F(buffer) => {
-            buffer.par_chunks_mut(3).for_each(|px| {
-                let mut float_pixel = Vector4::new(px[0], px[1], px[2], 0.0);
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
-                }
-                px[0] = float_pixel[0];
-                px[1] = float_pixel[1];
-                px[2] = float_pixel[2];
-            });
-        }
-        DynamicImage::ImageRgba32F(buffer) => {
-            buffer.par_chunks_mut(3).for_each(|px| {
-                let mut float_pixel = Vector4::new(px[0], px[1], px[2], px[3]);
-                for operation in operators {
-                    if let Err(e) = operation.process_pixel(&mut float_pixel) {
-                        error!("{e}")
-                    }
-                }
-                px[0] = float_pixel[0];
-                px[1] = float_pixel[1];
-                px[2] = float_pixel[2];
-                px[3] = float_pixel[3];
-            });
-        }
+            },
+        ),
+        // Gray is the same in every channel, opaque without alpha. It was red
+        // and transparent, and the alpha of gray with alpha came from green.
+        DynamicImage::ImageLuma8(buffer) => run_pixel_ops(
+            buffer,
+            1,
+            &ops,
+            |px| {
+                let v = px[0] as f32 / 255.;
+                Vector4::new(v, v, v, 1.)
+            },
+            |p, px| px[0] = to_u8(luma(&p)),
+        ),
+        DynamicImage::ImageLumaA8(buffer) => run_pixel_ops(
+            buffer,
+            2,
+            &ops,
+            |px| {
+                let v = px[0] as f32 / 255.;
+                Vector4::new(v, v, v, px[1] as f32 / 255.)
+            },
+            |p, px| {
+                px[0] = to_u8(luma(&p));
+                px[1] = to_u8(p[3]);
+            },
+        ),
+        // opaque, as for 8 bit RGB
+        DynamicImage::ImageRgb32F(buffer) => run_pixel_ops(
+            buffer,
+            3,
+            &ops,
+            |px| Vector4::new(px[0], px[1], px[2], 1.0),
+            |p, px| px.copy_from_slice(&[p[0], p[1], p[2]]),
+        ),
+        DynamicImage::ImageRgba32F(buffer) => run_pixel_ops(
+            buffer,
+            4,
+            &ops,
+            |px| Vector4::new(px[0], px[1], px[2], px[3]),
+            |p, px| px.copy_from_slice(p.as_slice()),
+        ),
         _ => {
             bail!("Pixel operators are not yet supported for this image type.");
         }
     }
-    Ok(())
+    match problem {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+/// Converts the image to another color type
+fn convert_color_type(image: &mut DynamicImage, t: &ColorTypeExt) {
+    match t {
+        ColorTypeExt::L8 => {
+            *image = DynamicImage::ImageLuma8(image.to_luma8());
+        }
+        ColorTypeExt::La8 => {
+            *image = DynamicImage::ImageLumaA8(image.to_luma_alpha8());
+        }
+        ColorTypeExt::Rgb8 => {
+            *image = DynamicImage::ImageRgb8(image.to_rgb8());
+        }
+        ColorTypeExt::Rgba8 => {
+            *image = DynamicImage::ImageRgba8(image.to_rgba8());
+        }
+        ColorTypeExt::L16 => {
+            *image = DynamicImage::ImageLuma16(image.to_luma16());
+        }
+        ColorTypeExt::La16 => {
+            *image = DynamicImage::ImageLumaA16(image.to_luma_alpha16());
+        }
+        ColorTypeExt::Rgb16 => {
+            *image = DynamicImage::ImageRgb16(image.to_rgb16());
+        }
+        ColorTypeExt::Rgba16 => {
+            *image = DynamicImage::ImageRgba16(image.to_rgba16());
+        }
+        ColorTypeExt::Rgb32F => {
+            *image = DynamicImage::ImageRgb32F(image.to_rgb32f());
+        }
+        ColorTypeExt::Rgba32F => {
+            *image = DynamicImage::ImageRgba32F(image.to_rgba32f());
+        }
+    }
+}
+
+/// How a perspective crop with these corners maps the image, and how large the
+/// result is. `None` if the corners are on one line.
+pub(crate) fn perspective(
+    points: &[(u32, u32); 4],
+) -> Option<(imageproc::geometric_transformations::Projection, (u32, u32))> {
+    // The result is as large as the area the corners span. Taken from the right
+    // corners less the left ones, the size went below zero when they were dragged
+    // past each other.
+    let span = |coord: fn(&(u32, u32)) -> u32| {
+        let values = points.map(|p| coord(&p));
+        values.iter().max().unwrap_or(&0) - values.iter().min().unwrap_or(&0)
+    };
+    let (width, height) = (span(|p| p.0), span(|p| p.1));
+    let from = points.map(|p| (p.0 as f32, p.1 as f32));
+    let to = [
+        (0., 0.),
+        (width as f32, 0.),
+        (0., height as f32),
+        (width as f32, height as f32),
+    ];
+    imageproc::geometric_transformations::Projection::from_control_points(from, to)
+        .filter(|_| width > 0 && height > 0)
+        .map(|projection| (projection, (width, height)))
 }
 
 /// Crop a left,top (x,y) plus x/y window safely into absolute pixel units.
@@ -1867,8 +2316,14 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
 
     debug!("h {mcu_h} w {mcu_w}");
 
-    // make sure crop is aligned to mcu bounds
     let mut transform = transform;
+    // Blocks at the right and bottom edge that are not complete can not be
+    // moved to the left or the top. They would stay where they are, a strip of
+    // the old image at an edge of the new one. They are left out instead, a few
+    // pixels at most.
+    transform.trim = true;
+
+    // make sure crop is aligned to mcu bounds
     if let Some(c) = transform.crop.as_mut() {
         c.x = (c.x as f32 / mcu_w as f32) as usize * mcu_w;
         c.y = (c.y as f32 / mcu_h as f32) as usize * mcu_h;
@@ -1975,7 +2430,7 @@ impl GradientStop {
 
     pub fn new(pos: u8, rgb: [u8; 3]) -> Self {
         GradientStop {
-            id: rand::thread_rng().gen(),
+            id: rand::rng().random::<u64>() as usize,
             pos,
             col: rgb,
         }
@@ -1998,7 +2453,8 @@ fn range_test() {
         GradientStop::new(128, [255, 83, 0]),
         GradientStop::new(255, [224, 255, 0]),
     ];
-    std::env::set_var("RUST_LOG", "debug");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("RUST_LOG", "debug") };
     let _ = env_logger::try_init();
     let res = interpolate_u8(&map, 5);
 
@@ -2045,5 +2501,678 @@ impl ColorTypeExt {
             ColorType::Rgba32F => ColorTypeExt::Rgba32F,
             _ => ColorTypeExt::Rgba8,
         }
+    }
+}
+
+#[cfg(test)]
+mod operation_tests {
+    use super::*;
+    use image::RgbaImage;
+
+    /// 16x12 pixels with different values in every channel, the last pixel transparent
+    fn sample() -> DynamicImage {
+        DynamicImage::ImageRgba8(RgbaImage::from_fn(16, 12, |x, y| {
+            let alpha = if (x, y) == (15, 11) { 0 } else { 255 };
+            image::Rgba([
+                (x * 16 + 5) as u8,
+                (y * 21 + 3) as u8,
+                (250 - x * 9 - y * 7) as u8,
+                alpha,
+            ])
+        }))
+    }
+
+    fn apply(op: ImageOperation, image: &DynamicImage) -> DynamicImage {
+        let mut out = image.clone();
+        if op.is_per_pixel() {
+            process_pixels(&mut out, &vec![op]).unwrap();
+        } else {
+            op.process_image(&mut out).unwrap();
+        }
+        out
+    }
+
+    /// Every pixel of `out` against `expected(pixel of input)`
+    fn assert_each(op: ImageOperation, expected: impl Fn([u8; 4]) -> [u8; 4]) {
+        let input = sample().to_rgba8();
+        let out = apply(op.clone(), &DynamicImage::ImageRgba8(input.clone())).to_rgba8();
+        for (x, y, p) in input.enumerate_pixels() {
+            assert_eq!(
+                out.get_pixel(x, y).0,
+                expected(p.0),
+                "{op:?} at {x},{y} from {:?}",
+                p.0
+            );
+        }
+    }
+
+    fn scale(v: u8, f: f32) -> u8 {
+        (v as f32 * f).round().clamp(0., 255.) as u8
+    }
+
+    #[test]
+    fn neutral_settings_change_nothing() {
+        let input = sample();
+        for op in [
+            ImageOperation::Brightness(0),
+            ImageOperation::Exposure(0),
+            ImageOperation::Contrast(0),
+            ImageOperation::Equalize((0, 255)),
+            ImageOperation::Desaturate(0),
+            ImageOperation::Mult([255, 255, 255]),
+            ImageOperation::Add([0, 0, 0]),
+            ImageOperation::Fill([255, 0, 0, 0]),
+            ImageOperation::Expression("r = r".into()),
+            ImageOperation::ChannelSwap((Channel::Red, Channel::Red)),
+            ImageOperation::Noise {
+                amt: 0,
+                mono: false,
+            },
+            ImageOperation::Blur(0),
+            ImageOperation::Rotate(0),
+            ImageOperation::Crop([0, 0, 0, 0]),
+            ImageOperation::Filter3x3([0, 0, 0, 0, 100, 0, 0, 0, 0]),
+            ImageOperation::Resize {
+                dimensions: (0, 0),
+                aspect: true,
+                filter: ScaleFilter::Bilinear,
+            },
+        ] {
+            assert_eq!(apply(op.clone(), &input), input, "{op:?}");
+        }
+        // HSL and back may differ by a rounding step
+        let hsv = apply(ImageOperation::HSV((0, 100, 100)), &input).to_rgba8();
+        for (a, b) in hsv.pixels().zip(input.to_rgba8().pixels()) {
+            for c in 0..4 {
+                assert!(
+                    a.0[c].abs_diff(b.0[c]) <= 1,
+                    "HSV: {:?} from {:?}",
+                    a.0,
+                    b.0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pixel_operations_give_the_exact_values() {
+        assert_each(ImageOperation::Invert, |p| {
+            [255 - p[0], 255 - p[1], 255 - p[2], p[3]]
+        });
+        assert_each(ImageOperation::Brightness(30), |p| {
+            [
+                p[0].saturating_add(30),
+                p[1].saturating_add(30),
+                p[2].saturating_add(30),
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Add([10, 20, 30]), |p| {
+            [
+                p[0].saturating_add(10),
+                p[1].saturating_add(20),
+                p[2].saturating_add(30),
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Mult([255, 128, 0]), |p| {
+            [p[0], scale(p[1], 128. / 255.), 0, p[3]]
+        });
+        assert_each(ImageOperation::Fill([10, 20, 30, 255]), |_| {
+            [10, 20, 30, 255]
+        });
+        assert_each(
+            ImageOperation::ChannelSwap((Channel::Red, Channel::Blue)),
+            |p| [p[2], p[1], p[2], p[3]],
+        );
+        assert_each(ImageOperation::Expression("r = 1.0 - r".into()), |p| {
+            [255 - p[0], p[1], p[2], p[3]]
+        });
+        assert_each(ImageOperation::Posterize(1), |p| {
+            [
+                scale(p[0], 1. / 255.) * 255,
+                scale(p[1], 1. / 255.) * 255,
+                scale(p[2], 1. / 255.) * 255,
+                p[3],
+            ]
+        });
+        assert_each(ImageOperation::Equalize((50, 100)), |p| {
+            let f = |v: u8| (50. + v as f32 / 255. * 50.).round() as u8;
+            [f(p[0]), f(p[1]), f(p[2]), p[3]]
+        });
+        // MMult multiplies by alpha: the transparent pixel turns black
+        assert_each(ImageOperation::MMult, |p| {
+            let a = p[3] as f32 / 255.;
+            [scale(p[0], a), scale(p[1], a), scale(p[2], a), p[3]]
+        });
+        // gray as the luma of the color, the same weights as the gradient map
+        assert_each(ImageOperation::Desaturate(100), |p| {
+            let v = (p[0] as f32 * 0.299 + p[1] as f32 * 0.587 + p[2] as f32 * 0.114).round() as u8;
+            [v, v, v, p[3]]
+        });
+    }
+
+    /// Scaling to the range of the image stretches its darkest value to 0 and its
+    /// brightest to 255
+    #[test]
+    fn scale_to_min_max() {
+        let input = sample();
+        let values = |img: &DynamicImage| {
+            let rgba = img.to_rgba8();
+            let all = rgba
+                .pixels()
+                .flat_map(|p| p.0[..3].to_vec())
+                .collect::<Vec<_>>();
+            (*all.iter().min().unwrap(), *all.iter().max().unwrap())
+        };
+        assert_eq!(values(&input), (3, 250));
+        assert_eq!(
+            values(&apply(ImageOperation::ScaleImageMinMax, &input)),
+            (0, 255)
+        );
+    }
+
+    /// A 3x3 filter leaves no black frame around the image
+    #[test]
+    fn filter_keeps_the_border() {
+        let input = sample();
+        let sharpened = apply(
+            ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
+            &input,
+        )
+        .to_rgba8();
+        let original = input.to_rgba8();
+        for (x, y) in [(0, 0), (15, 0), (0, 11), (7, 0), (0, 5)] {
+            assert_eq!(
+                sharpened.get_pixel(x, y),
+                original.get_pixel(x, y),
+                "at {x},{y}"
+            );
+        }
+    }
+
+    /// Inverting twice gives the image back
+    #[test]
+    fn invert_twice_is_the_image() {
+        let input = sample();
+        let twice = apply(
+            ImageOperation::Invert,
+            &apply(ImageOperation::Invert, &input),
+        );
+        assert_eq!(twice, input);
+    }
+
+    /// Contrast pushes values away from the middle, the middle stays
+    #[test]
+    fn contrast_keeps_the_middle() {
+        let gray = |v: u8| {
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([v, v, v, 255])))
+        };
+        let out = |v: u8| {
+            apply(ImageOperation::Contrast(60), &gray(v))
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert!(out(64) < 64, "dark gets darker: {}", out(64));
+        assert!(out(192) > 192, "bright gets brighter: {}", out(192));
+        assert!(
+            out(128).abs_diff(128) <= 1,
+            "the middle stays: {}",
+            out(128)
+        );
+        let less = |v: u8| {
+            apply(ImageOperation::Contrast(-60), &gray(v))
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert!(
+            less(64) > 64 && less(192) < 192,
+            "less contrast moves values to the middle"
+        );
+    }
+
+    #[test]
+    fn hsv_turns_red_into_cyan() {
+        let red =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255])));
+        let out = apply(ImageOperation::HSV((180, 100, 100)), &red)
+            .to_rgba8()
+            .get_pixel(0, 0)
+            .0;
+        assert_eq!(out, [0, 255, 255, 255]);
+    }
+
+    #[test]
+    fn gradient_map_from_black_to_white_is_the_brightness() {
+        let stops = vec![
+            GradientStop::new(0, [0, 0, 0]),
+            GradientStop::new(255, [255, 255, 255]),
+        ];
+        let out = apply(ImageOperation::GradientMap(stops), &sample()).to_rgba8();
+        for p in out.pixels() {
+            assert!(p.0[0] == p.0[1] && p.0[1] == p.0[2], "not gray: {:?}", p.0);
+        }
+    }
+
+    #[test]
+    fn slice_keeps_only_the_range() {
+        let out = |v: u8| {
+            let gray =
+                DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([v, v, v, 255])));
+            apply(ImageOperation::Slice(128, 20, false), &gray)
+                .to_rgba8()
+                .get_pixel(0, 0)
+                .0[0]
+        };
+        assert_eq!(out(128), 128);
+        assert_eq!(out(60), 0);
+        assert_eq!(out(220), 0);
+    }
+
+    /// Noise stays gray on a gray image when it is mono, and changes the image
+    #[test]
+    fn noise() {
+        let gray = DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+            8,
+            8,
+            image::Rgba([100, 100, 100, 255]),
+        ));
+        let mono = apply(
+            ImageOperation::Noise {
+                amt: 50,
+                mono: true,
+            },
+            &gray,
+        )
+        .to_rgba8();
+        assert!(mono.pixels().all(|p| p.0[0] == p.0[1] && p.0[1] == p.0[2]));
+        assert_ne!(DynamicImage::ImageRgba8(mono.clone()), gray);
+        // the same every time, it does not flicker when another slider moves
+        let again = apply(
+            ImageOperation::Noise {
+                amt: 50,
+                mono: true,
+            },
+            &gray,
+        );
+        assert_eq!(again, DynamicImage::ImageRgba8(mono));
+    }
+
+    #[test]
+    fn geometry() {
+        let input = sample();
+        let (w, h) = (input.width(), input.height());
+        let corner = input.to_rgba8().get_pixel(0, 0).0;
+        let at = |img: &DynamicImage, x: u32, y: u32| img.to_rgba8().get_pixel(x, y).0;
+
+        let turned = apply(ImageOperation::Rotate(90), &input);
+        assert_eq!((turned.width(), turned.height()), (h, w));
+        assert_eq!(at(&turned, h - 1, 0), corner, "clockwise");
+        let turned = apply(ImageOperation::Rotate(-90), &input);
+        assert_eq!(at(&turned, 0, w - 1), corner, "counter clockwise");
+        assert_eq!(apply(ImageOperation::Rotate(270), &input), turned);
+        let turned = apply(ImageOperation::Rotate(180), &input);
+        assert_eq!(at(&turned, w - 1, h - 1), corner);
+
+        assert_eq!(
+            at(&apply(ImageOperation::Flip(true), &input), 0, h - 1),
+            corner,
+            "vertical"
+        );
+        assert_eq!(
+            at(&apply(ImageOperation::Flip(false), &input), w - 1, 0),
+            corner,
+            "horizontal"
+        );
+
+        // a quarter off every side, in ten thousandths
+        let cropped = apply(ImageOperation::Crop([2500, 2500, 2500, 2500]), &input);
+        assert_eq!((cropped.width(), cropped.height()), (8, 6));
+        assert_eq!(at(&cropped, 0, 0), at(&input, 4, 3));
+        assert_eq!(cropped_range(&[2500; 4], &(100, 100)), [25, 25, 50, 50]);
+
+        // the whole image as the perspective crop keeps it
+        let whole = apply(
+            ImageOperation::CropPerspective {
+                points: [(0, 0), (w, 0), (0, h), (w, h)],
+                original_size: (w, h),
+            },
+            &input,
+        );
+        assert_eq!((whole.width(), whole.height()), (w, h));
+    }
+
+    /// Resize gives the size it is asked for, in every layout. Other layouts than
+    /// RGBA used the width for the height too, and kept the aspect ratio.
+    #[test]
+    fn resize_gives_the_size_asked_for() {
+        let resize = ImageOperation::Resize {
+            dimensions: (7, 3),
+            aspect: false,
+            filter: ScaleFilter::Lanczos3,
+        };
+        let input = sample();
+        for layout in [
+            input.clone(),
+            DynamicImage::ImageRgb8(input.to_rgb8()),
+            DynamicImage::ImageLuma16(input.to_luma16()),
+        ] {
+            let out = apply(resize.clone(), &layout);
+            assert_eq!((out.width(), out.height()), (7, 3), "{:?}", layout.color());
+            assert_eq!(out.color(), layout.color());
+        }
+    }
+
+    /// The conversion of the color type works on every layout. It did nothing on RGBA.
+    #[test]
+    fn color_conversion_on_every_layout() {
+        let input = sample();
+        for layout in [input.clone(), DynamicImage::ImageRgb8(input.to_rgb8())] {
+            let out = apply(ImageOperation::ColorConverter(ColorTypeExt::L8), &layout);
+            assert_eq!(
+                out.color(),
+                image::ColorType::L8,
+                "from {:?}",
+                layout.color()
+            );
+        }
+    }
+
+    /// The other whole-image operations change the image, keep its size and give
+    /// the same result every time
+    #[test]
+    fn image_operations_are_deterministic() {
+        // with structure, a sharpened gradient is the gradient
+        let input = DynamicImage::ImageRgba8(RgbaImage::from_fn(16, 12, |x, y| {
+            let v = ((x * 31 + y * 17) * 7 % 256) as u8;
+            image::Rgba([
+                v,
+                255 - v,
+                v / 2 + 40,
+                if (x, y) == (15, 11) { 0 } else { 255 },
+            ])
+        }));
+        for op in [
+            ImageOperation::Blur(10),
+            ImageOperation::Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
+            ImageOperation::LUT("Fuji Superia 1600 2".into()),
+            ImageOperation::ChromaticAberration(30),
+        ] {
+            let first = apply(op.clone(), &input);
+            assert_eq!(
+                (first.width(), first.height()),
+                (input.width(), input.height()),
+                "{op:?}"
+            );
+            assert_ne!(first, input, "{op:?} changed nothing");
+            assert_eq!(
+                apply(op.clone(), &input),
+                first,
+                "{op:?} differs from run to run"
+            );
+        }
+        // a LUT keeps the alpha
+        let lut = apply(ImageOperation::LUT("Fuji Superia 1600 2".into()), &input).to_rgba8();
+        assert_eq!(lut.get_pixel(15, 11).0[3], 0);
+    }
+
+    fn gray(v: u8) -> DynamicImage {
+        DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([v, v, v, 255])))
+    }
+
+    fn first_pixel(op: ImageOperation, image: &DynamicImage) -> [u8; 4] {
+        apply(op, image).to_rgba8().get_pixel(0, 0).0
+    }
+
+    /// One stop more is twice the light, in linear light. Twice the sRGB value
+    /// made a middle gray white.
+    #[test]
+    fn exposure_is_in_stops_of_light() {
+        let out = |amount: i32, v: u8| first_pixel(ImageOperation::Exposure(amount), &gray(v))[0];
+        assert_eq!(out(25, 128), 176);
+        assert_eq!(out(25, 64), 90);
+        assert_eq!(out(-25, 128), 92);
+        assert_eq!(out(-25, 255), 188);
+        assert_eq!(out(50, 128), 239);
+        assert_eq!(out(25, 0), 0);
+        assert_eq!(out(25, 200), 255);
+    }
+
+    /// The curve of an exposure is the exposure, near enough
+    #[test]
+    fn exposure_curve() {
+        for amount in (-100..=100).step_by(10) {
+            let PixelOp::Exposure { factor, curve } =
+                PixelOp::new(&ImageOperation::Exposure(amount), 0).unwrap()
+            else {
+                panic!("not an exposure");
+            };
+            for i in -100..=10100 {
+                let v = i as f32 / 10000.;
+                let (exact, fast) = (exposure(v, factor), curve.at(v, |v| exposure(v, factor)));
+                assert!(
+                    (exact - fast).abs() < 0.01 / 255. * exact.max(1.),
+                    "{amount} at {v}: {fast} for {exact}"
+                );
+            }
+        }
+    }
+
+    /// Posterize gives as many levels as it says, it gave one more
+    #[test]
+    fn posterize_gives_the_levels_asked_for() {
+        let ramp = DynamicImage::ImageRgba8(RgbaImage::from_fn(256, 1, |x, _| {
+            image::Rgba([x as u8, x as u8, x as u8, 255])
+        }));
+        for levels in [2, 3, 8, 255] {
+            let out = apply(ImageOperation::Posterize(levels), &ramp).to_rgba8();
+            let mut values = out.pixels().map(|p| p.0[0]).collect::<Vec<_>>();
+            values.dedup();
+            assert_eq!(values.len(), levels as usize, "{values:?}");
+            assert_eq!((values[0], values[values.len() - 1]), (0, 255));
+        }
+        // 1 was the setting for 2
+        assert_eq!(
+            apply(ImageOperation::Posterize(1), &ramp),
+            apply(ImageOperation::Posterize(2), &ramp)
+        );
+    }
+
+    /// Gray, with or without alpha, is gray in every channel for the pixel
+    /// operations. It was red and transparent, and the alpha of gray with alpha
+    /// came from green: every pixel operation made it transparent.
+    #[test]
+    fn pixel_operations_on_gray() {
+        let l8 = DynamicImage::ImageLuma8(image::GrayImage::from_pixel(2, 2, image::Luma([200])));
+        let la8 = DynamicImage::ImageLumaA8(image::GrayAlphaImage::from_pixel(
+            2,
+            2,
+            image::LumaA([200, 180]),
+        ));
+        let stops = vec![
+            GradientStop::new(0, [0, 0, 0]),
+            GradientStop::new(255, [255, 255, 255]),
+        ];
+        for op in [
+            ImageOperation::Desaturate(100),
+            ImageOperation::HSV((0, 100, 100)),
+            ImageOperation::Mult([255, 255, 255]),
+            ImageOperation::GradientMap(stops),
+        ] {
+            let mut out = l8.clone();
+            process_pixels(&mut out, &vec![op.clone()]).unwrap();
+            assert!(
+                out.as_luma8().unwrap().get_pixel(0, 0).0[0].abs_diff(200) <= 1,
+                "{op:?} on gray: {:?}",
+                out.as_luma8().unwrap().get_pixel(0, 0)
+            );
+            let mut out = la8.clone();
+            process_pixels(&mut out, &vec![op.clone()]).unwrap();
+            let p = out.as_luma_alpha8().unwrap().get_pixel(0, 0).0;
+            assert!(
+                p[0].abs_diff(200) <= 1 && p[1] == 180,
+                "{op:?} on gray with alpha: {p:?}"
+            );
+        }
+        // multiplied by an alpha of 1, not 0
+        let mut out = l8.clone();
+        process_pixels(&mut out, &vec![ImageOperation::MMult]).unwrap();
+        assert_eq!(out.as_luma8().unwrap().get_pixel(0, 0).0[0], 200);
+    }
+
+    /// Whole numbers work, an expression can have its own variables, and one that
+    /// does not parse changes nothing
+    #[test]
+    fn expressions() {
+        let out = |e: &str| first_pixel(ImageOperation::Expression(e.into()), &gray(100));
+        assert_eq!(out("r = 1"), [255, 100, 100, 255]);
+        assert_eq!(out("g = 0; r = 1.0"), [255, 0, 100, 255]);
+        assert_eq!(out("l = (r + g + b) / 3; r = l * 2"), [200, 100, 100, 255]);
+        assert_eq!(out("r = min(r * 2, 1)"), [200, 100, 100, 255]);
+        assert_eq!(out("r = "), [100, 100, 100, 255]);
+        assert_eq!(out("r = true"), [100, 100, 100, 255]);
+        // Nothing is left over from the pixel before: x is not there yet when r
+        // takes it, for every pixel
+        let input = sample();
+        assert_eq!(
+            apply(ImageOperation::Expression("r = x; x = 0.5".into()), &input),
+            input
+        );
+    }
+
+    /// Without alpha there is no color to get back, it stays. It turned white.
+    #[test]
+    fn divide_by_no_alpha() {
+        let clear =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(1, 1, image::Rgba([100, 50, 20, 0])));
+        assert_eq!(first_pixel(ImageOperation::MDiv, &clear), [100, 50, 20, 0]);
+    }
+
+    /// A filter whose weights add up to 0 finds edges, and keeps the alpha. It
+    /// made the image transparent.
+    #[test]
+    fn edge_filter_keeps_the_alpha() {
+        let input = sample();
+        let edges = apply(
+            ImageOperation::Filter3x3([-100, -100, -100, -100, 800, -100, -100, -100, -100]),
+            &input,
+        )
+        .to_rgba8();
+        for (x, y, p) in edges.enumerate_pixels() {
+            assert_eq!(p.0[3], input.to_rgba8().get_pixel(x, y).0[3], "at {x},{y}");
+        }
+        // the sample is a gradient, its inside has no edges
+        assert_eq!(edges.get_pixel(5, 5).0[..3], [0, 0, 0]);
+    }
+
+    /// The 3x3 filter rounds as the image crate did not, a blur of an even
+    /// color is that color
+    #[test]
+    fn filter_of_an_even_color() {
+        let even =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(5, 5, image::Rgba([201, 7, 99, 255])));
+        let blurred = apply(
+            ImageOperation::Filter3x3([6, 12, 6, 12, 25, 12, 6, 12, 6]),
+            &even,
+        );
+        assert_eq!(blurred, even);
+    }
+
+    /// Blur next to transparent pixels keeps the color, it turned gray
+    #[test]
+    fn blur_next_to_transparent() {
+        let half = DynamicImage::ImageRgba8(RgbaImage::from_fn(64, 8, |x, _| {
+            if x < 32 {
+                image::Rgba([0, 0, 0, 0])
+            } else {
+                image::Rgba([255, 255, 255, 255])
+            }
+        }));
+        let out = apply(ImageOperation::Blur(10), &half).to_rgba8();
+        for x in 28..36 {
+            let p = out.get_pixel(x, 4).0;
+            if p[3] > 20 {
+                assert!(p[..3].iter().all(|c| *c >= 250), "at {x}: {p:?}");
+            }
+        }
+        assert!(out.get_pixel(31, 4).0[3] > 0, "it blurred");
+    }
+
+    /// A LUT has to be a Hald CLUT. Any other picture crashed the app.
+    #[test]
+    fn a_lut_that_is_not_one() {
+        let dir = std::env::temp_dir().join(format!("oculante-lut-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let photo = dir.join("photo.png");
+        image::RgbImage::from_pixel(100, 80, image::Rgb([1, 2, 3]))
+            .save(&photo)
+            .unwrap();
+        let op = ImageOperation::LUT(photo.to_string_lossy().into());
+        let mut image = sample();
+        let error = process_pixels(&mut image, &vec![op.clone(), ImageOperation::Invert])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("not a Hald CLUT"), "{error}");
+        // the other operations still ran
+        assert_eq!(image, apply(ImageOperation::Invert, &sample()));
+        // in the stack of edits saved before, too
+        assert!(op.process_image(&mut sample()).is_err());
+        assert!(
+            ImageOperation::LUT(dir.join("missing.png").to_string_lossy().into())
+                .process_image(&mut sample())
+                .is_err()
+        );
+        _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// The LUT is a pixel operation now, it takes its place among them: after an
+    /// exposure that comes before it. Edits saved with it among the image
+    /// operations give the same.
+    #[test]
+    fn lut_among_the_pixel_operations() {
+        let lut = ImageOperation::LUT("Polaroid Polachrome".into());
+        assert!(lut.is_per_pixel());
+        let mut as_pixel_op = sample();
+        process_pixels(&mut as_pixel_op, &vec![lut.clone()]).unwrap();
+        let mut as_image_op = sample();
+        lut.process_image(&mut as_image_op).unwrap();
+        assert_eq!(as_pixel_op, as_image_op);
+
+        let mut exposed_first = sample();
+        process_pixels(
+            &mut exposed_first,
+            &vec![ImageOperation::Exposure(25), lut.clone()],
+        )
+        .unwrap();
+        let mut lut_first = sample();
+        process_pixels(&mut lut_first, &vec![lut, ImageOperation::Exposure(25)]).unwrap();
+        assert_ne!(exposed_first, lut_first);
+    }
+
+    /// Corners dragged past each other mirror the crop. The size went below zero:
+    /// a crash.
+    #[test]
+    fn perspective_crop_with_crossed_corners() {
+        let input = sample();
+        let crop = |points| {
+            let mut out = input.clone();
+            ImageOperation::CropPerspective {
+                points,
+                original_size: (16, 12),
+            }
+            .process_image(&mut out)
+            .map(|_| out)
+        };
+        // a rectangle is that part of the image
+        let part = crop([(2, 2), (10, 2), (2, 8), (10, 8)]).unwrap().to_rgba8();
+        assert_eq!(part.dimensions(), (8, 6));
+        assert_eq!(part.get_pixel(0, 0), input.to_rgba8().get_pixel(2, 2));
+        // the right corners left of the left ones
+        let mirrored = crop([(10, 2), (2, 2), (10, 8), (2, 8)]).unwrap().to_rgba8();
+        assert_eq!(mirrored.dimensions(), (8, 6));
+        // corners on one line give an error
+        assert!(crop([(0, 0), (16, 0), (0, 0), (16, 0)]).is_err());
     }
 }

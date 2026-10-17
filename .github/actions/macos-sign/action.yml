@@ -125,9 +125,8 @@ runs:
         echo "signing as: $IDENTITY"
 
         # Inside out. --deep is deprecated and does not apply the hardened
-        # runtime to nested code, which notarisation then rejects; oculante
-        # copies libheif and friends into Contents/Frameworks, so this is not
-        # hypothetical.
+        # runtime to nested code, which notarisation then rejects. Since libheif
+        # is gone the bundle holds no libraries, this is for when it does again.
         while IFS= read -r binary; do
           echo "  nested: ${binary#"$APP_PATH"/}"
           codesign --force --timestamp --options runtime \
