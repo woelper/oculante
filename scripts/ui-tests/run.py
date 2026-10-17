@@ -723,14 +723,19 @@ def test_paint_on_transparency(binary):
 
 # where the filter search shows Annotate, the only filter that matches "annot"
 ANNOTATE_BUTTON = (790, 108, 210, 18)
+# the tools of Annotate in the edit panel, scrolled to the top
+ANNOTATE_TOOLS = {
+    name: (x, 206) for name, x in zip(("arrow", "frame", "circle", "text", "pen", "redact"), (795, 831, 866, 903, 938, 975))
+}
 
 
 def test_annotate(binary):
-    """With experimental features on, Annotate draws an arrow, text and a redaction
-    on the image. Meanwhile the keys are for the annotations: Delete removes the one
-    that is selected, not the file, an arrow key moves it and no other image comes.
-    A selected arrow moves, the middle button still moves the image, Ctrl+C copies
-    it, and saved edits bring the annotations back."""
+    """With experimental features on, Annotate draws an arrow, a circle, text and a
+    redaction on the image. Meanwhile the keys are for the annotations: Delete
+    removes the one that is selected, not the file, an arrow key moves it and no
+    other image comes. What the mouse points at is outlined and moves with any tool,
+    a double click changes a text, the middle button still moves the image, Ctrl+C
+    copies it, and saved edits bring the annotations back."""
     folder = folder_of("annotate_images", [("a.jpg", "moss.jpg"), ("b.png", "test.png")])
     path = os.path.join(folder, "a.jpg")
     # the image, above the frame counter of debug builds
@@ -761,14 +766,23 @@ def test_annotate(binary):
         since = len(app.log())
         app.key("Right")
         assert not app.matched_shortcuts(since), "the arrow key went to the app, not to the arrow"
-        app.click(807, 206)  # "Select"
+        # nothing selected, the arrow tool stays
+        app.key("Escape")
+        app.settle(0.8)
+        unselected = app.shot("unselected")
+        app.move(350, 325)
+        app.settle(0.8)
+        pointed = app.shot("pointed_at")
+        changed = changed_pixels_in(unselected, pointed, (240, 240, 220, 170))
+        assert changed > 200, f"pointing at the arrow outlines only {changed} pixels"
+        # what is pointed at moves, with any tool
         app.drag(350, 325, 350, 425, steps=10)
         app.move(40, 560)
         app.settle(1.0)
         moved = app.shot("moved")
         assert changed_pixels_in(before, moved, (240, 240, 220, 60)) == 0, "the arrow left a trace"
         assert changed_pixels_in(arrow, moved, (240, 400, 220, 110)) > 1000, "the arrow did not move there"
-        # it is still selected
+        # it is selected now
         app.key("Delete")
         app.move(40, 560)
         app.settle(1.0)
@@ -776,7 +790,28 @@ def test_annotate(binary):
         assert os.path.exists(path), "Delete removed the file"
         changed = changed_pixels_in(before, gone, image_box)
         assert changed == 0, f"{changed} pixels of the removed arrow are left"
-        app.click(979, 206)  # "Text"
+        app.click(*ANNOTATE_TOOLS["circle"])
+        app.drag(480, 100, 600, 180, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        circle = app.shot("circle")
+        changed = changed_pixels_in(gone, circle, (470, 90, 140, 100))
+        assert changed > 500, f"the circle changed only {changed} pixels"
+        # the pen moves the circle by its line, it draws nothing
+        app.click(*ANNOTATE_TOOLS["pen"])
+        app.drag(480, 140, 480, 300, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        circle_moved = app.shot("circle_moved")
+        changed = changed_pixels_in(gone, circle_moved, (470, 90, 140, 100))
+        assert changed == 0, f"{changed} pixels are left where the circle was"
+        changed = changed_pixels_in(gone, circle_moved, (470, 250, 140, 100))
+        assert changed > 500, f"the moved circle changed only {changed} pixels"
+        app.key("Delete")
+        app.move(40, 560)
+        app.settle(1.0)
+        assert changed_pixels_in(before, app.shot("circle_gone"), image_box) == 0, "the circle is left"
+        app.click(*ANNOTATE_TOOLS["text"])
         app.click(200, 100)
         app.x("xdotool", "type", "--delay", "80", "Hello")
         app.key("Return")
@@ -785,7 +820,19 @@ def test_annotate(binary):
         text = app.shot("text")
         changed = changed_pixels_in(gone, text, (190, 80, 250, 70))
         assert changed > 300, f"the text changed only {changed} pixels"
-        app.click(853, 236)  # "Redact"
+        # a double click on it with another tool changes it
+        app.click(*ANNOTATE_TOOLS["arrow"])
+        app.move(215, 115)
+        app.settle(0.5)
+        app.x("xdotool", "click", "--repeat", "2", "--delay", "90", "1")
+        app.settle(0.8)
+        app.x("xdotool", "type", "--delay", "80", "!!")
+        app.key("Return")
+        app.move(40, 560)
+        app.settle(1.0)
+        changed = changed_pixels_in(text, app.shot("text_changed"), (190, 80, 250, 70))
+        assert changed > 30, f"typing after a double click changed only {changed} pixels"
+        app.click(*ANNOTATE_TOOLS["redact"])
         app.drag(450, 300, 650, 450, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -805,7 +852,11 @@ def test_annotate(binary):
         app.scroll_down(890, 450, 6)
         app.click(891, 555)  # "Save edits", at the bottom of the panel
         assert os.path.exists(os.path.join(folder, "a.oculante")), "the edits were not saved"
-        app.click(865, 206 - 16)  # "Arrow", the panel is scrolled
+        # back up, a tool on again
+        app.move(890, 300)
+        app.x("xdotool", "click", "--repeat", "8", "--delay", "60", "4")
+        app.settle(0.8)
+        app.click(*ANNOTATE_TOOLS["arrow"])
         app.move(300, 300)
         app.x("xdotool", "mousedown", "2")
         for i in range(1, 8):
@@ -823,7 +874,7 @@ def test_annotate(binary):
         reopened = app.shot("reopened")
         # the edits open the panel, the image is placed differently than before. Its
         # only edits that show are the annotations.
-        app.click(785, 391)  # "Disable all edits"
+        app.click(785, 360)  # "Disable all edits"
         app.move(40, 560)
         app.settle(1.0)
         off = app.shot("edits_off")

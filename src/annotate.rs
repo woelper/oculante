@@ -46,6 +46,8 @@ pub enum Shape {
     Arrow([i32; 2]),
     /// A frame this large
     Rect([i32; 2]),
+    /// A circle, or an ellipse, in a box this large
+    Ellipse([i32; 2]),
     /// Lines of text, the first one starts at the top left
     Text(String),
     /// A line through these points, the first one is where it starts
@@ -165,7 +167,9 @@ impl Annotation {
         };
         match &self.shape {
             Shape::Arrow(to) => around(&[[0, 0], *to]),
-            Shape::Rect(size) | Shape::Redact { size, .. } => around(&[[0, 0], *size]),
+            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
+                around(&[[0, 0], *size])
+            }
             Shape::Pen(points) => around(points),
             Shape::Text(text) => text_layout(text, self.width, self.color).map(|l| l.bounds),
         }
@@ -179,7 +183,7 @@ impl Annotation {
                 let length = (to[0] as f32).hypot(to[1] as f32);
                 half.max(arrow_head(self.line_width(), length).1)
             }
-            Shape::Rect(_) | Shape::Pen(_) => half,
+            Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half,
             Shape::Text(_) | Shape::Redact { .. } => 0.,
         }
     }
@@ -192,7 +196,9 @@ impl Annotation {
     fn is_empty(&self) -> bool {
         match &self.shape {
             Shape::Arrow(to) => to[0].abs().max(to[1].abs()) < 2,
-            Shape::Rect(size) | Shape::Redact { size, .. } => size[0] < 2 || size[1] < 2,
+            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
+                size[0] < 2 || size[1] < 2
+            }
             Shape::Pen(points) => points.is_empty(),
             Shape::Text(text) => text.trim().is_empty(),
         }
@@ -235,6 +241,7 @@ impl Annotation {
         match &self.shape {
             Shape::Arrow(_) => "Arrow".into(),
             Shape::Rect(_) => "Frame".into(),
+            Shape::Ellipse(_) => "Circle".into(),
             Shape::Pen(_) => "Pen".into(),
             Shape::Redact { .. } => "Redacted".into(),
             Shape::Text(text) => {
@@ -392,8 +399,9 @@ fn arrow_head(width: f32, length: f32) -> (f32, f32) {
     (head, head * 0.5)
 }
 
-/// The line and the head of an arrow from where it starts to `to`
-fn arrow(to: [i32; 2], width: f32) -> Option<(Path, Path)> {
+/// The tip and the two back corners of the head of an arrow from where it starts
+/// to `to`
+fn arrow_head_corners(to: [i32; 2], width: f32) -> Option<[Point; 3]> {
     let (x, y) = (to[0] as f32, to[1] as f32);
     let length = x.hypot(y);
     if length < 1. {
@@ -401,17 +409,30 @@ fn arrow(to: [i32; 2], width: f32) -> Option<(Path, Path)> {
     }
     let (dx, dy) = (x / length, y / length);
     let (head, half) = arrow_head(width, length);
+    let (bx, by) = (x - dx * head, y - dy * head);
+    Some([
+        Point::from_xy(x, y),
+        Point::from_xy(bx - dy * half, by + dx * half),
+        Point::from_xy(bx + dy * half, by - dx * half),
+    ])
+}
+
+/// The line and the head of an arrow from where it starts to `to`
+fn arrow(to: [i32; 2], width: f32) -> Option<(Path, Path)> {
+    let [tip, left, right] = arrow_head_corners(to, width)?;
+    let length = tip.x.hypot(tip.y);
+    let head = arrow_head(width, length).0;
     let mut line = PathBuilder::new();
     line.move_to(0., 0.);
     // into the head, which covers the round end
-    line.line_to(x - dx * head * 0.5, y - dy * head * 0.5);
-    let (bx, by) = (x - dx * head, y - dy * head);
-    let mut tip = PathBuilder::new();
-    tip.move_to(x, y);
-    tip.line_to(bx - dy * half, by + dx * half);
-    tip.line_to(bx + dy * half, by - dx * half);
-    tip.close();
-    Some((line.finish()?, tip.finish()?))
+    let into = 1. - head * 0.5 / length;
+    line.line_to(tip.x * into, tip.y * into);
+    let mut corners = PathBuilder::new();
+    corners.move_to(tip.x, tip.y);
+    corners.line_to(left.x, left.y);
+    corners.line_to(right.x, right.y);
+    corners.close();
+    Some((line.finish()?, corners.finish()?))
 }
 
 /// The fonts for text annotations: Inter right away, the fonts of the system for
@@ -627,6 +648,13 @@ fn draw(img: &mut RgbaImage, a: &Annotation, t: Transform, area: Rect) {
                 layer.stroke_path(&frame, &paint, &stroke, t, None);
             }
         }
+        Shape::Ellipse(size) => {
+            let oval = tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
+                .and_then(PathBuilder::from_oval);
+            if let Some(oval) = oval {
+                layer.stroke_path(&oval, &paint, &stroke, t, None);
+            }
+        }
         Shape::Pen(points) => {
             if let [only] = points.as_slice() {
                 let dot =
@@ -840,9 +868,9 @@ pub fn visible(stack: &[ImgOpItem], state: &AnnotateUi) -> Vec<Annotation> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
-    Select,
     Arrow,
-    Rectangle,
+    Frame,
+    Circle,
     Text,
     Pen,
     Redact,
@@ -850,9 +878,9 @@ pub enum Tool {
 
 impl Tool {
     const ALL: [Tool; 6] = [
-        Tool::Select,
         Tool::Arrow,
-        Tool::Rectangle,
+        Tool::Frame,
+        Tool::Circle,
         Tool::Text,
         Tool::Pen,
         Tool::Redact,
@@ -860,9 +888,9 @@ impl Tool {
 
     fn name(self) -> &'static str {
         match self {
-            Tool::Select => "Select",
             Tool::Arrow => "Arrow",
-            Tool::Rectangle => "Frame",
+            Tool::Frame => "Frame",
+            Tool::Circle => "Circle",
             Tool::Text => "Text",
             Tool::Pen => "Pen",
             Tool::Redact => "Redact",
@@ -871,14 +899,93 @@ impl Tool {
 
     fn hint(self) -> &'static str {
         match self {
-            Tool::Select => {
-                "Click to select, Shift+click for more, drag around several, drag to move"
-            }
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
-            Tool::Rectangle => "Drag a frame around something",
+            Tool::Frame => "Drag a frame around something, with Shift a square",
+            Tool::Circle => "Drag a circle around something, with Shift a round one",
             Tool::Text => "Click where the text goes, click a text to change it",
             Tool::Pen => "Draw freely",
             Tool::Redact => "Drag over what nobody should see",
+        }
+    }
+
+    fn icon(self) -> Icon {
+        match self {
+            Tool::Arrow => Icon::Arrow,
+            Tool::Frame => Icon::Frame,
+            Tool::Circle => Icon::Circle,
+            Tool::Text => Icon::Text,
+            Tool::Pen => Icon::Pen,
+            Tool::Redact => Icon::Pixelate,
+        }
+    }
+}
+
+/// What the button of a tool or of a way to hide shows
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Icon {
+    Arrow,
+    Frame,
+    Circle,
+    Text,
+    Pen,
+    Pixelate,
+    Fill,
+}
+
+/// Draws an icon in the middle of `rect`, in lines as thick as those of the icon font
+fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Color32) {
+    // in a box of 16 by 16
+    let at = |x: f32, y: f32| rect.center() + egui::vec2(x - 8., y - 8.);
+    let stroke = Stroke::new(1.6, color);
+    let square = egui::Rect::from_min_max(at(2.5, 3.5), at(13.5, 12.5));
+    match icon {
+        Icon::Arrow => {
+            painter.line_segment([at(2.5, 13.5), at(10., 6.)], stroke);
+            painter.add(egui::Shape::convex_polygon(
+                vec![at(13.5, 2.5), at(11.4, 8.9), at(7.1, 4.6)],
+                color,
+                Stroke::NONE,
+            ));
+        }
+        Icon::Frame => {
+            painter.rect_stroke(square, 1., stroke, egui::StrokeKind::Middle);
+        }
+        Icon::Circle => {
+            painter.circle_stroke(at(8., 8.), 5.8, stroke);
+        }
+        Icon::Text => {
+            let stroke = Stroke::new(1.9, color);
+            painter.line_segment([at(3., 3.), at(13., 3.)], stroke);
+            painter.line_segment([at(8., 3.), at(8., 14.)], stroke);
+        }
+        Icon::Pen => {
+            painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
+                [at(2., 12.), at(5., 0.), at(10., 17.), at(14., 4.)],
+                false,
+                Color32::TRANSPARENT,
+                stroke,
+            ));
+        }
+        Icon::Pixelate => {
+            // blocks of two shades, as a pixelated area
+            for row in 0..3 {
+                for column in 0..3 {
+                    let shade = if (row + column) % 2 == 0 {
+                        color
+                    } else {
+                        color.gamma_multiply(0.35)
+                    };
+                    let min = at(2. + column as f32 * 4., 2. + row as f32 * 4.);
+                    painter.rect_filled(
+                        egui::Rect::from_min_size(min, egui::vec2(4., 4.)),
+                        0.,
+                        shade,
+                    );
+                }
+            }
+        }
+        Icon::Fill => {
+            painter.rect_filled(square, 1., color);
         }
     }
 }
@@ -892,8 +999,6 @@ enum Drag {
         from: [f32; 2],
         starts: Vec<[i32; 2]>,
     },
-    /// Selecting what a box from here on the screen touches
-    Select { from: Pos2 },
 }
 
 /// What the mouse and the keys do with annotations
@@ -1003,8 +1108,8 @@ impl AnnotateUi {
 pub fn panel_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
     ui.horizontal_wrapped(|ui| {
         for tool in Tool::ALL {
-            if toggle(ui, state.tool == Some(tool), tool.name())
-                .on_hover_text(tool.hint())
+            if icon_button(ui, state.tool == Some(tool), tool.icon())
+                .on_hover_text(format!("{}\n{}", tool.name(), tool.hint()))
                 .clicked()
             {
                 state.finish_typing(annotations);
@@ -1069,8 +1174,14 @@ pub fn panel_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Anno
         .collect();
     if state.tool == Some(Tool::Redact) || !redactions.is_empty() {
         ui.horizontal(|ui| {
-            for (style, name) in [(Redaction::Pixelate, "Pixelate"), (Redaction::Fill, "Fill")] {
-                if toggle(ui, state.redaction == style, name).clicked() {
+            for (style, icon, name) in [
+                (Redaction::Pixelate, Icon::Pixelate, "Pixelate"),
+                (Redaction::Fill, Icon::Fill, "Fill with the color"),
+            ] {
+                if icon_button(ui, state.redaction == style, icon)
+                    .on_hover_text(name)
+                    .clicked()
+                {
                     state.redaction = style;
                     for i in &redactions {
                         if let Some(Shape::Redact { style: s, .. }) =
@@ -1089,9 +1200,8 @@ pub fn panel_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Anno
         ui.horizontal(|ui| {
             if toggle(ui, state.selected.contains(&i), &a.label()).clicked() {
                 state.selected = vec![i];
-                if state.tool.is_none() {
-                    state.tool = Some(Tool::Select);
-                }
+                // the selection lasts while annotating
+                state.tool.get_or_insert(Tool::Arrow);
             }
             if ui
                 .small_button(crate::icons::X)
@@ -1108,14 +1218,27 @@ pub fn panel_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Anno
 
     if state.tool.is_some() {
         ui.horizontal_wrapped(|ui| {
-            ui.small("Del removes what is selected, Esc stops annotating.");
+            ui.small(
+                "Drag what you point at to move it, Shift+click selects more, double click a \
+                 text to change it. Del removes what is selected, Esc stops annotating.",
+            );
         });
     }
 }
 
 /// A button that is lit while `on`, as the one for paint mode
 fn toggle(ui: &mut Ui, on: bool, text: &str) -> egui::Response {
-    let button = egui::Button::new(text);
+    lit(ui, on, egui::Button::new(text))
+}
+
+fn icon_button(ui: &mut Ui, on: bool, icon: Icon) -> egui::Response {
+    let response = lit(ui, on, egui::Button::new("").min_size(egui::vec2(28., 24.)));
+    let color = ui.style().interact(&response).fg_stroke.color;
+    paint_icon(ui.painter(), response.rect, icon, color);
+    response
+}
+
+fn lit<'a>(ui: &mut Ui, on: bool, button: egui::Button<'a>) -> egui::Response {
     ui.add(if on {
         button.fill(ui.style().visuals.selection.bg_fill)
     } else {
@@ -1162,35 +1285,36 @@ pub fn canvas_ui(
             p.y * geo.scale + geo.offset.y,
         )
     };
-    // the corners of an annotation on the screen, around its lines
-    let outline = |a: &Annotation| {
-        let b = a.bounds()?;
-        let reach = a.reach();
-        let mut corners = [
-            Point::from_xy(b[0] - reach, b[1] - reach),
-            Point::from_xy(b[2] + reach, b[1] - reach),
-            Point::from_xy(b[2] + reach, b[3] + reach),
-            Point::from_xy(b[0] - reach, b[3] + reach),
-        ];
-        a.transform(mapping).map_points(&mut corners);
-        Some(corners.map(to_screen))
-    };
     let painter = ctx
         .layer_painter(egui::LayerId::new(
             egui::Order::Middle,
             Id::new("annotation_overlay"),
         ))
         .with_clip_rect(canvas_rect(ctx));
-    let show = |corners: [Pos2; 4], strong: bool| {
+    // a thin line around it, for what the mouse points at, a stronger one for what
+    // is selected
+    let show = |a: &Annotation, strong: bool| {
+        let t = a.transform(mapping);
+        let on_screen = (scale_of(t) * geo.scale).max(0.001);
         let width = if strong { 1.5 } else { 1. };
-        painter.add(egui::Shape::closed_line(
-            corners.to_vec(),
-            Stroke::new(width + 2., Color32::from_black_alpha(120)),
-        ));
-        painter.add(egui::Shape::closed_line(
-            corners.to_vec(),
-            Stroke::new(width, Color32::from_rgb(255, 200, 40)),
-        ));
+        for line in outline(a, 3. / on_screen, on_screen) {
+            let points: Vec<Pos2> = line
+                .into_iter()
+                .map(|p| {
+                    let mut p = Point::from_xy(p[0], p[1]);
+                    t.map_point(&mut p);
+                    to_screen(p)
+                })
+                .collect();
+            painter.add(egui::Shape::closed_line(
+                points.clone(),
+                Stroke::new(width + 2., Color32::from_black_alpha(120)),
+            ));
+            painter.add(egui::Shape::closed_line(
+                points,
+                Stroke::new(width, Color32::from_rgb(255, 200, 40)),
+            ));
+        }
     };
 
     let typed = text_ui(ctx, annotations, state, mapping, geo);
@@ -1258,11 +1382,13 @@ pub fn canvas_ui(
             i.pointer.primary_pressed(),
             i.pointer.primary_down(),
             i.pointer.primary_released(),
+            // on the second release
             i.pointer
                 .button_double_clicked(egui::PointerButton::Primary),
             i.modifiers.shift,
         )
     });
+    // a drag goes on over the panels too
     let pointer = ctx.input(|i| i.pointer.hover_pos());
     // the mouse may be this far off a line on the screen and still hit it
     let slack = 6. / geo.scale.max(0.01);
@@ -1271,6 +1397,7 @@ pub fn canvas_ui(
             .rev()
             .find(|i| hits(&annotations[*i], mapping, p, slack))
     };
+    let is_text = |a: &Annotation| matches!(a.shape, Shape::Text(_));
 
     if let Some(pos) = pointer {
         let p = to_result(pos);
@@ -1281,62 +1408,51 @@ pub fn canvas_ui(
                 // the click only ends the typing
                 state.finish_typing(annotations);
             } else {
-                match tool {
-                    Tool::Select => match hit(annotations, p) {
-                        Some(i) if double && matches!(annotations[i].shape, Shape::Text(_)) => {
-                            state.start_typing(i)
-                        }
-                        Some(i) => {
-                            if shift {
-                                if let Some(at) = state.selected.iter().position(|s| *s == i) {
-                                    state.selected.remove(at);
-                                } else {
-                                    state.selected.push(i);
-                                }
-                            } else {
-                                if !state.selected.contains(&i) {
-                                    state.selected = vec![i];
-                                }
-                                state.drag = Some(Drag::Move {
-                                    from: o,
-                                    starts: state
-                                        .selected
-                                        .iter()
-                                        .map(|i| annotations[*i].start(original))
-                                        .collect(),
-                                });
-                            }
-                        }
-                        None => {
-                            if !shift {
-                                state.selected.clear();
-                            }
-                            state.drag = Some(Drag::Select { from: pos });
-                        }
-                    },
-                    Tool::Text => {
-                        let text = hit(annotations, p)
-                            .filter(|i| matches!(annotations[*i].shape, Shape::Text(_)));
-                        if let Some(i) = text {
-                            state.start_typing(i);
+                let under = hit(annotations, p);
+                let text_under = under.filter(|i| is_text(&annotations[*i]));
+                match under {
+                    // the text tool changes the text it clicks
+                    Some(i) if tool == Tool::Text && text_under.is_some() => state.start_typing(i),
+                    Some(i) if shift => {
+                        if let Some(at) = state.selected.iter().position(|s| *s == i) {
+                            state.selected.remove(at);
                         } else {
-                            let mut a = Annotation::new(
-                                Shape::Text(String::new()),
-                                state.color,
-                                state.text_size,
-                                round(o),
-                            );
-                            a.stand_upright(mapping);
-                            annotations.push(a);
-                            state.start_typing(annotations.len() - 1);
+                            state.selected.push(i);
                         }
                     }
-                    Tool::Arrow | Tool::Rectangle | Tool::Pen | Tool::Redact => {
+                    // what is pointed at is selected and moved, with what else is
+                    // selected
+                    Some(i) => {
+                        if !state.selected.contains(&i) {
+                            state.selected = vec![i];
+                        }
+                        state.drag = Some(Drag::Move {
+                            from: o,
+                            starts: state
+                                .selected
+                                .iter()
+                                .map(|i| annotations[*i].start(original))
+                                .collect(),
+                        });
+                    }
+                    None if tool == Tool::Text => {
+                        let mut a = Annotation::new(
+                            Shape::Text(String::new()),
+                            state.color,
+                            state.text_size,
+                            round(o),
+                        );
+                        a.stand_upright(mapping);
+                        annotations.push(a);
+                        state.start_typing(annotations.len() - 1);
+                    }
+                    None => {
                         let (shape, color, width) = match tool {
                             Tool::Arrow => (Shape::Arrow([0, 0]), state.color, state.width),
-                            Tool::Rectangle => (Shape::Rect([0, 0]), state.color, state.width),
+                            Tool::Frame => (Shape::Rect([0, 0]), state.color, state.width),
+                            Tool::Circle => (Shape::Ellipse([0, 0]), state.color, state.width),
                             Tool::Pen => (Shape::Pen(vec![[0, 0]]), state.color, state.width),
-                            _ => (
+                            Tool::Text | Tool::Redact => (
                                 Shape::Redact {
                                     size: [0, 0],
                                     style: state.redaction,
@@ -1358,12 +1474,17 @@ pub fn canvas_ui(
             match &state.drag {
                 Some(Drag::Draw { index, from }) => {
                     if let Some(a) = annotations.get_mut(*index) {
-                        let d = [o[0] - from[0], o[1] - from[1]];
-                        let corner = [from[0].min(o[0]), from[1].min(o[1])];
+                        let mut d = [o[0] - from[0], o[1] - from[1]];
+                        if shift && matches!(a.shape, Shape::Rect(_) | Shape::Ellipse(_)) {
+                            // as wide as high
+                            let side = d[0].abs().max(d[1].abs());
+                            d = [side.copysign(d[0]), side.copysign(d[1])];
+                        }
+                        let corner = [from[0] + d[0].min(0.), from[1] + d[1].min(0.)];
                         let size = round([d[0].abs(), d[1].abs()]);
                         match &mut a.shape {
                             Shape::Arrow(to) => *to = round(d),
-                            Shape::Rect(s) | Shape::Redact { size: s, .. } => {
+                            Shape::Rect(s) | Shape::Ellipse(s) | Shape::Redact { size: s, .. } => {
                                 *s = size;
                                 a.set_start(round(corner), original);
                             }
@@ -1383,44 +1504,22 @@ pub fn canvas_ui(
                         annotations[*i].set_start([start[0] + d[0], start[1] + d[1]], original);
                     }
                 }
-                Some(Drag::Select { from }) => {
-                    let rect = egui::Rect::from_two_pos(*from, pos);
-                    painter.rect_filled(rect, 0., Color32::from_white_alpha(20));
-                    painter.rect_stroke(
-                        rect,
-                        0.,
-                        Stroke::new(1., Color32::from_rgb(255, 200, 40)),
-                        egui::StrokeKind::Inside,
-                    );
-                    if released {
-                        for (i, a) in annotations.iter().enumerate() {
-                            let touched = outline(a).is_some_and(|corners| {
-                                rect.intersects(egui::Rect::from_points(&corners))
-                            });
-                            if touched && !state.selected.contains(&i) {
-                                state.selected.push(i);
-                            }
-                        }
-                    }
-                }
                 None => {}
             }
         }
 
         if !pointer_over_ui {
-            ctx.set_cursor_icon(match tool {
-                Tool::Select if hit(annotations, p).is_some() => CursorIcon::Move,
-                Tool::Select => CursorIcon::Default,
-                Tool::Text => CursorIcon::Text,
-                _ => CursorIcon::Crosshair,
+            // what a click would select and move
+            let pointed = hit(annotations, p).filter(|_| state.drag.is_none());
+            ctx.set_cursor_icon(match pointed {
+                Some(i) if tool == Tool::Text && is_text(&annotations[i]) => CursorIcon::Text,
+                Some(_) => CursorIcon::Move,
+                None if matches!(state.drag, Some(Drag::Move { .. })) => CursorIcon::Move,
+                None if tool == Tool::Text => CursorIcon::Text,
+                None => CursorIcon::Crosshair,
             });
-            // what a click would select
-            if tool == Tool::Select
-                && state.drag.is_none()
-                && let Some(i) = hit(annotations, p).filter(|i| !state.selected.contains(i))
-                && let Some(corners) = outline(&annotations[i])
-            {
-                show(corners, false);
+            if let Some(i) = pointed.filter(|i| !state.selected.contains(i)) {
+                show(&annotations[i], false);
             }
         }
     }
@@ -1439,15 +1538,22 @@ pub fn canvas_ui(
                     annotations[i].reanchor(original);
                 }
             }
-            Drag::Select { .. } => {}
         }
+    }
+    // a double click changes a text
+    if released
+        && double
+        && !pointer_over_ui
+        && state.typing.is_none()
+        && let Some(pos) = pointer
+        && let Some(i) = hit(annotations, to_result(pos)).filter(|i| is_text(&annotations[*i]))
+    {
+        state.start_typing(i);
     }
 
     for &i in &state.selected {
-        if state.typing != Some(i)
-            && let Some(corners) = outline(&annotations[i])
-        {
-            show(corners, true);
+        if state.typing != Some(i) {
+            show(&annotations[i], true);
         }
     }
     copy
@@ -1524,6 +1630,188 @@ fn text_ui(
     done
 }
 
+/// The lines that show an annotation is pointed at or selected, in its own
+/// coordinates, each closed: `gap` around its lines, its arrow, its text or the
+/// area it hides. `resolution` is how large it is on the screen.
+fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
+    let w = a.line_width();
+    let mut stroke = tiny_skia::Stroke {
+        width: w + gap * 2.,
+        line_cap: LineCap::Round,
+        line_join: LineJoin::Round,
+        ..Default::default()
+    };
+    // of an area, only the line outside of it
+    let mut area = false;
+    let path = match &a.shape {
+        Shape::Arrow(to) => {
+            let Some([tip, left, right]) = arrow_head_corners(*to, w) else {
+                return vec![];
+            };
+            // the arrow as one area: along the line on one side, around the head
+            // and back on the other side
+            let length = tip.x.hypot(tip.y);
+            let (nx, ny) = (-tip.y / length * w / 2., tip.x / length * w / 2.);
+            let (bx, by) = ((left.x + right.x) / 2., (left.y + right.y) / 2.);
+            let mut arrow = PathBuilder::new();
+            arrow.move_to(nx, ny);
+            arrow.line_to(bx + nx, by + ny);
+            arrow.line_to(left.x, left.y);
+            arrow.line_to(tip.x, tip.y);
+            arrow.line_to(right.x, right.y);
+            arrow.line_to(bx - nx, by - ny);
+            arrow.line_to(-nx, -ny);
+            // around the round end where it starts
+            let (backx, backy) = (-tip.x / length * w / 2., -tip.y / length * w / 2.);
+            for i in 1..8 {
+                let (sin, cos) = (i as f32 / 8. * std::f32::consts::PI).sin_cos();
+                arrow.line_to(-nx * cos + backx * sin, -ny * cos + backy * sin);
+            }
+            arrow.close();
+            stroke.width = gap * 2.;
+            area = true;
+            arrow.finish()
+        }
+        Shape::Rect(size) => {
+            stroke.line_join = LineJoin::Miter;
+            tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
+                .map(PathBuilder::from_rect)
+        }
+        Shape::Ellipse(size) => tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
+            .and_then(PathBuilder::from_oval),
+        Shape::Pen(points) => {
+            let mut line = PathBuilder::new();
+            for (i, p) in points.iter().enumerate() {
+                if i == 0 {
+                    line.move_to(p[0] as f32, p[1] as f32);
+                } else {
+                    line.line_to(p[0] as f32, p[1] as f32);
+                }
+            }
+            if let [only] = points.as_slice() {
+                // a dot
+                line.line_to(only[0] as f32, only[1] as f32 + 0.01);
+                area = true;
+            }
+            line.finish()
+        }
+        Shape::Text(_) | Shape::Redact { .. } => {
+            let Some(b) = a.bounds() else { return vec![] };
+            let (l, t, r, b) = (b[0] - gap, b[1] - gap, b[2] + gap, b[3] + gap);
+            return vec![vec![[l, t], [r, t], [r, b], [l, b]]];
+        }
+    };
+    let Some(around) = path.and_then(|path| path.stroke(&stroke, resolution)) else {
+        return vec![];
+    };
+    let mut lines = contours(&around);
+    // where it turns, a stroke also goes over itself, inside of what it draws
+    for line in &mut lines {
+        line.retain(|p| !touches(a, Point::from_xy(p[0], p[1]), gap * 0.5));
+        without_sharp_turns(line);
+    }
+    lines.retain(|line| line.len() > 2);
+    if area {
+        // the widest one
+        let extent = |line: &Vec<[f32; 2]>| {
+            let (min, max) = line
+                .iter()
+                .fold(([f32::MAX; 2], [f32::MIN; 2]), |(min, max), p| {
+                    (
+                        [min[0].min(p[0]), min[1].min(p[1])],
+                        [max[0].max(p[0]), max[1].max(p[1])],
+                    )
+                });
+            (max[0] - min[0]) * (max[1] - min[1])
+        };
+        lines.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+        lines.truncate(1);
+    }
+    lines
+}
+
+/// Takes out the points of a closed line where it turns back, a line drawn through
+/// them would end in a long spike there
+fn without_sharp_turns(line: &mut Vec<[f32; 2]>) {
+    let mut i = 0;
+    let mut kept = 0;
+    // until it went once around without taking any out
+    while line.len() > 2 && kept < line.len() {
+        let n = line.len();
+        let (before, at, after) = (line[(i + n - 1) % n], line[i % n], line[(i + 1) % n]);
+        let (ax, ay) = (at[0] - before[0], at[1] - before[1]);
+        let (bx, by) = (after[0] - at[0], after[1] - at[1]);
+        let (a, b) = (ax.hypot(ay), bx.hypot(by));
+        // twice the same point, or turned by more than about 100°
+        if a < 0.001 || (b >= 0.001 && ax * bx + ay * by < -0.2 * a * b) {
+            line.remove(i % n);
+            kept = 0;
+            // the one before may turn sharply now
+            i = (i + n - 2) % (n - 1);
+        } else {
+            i = (i + 1) % n;
+            kept += 1;
+        }
+    }
+}
+
+/// The lines a path is made of, its curves in short straight pieces
+fn contours(path: &Path) -> Vec<Vec<[f32; 2]>> {
+    let mut lines = vec![];
+    let mut line: Vec<[f32; 2]> = vec![];
+    let mut last = Point::zero();
+    for segment in path.segments() {
+        match segment {
+            tiny_skia::PathSegment::MoveTo(p) => {
+                if line.len() > 1 {
+                    lines.push(std::mem::take(&mut line));
+                }
+                line = vec![[p.x, p.y]];
+                last = p;
+            }
+            tiny_skia::PathSegment::LineTo(p) => {
+                line.push([p.x, p.y]);
+                last = p;
+            }
+            tiny_skia::PathSegment::QuadTo(c, p) => {
+                for i in 1..=8 {
+                    let (t, u) = (i as f32 / 8., 1. - i as f32 / 8.);
+                    line.push([
+                        u * u * last.x + 2. * u * t * c.x + t * t * p.x,
+                        u * u * last.y + 2. * u * t * c.y + t * t * p.y,
+                    ]);
+                }
+                last = p;
+            }
+            tiny_skia::PathSegment::CubicTo(c1, c2, p) => {
+                for i in 1..=8 {
+                    let (t, u) = (i as f32 / 8., 1. - i as f32 / 8.);
+                    line.push([
+                        u * u * u * last.x
+                            + 3. * u * u * t * c1.x
+                            + 3. * u * t * t * c2.x
+                            + t * t * t * p.x,
+                        u * u * u * last.y
+                            + 3. * u * u * t * c1.y
+                            + 3. * u * t * t * c2.y
+                            + t * t * t * p.y,
+                    ]);
+                }
+                last = p;
+            }
+            tiny_skia::PathSegment::Close => {
+                if line.len() > 1 {
+                    lines.push(std::mem::take(&mut line));
+                }
+            }
+        }
+    }
+    if line.len() > 1 {
+        lines.push(line);
+    }
+    lines
+}
+
 /// Whether a point of the edited image is on an annotation, `slack` pixels around
 /// it count too
 fn hits(a: &Annotation, mapping: &Mapping, p: [f32; 2], slack: f32) -> bool {
@@ -1533,30 +1821,80 @@ fn hits(a: &Annotation, mapping: &Mapping, p: [f32; 2], slack: f32) -> bool {
     };
     let mut q = Point::from_xy(p[0], p[1]);
     back.map_point(&mut q);
-    let slack = slack / scale_of(t).max(0.001);
-    let near = a.line_width() / 2. + slack;
-    let to_line = |p0: [i32; 2], p1: [i32; 2]| {
-        let (ax, ay, bx, by) = (p0[0] as f32, p0[1] as f32, p1[0] as f32, p1[1] as f32);
-        let (dx, dy) = (bx - ax, by - ay);
-        let length = dx * dx + dy * dy;
-        let along = if length == 0. {
-            0.
-        } else {
-            (((q.x - ax) * dx + (q.y - ay) * dy) / length).clamp(0., 1.)
-        };
-        (q.x - ax - along * dx).hypot(q.y - ay - along * dy)
+    touches(a, q, slack / scale_of(t).max(0.001))
+}
+
+/// How far a point, from the centre of an ellipse with these radii, is from its line.
+/// After github.com/0xfaded/ellipse_demo, which comes close in a few steps.
+fn ellipse_distance(rx: f32, ry: f32, dx: f32, dy: f32) -> f32 {
+    let (px, py) = (dx.abs(), dy.abs());
+    let (mut tx, mut ty) = (
+        std::f32::consts::FRAC_1_SQRT_2,
+        std::f32::consts::FRAC_1_SQRT_2,
+    );
+    for _ in 0..4 {
+        let (x, y) = (rx * tx, ry * ty);
+        let ex = (rx * rx - ry * ry) * tx.powi(3) / rx;
+        let ey = (ry * ry - rx * rx) * ty.powi(3) / ry;
+        let r = (x - ex).hypot(y - ey);
+        let (qx, qy) = (px - ex, py - ey);
+        let q = qx.hypot(qy).max(f32::EPSILON);
+        tx = ((qx * r / q + ex) / rx).clamp(0., 1.);
+        ty = ((qy * r / q + ey) / ry).clamp(0., 1.);
+        let t = tx.hypot(ty).max(f32::EPSILON);
+        (tx, ty) = (tx / t, ty / t);
+    }
+    (px - rx * tx).hypot(py - ry * ty)
+}
+
+/// How far a point is from the straight line between two others
+fn segment_distance(q: Point, a: Point, b: Point) -> f32 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let length = dx * dx + dy * dy;
+    let along = if length == 0. {
+        0.
+    } else {
+        (((q.x - a.x) * dx + (q.y - a.y) * dy) / length).clamp(0., 1.)
     };
+    (q.x - a.x - along * dx).hypot(q.y - a.y - along * dy)
+}
+
+/// Whether a point in the annotation's own coordinates is on it, or `slack` off it
+fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
+    let near = a.line_width() / 2. + slack;
+    let point = |p: [i32; 2]| Point::from_xy(p[0] as f32, p[1] as f32);
+    let to_line = |p0: [i32; 2], p1: [i32; 2]| segment_distance(q, point(p0), point(p1));
     match &a.shape {
-        Shape::Arrow(to) => {
-            let length = (to[0] as f32).hypot(to[1] as f32);
-            let head = arrow_head(a.line_width(), length).1;
-            to_line([0, 0], *to) <= near
-                || (q.x - to[0] as f32).hypot(q.y - to[1] as f32) <= head + slack
-        }
+        Shape::Arrow(to) => match arrow_head_corners(*to, a.line_width()) {
+            None => to_line([0, 0], *to) <= near,
+            Some([tip, left, right]) => {
+                // the line ends below the head, as it is drawn
+                let length = tip.x.hypot(tip.y);
+                let into = 1. - arrow_head(a.line_width(), length).0 * 0.5 / length;
+                let end = Point::from_xy(tip.x * into, tip.y * into);
+                let sides = [(tip, left), (left, right), (right, tip)];
+                // on the same side of all sides of the head is inside it
+                let turns = sides
+                    .map(|(p0, p1)| (p1.x - p0.x) * (q.y - p0.y) - (p1.y - p0.y) * (q.x - p0.x));
+                segment_distance(q, Point::zero(), end) <= near
+                    || turns.iter().all(|t| *t >= 0.)
+                    || turns.iter().all(|t| *t <= 0.)
+                    || sides
+                        .iter()
+                        .any(|(p0, p1)| segment_distance(q, *p0, *p1) <= slack)
+            }
+        },
         Shape::Rect(size) => {
             let (w, h) = (size[0] as f32, size[1] as f32);
             let inside = |by: f32| q.x >= -by && q.y >= -by && q.x <= w + by && q.y <= h + by;
             inside(near) && !inside(-near)
+        }
+        Shape::Ellipse(size) => {
+            let (rx, ry) = (size[0] as f32 / 2., size[1] as f32 / 2.);
+            if rx.min(ry) <= 0. {
+                return to_line([0, 0], *size) <= near;
+            }
+            ellipse_distance(rx, ry, q.x - rx, q.y - ry) <= near
         }
         Shape::Pen(points) => match points.as_slice() {
             [only] => to_line(*only, *only) <= near,
@@ -1715,6 +2053,14 @@ mod tests {
             Box::new(|a| a[2].shape = Shape::Text("Changed".into())),
             Box::new(|a| a[1].color = [10, 10, 10, 90]),
             Box::new(|a| a.push(arrow_at([300, 230], [-200, -200]))),
+            Box::new(|a| {
+                a.push(Annotation::new(
+                    Shape::Ellipse([70, 50]),
+                    [255, 255, 0, 200],
+                    7,
+                    [100, 100],
+                ))
+            }),
             // to the front
             Box::new(|a| {
                 let first = a.remove(0);
@@ -1850,14 +2196,147 @@ mod tests {
         let frame = Annotation::new(Shape::Rect([100, 100]), [0; 4], 4, [100, 100]);
         assert!(hits(&frame, &mapping, [101., 150.], 2.), "on the frame");
         assert!(!hits(&frame, &mapping, [150., 150.], 2.), "inside it");
+        // the head is hit to its corners, not before its tip
+        let head = arrow_head_corners([100, 0], 6.).expect("a head");
+        assert!(hits(
+            &arrow,
+            &mapping,
+            [head[1].x + 50.5, head[1].y + 50.],
+            1.
+        ));
+        assert!(!hits(&arrow, &mapping, [153., 50.], 1.));
         let text = Annotation::new(Shape::Text("Hi".into()), [0; 4], 30, [20, 200]);
         assert!(hits(&text, &mapping, [30., 220.], 0.));
+    }
+
+    #[test]
+    fn circles_are_drawn_and_hit() {
+        let img = RgbaImage::from_pixel(100, 100, Rgba([0, 0, 0, 255]));
+        let mapping = Mapping::new(&[], (100, 100));
+        let circle = Annotation::new(Shape::Ellipse([60, 40]), [255, 0, 0, 255], 4, [20, 30]);
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&circle), &mapping);
+        for (x, y) in [(20, 50), (79, 50), (50, 30), (50, 69)] {
+            assert!(drawn.get_pixel(x, y)[0] > 200, "no line at {x},{y}");
+        }
+        assert_eq!(drawn.get_pixel(50, 50).0, [0, 0, 0, 255], "inside it");
+        assert_eq!(
+            drawn.get_pixel(22, 32).0,
+            [0, 0, 0, 255],
+            "in the corner of its box"
+        );
+        assert!(hits(&circle, &mapping, [21., 50.], 2.));
+        assert!(hits(&circle, &mapping, [50., 31.], 2.));
+        assert!(!hits(&circle, &mapping, [50., 50.], 2.), "inside it");
+        assert!(
+            !hits(&circle, &mapping, [22., 32.], 2.),
+            "in the corner of its box"
+        );
+        for (rx, ry, dx, dy, distance) in [
+            (10., 10., 13., 0., 3.),
+            (10., 10., 3., -4., 5.),
+            (40., 4., 0., 0., 4.),
+            (40., 4., 45., 0., 5.),
+            // nearer above than at the end
+            (40., 4., -30., 0., 2.63),
+        ] {
+            let d = ellipse_distance(rx, ry, dx, dy);
+            assert!(
+                (d - distance).abs() < 0.05,
+                "{dx},{dy} is {d} from an ellipse of {rx} by {ry}, not {distance}"
+            );
+        }
+    }
+
+    #[test]
+    fn what_is_outlined_is_what_a_click_hits() {
+        let ops = [
+            item(ImageOperation::Rotate(90)),
+            item(ImageOperation::Resize {
+                dimensions: (150, 300),
+                aspect: false,
+                filter: crate::image_editing::ScaleFilter::Box,
+            }),
+        ];
+        let mapping = Mapping::new(&ops, (200, 100));
+        let shapes = [
+            Shape::Arrow([60, -30]),
+            Shape::Arrow([500, -375]),
+            Shape::Rect([50, 30]),
+            Shape::Ellipse([50, 30]),
+            Shape::Pen(vec![[0, 0], [20, 10], [40, -5]]),
+            // as drawn by hand, in small steps that turn a lot
+            Shape::Pen(
+                (0..60)
+                    .map(|i| [i, ((i as f32 * 0.7).sin() * 6.) as i32])
+                    .collect(),
+            ),
+            Shape::Pen(vec![[0, 0]]),
+            Shape::Ellipse([80, 8]),
+            Shape::Text("Hi".into()),
+            Shape::Redact {
+                size: [30, 20],
+                style: Redaction::Fill,
+            },
+        ];
+        for shape in shapes {
+            let a = Annotation::new(shape, [0; 4], 6, [80, 40]);
+            let t = a.transform(&mapping);
+            // 2 pixels around it in the edited image
+            let gap = 2. / scale_of(t);
+            let lines = outline(&a, gap, scale_of(t));
+            assert!(!lines.is_empty(), "{:?} has no outline", a.shape);
+            // all of it is inside
+            let b = a.bounds().expect("bounds");
+            let all = lines.iter().flatten();
+            let (left, top, right, bottom) = all.fold(
+                (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
+                |(l, t, r, b), p| (l.min(p[0]), t.min(p[1]), r.max(p[0]), b.max(p[1])),
+            );
+            assert!(
+                left < b[0] - gap / 2.
+                    && top < b[1] - gap / 2.
+                    && right > b[2] + gap / 2.
+                    && bottom > b[3] + gap / 2.,
+                "the outline of {:?} from {left},{top} to {right},{bottom} leaves out some of {b:?}",
+                a.shape
+            );
+            // egui draws a spike where a line turns back
+            for line in &lines {
+                let n = line.len();
+                for i in 0..n {
+                    let (before, at, after) = (line[(i + n - 1) % n], line[i], line[(i + 1) % n]);
+                    let (ax, ay) = (at[0] - before[0], at[1] - before[1]);
+                    let (bx, by) = (after[0] - at[0], after[1] - at[1]);
+                    assert!(
+                        ax * bx + ay * by >= -0.2 * ax.hypot(ay) * bx.hypot(by),
+                        "the outline of {:?} turns back at {at:?}",
+                        a.shape
+                    );
+                }
+            }
+            for p in lines.into_iter().flatten() {
+                let mut at = Point::from_xy(p[0], p[1]);
+                t.map_point(&mut at);
+                assert!(
+                    hits(&a, &mapping, [at.x, at.y], 2.5),
+                    "{:?} is not hit at {p:?} of its outline",
+                    a.shape
+                );
+                // and not much closer
+                assert!(
+                    !hits(&a, &mapping, [at.x, at.y], 1.),
+                    "{:?} is outlined too closely at {p:?}",
+                    a.shape
+                );
+            }
+        }
     }
 
     #[test]
     fn saved_with_the_edits() {
         let op = ImageOperation::Annotate(vec![
             arrow_at([1, 2], [3, 4]),
+            Annotation::new(Shape::Ellipse([8, 9]), [1, 2, 3, 4], 5, [6, 7]),
             Annotation::new(Shape::Text("ü & <b>".into()), [1, 2, 3, 4], 5, [6, 7]),
         ]);
         let json = serde_json::to_string(&op).expect("saved");
