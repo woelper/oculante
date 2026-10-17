@@ -1323,20 +1323,24 @@ impl AnnotateUi {
 }
 
 /// The annotations part of the edit panel: a tile for each tool, then a card for
-/// each annotation, the one in front first. Returns whether the edits changed.
+/// each annotation, the one in front first, all in one box that folds away. Returns
+/// whether the edits changed.
 pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi) -> bool {
     let mut changed = false;
     state.pointed_card = None;
     // before the lists of this frame are shown, which close on Esc
     state.popup_open = egui::Popup::is_any_open(ui.ctx());
-    let mut picked = None;
+    // saved edits with annotations show them right away
+    let any = annotations_mut(stack).is_some_and(|a| !a.is_empty());
     ui.scope(|ui| {
         ui.style_mut().visuals.collapsing_header_frame = true;
         ui.style_mut().visuals.indent_has_left_vline = false;
         egui::CollapsingHeader::new("Annotations")
             .icon(crate::ui::caret_icon)
+            .default_open(any)
             .show_unindented(ui, |ui| {
                 crate::ui::dark_panel(ui, |ui| {
+                    let mut picked = None;
                     let spacing = ui.spacing().item_spacing.x;
                     let width = ((ui.available_width() - spacing * 2.) / 3.).floor();
                     for row in Tool::ALL.chunks(3) {
@@ -1355,28 +1359,33 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
                             }
                         });
                     }
-                });
-                if state.tool.is_some() {
-                    ui.horizontal_wrapped(|ui| {
+                    if let Some(tool) = picked {
+                        let (annotations, created) = annotations_or_new(stack);
+                        changed |= created;
+                        state.finish_typing(annotations);
+                        state.tool = (state.tool != Some(tool)).then_some(tool);
+                    }
+                    if state.tool.is_some() {
+                        ui.add_space(2.);
                         ui.small(
                             "Drag what you point at to move it, Shift+click selects more, double \
                              click a text to change it. Del removes what is selected, Esc stops \
                              annotating.",
                         );
-                    });
-                }
+                        ui.add_space(2.);
+                    }
+                    if let Some(annotations) = annotations_mut(stack) {
+                        cards_ui(ui, annotations, state);
+                    }
+                });
             });
     });
-    if let Some(tool) = picked {
-        let (annotations, created) = annotations_or_new(stack);
-        changed |= created;
-        state.finish_typing(annotations);
-        state.tool = (state.tool != Some(tool)).then_some(tool);
-    }
-    let Some(annotations) = annotations_mut(stack) else {
-        return changed;
-    };
+    changed
+}
 
+/// The card of what comes next while nothing is selected, then one for each
+/// annotation, the one in front first
+fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
     // what comes next, while nothing is selected
     if let Some(tool) = state.tool
         && state.selected.is_empty()
@@ -1493,7 +1502,6 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
     if let Some(i) = remove {
         state.remove(annotations, vec![i]);
     }
-    changed
 }
 
 /// The annotations of the edits, which get them if they have none
