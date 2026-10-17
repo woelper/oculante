@@ -1310,10 +1310,15 @@ pub fn canvas_ui(
                 points.clone(),
                 Stroke::new(width + 2., Color32::from_black_alpha(120)),
             ));
-            painter.add(egui::Shape::closed_line(
-                points,
-                Stroke::new(width, Color32::from_rgb(255, 200, 40)),
-            ));
+            let yellow = Stroke::new(width, Color32::from_rgb(255, 200, 40));
+            if strong {
+                // what is selected is dashed, what is pointed at is not
+                let mut points = points;
+                points.push(points[0]);
+                painter.extend(egui::Shape::dashed_line(&points, yellow, 6., 4.));
+            } else {
+                painter.add(egui::Shape::closed_line(points, yellow));
+            }
         }
     };
 
