@@ -1551,8 +1551,13 @@ pub fn canvas_ui(
         state.start_typing(i);
     }
 
+    // not while it is typed or drawn
+    let drawn = match state.drag {
+        Some(Drag::Draw { index, .. }) => Some(index),
+        _ => None,
+    };
     for &i in &state.selected {
-        if state.typing != Some(i) {
+        if state.typing != Some(i) && drawn != Some(i) {
             show(&annotations[i], true);
         }
     }

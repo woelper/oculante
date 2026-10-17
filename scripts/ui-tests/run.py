@@ -723,6 +723,8 @@ def test_paint_on_transparency(binary):
 
 # where the filter search shows Annotate, the only filter that matches "annot"
 ANNOTATE_BUTTON = (790, 108, 210, 18)
+# the line around what is selected or pointed at
+OUTLINE = (255, 200, 40)
 # the tools of Annotate in the edit panel, scrolled to the top
 ANNOTATE_TOOLS = {
     name: (x, 206) for name, x in zip(("arrow", "frame", "circle", "text", "pen", "redact"), (795, 831, 866, 903, 938, 975))
@@ -756,12 +758,23 @@ def test_annotate(binary):
         app.move(40, 560)
         app.settle(1.0)
         before = app.shot("before")
-        app.drag(250, 400, 450, 250, steps=15)
+        app.move(250, 400)
+        app.x("xdotool", "mousedown", "1")
+        for i in range(1, 16):
+            app.move(250 + i * 200 / 15, 400 - i * 150 / 15)
+        app.settle(0.8)
+        drawing = app.shot("drawing")
+        app.x("xdotool", "mouseup", "1")
         app.move(40, 560)
         app.settle(1.0)
         arrow = app.shot("arrow")
         changed = changed_pixels_in(before, arrow, (240, 240, 220, 170))
         assert changed > 1000, f"the arrow changed only {changed} pixels"
+        # the outline of what is selected, only once it is drawn
+        arrow_box = (240, 240, 220, 170)
+        yellow = [count_color(shot, arrow_box, OUTLINE, 30) for shot in (before, drawing, arrow)]
+        assert yellow[1] - yellow[0] < 20, f"an outline while drawing: {yellow}"
+        assert yellow[2] - yellow[0] > 100, f"no outline around the arrow that was drawn: {yellow}"
         assert changed_pixels_in(before, arrow, (600, 420, 150, 90)) == 0, "the drag moved the image"
         since = len(app.log())
         app.key("Right")
