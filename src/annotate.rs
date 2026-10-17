@@ -1322,22 +1322,20 @@ impl AnnotateUi {
     }
 }
 
-/// The annotations part of the edit panel: a tile for each tool, then a card for
-/// each annotation, the one in front first, all in one box that folds away. Returns
+/// The annotations part of the edit panel: a tile for each tool in a box that folds
+/// away, then a card for each annotation, the one in front first. Like the cards of
+/// the filters they stay when it is folded, as they are still on the image. Returns
 /// whether the edits changed.
 pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi) -> bool {
     let mut changed = false;
     state.pointed_card = None;
     // before the lists of this frame are shown, which close on Esc
     state.popup_open = egui::Popup::is_any_open(ui.ctx());
-    // saved edits with annotations show them right away
-    let any = annotations_mut(stack).is_some_and(|a| !a.is_empty());
     ui.scope(|ui| {
         ui.style_mut().visuals.collapsing_header_frame = true;
         ui.style_mut().visuals.indent_has_left_vline = false;
         egui::CollapsingHeader::new("Annotations")
             .icon(crate::ui::caret_icon)
-            .default_open(any)
             .show_unindented(ui, |ui| {
                 crate::ui::dark_panel(ui, |ui| {
                     let mut picked = None;
@@ -1365,21 +1363,19 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
                         state.finish_typing(annotations);
                         state.tool = (state.tool != Some(tool)).then_some(tool);
                     }
-                    if state.tool.is_some() {
-                        ui.add_space(2.);
-                        ui.small(
-                            "Drag what you point at to move it, Shift+click selects more, double \
-                             click a text to change it. Del removes what is selected, Esc stops \
-                             annotating.",
-                        );
-                        ui.add_space(2.);
-                    }
-                    if let Some(annotations) = annotations_mut(stack) {
-                        cards_ui(ui, annotations, state);
-                    }
                 });
+                if state.tool.is_some() {
+                    ui.small(
+                        "Drag what you point at to move it, Shift+click selects more, double \
+                         click a text to change it. Del removes what is selected, Esc stops \
+                         annotating.",
+                    );
+                }
             });
     });
+    if let Some(annotations) = annotations_mut(stack) {
+        cards_ui(ui, annotations, state);
+    }
     changed
 }
 

@@ -898,13 +898,12 @@ def test_annotate(binary):
         assert app.wait_for_log(LOADED), "the image never loaded"
         app.settle(2.0)
         reopened = app.shot("reopened")
-        # the edits open the panel and the Annotations with a card for each of them,
-        # in the box below the tools
-        cards = count_color(reopened, (780, 285, 220, 90), (33, 33, 33), 2)
-        assert cards > 8000, f"the cards of the saved annotations have only {cards} pixels"
+        # the edits open the panel with a card for each annotation, the tools folded
+        cards = count_color(reopened, (780, 185, 220, 95), (33, 33, 33), 2)
+        assert cards > 10000, f"the cards of the saved annotations have only {cards} pixels"
         # the image is placed differently than before. Its only edits that show are
         # the annotations.
-        app.click(785, 431)  # "Disable all edits"
+        app.click(785, 327)  # "Disable all edits"
         app.move(40, 560)
         app.settle(1.0)
         off = app.shot("edits_off")
@@ -1244,7 +1243,7 @@ def test_annotation_cards(binary):
     """Each annotation has a card in the edit panel, the one in front first. What is
     set while nothing is selected is for the next one, an outline here. A card sends
     its annotation backward, hides it and removes it, and Esc closes a list of a card
-    without dropping the selection. The cards fold away with the tools."""
+    without dropping the selection. The tools fold away, the cards stay."""
     white = (255, 255, 255)
     frame_box = (470, 90, 140, 100)
     image_box = (140, 40, 620, 480)
@@ -1260,7 +1259,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 474, 894, 474, steps=6)
+        app.drag(876, 475, 894, 475, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1274,7 +1273,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(810, 377)  # "Send backward" on the card of the circle
+        app.click(803, 379)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
@@ -1282,17 +1281,17 @@ def test_annotation_cards(binary):
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
         corner = (470, 90, 25, 25)
-        app.click(828, 377)
+        app.click(822, 379)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(828, 377)
+        app.click(822, 379)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(848, 425)
+        app.click(842, 427)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1309,7 +1308,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 461)  # its font
+        app.click(980, 463)  # its font
         app.settle(0.8)
         listed = app.shot("list")
         assert changed_pixels_in(text, listed, (790, 280, 230, 200)) > 1000, "no list of fonts"
@@ -1325,14 +1324,15 @@ def test_annotation_cards(binary):
         unselected = app.shot("unselected")
         changed = changed_pixels_in(closed, unselected, text_box)
         assert changed > 50, f"the outline of the selected text is only {changed} pixels"
-        # the cards fold away with the tools, the annotations stay
+        # the tools fold away, the cards stay like those of the filters
         app.click(*ANNOTATIONS_HEADER)
         app.move(40, 560)
         app.settle(1.0)
         folded = app.shot("folded")
-        cards_box = (780, 280, 220, 150)
-        cards = [count_color(shot, cards_box, (33, 33, 33), 2) for shot in (unselected, folded)]
-        assert cards[0] > 8000 and cards[1] < 3000, f"pixels of cards, open and folded: {cards}"
+        tools = changed_pixels_in(unselected, folded, (780, 190, 225, 90))
+        assert tools > 5000, f"folding changed only {tools} pixels of the tools"
+        cards = count_color(folded, (780, 180, 220, 300), (33, 33, 33), 2)
+        assert cards > 30000, f"the folded Annotations have only {cards} pixels of cards"
         assert changed_pixels_in(unselected, folded, image_box) == 0, "folding changed the image"
 
 
