@@ -227,12 +227,16 @@ name = "my_benchmark"
 harness = false
 
 [patch.crates-io]
-# heic-rs 0.1.1 decodes photos from phones with the wrong contrast and colour:
+# Both are pinned to a commit, so packagers who build offline can fetch them first.
+#
+# heic-rs 0.1.4 decodes photos from phones with the wrong contrast and colour:
 # it ignores what the video stream says about range and matrix when the file
-# has no colr box. Fixed in tbraun96/heic-rs#7 and #8. Remove this once a
-# release contains both.
-heic-rs = { git = "https://github.com/woelper/heic-rs", branch = "oculante" }
+# has no colr box (tbraun96/heic-rs#7 and #8). It decodes only the primary image
+# of a file (#9), and camera HIF in 4:2:2 (#10) and 4:4:4 (#12) do not decode right.
+# The commit is the `oculante` branch of the fork, remove this once a release
+# contains all of them.
+heic-rs = { git = "https://github.com/woelper/heic-rs", rev = "5a8e7146aea6f216bff931ddd67ec4a77fe64384" }
 # avif-parse 2.1.0 refuses AVIFs whose last box has the size 0, which means it runs
 # to the end of the file. Lightroom writes its AVIF exports like that. Fixed in
 # kornelski/avif-parse#4, remove this once a release contains it.
-avif-parse = { git = "https://github.com/woelper/avif-parse", branch = "oculante" }
+avif-parse = { git = "https://github.com/woelper/avif-parse", rev = "616d71b0597707e658d382f76bbf93961d4c411e" }
