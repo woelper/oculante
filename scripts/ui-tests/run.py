@@ -377,6 +377,37 @@ def test_first_and_last_image(binary):
         assert app.log().count(LOADED) == loads, "Home on the first image loaded it again"
 
 
+def test_ctrl_and_the_wheel_go_through_the_images(binary):
+    """Ctrl and the wheel go to the next image and back, one a notch, as in 0.9.6.
+    egui turns Ctrl and the wheel into zooming, they did nothing for a while. The
+    wheel alone still zooms and stays on the image."""
+    folder = folder_of("ctrl_wheel_images", [(f"{n:02}.png", "test.png") for n in range(4)])
+    with App(binary, "ctrl_wheel", [os.path.join(folder, "01.png")]) as app:
+        app.wait_window()
+        app.move(0.5, 0.5)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        app.x("xdotool", "windowfocus", app.win)
+
+        def ctrl_wheel(button):
+            app.x("xdotool", "keydown", "Control_L")
+            app.settle(0.3)
+            app.x("xdotool", "click", button)
+            app.settle(0.3)
+            app.x("xdotool", "keyup", "Control_L")
+            app.settle(1.5)
+
+        ctrl_wheel("5")
+        assert shown_file(app) == "02.png", f"Ctrl and the wheel down did not show the next image: {shown_file(app)}"
+        ctrl_wheel("4")
+        assert shown_file(app) == "01.png", f"Ctrl and the wheel up did not go back: {shown_file(app)}"
+        before = app.shot("before_zoom")
+        app.scroll_down(0.5, 0.5, 3)
+        zoomed = app.shot("zoomed")
+        assert shown_file(app) == "01.png", f"the wheel alone changed the image: {shown_file(app)}"
+        assert changed_pixels(before, zoomed) > 5000, "the wheel alone did not zoom"
+
+
 def test_sequence_of_tiff_pages(binary):
     """A TIFF with three pages: the title counts them, the arrow keys go through them,
     a page seen before comes from the cache, and the list in the info panel shows a
@@ -1747,6 +1778,7 @@ TESTS = [
     test_relative_file_name,
     test_several_files_as_arguments,
     test_first_and_last_image,
+    test_ctrl_and_the_wheel_go_through_the_images,
     test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
     test_delete,

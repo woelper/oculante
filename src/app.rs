@@ -811,33 +811,27 @@ impl eframe::App for OculanteApp {
             self.state.image_geometry.offset += self.state.mouse_delta;
         }
 
-        // Scroll zoom
+        // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch zooms
         let scroll_delta = ctx.input(|i| i.smooth_scroll_delta.y);
-        if scroll_delta != 0.0 && !self.state.pointer_over_ui {
-            let ctrl = ctx.input(|i| i.modifiers.ctrl || i.modifiers.command);
-            if ctrl {
-                if scroll_delta > 0.0 {
-                    prev_image(&mut self.state)
-                } else {
-                    next_image(&mut self.state)
-                }
-            } else {
+        let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events));
+        if !self.state.pointer_over_ui {
+            match browse {
+                1 => next_image(&mut self.state),
+                -1 => prev_image(&mut self.state),
+                _ => {}
+            }
+            if scroll_delta != 0.0 {
                 let divisor = if cfg!(target_os = "macos") { 1.5 } else { 10. };
                 let delta = zoomratio(
                     ((scroll_delta / divisor) * self.state.persistent_settings.zoom_multiplier)
                         .clamp(-5.0, 5.0),
                     self.state.image_geometry.scale,
                 );
-                let new_scale = self.state.image_geometry.scale + delta;
-                if new_scale > 0.01 && new_scale < 40. {
-                    self.state.image_geometry.offset -= scale_pt(
-                        self.state.image_geometry.offset,
-                        self.state.cursor,
-                        self.state.image_geometry.scale,
-                        delta,
-                    );
-                    self.state.image_geometry.scale += delta;
-                }
+                zoom_at_cursor(&mut self.state, delta);
+            }
+            if pinch != 1.0 {
+                let delta = self.state.image_geometry.scale * (pinch - 1.0);
+                zoom_at_cursor(&mut self.state, delta);
             }
         }
 

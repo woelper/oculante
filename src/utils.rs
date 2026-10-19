@@ -664,6 +664,48 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+/// What the wheel and the trackpad ask for in one frame, besides scrolling: the
+/// direction to go through the images (Ctrl or Cmd and the wheel, 1 is the next
+/// one, -1 the one before) and the factor a pinch on a trackpad zooms by.
+/// egui turns Ctrl and the wheel into zooming and leaves its scroll delta at
+/// zero then, so both are read from the events.
+pub fn browse_and_pinch(events: &[egui::Event]) -> (i32, f32) {
+    let mut browse = 0.;
+    let mut pinch = 1.;
+    for event in events {
+        match event {
+            egui::Event::MouseWheel {
+                delta, modifiers, ..
+            } if modifiers.ctrl || modifiers.command => browse -= delta.y,
+            egui::Event::Zoom(factor) => pinch *= factor,
+            _ => {}
+        }
+    }
+    // a notch of the wheel can come in two events, it goes one image further
+    let direction = if browse > 0. {
+        1
+    } else if browse < 0. {
+        -1
+    } else {
+        0
+    };
+    (direction, pinch)
+}
+
+/// Changes the scale by `delta`, the pixel under the cursor stays where it is
+pub fn zoom_at_cursor(state: &mut OculanteState, delta: f32) {
+    let new_scale = state.image_geometry.scale + delta;
+    if new_scale > 0.01 && new_scale < 40. {
+        state.image_geometry.offset -= scale_pt(
+            state.image_geometry.offset,
+            state.cursor,
+            state.image_geometry.scale,
+            delta,
+        );
+        state.image_geometry.scale += delta;
+    }
+}
+
 pub fn delete_file(state: &mut OculanteState) {
     if let Some(p) = state.current_path.clone() {
         let name = p
@@ -1219,6 +1261,61 @@ fn is_dicom(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn wheel(y: f32, modifiers: egui::Modifiers) -> egui::Event {
+        egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0., y),
+            phase: egui::TouchPhase::Move,
+            modifiers,
+        }
+    }
+
+    /// Ctrl or Cmd and the wheel go through the images as in 0.9.6: down is the
+    /// next one, one image a frame. egui leaves its scroll delta at zero then, so
+    /// for a while they did nothing. A pinch zooms, the wheel alone does neither.
+    #[test]
+    fn ctrl_and_the_wheel_go_through_the_images() {
+        let ctrl = egui::Modifiers::CTRL;
+        // what egui-winit gives for Cmd on a Mac
+        let cmd = egui::Modifiers {
+            mac_cmd: true,
+            command: true,
+            ..Default::default()
+        };
+        assert_eq!(browse_and_pinch(&[wheel(-1., ctrl)]), (1, 1.));
+        assert_eq!(browse_and_pinch(&[wheel(1., cmd)]), (-1, 1.));
+        // X11 sends a notch in two events
+        assert_eq!(browse_and_pinch(&[wheel(-1., ctrl), wheel(-1., ctrl)]).0, 1);
+        assert_eq!(
+            browse_and_pinch(&[wheel(-1., egui::Modifiers::NONE)]),
+            (0, 1.)
+        );
+        assert_eq!(
+            browse_and_pinch(&[wheel(-1., egui::Modifiers::SHIFT)]),
+            (0, 1.)
+        );
+        let (browse, pinch) = browse_and_pinch(&[egui::Event::Zoom(1.25), egui::Event::Zoom(2.)]);
+        assert_eq!((browse, pinch), (0, 2.5));
+        assert_eq!(browse_and_pinch(&[]), (0, 1.));
+    }
+
+    /// A pinch keeps the pixel under the cursor where it is
+    #[test]
+    fn zooming_keeps_the_pixel_under_the_cursor() {
+        let mut state = OculanteState::default();
+        state.image_geometry.scale = 1.;
+        state.image_geometry.offset = Vector2::new(100., 50.);
+        state.cursor = Vector2::new(300., 250.);
+        let under = (state.cursor - state.image_geometry.offset) / state.image_geometry.scale;
+        zoom_at_cursor(&mut state, 1.5);
+        assert_eq!(state.image_geometry.scale, 2.5);
+        let after = (state.cursor - state.image_geometry.offset) / state.image_geometry.scale;
+        assert!((after - under).norm() < 1e-4, "{under} moved to {after}");
+        // out of bounds it stays
+        zoom_at_cursor(&mut state, 100.);
+        assert_eq!(state.image_geometry.scale, 2.5);
+    }
 
     /// A file that can not be deleted is reported as such and stays on screen.
     /// Before, the app said it was deleted and moved on.
