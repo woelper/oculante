@@ -1016,17 +1016,18 @@ impl ImageOperation {
                                 Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             );
 
+                            // as in 0.9.6, a thin white frame that leaves the image as it is
                             painter.rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(*width as f32, Color32::BLACK),
+                                Stroke::new(*width as f32 / 2., Color32::WHITE),
                                 StrokeKind::Inside,
                             );
 
                             painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::from_rgba_unmultiplied(0, 0, 0, 80),
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
                             );
 
                             painter.text(

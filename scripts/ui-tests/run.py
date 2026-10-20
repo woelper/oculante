@@ -273,6 +273,13 @@ def test_measure_draws_rectangle(binary):
         measure(450, 180, 750, 400)
         forward = app.shot("measured")
         assert changed_pixels_in(before, forward, inside) > 5_000, "the measured rectangle is not drawn"
+        # A thin white frame that leaves the image as it is, as in 0.9.6. rc.1 drew a
+        # black frame over a darkened inside, which got lost on dark images (#813).
+        left_edge = (440, 200, 25, 180)
+        white = count_color(forward, left_edge, (255, 255, 255), 30) - count_color(before, left_edge, (255, 255, 255), 30)
+        assert white > 150, f"the frame is not white, {white} more white pixels at its left edge"
+        darker = mean_level(before, inside) - mean_level(forward, inside)
+        assert darker < 3, f"the measured part of the image is darker by {darker:.1f}"
         # from the bottom right to the top left, ending on the info panel
         measure(750, 400, 150, 180)
         backward = app.shot("measured_backwards")
