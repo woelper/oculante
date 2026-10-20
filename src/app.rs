@@ -1158,7 +1158,7 @@ impl eframe::App for OculanteApp {
                 }
             }
             if key_pressed(ctx, state, DeleteFile) {
-                // Shared with trash button in top bar. Both trigger the same confirmation modal.
+                // Shared with the delete button in the top bar. Both trigger the same confirmation modal.
                 request_delete_current_file(ctx, state);
             }
             if key_pressed(ctx, state, ClearImage) {

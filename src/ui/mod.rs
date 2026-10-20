@@ -877,7 +877,7 @@ pub fn show_delete_confirmation_modal(ctx: &egui::Context, state: &mut OculanteS
         return;
     };
 
-    Modal::new(DELETE_MODAL_ID, ctx).show(format!("Move \"{name}\" to the trash?"), |_| {
+    Modal::new(DELETE_MODAL_ID, ctx).show(delete_question(&name, DELETE_TO_TRASH), |_| {
         delete_file(state);
     });
 }

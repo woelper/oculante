@@ -199,7 +199,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             && window_x > ui.cursor().left() + 80.
             && tooltip(
                 unframed_button(TRASH, ui),
-                "Move file to trash",
+                if DELETE_TO_TRASH {
+                    "Move file to trash"
+                } else {
+                    "Delete file"
+                },
                 &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
                 ui,
             )

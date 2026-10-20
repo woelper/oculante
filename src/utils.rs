@@ -706,6 +706,18 @@ pub fn zoom_at_cursor(state: &mut OculanteState, delta: f32) {
     }
 }
 
+/// Whether a deleted file goes to the trash. On NetBSD and FreeBSD it is removed for good.
+pub const DELETE_TO_TRASH: bool = cfg!(not(any(target_os = "netbsd", target_os = "freebsd")));
+
+/// What the app asks before it deletes the file `name`
+pub fn delete_question(name: &str, to_trash: bool) -> String {
+    if to_trash {
+        format!("Move \"{name}\" to the trash?")
+    } else {
+        format!("Delete \"{name}\"? This can't be undone.")
+    }
+}
+
 pub fn delete_file(state: &mut OculanteState) {
     if let Some(p) = state.current_path.clone() {
         let name = p
@@ -1331,6 +1343,22 @@ mod tests {
             "expected one error, got {messages:?}"
         );
         assert_eq!(state.current_path, Some(missing));
+    }
+
+    /// On NetBSD and FreeBSD the file is removed for good, the question said it went to the trash
+    #[test]
+    fn the_delete_question_says_where_the_file_goes() {
+        assert_eq!(
+            delete_question("a.png", true),
+            "Move \"a.png\" to the trash?"
+        );
+        let removed = delete_question("a.png", false);
+        assert!(!removed.contains("trash"), "{removed}");
+        assert!(removed.contains("can't be undone"), "{removed}");
+        assert_eq!(
+            DELETE_TO_TRASH,
+            !cfg!(any(target_os = "netbsd", target_os = "freebsd"))
+        );
     }
 
     /// Only DICOM files are read as DICOM. Every image was tried before.

@@ -52,6 +52,11 @@ Found in rc.1 on 2026-10-20, from Stoppedpuma's list in #813, fixed:
 - [x] The tiled photo of M31 from #683 (42208x9870, 416 MP) did not open: heic-rs stops at 256 MP unless told otherwise, 0.9.6 had a setting to raise the limit of libheif. HEIF is read without a limit now, like the other formats. It opens in 40 s with a debug build, 2.7 GB at the peak. Unit test `heif_has_no_pixel_limit`, the file is 111 MB and was tried by hand.
 - [x] Measure drew a black frame over a darkened rectangle, which got lost on dark images. 0.9.6 drew a thin white frame and left the image as it was, back to that. UI test `test_measure_draws_rectangle`.
 
+Found in rc.1 on 2026-10-20, from Stoppedpuma's list in #813, fixed:
+- [x] The tiled photo of M31 from #683 (42208x9870, 416 MP) did not open: heic-rs stops at 256 MP unless told otherwise, 0.9.6 had a setting to raise the limit of libheif. HEIF is read without a limit now, like the other formats. It opens in 40 s with a debug build, 2.7 GB at the peak. Unit test `heif_has_no_pixel_limit`, the file is 111 MB and was tried by hand.
+- [x] Measure drew a black frame over a darkened rectangle, which got lost on dark images. 0.9.6 drew a thin white frame and left the image as it was, back to that. UI test `test_measure_draws_rectangle`.
+- [x] On NetBSD and FreeBSD the question before deleting said "Move to the trash?" and the file was removed for good, also in 0.9.6. There it says that it can't be undone now, and the button says "Delete file". Unit test `the_delete_question_says_where_the_file_goes`.
+
 Added for 1.0 on purpose (2026-10-19):
 - [ ] Pinch to zoom on a trackpad (jobukkit in #813), 0.9.6 could not: winit gives the gesture on macOS only. It zooms around the cursor, not over the panels. Unit test `zooming_keeps_the_pixel_under_the_cursor`, the gesture itself needs a Mac: human test in the macOS rows above.
 
