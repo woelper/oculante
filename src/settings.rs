@@ -1,4 +1,4 @@
-use crate::{file_encoder::FileEncoder, shortcuts::*, utils::ColorChannel};
+use crate::{file_encoder::FileEncoder, file_sort::FileSort, shortcuts::*, utils::ColorChannel};
 use anyhow::{Result, anyhow};
 use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
@@ -166,6 +166,10 @@ pub struct VolatileSettings {
     pub last_open_directory: PathBuf,
     pub folder_bookmarks: BTreeSet<PathBuf>,
     pub encoding_options: Vec<FileEncoder>,
+    /// The order of the files in the file browser and of the next and previous image
+    pub file_sort: FileSort,
+    /// The file browser shows a list instead of thumbnails
+    pub browser_list: bool,
 }
 
 impl Default for VolatileSettings {
@@ -189,6 +193,8 @@ impl Default for VolatileSettings {
             ]
             .into_iter()
             .collect(),
+            file_sort: Default::default(),
+            browser_list: false,
         }
     }
 }

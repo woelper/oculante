@@ -33,7 +33,52 @@ fn paint_texture_load_result(
     }
 }
 
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
+/// The thumbnail of a file in `rect`, or its extension while there is none
+pub fn paint_thumbnail(
+    ui: &Ui,
+    path: &Path,
+    thumbnails: &mut Thumbnails,
+    rect: Rect,
+    rounding: CornerRadius,
+    font_size: f32,
+) {
+    match thumbnails.get(path) {
+        Ok(tp) => {
+            let image = egui::Image::new(format!("file://{}", tp.display()))
+                .corner_radius(rounding)
+                .show_loading_spinner(true);
+
+            let load_result = image.load_for_size(ui.ctx(), rect.size());
+
+            paint_texture_load_result(ui, &load_result, rect, None, image.image_options());
+            if load_result.is_err() {
+                // If an image could not be loaded, reload. This is usually because the image
+                // is being written while loading.
+                ui.ctx().forget_image(&format!("file://{}", tp.display()));
+            }
+        }
+        Err(_) => {
+            ui.painter()
+                .rect_filled(rect, rounding, Color32::from_gray(80).to_opaque());
+            ui.painter().text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                path.extension()
+                    .map(|e| e.to_string_lossy().to_string().to_uppercase())
+                    .unwrap_or_default(),
+                FontId::proportional(font_size),
+                Color32::WHITE,
+            );
+        }
+    }
+}
+
+pub fn render_file_icon(
+    icon_path: &Path,
+    is_dir: bool,
+    ui: &mut Ui,
+    thumbnails: &mut Thumbnails,
+) -> Response {
     let zoom = 1.;
 
     let size = Vec2::new(
@@ -48,7 +93,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     image_rect.min = image_rect.min.round();
     image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
 
-    if icon_path.is_dir() {
+    if is_dir {
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
@@ -57,43 +102,7 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
             ui.style().visuals.text_color(),
         );
     } else {
-        match thumbnails.get(icon_path) {
-            Ok(tp) => {
-                let image = egui::Image::new(format!("file://{}", tp.display()))
-                    .corner_radius(rounding)
-                    .show_loading_spinner(true);
-
-                let load_result = image.load_for_size(ui.ctx(), image_rect.size());
-
-                paint_texture_load_result(
-                    ui,
-                    &load_result,
-                    image_rect,
-                    None,
-                    image.image_options(),
-                );
-                if load_result.is_err() {
-                    // If an image could not be loaded, reload. This is usually because the image
-                    // is being written while loading.
-                    ui.ctx().forget_image(&format!("file://{}", tp.display()));
-                }
-            }
-            Err(_) => {
-                // warn!("{e}");
-                ui.painter()
-                    .rect_filled(image_rect, rounding, Color32::from_gray(80).to_opaque());
-                ui.painter().text(
-                    image_rect.center(),
-                    Align2::CENTER_CENTER,
-                    icon_path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_string().to_uppercase())
-                        .unwrap_or_default(),
-                    FontId::proportional(25.),
-                    Color32::WHITE,
-                );
-            }
-        }
+        paint_thumbnail(ui, icon_path, thumbnails, image_rect, rounding, 25.);
     }
 
     let text = icon_path

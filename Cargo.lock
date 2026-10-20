@@ -3837,6 +3837,7 @@ dependencies = [
  "avif-decode",
  "basisu",
  "bytemuck",
+ "chrono",
  "clap",
  "criterion",
  "dds-rs",

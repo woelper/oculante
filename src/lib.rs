@@ -12,6 +12,7 @@ pub mod utils;
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 pub const BOLD_FONT: &[u8; 344152] = include_bytes!("../res/fonts/Inter-Bold.ttf");
 pub(crate) mod file_encoder;
+pub(crate) mod file_sort;
 // With file_open the system file dialog replaces the built-in browser, what only
 // the browser uses is unused then
 pub(crate) mod annotate;

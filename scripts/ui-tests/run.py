@@ -417,33 +417,127 @@ def test_ctrl_and_the_wheel_go_through_the_images(binary):
 
 def test_save_as_writes_the_file(binary):
     """Save as shows the name of the file and the button to save below the files, and
-    writes the file. The files took all the height of the dialog for a while, the row
-    to save was cut off."""
-    folder = folder_of("save_as_images", [("moss.jpg", "moss.jpg")])
-    with App(binary, "save_as", [os.path.join(folder, "moss.jpg")], volatile={"last_open_directory": folder}) as app:
+    writes the file, with thumbnails and with the list. The format is picked from a
+    list, Escape closes that list and not the dialog. The files took all the height
+    of the dialog for a while, the row to save was cut off."""
+    for name, list_mode, jpg in (("save_as", False, False), ("save_as_list", True, True)):
+        folder = folder_of(f"{name}_images", [("moss.jpg", "moss.jpg")])
+        volatile = {"last_open_directory": folder, "browser_list": list_mode}
+        with App(binary, name, [os.path.join(folder, "moss.jpg")], volatile=volatile) as app:
+            app.wait_window()
+            app.move(0.5, 0.5)
+            assert app.wait_for_log(LOADED), "the image never loaded"
+            app.settle(1.0)
+            app.key("e")
+            app.settle(1.5)
+            app.click(896, 343)  # "Save as..." in the edit panel
+            app.settle(2.0)
+            app.shot("dialog")
+            if jpg:
+                app.click(497, 530)  # the list of formats
+                app.settle(0.8)
+                app.key("Escape")
+                app.settle(0.8)
+                app.click(497, 530)
+                app.settle(0.8)
+                app.shot("formats")
+                app.click(497, 377)  # jpg, the list opens upwards
+                app.settle(0.8)
+            # the name has the keyboard. In front of it, a name without an extension
+            # gets ".jpg" right away, also in 0.9.6.
+            app.click(300, 524)
+            app.key("Home")
+            app.x("xdotool", "type", "--delay", "60", "copy_")
+            app.settle(0.5)
+            app.click(586, 530)  # "Save file"
+            saved = os.path.join(folder, "copy_unnamed.jpg" if jpg else "copy_unnamed.png")
+            for _ in range(20):
+                if os.path.exists(saved) and os.path.getsize(saved) > 0:
+                    break
+                time.sleep(0.5)
+            assert os.path.exists(saved), f"Save file did not write {os.path.basename(saved)}: {os.listdir(folder)}"
+            magic = b"\xff\xd8\xff" if jpg else b"\x89PNG\r\n\x1a\n"
+            with open(saved, "rb") as f:
+                assert f.read(len(magic)) == magic, f"{os.path.basename(saved)} is not what it says"
+
+
+def test_file_browser_list_and_sort(binary):
+    """The file browser shows a list. A click on a column sorts by it, a second one turns
+    the order around, the folder stays first. The menu above sorts the thumbnails. The
+    next and the previous image follow the order (#814)."""
+    folder = folder_of(
+        "browser_sort_images",
+        [
+            ("apple.jpg", "moss.jpg"),  # 144 kB
+            ("banana.png", "test.png"),  # 34 kB
+            ("cherry.png", "3d2.png"),  # 368 kB
+            ("date10.jpg", "test.jpg"),  # 26 kB
+            ("date2.png", "gray_8bpp.png"),  # 10 kB
+        ],
+    )
+    os.makedirs(os.path.join(folder, "subfolder"))
+    for day, name in enumerate(["cherry.png", "date10.jpg", "apple.jpg", "date2.png", "banana.png"]):
+        changed = 1_700_000_000 + day * 86_400
+        os.utime(os.path.join(folder, name), (changed, changed))
+    volatile = {"last_open_directory": folder, "browser_list": True}
+    with App(binary, "browser_sort", [], volatile=volatile) as app:
         app.wait_window()
-        app.move(0.5, 0.5)
-        assert app.wait_for_log(LOADED), "the image never loaded"
-        app.settle(1.0)
-        app.key("e")
-        app.settle(1.5)
-        app.click(896, 343)  # "Save as..." in the edit panel
         app.settle(2.0)
-        app.shot("dialog")
-        # the name has the keyboard. In front of it, a name without an extension
-        # gets ".jpg" right away, also in 0.9.6.
-        app.key("Home")
-        app.x("xdotool", "type", "--delay", "60", "copy_")
-        app.settle(0.5)
-        app.click(713, 531)  # "Save file"
-        saved = os.path.join(folder, "copy_unnamed.png")
-        for _ in range(20):
-            if os.path.exists(saved) and os.path.getsize(saved) > 0:
-                break
-            time.sleep(0.5)
-        assert os.path.exists(saved), "Save file did not write the file"
-        with open(saved, "rb") as f:
-            assert f.read(8) == b"\x89PNG\r\n\x1a\n", "the saved file is not a PNG"
+
+        def open_browser():
+            app.key("ctrl+o")
+            app.settle(2.0)
+
+        def open_first_file(x, y):
+            """Clicks the first file, below the folder, and gives the image that shows."""
+            app.click(x, y)
+            assert app.wait_for_log(LOADED), "the clicked file never loaded"
+            app.settle(1.5)
+            app.move(700, 400)
+            return shown_file(app)
+
+        def go(key):
+            app.key(key)
+            app.settle(1.5)
+            return shown_file(app)
+
+        def pick(y):
+            """An entry of the sort menu"""
+            app.click(720, 62)
+            app.settle(0.8)
+            app.shot(f"menu_{y}")
+            app.click(700, y)
+            app.settle(1.0)
+
+        open_browser()
+        app.shot("list")
+        app.click(615, 107)  # the size column
+        app.settle(1.0)
+        app.shot("by_size")
+        first = open_first_file(300, 182)
+        assert first == "date2.png", f"the smallest file is not first: {first}"
+        order = [go("Right"), go("Right"), go("Left")]
+        assert order == ["date10.jpg", "banana.png", "date10.jpg"], f"next and previous don't go by size: {order}"
+        open_browser()
+        app.click(615, 107)  # again, the largest first
+        app.settle(1.0)
+        first = open_first_file(300, 182)
+        assert first == "cherry.png", f"a second click did not turn the order around: {first}"
+        assert go("Right") == "apple.jpg"
+
+        open_browser()
+        app.click(815, 62)  # thumbnails
+        app.settle(1.0)
+        pick(128)  # date modified, still the other way round
+        app.shot("thumbnails_newest_first")
+        first = open_first_file(374, 145)
+        assert first == "banana.png", f"the newest file is not first: {first}"
+        assert go("Right") == "date2.png"
+        open_browser()
+        pick(260)  # ascending
+        first = open_first_file(374, 145)
+        assert first == "cherry.png", f"the oldest file is not first: {first}"
+        assert go("Right") == "date10.jpg"
 
 
 def test_sequence_of_tiff_pages(binary):
@@ -1818,6 +1912,7 @@ TESTS = [
     test_first_and_last_image,
     test_ctrl_and_the_wheel_go_through_the_images,
     test_save_as_writes_the_file,
+    test_file_browser_list_and_sort,
     test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
     test_delete,

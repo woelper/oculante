@@ -16,6 +16,7 @@ pub const INFO: &str = "\u{E905}";
 pub const INTERSECT: &str = "\u{E917}";
 pub const MOUSE: &str = "\u{E90E}";
 pub const LIST: &str = "\u{E90B}";
+pub const GRID: &str = "\u{E934}";
 pub const PALETTE: &str = "\u{E918}";
 pub const PENCIL_SIMPLE_LINE: &str = "\u{E906}";
 pub const PLACEHOLDER: &str = "\u{E909}";

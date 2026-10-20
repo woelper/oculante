@@ -1074,7 +1074,9 @@ pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
     if paths_to_open.len() == 1 {
         let location = paths_to_open.into_iter().next().unwrap();
         if location.is_dir() {
-            if let Ok(first) = find_first_image_in_directory(&location) {
+            if let Ok(first) =
+                find_first_image_in_directory(&location, state.volatile_settings.file_sort)
+            {
                 state.load(&first);
             }
         } else {
@@ -1083,7 +1085,9 @@ pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
     } else if paths_to_open.len() > 1 {
         let location = paths_to_open.first().unwrap();
         if location.is_dir() {
-            if let Ok(first) = find_first_image_in_directory(location) {
+            if let Ok(first) =
+                find_first_image_in_directory(location, state.volatile_settings.file_sort)
+            {
                 state.load(&first);
             }
         } else {
@@ -1092,6 +1096,7 @@ pub fn open_paths(state: &mut OculanteState, paths_to_open: Vec<PathBuf>) {
         state.scrubber.fixed_paths = paths_to_open.iter().all(|p| p.is_file());
         state.scrubber.entries = paths_to_open;
         state.scrubber.wrap = state.persistent_settings.wrap_folder;
+        state.scrubber.sort = state.volatile_settings.file_sort;
     }
 }
 

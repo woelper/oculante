@@ -117,6 +117,8 @@ kamadak-exif = "0.6"
 lexical-sort = "0.3"
 log = "0.4"
 percent-encoding = "2"
+# dates in the file list, in local time. Already used by dicom and trash.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 nalgebra = "0.35"
 anyhow = "1.0"
 arboard = { version = "3.6", features = ["wayland-data-control"] }

@@ -483,7 +483,10 @@ impl OculanteApp {
             if let Some(path) = &self.state.current_path {
                 if self.state.scrubber.has_folder_changed(path) && !self.state.scrubber.fixed_paths
                 {
-                    self.state.scrubber = crate::scrubber::Scrubber::new(path);
+                    self.state.scrubber = crate::scrubber::Scrubber::new(
+                        path,
+                        self.state.volatile_settings.file_sort,
+                    );
                     self.state.scrubber.wrap = self.state.persistent_settings.wrap_folder;
                 } else {
                     let index = self
@@ -899,6 +902,19 @@ impl eframe::App for OculanteApp {
                     ctx,
                     Id::new("OPEN"),
                 );
+            }
+        }
+
+        // The next and the previous image follow the order chosen in the file browser
+        if !state.scrubber.fixed_paths && state.scrubber.sort != state.volatile_settings.file_sort {
+            let sort = state.volatile_settings.file_sort;
+            match state.current_path.clone() {
+                Some(path) => {
+                    let wrap = state.scrubber.wrap;
+                    state.scrubber = crate::scrubber::Scrubber::new(&path, sort);
+                    state.scrubber.wrap = wrap;
+                }
+                None => state.scrubber.sort = sort,
             }
         }
 
