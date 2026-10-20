@@ -16,10 +16,21 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
     let mut button_color = Color32::from_hex("#262626").unwrap_or_default();
     let mut panel_color = Color32::from_gray(25);
 
+    // egui follows the system theme on its own and keeps a style for each, the one not set
+    // here stays egui's: Dark picked on a light system turned teal when the system went dark
     match state.persistent_settings.theme {
-        ColorTheme::Light => ctx.set_visuals(Visuals::light()),
-        ColorTheme::Dark => ctx.set_visuals(Visuals::dark()),
-        ColorTheme::System => set_system_theme(ctx),
+        ColorTheme::Light => {
+            ctx.set_theme(egui::Theme::Light);
+            ctx.set_visuals(Visuals::light())
+        }
+        ColorTheme::Dark => {
+            ctx.set_theme(egui::Theme::Dark);
+            ctx.set_visuals(Visuals::dark())
+        }
+        ColorTheme::System => {
+            ctx.set_theme(egui::ThemePreference::System);
+            set_system_theme(ctx)
+        }
     }
 
     // Switching theme resets accent color, set it again
@@ -311,6 +322,7 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
 #[cfg(test)]
 mod tests {
     use super::{ColorTheme, OculanteState, apply_theme, needs_system_fonts};
+    use egui::Color32;
 
     /// The text cursor was egui's light blue whatever the accent color was
     #[test]
@@ -327,6 +339,39 @@ mod tests {
                 egui::Color32::from_rgb(10, 200, 30),
                 "{theme:?}"
             );
+        }
+    }
+
+    /// Dark picked in the settings while the system was light, then the system turned dark:
+    /// egui showed its own style, with a teal accent (Stoppedpuma on macOS in #813)
+    #[test]
+    fn the_theme_stays_when_the_system_theme_changes() {
+        for (picked, dark) in [(ColorTheme::Dark, true), (ColorTheme::Light, false)] {
+            for (start, then) in [
+                (egui::Theme::Light, egui::Theme::Dark),
+                (egui::Theme::Dark, egui::Theme::Light),
+            ] {
+                let ctx = egui::Context::default();
+                let mut state = OculanteState::default();
+                state.persistent_settings.theme = picked.clone();
+                state.persistent_settings.accent_color = [10, 200, 30];
+                state.persistent_settings.accent_color_is_custom = true;
+                let system = |theme| egui::RawInput {
+                    system_theme: Some(theme),
+                    ..Default::default()
+                };
+                ctx.run_ui(system(start), |ui| apply_theme(&mut state, ui.ctx()))
+                    .textures_delta
+                    .clear();
+                ctx.run_ui(system(then), |_| {}).textures_delta.clear();
+                let visuals = &ctx.global_style().visuals;
+                assert_eq!(
+                    visuals.text_cursor.stroke.color,
+                    Color32::from_rgb(10, 200, 30),
+                    "{picked:?} on a {start:?} system"
+                );
+                assert_eq!(visuals.dark_mode, dark, "{picked:?} on a {start:?} system");
+            }
         }
     }
 
