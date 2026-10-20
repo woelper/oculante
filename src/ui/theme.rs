@@ -106,6 +106,9 @@ pub fn apply_theme(state: &mut OculanteState, ctx: &Context) {
         state.persistent_settings.accent_color[2],
     );
 
+    // The cursor where text is typed, egui draws its own light blue
+    style.visuals.text_cursor.stroke.color = style.visuals.selection.bg_fill;
+
     let accent_color = style.visuals.selection.bg_fill.to_array();
 
     let accent_color_luma = (accent_color[0] as f32 * 0.299
@@ -307,7 +310,25 @@ pub fn load_system_fonts(mut fonts: FontDefinitions) -> FontDefinitions {
 
 #[cfg(test)]
 mod tests {
-    use super::needs_system_fonts;
+    use super::{ColorTheme, OculanteState, apply_theme, needs_system_fonts};
+
+    /// The text cursor was egui's light blue whatever the accent color was
+    #[test]
+    fn the_text_cursor_has_the_accent_color() {
+        for theme in [ColorTheme::Dark, ColorTheme::Light] {
+            let ctx = egui::Context::default();
+            let mut state = OculanteState::default();
+            state.persistent_settings.theme = theme.clone();
+            state.persistent_settings.accent_color = [10, 200, 30];
+            state.persistent_settings.accent_color_is_custom = true;
+            apply_theme(&mut state, &ctx);
+            assert_eq!(
+                ctx.global_style().visuals.text_cursor.stroke.color,
+                egui::Color32::from_rgb(10, 200, 30),
+                "{theme:?}"
+            );
+        }
+    }
 
     #[test]
     fn built_in_fonts_cover_western_text() {
