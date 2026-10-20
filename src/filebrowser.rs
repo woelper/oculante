@@ -691,7 +691,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
 
 /// A round button with an icon, as in the bar above the files
 fn nav_button(ui: &Ui, icon: &str) -> Button<'static> {
-    egui::Button::new(RichText::new(icon).color(ui.style().visuals.selection.bg_fill))
+    egui::Button::new(RichText::new(icon).color(crate::ui::accent_color(ui.ctx())))
         .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
         .min_size(vec2(BUTTON_HEIGHT_LARGE, BUTTON_HEIGHT_LARGE))
 }

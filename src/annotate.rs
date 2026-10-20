@@ -1467,7 +1467,7 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
 
 /// As wide as the box of the tools, tinted while it is on
 fn select_button(ui: &mut Ui, on: bool) -> egui::Response {
-    let accent = ui.visuals().selection.bg_fill;
+    let accent = crate::ui::accent_color(ui.ctx());
     let mut text = egui::RichText::new(Tool::Select.name());
     if on {
         text = text.color(accent);
@@ -1494,7 +1494,7 @@ fn select_button(ui: &mut Ui, on: bool) -> egui::Response {
 /// The color of the select button while it is on and of the cards of what is
 /// selected
 fn tint(ui: &Ui) -> Color32 {
-    card_fill(ui).lerp_to_gamma(ui.visuals().selection.bg_fill, 0.2)
+    card_fill(ui).lerp_to_gamma(crate::ui::accent_color(ui.ctx()), 0.2)
 }
 
 /// The card of what comes next while nothing is selected, then one for each
@@ -1571,7 +1571,7 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
                 ui.add_space(size / 2.);
                 let mut name = egui::RichText::new(&names[i]);
                 if selected {
-                    name = name.color(ui.visuals().selection.bg_fill);
+                    name = name.color(crate::ui::accent_color(ui.ctx()));
                 } else if a.hidden {
                     name = name.weak();
                 }
@@ -1890,7 +1890,7 @@ fn icon_button(ui: &mut Ui, on: bool, icon: Icon) -> egui::Response {
 
 fn lit<'a>(ui: &mut Ui, on: bool, button: egui::Button<'a>) -> egui::Response {
     ui.add(if on {
-        button.fill(ui.style().visuals.selection.bg_fill)
+        button.fill(crate::ui::accent_color(ui.ctx()))
     } else {
         button
     })
@@ -2192,7 +2192,7 @@ pub fn canvas_ui(
         && let Some(Drag::Select { from, .. }) = &state.drag
         && let Some(pos) = pointer
     {
-        let accent = ctx.global_style().visuals.selection.bg_fill;
+        let accent = crate::ui::accent_color(ctx);
         let corner = to_screen(Point::from_xy(from[0], from[1]));
         painter.rect(
             egui::Rect::from_two_pos(corner, pos),

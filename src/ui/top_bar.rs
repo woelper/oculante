@@ -424,7 +424,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                             .unwrap_or_default();
 
                         let res = ui.horizontal(|ui| {
-                            let accent = ui.style().visuals.selection.bg_fill;
+                            let accent = accent_color(ui.ctx());
                             let (_, icon_rect) = ui.allocate_space(Vec2::splat(24.));
                             ui.painter().rect(
                                 icon_rect,

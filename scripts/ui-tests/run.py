@@ -502,12 +502,13 @@ def test_file_browser_list_and_sort(binary):
             return shown_file(app)
 
         def pick(y):
-            """An entry of the sort menu"""
+            """An entry of the sort menu, returns the screenshot of the open menu"""
             app.click(720, 62)
             app.settle(0.8)
-            app.shot(f"menu_{y}")
+            menu = app.shot(f"menu_{y}")
             app.click(700, y)
             app.settle(1.0)
+            return menu
 
         open_browser()
         app.shot("list")
@@ -528,7 +529,13 @@ def test_file_browser_list_and_sort(binary):
         open_browser()
         app.click(815, 62)  # thumbnails
         app.settle(1.0)
-        pick(128)  # date modified, still the other way round
+        menu = pick(128)  # date modified, still the other way round
+        # what is selected has the accent on a dark shade of it, gray text on the accent
+        # was hard to read (Stoppedpuma's design: #3D0A19 behind the red)
+        for entry, y in (("Size", 188), ("Descending", 290)):
+            assert count_color(menu, (668, y - 10, 100, 20), (61, 10, 25), 3) > 300, f"{entry} is not on the shade"
+            assert count_color(menu, (668, y - 10, 100, 20), ACCENT, 60) > 20, f"{entry} is not in the accent"
+        assert count_color(menu, (668, 118, 100, 20), (61, 10, 25), 3) == 0, "Date modified is shown as selected"
         app.shot("thumbnails_newest_first")
         first = open_first_file(374, 145)
         assert first == "banana.png", f"the newest file is not first: {first}"

@@ -323,7 +323,7 @@ fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
     };
     let (mut show, mut compare) = (None, None);
     // the accent color
-    let highlight = ui.visuals().selection.bg_fill;
+    let highlight = accent_color(ui.ctx());
     // inside the scrolling panel the list would shrink to egui's smallest height
     let row = ROW + ui.spacing().item_spacing.y;
     let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);

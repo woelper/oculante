@@ -243,7 +243,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     if ui
                         .add(
                             egui::Button::new("Stop painting")
-                                .fill(ui.style().visuals.selection.bg_fill),
+                                .fill(accent_color(ui.ctx())),
                         )
                         .clicked()
                     {

@@ -126,7 +126,7 @@ impl EguiExt for Ui {
     }
 
     fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
-        let color = self.style().visuals.selection.bg_fill;
+        let color = accent_color(self.ctx());
         let text = text.into();
         let spacing = &self.spacing();
         let icon_width = spacing.icon_width;
@@ -167,7 +167,8 @@ impl EguiExt for Ui {
                 big_icon_rect.expand(visuals.expansion),
                 visuals.corner_radius,
                 if *checked {
-                    color.gamma_multiply(0.3)
+                    // a dark shade of the accent, as behind what is selected
+                    self.style().visuals.selection.bg_fill
                 } else {
                     visuals.weak_bg_fill
                 },
@@ -213,7 +214,7 @@ impl EguiExt for Ui {
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             ui.add(egui::Label::new(
-                RichText::new(icon).color(ui.style().visuals.selection.bg_fill),
+                RichText::new(icon).color(accent_color(ui.ctx())),
             ));
             ui.label(
                 RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
@@ -251,7 +252,7 @@ impl EguiExt for Ui {
             Align2::CENTER_CENTER,
             icon,
             FontId::proportional(16.),
-            self.style().visuals.selection.bg_fill,
+            accent_color(self.ctx()),
         );
 
         r.response
@@ -280,7 +281,7 @@ impl EguiExt for Ui {
             Align2::CENTER_CENTER,
             icon,
             FontId::proportional(16.),
-            self.style().visuals.selection.bg_fill,
+            accent_color(self.ctx()),
         );
         r
     }
@@ -311,7 +312,7 @@ impl EguiExt for Ui {
             Align2::CENTER_CENTER,
             icon,
             FontId::proportional(icon_size),
-            self.style().visuals.selection.bg_fill,
+            accent_color(self.ctx()),
         );
         r
     }
@@ -341,8 +342,10 @@ impl EguiExt for Ui {
             ui.style_mut().spacing.interact_size.y = 18.;
             ui.style_mut().spacing.slider_rail_height = height;
 
-            let color = ui.style().visuals.selection.bg_fill;
+            let color = accent_color(ui.ctx());
             let style = ui.style_mut();
+            // the filled part of the rail, egui takes the color of what is selected
+            style.visuals.selection.bg_fill = color;
 
             // Use fg_stroke for the rail appearance
             style.visuals.widgets.inactive.fg_stroke.width = height;
@@ -400,7 +403,7 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
-            let color = ui.style().visuals.selection.bg_fill;
+            let color = accent_color(ui.ctx());
             let available_width = ui.available_width() * 1. - 60.;
             let style = ui.style_mut();
             style.spacing.interact_size.y = 18.;
@@ -581,10 +584,8 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
 // TODO redo as impl UI
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
-        let avg = (ui.style().visuals.selection.bg_fill.r() as i32
-            + ui.style().visuals.selection.bg_fill.g() as i32
-            + ui.style().visuals.selection.bg_fill.b() as i32)
-            / 3;
+        let accent = accent_color(ui.ctx());
+        let avg = (accent.r() as i32 + accent.g() as i32 + accent.b() as i32) / 3;
         let contrast_color: u8 = if avg > 128 { 0 } else { 255 };
         ui.horizontal(|ui| {
             ui.label(tooltip);
@@ -592,7 +593,7 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
                 RichText::new(hotkey)
                     .monospace()
                     .color(Color32::from_gray(contrast_color))
-                    .background_color(ui.style().visuals.selection.bg_fill),
+                    .background_color(accent),
             );
         });
     })
@@ -609,7 +610,7 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             egui::Button::new(
                 RichText::new(text)
                     .size(ICON_SIZE)
-                    .color(ui.style().visuals.selection.bg_fill),
+                    .color(accent_color(ui.ctx())),
             )
             .frame(false),
         )
@@ -698,11 +699,12 @@ pub fn blank_icon(
 }
 
 pub(crate) fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
+    let color = accent_color(ui.ctx());
     let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
             CARET_RIGHT.to_string(),
             FontId::proportional(12.),
-            ui.style().visuals.selection.bg_fill,
+            color,
             10.,
         )
     });

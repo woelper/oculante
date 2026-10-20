@@ -37,7 +37,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     ui.painter().rect_stroke(
                                         rect,
                                         1.,
-                                        Stroke::new(2., ui.style().visuals.selection.bg_fill),
+                                        Stroke::new(2., accent_color(ui.ctx())),
                                         StrokeKind::Inside,
                                     );
                                 }

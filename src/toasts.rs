@@ -224,7 +224,7 @@ fn ease_out_cubic(t: f32) -> f32 {
 
 /// Draws a single toast card and returns whether its close button was clicked this frame.
 fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
-    let accent = style.visuals.selection.bg_fill;
+    let accent = crate::ui::accent_color(ui.ctx());
     let bg = style.visuals.window_fill();
     let fg = style.visuals.text_color();
 
