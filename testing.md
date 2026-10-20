@@ -26,7 +26,7 @@ Before tagging:
   - Libraries packages no longer need: libheif, libavif, libdav1d, lcms2, FreeType, fontconfig, GTK, cairo, expat, libwebp. The binary links only libc, plus libturbojpeg with `TURBOJPEG_SOURCE=pkg-config`. To build: Rust 1.98, cmake, nasm and a C compiler.
   - No update check and no self update in the app: updates come from the package manager or the releases page.
   - Only libheif opened these, so they no longer open on macOS and Windows: .heics, .heifs, .avci and .avcs. Camera HIF (4:2:2) and 4:4:4 open again since 2026-10-13, with tbraun96/heic-rs#10 and #12 in the fork.
-  - The HEIF security limits are gone from the settings.
+  - The HEIF security limits are gone from the settings, HEIF is read without a limit like the other formats.
   - X11 window rules on the instance (i3 `instance="oculante"`) no longer match, unless egui-winit is fixed first: match the class, `class="oculante"`.
   - The SVG scale saved by 0.9.6 is not read, it starts at 2. Set it again in the settings.
   - Nothing to do, but say so: everything else in the settings carries over, shortcuts are converted (human test above).
@@ -44,6 +44,9 @@ Regressions found on 2026-10-12, from Stoppedpuma's list in #799, fixed:
 
 Found on 2026-10-19 while adding pinch to zoom (after jobukkit's report in #813), fixed:
 - [x] Ctrl (Cmd on a Mac) and the wheel did not go through the images any more, 0.9.6 did: egui turns them into zooming and leaves its scroll delta at zero. They are read from the wheel's events now, one image a notch. Unit test `ctrl_and_the_wheel_go_through_the_images`, UI test `test_ctrl_and_the_wheel_go_through_the_images`.
+
+Found in rc.1 on 2026-10-20, from Stoppedpuma's list in #813, fixed:
+- [x] The tiled photo of M31 from #683 (42208x9870, 416 MP) did not open: heic-rs stops at 256 MP unless told otherwise, 0.9.6 had a setting to raise the limit of libheif. HEIF is read without a limit now, like the other formats. It opens in 40 s with a debug build, 2.7 GB at the peak. Unit test `heif_has_no_pixel_limit`, the file is 111 MB and was tried by hand.
 
 Added for 1.0 on purpose (2026-10-19):
 - [ ] Pinch to zoom on a trackpad (jobukkit in #813), 0.9.6 could not: winit gives the gesture on macOS only. It zooms around the cursor, not over the panels. Unit test `zooming_keeps_the_pixel_under_the_cursor`, the gesture itself needs a Mac: human test in the macOS rows above.

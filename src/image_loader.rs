@@ -1041,6 +1041,18 @@ fn decode_apng<R: std::io::BufRead + std::io::Seek>(
     Ok(Apng { frames, plays })
 }
 
+/// How HEIF images are decoded. heic-rs refuses images above 256 megapixels unless
+/// told otherwise, 0.9.6 had a setting to raise that limit of libheif (#683). The
+/// other formats are read without a limit, so HEIF is too.
+#[cfg(feature = "heif_native")]
+fn heif_options(layout: heic_rs::PixelLayout) -> heic_rs::DecodeOptions {
+    heic_rs::DecodeOptions {
+        layout,
+        max_pixels: None,
+        ..Default::default()
+    }
+}
+
 /// Decode a HEIC or HEIF image with `heic-rs`, in the layout the file has:
 /// with alpha if there is any, and 16 bit if it has more than 8.
 ///
@@ -1062,11 +1074,8 @@ pub fn load_heif_native(path: &Path, item: usize) -> Result<DynamicImage> {
         (true, false) => PixelLayout::Rgb16,
         (true, true) => PixelLayout::Rgba16,
     };
-    let options = heic_rs::DecodeOptions {
-        layout,
-        ..Default::default()
-    };
-    let img = heic_rs::decode_image(&bytes, id, &options).context("Can't decode HEIF image")?;
+    let img = heic_rs::decode_image(&bytes, id, &heif_options(layout))
+        .context("Can't decode HEIF image")?;
     let (w, h) = (img.width, img.height);
     // 16 bit samples come as pairs of bytes in the byte order of the machine
     let wide = || -> Vec<u16> {
@@ -1237,6 +1246,15 @@ fn load_jpeg_turbojpeg(img_location: &Path) -> Result<DynamicImage> {
 
 #[cfg(test)]
 mod tests {
+    /// The tiled photo of M31 in #683 has 416 megapixels, heic-rs stops at 256 by default
+    #[cfg(feature = "heif_native")]
+    #[test]
+    fn heif_has_no_pixel_limit() {
+        let options = super::heif_options(heic_rs::PixelLayout::Rgb8);
+        assert_eq!(options.max_pixels, None);
+        const { assert!(heic_rs::DEFAULT_MAX_PIXELS < 42208 * 9870) };
+    }
+
     #[test]
     fn ci_autoscale_stretches_to_8_bit() {
         use super::autoscale;
