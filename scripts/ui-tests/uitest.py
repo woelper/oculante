@@ -37,6 +37,7 @@ class App:
         display=":97",
         stdin=subprocess.DEVNULL,
         settings=None,
+        volatile=None,
         env=None,
         pointer=None,
         window_manager=False,
@@ -65,12 +66,13 @@ class App:
         for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
             env[var] = os.path.join(self.out, var.lower())
             os.makedirs(env[var])
-        if settings is not None:
-            # settings that are not given keep their defaults
-            settings_dir = os.path.join(env["XDG_DATA_HOME"], "oculante")
-            os.makedirs(settings_dir)
-            with open(os.path.join(settings_dir, "config.json"), "w") as f:
-                json.dump(settings, f)
+        # settings that are not given keep their defaults
+        settings_dir = os.path.join(env["XDG_DATA_HOME"], "oculante")
+        for file, values in (("config.json", settings), ("config_volatile.json", volatile)):
+            if values is not None:
+                os.makedirs(settings_dir, exist_ok=True)
+                with open(os.path.join(settings_dir, file), "w") as f:
+                    json.dump(values, f)
         self.env = env
         self.wm = None
         if window_manager:

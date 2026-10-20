@@ -486,72 +486,91 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     .min(num_entries as f32);
                 let num_rows = (num_entries as f32 / (thumbs_per_row).max(1.)).ceil() as usize;
 
-                egui::Frame::new()
-                    .fill(panel_bg_color)
-                    .corner_radius(ui.style().visuals.widgets.active.corner_radius * 2.0)
-                    .inner_margin(Margin::same(10))
-                    .show(ui, |ui| {
-                        egui::ScrollArea::new([false, true])
-                            .min_scrolled_height(400.)
-                            .auto_shrink([false, false])
-                            .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
-                            .show_rows(
-                                ui,
-                                (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
-                                num_rows,
-                                |ui, row_range| {
-                                    let range = (row_range.start * thumbs_per_row as usize)
-                                        ..(row_range.end * thumbs_per_row as usize)
-                                            .min(num_entries);
-                                    let mut visible_entries: Vec<&PathBuf> = vec![];
-                                    for i in range {
-                                        if let Some(e) = entries.get(i) {
-                                            visible_entries.push(e);
+                // The name of the file and the button to save go below the files. Keep room
+                // for them, as high as they were in the last frame.
+                let save_row_id = Id::new("file_browser_save_row");
+                let save_row = if save {
+                    ui.ctx()
+                        .data(|d| d.get_temp::<f32>(save_row_id))
+                        .unwrap_or(BUTTON_HEIGHT_LARGE * 2.)
+                        + ui.spacing().item_spacing.y
+                } else {
+                    0.
+                };
+                let files_size = vec2(
+                    ui.available_width(),
+                    (ui.available_height() - save_row).max(0.),
+                );
+                ui.allocate_ui(files_size, |ui| {
+                    egui::Frame::new()
+                        .fill(panel_bg_color)
+                        .corner_radius(ui.style().visuals.widgets.active.corner_radius * 2.0)
+                        .inner_margin(Margin::same(10))
+                        .show(ui, |ui| {
+                            // never taller than the room left, the row to save goes below
+                            egui::ScrollArea::new([false, true])
+                                .min_scrolled_height(ui.available_height().min(400.))
+                                .auto_shrink([false, false])
+                                .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+                                .show_rows(
+                                    ui,
+                                    (THUMB_SIZE[1] + THUMB_CAPTION_HEIGHT) as f32,
+                                    num_rows,
+                                    |ui, row_range| {
+                                        let range = (row_range.start * thumbs_per_row as usize)
+                                            ..(row_range.end * thumbs_per_row as usize)
+                                                .min(num_entries);
+                                        let mut visible_entries: Vec<&PathBuf> = vec![];
+                                        for i in range {
+                                            if let Some(e) = entries.get(i) {
+                                                visible_entries.push(e);
+                                            }
                                         }
-                                    }
-                                    if state.listview_active {
-                                    } else {
-                                        ui.horizontal_wrapped(|ui| {
-                                            if visible_entries.is_empty() {
-                                                let r = ui.label("Empty directory");
-                                                let r = r.interact(Sense::click());
-                                                if r.clicked()
-                                                    && let Some(parent) = path.parent()
-                                                {
-                                                    *path = parent.to_path_buf();
-                                                }
-                                            } else {
-                                                // render directories
-                                                for de in
-                                                    visible_entries.iter().filter(|e| e.is_dir())
-                                                {
-                                                    if render_file_icon(
-                                                        de,
-                                                        ui,
-                                                        &mut state.thumbnails,
-                                                    )
-                                                    .clicked()
+                                        if state.listview_active {
+                                        } else {
+                                            ui.horizontal_wrapped(|ui| {
+                                                if visible_entries.is_empty() {
+                                                    let r = ui.label("Empty directory");
+                                                    let r = r.interact(Sense::click());
+                                                    if r.clicked()
+                                                        && let Some(parent) = path.parent()
                                                     {
-                                                        *path = de.to_path_buf();
-                                                        // If user has a search term active, we want to
-                                                        // clear it when changing dir
-                                                        if state.search_active {
-                                                            state.search_term.clear();
-                                                        }
+                                                        *path = parent.to_path_buf();
                                                     }
-                                                }
-
-                                                for de in visible_entries {
-                                                    if de.is_file()
-                                                        && render_file_icon(
+                                                } else {
+                                                    // render directories
+                                                    for de in visible_entries
+                                                        .iter()
+                                                        .filter(|e| e.is_dir())
+                                                    {
+                                                        if render_file_icon(
                                                             de,
                                                             ui,
                                                             &mut state.thumbnails,
                                                         )
                                                         .clicked()
-                                                    {
-                                                        settings.last_open_directory =
-                                                            if de.is_file() {
+                                                        {
+                                                            *path = de.to_path_buf();
+                                                            // If user has a search term active, we want to
+                                                            // clear it when changing dir
+                                                            if state.search_active {
+                                                                state.search_term.clear();
+                                                            }
+                                                        }
+                                                    }
+
+                                                    for de in visible_entries {
+                                                        if de.is_file()
+                                                            && render_file_icon(
+                                                                de,
+                                                                ui,
+                                                                &mut state.thumbnails,
+                                                            )
+                                                            .clicked()
+                                                        {
+                                                            settings.last_open_directory = if de
+                                                                .is_file()
+                                                            {
                                                                 de.parent()
                                                                     .and_then(|parent| {
                                                                         parent.canonicalize().ok()
@@ -560,79 +579,87 @@ pub fn browse<F: FnMut(&PathBuf)>(
                                                             } else {
                                                                 de.clone()
                                                             };
-                                                        if !save {
-                                                            state.search_active = false;
-                                                            state.search_term.clear();
-                                                            callback(de);
-                                                        } else {
-                                                            state.filename = de
-                                                                .file_name()
-                                                                .map(|f| {
-                                                                    f.to_string_lossy().to_string()
-                                                                })
-                                                                .unwrap_or_default();
+                                                            if !save {
+                                                                state.search_active = false;
+                                                                state.search_term.clear();
+                                                                callback(de);
+                                                            } else {
+                                                                state.filename = de
+                                                                    .file_name()
+                                                                    .map(|f| {
+                                                                        f.to_string_lossy()
+                                                                            .to_string()
+                                                                    })
+                                                                    .unwrap_or_default();
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
-                                        });
-                                    }
-                                },
-                            );
-                    });
+                                            });
+                                        }
+                                    },
+                                );
+                        });
+                });
 
                 // ui.add_space(10.);
 
                 if save {
-                    let mut ext = Path::new(&state.filename).ext();
+                    let save_ui = ui
+                        .scope(|ui| {
+                            let mut ext = Path::new(&state.filename).ext();
 
-                    // Safeguard: if saving as lut, ase etc, make sure the extension matches. If not, choose the first filter item.
-                    if !filter.contains(&ext.as_str()) {
-                        ext = filter.first().map(|e| e.to_string()).unwrap_or(ext.clone());
-                        state.filename = Path::new(&state.filename)
-                            .with_extension(&ext)
-                            .to_string_lossy()
-                            .to_string();
-                    }
-
-                    ui.label("Filename");
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().button_padding = Vec2::new(2., 5.);
-                        let textinput = ui.add(
-                            egui::TextEdit::singleline(&mut state.filename)
-                                .min_size(Vec2::new(10., 28.)),
-                        );
-
-                        if prev_path == PathBuf::default() {
-                            textinput.request_focus();
-                        }
-
-                        for f in FileEncoder::iter() {
-                            if !filter.contains(&f.ext().as_str()) {
-                                continue;
-                            }
-                            let e = f.ext();
-                            if ui.add(egui::Button::new(&e).selected(ext == e)).clicked() {
+                            // Safeguard: if saving as lut, ase etc, make sure the extension matches. If not, choose the first filter item.
+                            if !filter.contains(&ext.as_str()) {
+                                ext = filter.first().map(|e| e.to_string()).unwrap_or(ext.clone());
                                 state.filename = Path::new(&state.filename)
-                                    .with_extension(&e)
+                                    .with_extension(&ext)
                                     .to_string_lossy()
                                     .to_string();
                             }
-                        }
 
-                        if ui.button("   Save file   ".to_string()).clicked() {
-                            state.search_active = false;
-                            state.search_term.clear();
-                            prev_path = Default::default();
-                            callback(&path.join(state.filename.clone()));
-                        }
-                    });
+                            ui.label("Filename");
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().button_padding = Vec2::new(2., 5.);
+                                let textinput = ui.add(
+                                    egui::TextEdit::singleline(&mut state.filename)
+                                        .min_size(Vec2::new(10., 28.)),
+                                );
 
-                    for fe in settings.encoding_options.iter_mut() {
-                        if ext.to_lowercase() == fe.ext() {
-                            fe.ui(ui);
-                        }
-                    }
+                                if prev_path == PathBuf::default() {
+                                    textinput.request_focus();
+                                }
+
+                                for f in FileEncoder::iter() {
+                                    if !filter.contains(&f.ext().as_str()) {
+                                        continue;
+                                    }
+                                    let e = f.ext();
+                                    if ui.add(egui::Button::new(&e).selected(ext == e)).clicked() {
+                                        state.filename = Path::new(&state.filename)
+                                            .with_extension(&e)
+                                            .to_string_lossy()
+                                            .to_string();
+                                    }
+                                }
+
+                                if ui.button("   Save file   ".to_string()).clicked() {
+                                    state.search_active = false;
+                                    state.search_term.clear();
+                                    prev_path = Default::default();
+                                    callback(&path.join(state.filename.clone()));
+                                }
+                            });
+
+                            for fe in settings.encoding_options.iter_mut() {
+                                if ext.to_lowercase() == fe.ext() {
+                                    fe.ui(ui);
+                                }
+                            }
+                        })
+                        .response;
+                    ui.ctx()
+                        .data_mut(|d| d.insert_temp(save_row_id, save_ui.rect.height()));
                 }
             });
         },

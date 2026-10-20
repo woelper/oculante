@@ -415,6 +415,37 @@ def test_ctrl_and_the_wheel_go_through_the_images(binary):
         assert changed_pixels(before, zoomed) > 5000, "the wheel alone did not zoom"
 
 
+def test_save_as_writes_the_file(binary):
+    """Save as shows the name of the file and the button to save below the files, and
+    writes the file. The files took all the height of the dialog for a while, the row
+    to save was cut off."""
+    folder = folder_of("save_as_images", [("moss.jpg", "moss.jpg")])
+    with App(binary, "save_as", [os.path.join(folder, "moss.jpg")], volatile={"last_open_directory": folder}) as app:
+        app.wait_window()
+        app.move(0.5, 0.5)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.settle(1.0)
+        app.key("e")
+        app.settle(1.5)
+        app.click(896, 343)  # "Save as..." in the edit panel
+        app.settle(2.0)
+        app.shot("dialog")
+        # the name has the keyboard. In front of it, a name without an extension
+        # gets ".jpg" right away, also in 0.9.6.
+        app.key("Home")
+        app.x("xdotool", "type", "--delay", "60", "copy_")
+        app.settle(0.5)
+        app.click(713, 531)  # "Save file"
+        saved = os.path.join(folder, "copy_unnamed.png")
+        for _ in range(20):
+            if os.path.exists(saved) and os.path.getsize(saved) > 0:
+                break
+            time.sleep(0.5)
+        assert os.path.exists(saved), "Save file did not write the file"
+        with open(saved, "rb") as f:
+            assert f.read(8) == b"\x89PNG\r\n\x1a\n", "the saved file is not a PNG"
+
+
 def test_sequence_of_tiff_pages(binary):
     """A TIFF with three pages: the title counts them, the arrow keys go through them,
     a page seen before comes from the cache, and the list in the info panel shows a
@@ -1786,6 +1817,7 @@ TESTS = [
     test_several_files_as_arguments,
     test_first_and_last_image,
     test_ctrl_and_the_wheel_go_through_the_images,
+    test_save_as_writes_the_file,
     test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
     test_delete,
