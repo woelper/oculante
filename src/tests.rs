@@ -420,6 +420,48 @@ fn ci_exif_is_read_and_kept_when_saving() {
 
 /// The parallel reorientation gives the same pixels as the image crate, for
 /// every orientation and layout
+/// The numbers of the info panel for an edit are those of the edited pixels, with the
+/// EXIF read from the file before: it is not read again for every change
+#[test]
+fn ci_info_for_an_edit_keeps_what_was_read_of_the_file() {
+    use crate::utils::send_extended_info;
+    use image::{DynamicImage, Rgb, RgbImage};
+    use std::sync::Arc;
+    let dir = std::env::temp_dir().join("oculante_test_info_edit");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.jpg");
+    write_jpeg_with_orientation(&source, 6);
+    let channel = std::sync::mpsc::channel();
+    let plain = Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+        4,
+        4,
+        Rgb([200, 10, 10]),
+    )));
+    send_extended_info(plain, Some(source.clone()), None, (3, 0), &channel);
+    let (version, first) = channel.1.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(version, (3, 0));
+    assert!(!first.exif.is_empty(), "no EXIF was read");
+    // brighter, and the file is gone
+    std::fs::remove_file(&source).unwrap();
+    let edited = Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+        4,
+        4,
+        Rgb([250, 60, 60]),
+    )));
+    send_extended_info(edited, Some(source), Some(&first), (3, 7), &channel);
+    let (version, info) = channel.1.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(version, (3, 7));
+    assert_eq!(info.exif, first.exif);
+    let red = |info: &crate::utils::ExtendedImageInfo, level: i32| {
+        info.red_histogram
+            .iter()
+            .find(|(v, _)| *v == level)
+            .map_or(0, |(_, n)| *n)
+    };
+    assert_eq!((red(&first, 200), red(&first, 250)), (16, 0));
+    assert_eq!((red(&info, 200), red(&info, 250)), (0, 16));
+}
+
 #[test]
 fn ci_reorient_like_the_image_crate() {
     use crate::image_loader::reorient;

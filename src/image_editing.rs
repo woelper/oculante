@@ -145,6 +145,14 @@ impl EditState {
         }
     }
 
+    /// Whether anything is there to change the image: operations, annotations or
+    /// paint strokes. Without, the edited image has the pixels of the image.
+    pub fn changes_the_image(&self) -> bool {
+        !self.image_op_stack.is_empty()
+            || !self.pixel_op_stack.is_empty()
+            || self.paint_strokes.iter().any(|s| !s.is_empty())
+    }
+
     /// The result of the image operations is kept when that saves work: when
     /// there is an operation other than the conversion of the color type. The
     /// conversion alone is cheap to do again, and keeping its result would hold

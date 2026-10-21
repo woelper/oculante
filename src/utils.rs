@@ -901,30 +901,40 @@ pub fn pos_from_coord(
     size
 }
 
-/// Computes the numbers of the info panel for an image in the background. They
-/// come back with the version of the image they belong to.
+/// The version of the image and of its edits that the numbers of the info panel are for
+pub type InfoVersion = (u64, u64);
+
+/// Computes the numbers of the info panel for an image in the background. EXIF and
+/// DICOM are read from the file, unless they are known from numbers computed before
+/// for it: edits do not change them. The numbers come back with the version of the
+/// image they belong to.
 pub fn send_extended_info(
-    current_image: &Option<Arc<DynamicImage>>,
-    current_path: &Option<PathBuf>,
-    version: u64,
+    img: Arc<DynamicImage>,
+    path: Option<PathBuf>,
+    known: Option<&ExtendedImageInfo>,
+    version: InfoVersion,
     channel: &ExtendedInfoChannel,
 ) {
-    if let Some(img) = current_image {
-        // The image is shared with the thread, not copied
-        let img = img.clone();
-        let sender = channel.0.clone();
-        let current_path = current_path.clone();
-        thread::spawn(move || {
-            let mut e_info = ExtendedImageInfo::from_dynamic_image(&img);
-            if let Some(p) = current_path {
-                _ = e_info.with_exif(&p);
-                _ = e_info.with_dicom(&p);
+    let sender = channel.0.clone();
+    let known = known.map(|info| (info.exif.clone(), info.dicom.clone()));
+    thread::spawn(move || {
+        let mut e_info = ExtendedImageInfo::from_dynamic_image(&img);
+        match known {
+            Some((exif, dicom)) => {
+                e_info.exif = exif;
+                e_info.dicom = dicom;
             }
-            debug!("Sending extended info");
-            _ = sender.send((version, e_info));
-            request_repaint();
-        });
-    }
+            None => {
+                if let Some(p) = path {
+                    _ = e_info.with_exif(&p);
+                    _ = e_info.with_dicom(&p);
+                }
+            }
+        }
+        debug!("Sending extended info");
+        _ = sender.send((version, e_info));
+        request_repaint();
+    });
 }
 
 pub trait ImageExt {
@@ -1201,8 +1211,8 @@ pub fn toggle_zen_mode(state: &mut OculanteState, ctx: &egui::Context) {
 /// Fix missing exif by re-applying exif to saved files
 /// The channel for the numbers of the info panel, with the version of the image
 pub type ExtendedInfoChannel = (
-    Sender<(u64, ExtendedImageInfo)>,
-    Receiver<(u64, ExtendedImageInfo)>,
+    Sender<(InfoVersion, ExtendedImageInfo)>,
+    Receiver<(InfoVersion, ExtendedImageInfo)>,
 );
 
 /// The EXIF data of a file, to write into a copy of the image that is saved

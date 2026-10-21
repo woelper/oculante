@@ -1298,21 +1298,56 @@ def test_keep_edits(binary):
                 assert changed > 50_000, "the edits stayed although they should be dropped"
 
 
+# where the info panel shows the histogram of moss.jpg
+HISTOGRAM = (10, 480, 230, 110)
+
+
 def test_image_info_is_computed_when_shown(binary):
-    """The histogram and the other numbers of the info panel are computed once for
-    every version of the image, and only while the panel is open."""
+    """The histogram and the other numbers of the info panel are computed only while
+    the panel is open, once for every version of the image, and again while an edit
+    changes it, for the edited image. Not for every step of a slider, but always for
+    the last one. Up to 0.9.2 the histogram followed the edits, then it showed the
+    image as it was loaded."""
     computed = "Sending extended info"
+    updates = "received UpdateTexture"
     with start(binary, "info_when_shown", image("moss.jpg")) as app:
         app.settle(1.5)
         assert app.log().count(computed) == 0, "computed with the info panel closed"
         app.key("i")
         app.settle(1.5)
         assert app.log().count(computed) == 1, "not computed when the info panel opened"
-        brighten(app)
-        assert app.log().count(computed) == 1, "computed again for every change of an edit"
+        app.scroll_down(120, 300, 12)  # down to the histogram
+        app.settle(0.8)
+        plain = app.shot("plain")
+        open_edit_panel(app)
+        assert app.log().count(computed) == 1, "computed again for the edit panel, without an edit"
+        before = app.log().count(updates)
+        app.click(897, 117)  # add "Brightness"
+        app.settle(0.8)
+        app.move(0.4, 0.5)
+        app.settle(0.8)
+        slider = find_slider(app.shot("slider"), (770, 60, 200, 400), ACCENT)
+        assert slider is not None, "the slider is missing"
+        handle, y = slider
+        started = time.time()
+        app.drag(handle - 4, y, handle + 30, y, steps=30)
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        elapsed = time.time() - started
+        edited = app.shot("edited")
+        changes = app.log().count(updates) - before
+        again = app.log().count(computed) - 1
+        assert again >= 1, "not computed again for the edit"
+        # at most every 200 ms, the first one right away
+        assert again < changes and again <= elapsed / 0.2 + 1, f"computed {again} times in {elapsed:.1f} s, for {changes} changes of the image"
+        changed = changed_pixels_in(plain, edited, HISTOGRAM)
+        assert changed > 300, f"the histogram changed only {changed} pixels with the edit"
         app.click(890, 210)  # "Apply all edits"
         app.settle(1.5)
-        assert app.log().count(computed) == 2, "not computed again after the edits were applied"
+        assert app.log().count(computed) == again + 2, "not computed again after the edits were applied"
+        applied = app.shot("applied")
+        changed = changed_pixels_in(edited, applied, HISTOGRAM)
+        assert changed < 50, f"the histogram of the edited image changed {changed} pixels when it was applied"
 
 
 def test_info_panel_resizes(binary):

@@ -60,9 +60,16 @@ pub struct OculanteApp {
     last_file_check: Instant,
     /// Fonts of the system for scripts the built-in fonts do not cover
     system_fonts: SystemFonts,
-    /// The image version the numbers of the info panel were asked for
-    info_requested: Option<u64>,
+    /// The version of the image and its edits the numbers of the info panel were
+    /// asked for last, and when
+    info_requested: Option<(InfoVersion, Instant)>,
+    /// The version they are being computed for
+    info_running: Option<InfoVersion>,
 }
+
+/// While an edit changes, the numbers of the info panel are computed again at most
+/// this often. Each time the edited image is copied for it.
+const INFO_INTERVAL: Duration = Duration::from_millis(200);
 
 /// The frames of an animation and the time to show the next one. The frames
 /// arrive from the loader thread while the first ones are already playing.
@@ -177,6 +184,7 @@ impl OculanteApp {
             last_file_check: Instant::now(),
             system_fonts: SystemFonts::Loaded,
             info_requested: None,
+            info_running: None,
         }
     }
 
@@ -583,9 +591,11 @@ impl OculanteApp {
             Frame::UpdateTexture => {
                 debug!("received UpdateTexture");
                 self.texture_dirty = true;
+                self.state.edit_version += 1;
                 ctx.request_repaint();
             }
             Frame::UpdateTextureArea(area) => {
+                self.state.edit_version += 1;
                 self.texture_area = Some(
                     self.texture_area
                         .map_or(area, |before| rect_union(before, area)),
@@ -738,24 +748,58 @@ impl eframe::App for OculanteApp {
             self.upload_area_to_glow(gl, area);
         }
 
-        // The numbers of the info panel are computed when it shows them, once for
-        // every version of the image: not while it is closed, not for every frame
-        // of an animation and not for every change of an edit.
+        // The numbers of the info panel are computed when it shows them, for what it
+        // shows: the image or the edited one. Not while it is closed and not for every
+        // frame of an animation. While an edit changes, one at a time and at most every
+        // INFO_INTERVAL, the last change always gets its numbers. Without edits the
+        // edited image is a copy of the image and has its numbers.
+        let edited = self.state.edit_state.changes_the_image();
+        let shown = (
+            self.state.image_version,
+            if edited { self.state.edit_version } else { 0 },
+        );
         if self.state.persistent_settings.info_enabled
-            && self.state.current_image.is_some()
-            && self.info_requested != Some(self.state.image_version)
+            && let Some(original) = &self.state.current_image
+            && self
+                .info_requested
+                .is_none_or(|(version, _)| version != shown)
         {
-            self.info_requested = Some(self.state.image_version);
-            send_extended_info(
-                &self.state.current_image,
-                &self.state.current_path,
-                self.state.image_version,
-                &self.state.extended_info_channel,
-            );
+            let same_image = |version: Option<InfoVersion>| version.is_some_and(|v| v.0 == shown.0);
+            let wait = self
+                .info_requested
+                .filter(|(version, _)| same_image(Some(*version)))
+                .map_or(Duration::ZERO, |(_, when)| {
+                    INFO_INTERVAL.saturating_sub(when.elapsed())
+                });
+            if same_image(self.info_running) {
+                // asked again when they arrive
+            } else if !wait.is_zero() {
+                ctx.request_repaint_after(wait);
+            } else {
+                let result = &self.state.edit_state.result_pixel_op;
+                let img = if edited && result.width() > 0 && self.animation.is_none() {
+                    Arc::new(result.clone())
+                } else {
+                    original.clone()
+                };
+                self.info_requested = Some((shown, Instant::now()));
+                self.info_running = Some(shown);
+                send_extended_info(
+                    img,
+                    self.state.current_path.clone(),
+                    self.state.image_metadata.as_ref(),
+                    shown,
+                    &self.state.extended_info_channel,
+                );
+            }
         }
         while let Ok((version, info)) = self.state.extended_info_channel.1.try_recv() {
-            // numbers for an image that is no longer shown are dropped
-            if version != self.state.image_version {
+            if self.info_running == Some(version) {
+                self.info_running = None;
+            }
+            // numbers for an image that is no longer shown are dropped, those for an
+            // edit that changed since are the newest there are
+            if version.0 != self.state.image_version {
                 continue;
             }
             for value in info.exif.values() {

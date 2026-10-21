@@ -82,6 +82,9 @@ pub struct OculanteState {
     /// or edits applied to it. The info panel computes its numbers once for
     /// every version.
     pub image_version: u64,
+    /// Changes whenever what is shown of the image changes while it is edited. The
+    /// info panel computes its numbers for the edited image again.
+    pub edit_version: u64,
     /// The Player, responsible for loading and sending Frames
     pub player: Player,
     pub current_path: Option<PathBuf>,
@@ -233,6 +236,7 @@ impl Default for OculanteState {
             load_channel: mpsc::channel(),
             extended_info_channel: meta_channel,
             image_version: 0,
+            edit_version: 0,
             mouse_delta: Default::default(),
             current_image: Default::default(),
             current_path: Default::default(),
