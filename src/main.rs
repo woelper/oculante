@@ -96,7 +96,7 @@ fn main() -> eframe::Result<()> {
 
     // Load application icon from embedded ICO
     let icon = {
-        let icon_data = include_bytes!("../res/icons/icon.ico");
+        let icon_data = include_bytes!("../res/app_icons/icon.ico");
         image::load_from_memory(icon_data).ok().map(|img| {
             let rgba = img.to_rgba8();
             egui::IconData {

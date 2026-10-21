@@ -834,7 +834,7 @@ fn modifier_stack_ui(
                         *image_changed = true;
                     }
 
-                    if egui::Button::new(RichText::new(X).size(caret_size * 1.5))
+                    if egui::Button::new(RichText::new(X).size(caret_size))
                         .frame(false)
                         .ui(ui)
                         .on_hover_text("Remove operator")

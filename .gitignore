@@ -14,4 +14,7 @@ TODO
 debug.png
 .idea
 icon.ico
-res/fonts/icons.css
+res/fonts/ui_icons.css
+node_modules
+package-lock.json
+package.json
