@@ -1,26 +1,34 @@
 pub mod app;
 pub mod appstate;
-pub mod cache;
-pub mod comparelist;
-pub mod glow_renderer;
+pub(crate) mod cache;
+pub(crate) mod comparelist;
+pub(crate) mod glow_renderer;
 pub mod image_editing;
 pub mod image_loader;
-pub mod input;
-pub mod ktx2_loader;
-pub mod settings;
-pub mod shortcuts;
+pub(crate) mod ktx2_loader;
+pub(crate) mod settings;
+pub(crate) mod shortcuts;
 pub mod utils;
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 pub const BOLD_FONT: &[u8; 344152] = include_bytes!("../res/fonts/Inter-Bold.ttf");
-pub mod file_encoder;
-pub mod filebrowser;
-pub mod icons;
+pub(crate) mod file_encoder;
+pub(crate) mod file_sort;
+// With file_open the system file dialog replaces the built-in browser, what only
+// the browser uses is unused then
+pub(crate) mod annotate;
+#[cfg_attr(feature = "file_open", allow(dead_code))]
+pub(crate) mod filebrowser;
+// Written by scripts/generate_icons.sh from every icon in res/ui_icons, not all are used
+#[allow(dead_code)]
+pub(crate) mod icons;
 pub mod net;
-pub mod paint;
-pub mod scrubber;
-pub mod thumbnails;
-pub mod toasts;
-pub mod ui;
+pub(crate) mod paint;
+pub(crate) mod scrubber;
+pub(crate) mod sequence;
+#[cfg_attr(feature = "file_open", allow(dead_code))]
+pub(crate) mod thumbnails;
+pub(crate) mod toasts;
+pub(crate) mod ui;
 pub mod window_config;
 
 // mod events;

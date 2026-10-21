@@ -45,6 +45,9 @@ pub enum InputEvent {
     ZenMode,
     ScrubBar,
     CopyPath,
+    /// The next image of a file that holds several
+    NextItem,
+    PreviousItem,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -115,30 +118,67 @@ impl Shortcut {
         }
         parts.join(" + ")
     }
-
-    /// Markdown version for documentation
-    pub fn to_markdown(&self) -> String {
-        let mut parts = Vec::new();
-        if self.modifiers.ctrl {
-            parts.push("<kbd>Ctrl</kbd>".to_string());
-        }
-        if self.modifiers.mac_cmd || self.modifiers.command {
-            parts.push("<kbd>Cmd</kbd>".to_string());
-        }
-        if self.modifiers.alt {
-            parts.push("<kbd>Alt</kbd>".to_string());
-        }
-        if self.modifiers.shift {
-            parts.push("<kbd>Shift</kbd>".to_string());
-        }
-        for k in &self.keys {
-            parts.push(format!("<kbd>{k:?}</kbd>"));
-        }
-        parts.join(" + ")
-    }
 }
 
 pub type Shortcuts = BTreeMap<InputEvent, Shortcut>;
+
+/// Reads the shortcuts as they are saved now, and as 0.9.6 and older saved
+/// them: a list of key names with the modifiers among them, like
+/// ["LShift", "Right"]. Those could not be read, and with them nothing of the
+/// settings. A shortcut that can not be read keeps its default.
+pub fn deserialize_shortcuts<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Shortcuts, D::Error> {
+    let saved = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+    let mut shortcuts = Shortcuts::new();
+    for (event, value) in saved {
+        let Ok(event) = serde_json::from_value::<InputEvent>(serde_json::Value::String(event))
+        else {
+            continue;
+        };
+        let shortcut = serde_json::from_value::<Shortcut>(value.clone())
+            .ok()
+            .or_else(|| {
+                shortcut_from_key_names(&serde_json::from_value::<Vec<String>>(value).ok()?)
+            });
+        if let Some(shortcut) = shortcut {
+            shortcuts.insert(event, shortcut);
+        }
+    }
+    Ok(shortcuts)
+}
+
+/// A shortcut from key names as the notan versions saved them
+fn shortcut_from_key_names(names: &[String]) -> Option<Shortcut> {
+    let mut keys = BTreeSet::new();
+    let mut modifiers = Modifiers::NONE;
+    for name in names {
+        match name.as_str() {
+            "LShift" | "RShift" => modifiers.shift = true,
+            "LAlt" | "RAlt" => modifiers.alt = true,
+            // as in the default shortcuts: cmd on macOS, ctrl elsewhere
+            "LControl" | "RControl" => {
+                modifiers |= if cfg!(target_os = "macos") {
+                    Modifiers::MAC_CMD
+                } else {
+                    Modifiers::CTRL
+                }
+            }
+            other => {
+                let key = match other {
+                    "LBracket" => "[",
+                    "RBracket" => "]",
+                    "Back" => "Backspace",
+                    // Key0 to Key9
+                    digit if digit.len() == 4 && digit.starts_with("Key") => &digit[3..],
+                    key => key,
+                };
+                keys.insert(Key::from_name(key)?);
+            }
+        }
+    }
+    (!keys.is_empty()).then_some(Shortcut { keys, modifiers })
+}
 
 pub fn default_shortcuts() -> Shortcuts {
     use Key::*;
@@ -160,6 +200,8 @@ pub fn default_shortcuts() -> Shortcuts {
     s.insert(InputEvent::FirstImage, Shortcut::key(Home));
     s.insert(InputEvent::LastImage, Shortcut::key(End));
     s.insert(InputEvent::NextImage, Shortcut::key(ArrowRight));
+    s.insert(InputEvent::NextItem, Shortcut::key(ArrowDown));
+    s.insert(InputEvent::PreviousItem, Shortcut::key(ArrowUp));
     s.insert(InputEvent::ZoomIn, Shortcut::key(Equals));
     s.insert(InputEvent::ZoomOut, Shortcut::key(Minus));
     s.insert(InputEvent::ZoomActualSize, Shortcut::key(Num1));
@@ -271,8 +313,4 @@ pub fn lookup(shortcuts: &Shortcuts, command: &InputEvent) -> String {
 
 pub fn keypresses_as_string(shortcut: &Shortcut) -> String {
     shortcut.to_string_pretty()
-}
-
-pub fn keypresses_as_markdown(shortcut: &Shortcut) -> String {
-    shortcut.to_markdown()
 }

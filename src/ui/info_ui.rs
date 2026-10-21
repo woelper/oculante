@@ -6,7 +6,7 @@ use crate::filebrowser::browse_for_image_path;
 use crate::glow_renderer::{self, GlowRenderer, GlowTile, Quad};
 use crate::icons::*;
 use crate::utils::*;
-use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
+use egui_plot::{HoverPosition, Line, Plot, PlotPoint, PlotPoints};
 use image::ColorType;
 
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
@@ -55,89 +55,54 @@ pub fn info_ui(
     egui::Panel::left("info")
     .show_separator_line(true)
     .default_size(PANEL_WIDTH)
+    .size_range(MIN_WIDTH..=MAX_WIDTH)
     .resizable(true)
     .show(ui, |ui| {
+        // The scroll bar keeps its room when it is hidden. The zoom preview and the
+        // histogram are as tall as they are wide: when the bar took its room, they
+        // got short enough to fit, the bar went away, they got taller again, and
+        // the panel flickered. The panel is as wide as what is in it, so the room
+        // stays a part of the scroll area.
+        let width = ui.available_width() - ui.spacing().scroll.allocated_width();
         egui::ScrollArea::vertical()
             .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
+            .auto_shrink([false, true])
             .show(ui, |ui| {
+            ui.set_max_width(width);
 
             // SECTION 1: Info grid
             if state.current_image.is_some() {
-                let desired_width = PANEL_WIDTH as f64 - PANEL_WIDGET_OFFSET as f64 - 20.;
                 uv_center = (
                     state.cursor_relative.x as f64 / state.image_geometry.dimensions.0 as f64,
                     (state.cursor_relative.y as f64 / state.image_geometry.dimensions.1 as f64),
                 );
 
-                egui::Grid::new("info")
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                    ui.label_i(format!("{BOUNDING_BOX} Size",));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{}x{}",
-                            state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
-                        ))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{BOUNDING_BOX} Size")), format!(
+                    "{}x{}",
+                    state.image_geometry.dimensions.0, state.image_geometry.dimensions.1
+                ));
 
-                    if let Some(path) = &state.current_path {
-                        // make sure we truncate filenames
-                        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(format!("{} File", FILE));
-                        let path_label = egui::Label::new(
-                            RichText::new(file_name)
-                        ).truncate();
-                        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                            ui.add(path_label)
-                            .on_hover_text(format!("{}", path.display()));
-                        });
-                        ui.end_row();
-                    }
+                if let Some(path) = &state.current_path {
+                    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                    info_row(ui, |ui| ui.label_i(format!("{FILE} File")), file_name)
+                        .on_hover_text(format!("{}", path.display()));
+                }
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col(state.sampled_color))
-                    );
-                    ui.end_row();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                    ui.label_i(format!("{PALETTE} RGBA"));
-                    ui.label_right(
-                        RichText::new(disp_col_norm(state.sampled_color, 255.))
-                    );
-                    ui.end_row();
+                let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
+                info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
+                    "{:.0},{:.0}",
+                    state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
+                ));
+                info_row(ui, |ui| ui.label_i(format!("{INTERSECT} UV")), format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1));
 
-                    ui.label_i(format!("{PALETTE} HEX"));
-                    let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
-                    ui.label_right(
-                        RichText::new(hex)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{PALETTE} Color"));
-                    ui.label_right(
-                        format!("{:?}", color_type)
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{MOVE} Pos"));
-                    ui.label_right(
-                        RichText::new(format!(
-                            "{:.0},{:.0}",
-                            state.cursor_relative.x.floor(), state.cursor_relative.y.floor()
-                        ))
-                    );
-                    ui.end_row();
-
-                    ui.label_i(format!("{INTERSECT} UV"));
-                    ui.label_right(
-                        RichText::new(format!("{:.3},{:.3}", uv_center.0, 1.0 - uv_center.1))
-                    );
-                    ui.end_row();
-                });
-                // SECTION 2: Zoom preview
+                // SECTION 2: Zoom preview, as wide as the panel and square
                 ui.add_space(10.);
-                let preview_size = desired_width as f32;
+                let preview_size = ui.available_width();
                 let preview_rect = egui::Rect::from_min_size(
                     ui.cursor().left_top(),
                     egui::Vec2::splat(preview_size),
@@ -153,8 +118,15 @@ pub fn info_ui(
                 ui.advance_cursor_after_rect(preview_rect);
             } // end if current_image
 
-            // SECTION 3: Compare
             ui.add_space(10.);
+            // The images of a file that holds several
+            if state.sequence().is_some() {
+                ui.vertical_centered_justified(|ui| {
+                    ui.styled_collapsing("Sequence", |ui| sequence_ui(ui, state));
+                });
+            }
+
+            // SECTION 3: Compare
             ui.vertical_centered_justified(|ui| {
                 ui.styled_collapsing("Compare", |ui| {
 
@@ -200,39 +172,47 @@ pub fn info_ui(
                             if ui.ctx().data(|r|r.get_temp::<bool>("compare".into())).is_some()
                                 && state.is_loaded && !state.reset_image
                                     && let Some(path) = &state.current_path {
-                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                        state.compare_list.insert(CompareItem::new(path, state.current_item(), state.image_geometry));
                                         ui.ctx().data_mut(|w|w.remove_temp::<bool>("compare".into()));
                                     }
 
                             let mut to_remove = None;
-                            for CompareItem {path, geometry} in state.compare_list.iter() {
+                            let mut to_show = None;
+                            let shown = (state.current_path.clone(), state.current_item());
+                            for CompareItem {path, item, geometry} in state.compare_list.iter() {
                                 ui.horizontal(|ui|{
                                     if ui.button(X).clicked() {
-                                        to_remove = Some(path.to_owned());
+                                        to_remove = Some((path.to_owned(), *item));
                                     }
                                     ui.vertical_centered_justified(|ui| {
-                                        if ui.add(egui::Button::new(path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default().to_string()).selected(state.current_path.as_ref() == Some(path))).clicked(){
-                                            state
-                                                .player
-                                                .load_advanced(path, Some(crate::utils::Frame::CompareResult(Default::default(), *geometry)));
-                                            ui.ctx().request_repaint();
-                                            ui.ctx().request_repaint_after(Duration::from_millis(500));
-                                            state.current_path = Some(path.clone());
+                                        let mut name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+                                        if *item > 0 {
+                                            name.push_str(&format!(" ({})", item + 1));
+                                        }
+                                        let selected = shown.0.as_ref() == Some(path) && shown.1 == *item;
+                                        if ui.add(egui::Button::new(name).selected(selected)).clicked(){
+                                            to_show = Some((path.clone(), *item, *geometry));
                                         }
                                     });
                                 });
                             }
-                            if let Some(remove) = to_remove {
-                                state.compare_list.remove(remove);
+                            if let Some((path, item, geometry)) = to_show {
+                                crate::utils::compare_show(state, &path, item, geometry);
+                                ui.ctx().request_repaint();
+                                ui.ctx().request_repaint_after(Duration::from_millis(500));
+                            }
+                            if let Some((path, item)) = to_remove {
+                                state.compare_list.remove(path, item);
                             }
                             if let Some(path) = &state.current_path {
-                                if let Some(geo) = state.compare_list.get(path) {
+                                let item = state.current_item();
+                                if let Some(geo) = state.compare_list.get(path, item) {
                                     if state.image_geometry != geo
                                         && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
-                                                state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                                state.compare_list.insert(CompareItem::new(path, item, state.image_geometry));
                                         }
                                     } else if ui.button(format!("{PLUS} Add current image")).clicked() {
-                                        state.compare_list.insert(CompareItem::new(path, state.image_geometry));
+                                        state.compare_list.insert(CompareItem::new(path, item, state.image_geometry));
                                     }
                             }
                             if !state.compare_list.is_empty()
@@ -288,6 +268,11 @@ pub fn info_ui(
 
                 ui.horizontal(|ui| {
                     ui.label("Tiling");
+                    // The slider fills the row, its value is at the right edge like the
+                    // others. The value takes 40 points.
+                    let spacing = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().slider_width =
+                        (ui.available_width() - 40. - 2. * spacing).at_least(40.);
                     ui.styled_slider(&mut state.tiling, 1..=10);
                 });
             }
@@ -300,23 +285,130 @@ pub fn info_ui(
     (bbox_tl, bbox_br)
 }
 
+/// The narrowest and widest the info panel can be dragged to. While its edge is
+/// dragged, the panel is cut off at the dragged width, so the narrowest has to fit
+/// what is in the panel, like the slider for tiling. Narrower, the cut off part
+/// showed the background of the canvas until the panel was let go.
+const MIN_WIDTH: f32 = 240.;
+const MAX_WIDTH: f32 = 640.;
+
+/// A row of the info panel: the label, and the value right-aligned in the space
+/// that is left. A value that does not fit is cut short, it ran over the label.
+fn info_row(
+    ui: &mut Ui,
+    label: impl FnOnce(&mut Ui) -> egui::Response,
+    value: impl Into<egui::WidgetText>,
+) -> egui::Response {
+    ui.horizontal(|ui| {
+        label(ui);
+        ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+            ui.add(egui::Label::new(value).truncate())
+        })
+        .inner
+    })
+    .inner
+}
+
+/// One row for every image of the file: a picture, its number and size, and a
+/// button to add it to the compare list. Only the rows in view are drawn, and
+/// their pictures decoded.
+fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
+    use crate::sequence::Thumbnail;
+    const ROW: f32 = 76.;
+    let (Some(path), geometry) = (state.current_path.clone(), state.image_geometry) else {
+        return;
+    };
+    let Some(sequence) = state.sequence.as_mut() else {
+        return;
+    };
+    let (mut show, mut compare) = (None, None);
+    // the accent color
+    let highlight = accent_color(ui.ctx());
+    // inside the scrolling panel the list would shrink to egui's smallest height
+    let row = ROW + ui.spacing().item_spacing.y;
+    let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);
+    egui::ScrollArea::vertical()
+        .id_salt("sequence")
+        // as wide as the panel, the scroll bar at its edge
+        .auto_shrink([false, true])
+        .min_scrolled_height(height)
+        .max_height(height)
+        .show_rows(ui, ROW, sequence.count, |ui, rows| {
+            for item in rows {
+                ui.horizontal(|ui| {
+                    let (cell, response) =
+                        ui.allocate_exact_size(vec2(ROW * 4. / 3., ROW - 8.), Sense::click());
+                    // room for the frame of the image that is shown, the list cuts off
+                    // anything drawn outside of it
+                    let mut rect = cell.shrink(3.);
+                    let mut size = None;
+                    match sequence.thumbnail(ui.ctx(), item) {
+                        Some(Thumbnail::Done(texture, image_size)) => {
+                            size = Some(*image_size);
+                            let fit = texture.size_vec2()
+                                * (rect.size() / texture.size_vec2()).min_elem();
+                            rect = Rect::from_center_size(rect.center(), fit);
+                            ui.painter().image(
+                                texture.id(),
+                                rect,
+                                Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)),
+                                Color32::WHITE,
+                            );
+                        }
+                        _ => {
+                            ui.painter()
+                                .rect_filled(rect, 4., ui.visuals().extreme_bg_color);
+                        }
+                    }
+                    if item == sequence.current {
+                        ui.painter().rect_stroke(
+                            rect,
+                            4.,
+                            Stroke::new(2., highlight),
+                            StrokeKind::Outside,
+                        );
+                    }
+                    if response.on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                        show = Some(item);
+                    }
+                    ui.vertical(|ui| {
+                        ui.label(format!("Item {}", item + 1));
+                        if let Some([width, height]) = size {
+                            ui.label(format!("{width}x{height}"));
+                        }
+                        if ui.button("Compare").clicked() {
+                            compare = Some(item);
+                        }
+                    });
+                });
+            }
+        });
+    if let Some(item) = show {
+        state.load_item(item);
+    }
+    if let Some(item) = compare {
+        state
+            .compare_list
+            .insert(CompareItem::new(&path, item, geometry));
+    }
+}
+
 fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
     if let Some(info) = &state.image_metadata {
-        egui::Grid::new("extended").num_columns(2).show(ui, |ui| {
-            ui.label("Number of colors");
-            ui.label_right(format!("{}", info.num_colors));
-            ui.end_row();
-
-            ui.label("Fully transparent");
-            ui.label_right(format!(
+        info_row(
+            ui,
+            |ui| ui.label("Number of colors"),
+            format!("{}", info.num_colors),
+        );
+        info_row(
+            ui,
+            |ui| ui.label("Fully transparent"),
+            format!(
                 "{:.2}%",
                 (info.num_transparent_pixels as f32 / info.num_pixels as f32) * 100.
-            ));
-            ui.end_row();
-            ui.label("Pixels");
-            ui.label_right(format!("{}", info.num_pixels));
-            ui.end_row();
-        });
+            ),
+        );
+        info_row(ui, |ui| ui.label("Pixels"), format!("{}", info.num_pixels));
 
         if !info.exif.is_empty() {
             ui.styled_collapsing("EXIF", |ui| {
@@ -380,7 +472,21 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             .allow_drag(false)
             .show_axes(false)
             .show_grid(false)
-            .width(PANEL_WIDTH - PANEL_WIDGET_OFFSET)
+            .width(ui.available_width())
+            // the height that is left, but not flatter than 2:1
+            .height(ui.available_height().max(ui.available_width() / 2.))
+            // egui_plot shows the values under the pointer only with a formatter
+            .label_formatter(|position| match position {
+                HoverPosition::NearDataPoint {
+                    plot_name,
+                    position,
+                    ..
+                } => Some(format!(
+                    "{plot_name}: {:.0}\n{:.0} pixels",
+                    position.x, position.y
+                )),
+                HoverPosition::Elsewhere { .. } => None,
+            })
             .show(ui, |plot_ui| {
                 plot_ui.line(line("red", &info.red_histogram, Color32::RED));
                 plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));
@@ -500,6 +606,7 @@ fn zoom_preview(
             size: [screen_right - screen_left, screen_bottom - screen_top],
             uv_offset: [uv_left, uv_top],
             uv_scale: [uv_right - uv_left, uv_bottom - uv_top],
+            premultiplied: tile.texture.premultiplied,
         });
     }
 

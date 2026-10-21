@@ -2,7 +2,6 @@ const ICON_SIZE: f32 = 20.;
 pub const BUTTON_HEIGHT_LARGE: f32 = 35.;
 pub const BUTTON_HEIGHT_SMALL: f32 = 24.;
 pub const PANEL_WIDTH: f32 = 260.0;
-const PANEL_WIDGET_OFFSET: f32 = 0.0;
 
 mod info_ui;
 pub use info_ui::info_ui;
@@ -16,6 +15,7 @@ mod edit_ui;
 pub use edit_ui::edit_ui;
 mod theme;
 pub use theme::*;
+#[cfg_attr(feature = "file_open", allow(dead_code))]
 mod thumbnail_rendering;
 pub use thumbnail_rendering::*;
 
@@ -41,8 +41,7 @@ use crate::{
     appstate::{ImageGeometry, OculanteState},
     file_encoder::FileEncoder,
     image_editing::{
-        Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter,
-        process_pixels,
+        Channel, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter, process_pixels,
     },
     paint::PaintStroke,
     settings::{ColorTheme, PersistentSettings, VolatileSettings, set_system_theme},
@@ -59,15 +58,6 @@ pub trait EguiExt {
     }
 
     fn label_unselectable(&mut self, _text: impl Into<WidgetText>) -> Response {
-        unimplemented!()
-    }
-
-    fn label_right(&mut self, _text: impl Into<WidgetText>) -> Response {
-        unimplemented!()
-    }
-
-    #[allow(unused)]
-    fn label_i_selected(&mut self, _selected: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
 
@@ -95,6 +85,7 @@ pub trait EguiExt {
         unimplemented!()
     }
 
+    #[cfg_attr(feature = "file_open", allow(dead_code))]
     fn styled_selectable_label(&mut self, _active: bool, _text: impl Into<WidgetText>) -> Response {
         unimplemented!()
     }
@@ -134,7 +125,7 @@ impl EguiExt for Ui {
     }
 
     fn styled_checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
-        let color = self.style().visuals.selection.bg_fill;
+        let color = accent_color(self.ctx());
         let text = text.into();
         let spacing = &self.spacing();
         let icon_width = spacing.icon_width;
@@ -175,7 +166,8 @@ impl EguiExt for Ui {
                 big_icon_rect.expand(visuals.expansion),
                 visuals.corner_radius,
                 if *checked {
-                    color.gamma_multiply(0.3)
+                    // a dark shade of the accent, as behind what is selected
+                    self.style().visuals.selection.bg_fill
                 } else {
                     visuals.weak_bg_fill
                 },
@@ -221,7 +213,7 @@ impl EguiExt for Ui {
 
         self.with_layout(egui::Layout::left_to_right(Align::Center), |ui| {
             ui.add(egui::Label::new(
-                RichText::new(icon).color(ui.style().visuals.selection.bg_fill),
+                RichText::new(icon).color(accent_color(ui.ctx())),
             ));
             ui.label(
                 RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
@@ -259,7 +251,7 @@ impl EguiExt for Ui {
             Align2::CENTER_CENTER,
             icon,
             FontId::proportional(16.),
-            self.style().visuals.selection.bg_fill,
+            accent_color(self.ctx()),
         );
 
         r.response
@@ -288,7 +280,7 @@ impl EguiExt for Ui {
             Align2::CENTER_CENTER,
             icon,
             FontId::proportional(16.),
-            self.style().visuals.selection.bg_fill,
+            accent_color(self.ctx()),
         );
         r
     }
@@ -321,7 +313,7 @@ impl EguiExt for Ui {
                 2.,
                 TextFormat {
                     font_id: font,
-                    color: self.style().visuals.selection.bg_fill,
+                    color: accent_color(self.ctx()),
                     ..Default::default()
                 },
             );
@@ -333,14 +325,6 @@ impl EguiExt for Ui {
                 .corner_radius(self.get_rounding(BUTTON_HEIGHT_LARGE))
                 .min_size(vec2(0., BUTTON_HEIGHT_LARGE)),
         )
-    }
-
-    /// Draw a right justified label
-    fn label_right(&mut self, text: impl Into<WidgetText>) -> Response {
-        self.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-            ui.label(text);
-        })
-        .response
     }
 
     fn styled_collapsing<R>(
@@ -356,36 +340,6 @@ impl EguiExt for Ui {
             .show_unindented(self, add_contents)
     }
 
-    /// Draw a justified icon from a string starting with an emoji
-    fn label_i_selected(&mut self, selected: bool, text: impl Into<WidgetText>) -> Response {
-        let text: WidgetText = text.into();
-        let text = text.text();
-
-        let (icon, description) = parse_icon_plus_text(text);
-        let icon = icon.unwrap_or_default();
-
-        // let description = text.chars().filter(|c| c.is_ascii()).collect::<String>();
-        self.horizontal(|ui| {
-            let mut r = ui.add_sized(
-                egui::Vec2::new(30., ui.available_height()),
-                egui::Button::new(RichText::new(icon)).selected(selected),
-            );
-            if ui
-                .add_sized(
-                    egui::Vec2::new(ui.available_width(), ui.available_height()),
-                    egui::Button::new(RichText::new(description)).selected(selected),
-                )
-                .clicked()
-            {
-                // r.flags.insert(egui::response::Flags::CLICKED);
-                r.flags.insert(egui::response::Flags::CLICKED);
-                // r.clicked = true;
-            }
-            r
-        })
-        .inner
-    }
-
     fn styled_slider<Num: emath::Numeric>(
         &mut self,
         value: &mut Num,
@@ -398,8 +352,10 @@ impl EguiExt for Ui {
             ui.style_mut().spacing.interact_size.y = 18.;
             ui.style_mut().spacing.slider_rail_height = height;
 
-            let color = ui.style().visuals.selection.bg_fill;
+            let color = accent_color(ui.ctx());
             let style = ui.style_mut();
+            // the filled part of the rail, egui takes the color of what is selected
+            style.visuals.selection.bg_fill = color;
 
             // Use fg_stroke for the rail appearance
             style.visuals.widgets.inactive.fg_stroke.width = height;
@@ -457,7 +413,7 @@ impl EguiExt for Ui {
         range: RangeInclusive<Num>,
     ) -> Response {
         self.scope(|ui| {
-            let color = ui.style().visuals.selection.bg_fill;
+            let color = accent_color(ui.ctx());
             let available_width = ui.available_width() * 1. - 60.;
             let style = ui.style_mut();
             style.spacing.interact_size.y = 18.;
@@ -532,46 +488,6 @@ fn parse_icon_plus_text(line: &str) -> (Option<String>, String) {
 
     // 3) No icon found
     (None, trimmed.to_owned())
-}
-
-/// Proof-of-concept funtion to draw texture completely with egui
-#[allow(unused)]
-pub fn image_ui(ctx: &Context, state: &mut OculanteState) {
-    if let Some(_img) = &state.current_image {
-        let image_rect = Rect::from_center_size(
-            Pos2::new(
-                state.image_geometry.offset.x
-                    + state.image_geometry.dimensions.0 as f32 / 2. * state.image_geometry.scale,
-                state.image_geometry.offset.y
-                    + state.image_geometry.dimensions.1 as f32 / 2. * state.image_geometry.scale,
-            ),
-            vec2(
-                state.image_geometry.dimensions.0 as f32,
-                state.image_geometry.dimensions.1 as f32,
-            ) * state.image_geometry.scale,
-        );
-
-        /*egui::Painter::new(ctx.clone(), LayerId::background(), ctx.available_rect()).image(
-            tex_id.id,
-            image_rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );*/
-    }
-
-    // state.image_geometry.scale;
-
-    // let preview_rect = ui
-    // .add(
-    //     egui::Image::new(tex_id)
-    //     .maintain_aspect_ratio(false)
-    //     .fit_to_exact_size(egui::Vec2::splat(desired_width))
-    //     .uv(egui::Rect::from_x_y_ranges(
-    //         uv_center.0 - uv_size.0..=uv_center.0 + uv_size.0,
-    //         uv_center.1 - uv_size.1..=uv_center.1 + uv_size.1,
-    //     )),
-    // )
-    // .rect;
 }
 
 fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
@@ -678,10 +594,8 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
 // TODO redo as impl UI
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
-        let avg = (ui.style().visuals.selection.bg_fill.r() as i32
-            + ui.style().visuals.selection.bg_fill.g() as i32
-            + ui.style().visuals.selection.bg_fill.b() as i32)
-            / 3;
+        let accent = accent_color(ui.ctx());
+        let avg = (accent.r() as i32 + accent.g() as i32 + accent.b() as i32) / 3;
         let contrast_color: u8 = if avg > 128 { 0 } else { 255 };
         ui.horizontal(|ui| {
             ui.label(tooltip);
@@ -689,7 +603,7 @@ pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Respon
                 RichText::new(hotkey)
                     .monospace()
                     .color(Color32::from_gray(contrast_color))
-                    .background_color(ui.style().visuals.selection.bg_fill),
+                    .background_color(accent),
             );
         });
     })
@@ -706,7 +620,7 @@ pub fn unframed_button_colored(text: impl Into<String>, is_colored: bool, ui: &m
             egui::Button::new(
                 RichText::new(text)
                     .size(ICON_SIZE)
-                    .color(ui.style().visuals.selection.bg_fill),
+                    .color(accent_color(ui.ctx())),
             )
             .frame(false),
         )
@@ -729,6 +643,9 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
 
 /// An area that can be dragged by a user to move the window
 pub fn drag_area(ui: &mut Ui, state: &mut OculanteState) {
+    // There is no mouse position to move the window with
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
+    let _ = (ui, state);
     #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
     if state.persistent_settings.borderless {
         let r = ui.interact(
@@ -791,12 +708,13 @@ pub fn blank_icon(
 ) {
 }
 
-fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
+pub(crate) fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Response) {
+    let color = accent_color(ui.ctx());
     let galley = ui.ctx().fonts_mut(|fonts| {
         fonts.layout(
             CHEVRON_RIGHT.to_string(),
             FontId::proportional(12.),
-            ui.style().visuals.selection.bg_fill,
+            color,
             10.,
         )
     });
@@ -826,7 +744,7 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
         });
 }
 
-fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
+pub(crate) fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
     let panel_bg_color = match ui.style().visuals.dark_mode {
         true => Color32::from_gray(13),
         false => Color32::from_gray(217),
@@ -842,24 +760,22 @@ fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
 }
 
 /// Save an image to a path using encoding options and generate a thumbnail
+/// The EXIF data of the source file, the image was loaded from, goes into the saved file.
 fn save_with_encoding(
     image: &DynamicImage,
     path: &Path,
-    image_info: &Option<ExtendedImageInfo>,
+    source: Option<&Path>,
     encoders: &Vec<FileEncoder>,
 ) -> anyhow::Result<()> {
     let encoding_options = FileEncoder::matching_variant(path, encoders);
+    // read before saving, the source may be the file that is overwritten
+    let exif = source.and_then(raw_exif);
     encoding_options.save(image, path)?;
     debug!("Saved to {}", path.display());
-    // Re-apply exif
-    if let Some(info) = &image_info {
-        debug!("Extended image info present");
-        // before doing anything, make sure we have raw exif data
-        if info.raw_exif.is_some() {
-            fix_exif(path, info.raw_exif.clone())?;
-        } else {
-            debug!("No raw exif");
-        }
+    if exif.is_some() {
+        fix_exif(path, exif)?;
+    } else {
+        debug!("No raw exif");
     }
     thumbnails::generate(path)?;
     Ok(())
@@ -902,6 +818,24 @@ impl Modal {
             return;
         }
         egui::Modal::new(self.id.clone().into()).show(&self.ctx, |ui| {
+            // Enter accepts and Escape cancels. The keys are consumed so they
+            // don't reach the shortcuts. A focused button keeps Enter for itself.
+            let button_focused = ui.memory(|m| m.focused().is_some());
+            let (accept, cancel) = ui.input_mut(|i| {
+                (
+                    !button_focused && i.consume_key(Modifiers::NONE, Key::Enter),
+                    i.consume_key(Modifiers::NONE, Key::Escape),
+                )
+            });
+            if accept {
+                ui.scope(add_contents);
+                self.close();
+                return;
+            }
+            if cancel {
+                self.close();
+                return;
+            }
             ui.set_width(MODAL_WIDTH);
             ui.set_min_height(MODAL_MIN_HEIGHT);
             ui.vertical_centered_justified(|ui| {
@@ -955,7 +889,7 @@ pub fn show_delete_confirmation_modal(ctx: &egui::Context, state: &mut OculanteS
         return;
     };
 
-    Modal::new(DELETE_MODAL_ID, ctx).show(format!("Move \"{name}\" to the trash?"), |_| {
+    Modal::new(DELETE_MODAL_ID, ctx).show(delete_question(&name, DELETE_TO_TRASH), |_| {
         delete_file(state);
     });
 }

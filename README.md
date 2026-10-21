@@ -12,11 +12,7 @@ Oculante is a free, open-source, bloat-free, and privacy-respecting image viewer
 
 [![](https://dcbadge.limes.pink/api/server/https://discord.gg/2Q6cF5ZWe7)](https://discord.gg/https://discord.gg/2Q6cF5ZWe7)
 ---
-[![OSX](https://github.com/woelper/oculante/actions/workflows/check_osx.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_osx.yml)
-[![NetBSD](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_netbsd_minimal.yml)
-[![Ubuntu](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_ubuntu_no_default_features.yml)
-[![Windows](https://github.com/woelper/oculante/actions/workflows/check_windows.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_windows.yml)
-[![ARM](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/check_arm7.yml)
+[![CI](https://github.com/woelper/oculante/actions/workflows/ci.yml/badge.svg)](https://github.com/woelper/oculante/actions/workflows/ci.yml)
 ---
 ![GitHub all releases](https://img.shields.io/github/downloads/woelper/oculante/total?label=release%20downloads)
 ![Crates.io](https://img.shields.io/crates/d/oculante?label=crates.io%20downloads)
@@ -49,8 +45,6 @@ Images may contain color information that is masked by the alpha channel. Althou
 ## Installation
 
 Find and download the correct executable for your operating system on the [releases](https://github.com/woelper/oculante/releases/latest) page. The download is small, around 25MB, as we link dependencies statically by default. We also have packages available for ARM Linux. Have a different OS? Please feel free to open an issue if you want your operating system of choice supported!
-
-If you are on macOS, please ensure you have `libheif` installed.
 
 For those looking to manage Oculante through a package manager, please see the options below.
 
@@ -145,6 +139,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 ## Features
 
 - Image info: pixel position, color info, color histogram.
+- Files with several images: the pages of a TIFF, the images of a HEIC, the frames of a DICOM file and the layers and cube faces of a KTX2 texture are listed in the info panel and shown one at a time, Up and Down go through them.
 - Non-destructive editing, painting, and operator stack.
 - Lossless JPEG editing: Crop, rotate, mirror without recompressing data.
 - Built-in File Manager: Bookmark directories, favorite and manage files.
@@ -174,13 +169,14 @@ You can see what we're currently working on in our [Release Plan](https://github
 - webp
 - farbfeld
 - DDS (DXT1-5, via `dds-rs`)
+- KTX2: Basis Universal and ASTC (via `basisu`), BC1-7, ETC2 and EAC (via `texture2ddecoder`), 8 and 16 bit, half and float formats
 - DICOM (via dicom-rs) - Some metadata supported, too.
 - psd (via `psd`)
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
 - RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
-- HEIC/HEIF (via `libheif-rs`). Enabled on Windows builds, but optional dependency on MacOS and Linux - available behind `heif` flag.
+- HEIC/HEIF (via `heic-rs`, in pure Rust), with every image a file holds, camera HIF (4:2:2) included
 - qoi
 - kra (Krita files)
 - ora
@@ -241,13 +237,13 @@ This project is MIT licensed, but some parts such as the LUTs in res/LUT are und
 
 - `file_open` will enable/disable a OS-native file open dialog. This pulls in additional dependencies and is enabled by default. Disabling it will enable a custom file dialog. This will probably the default in the future.
 
-- `heif` HEIF format support.
+- `heif_native` (on by default) HEIC and HEIF in pure Rust. `heif` is a second name for it, it used libheif before 1.0.
 
 - `avif_native` (on by default) Rust AVIF decoder.
 
-- `dav1d` Tried and tested AVIF decoder, takes priority over `avif_native` if both are enabled.
+- `dav1d` used libdav1d and libavif until 1.0. It is a second name for `avif_native` now.
 
-- `jxlcms` (on by default) Required for complete JXL support.
+- `jxlcms` (on by default) Colour management for JXL, in pure Rust.
 
 - `j2k` (on by default) Support for jpeg2000.
 

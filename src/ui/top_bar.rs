@@ -199,7 +199,11 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             && window_x > ui.cursor().left() + 80.
             && tooltip(
                 unframed_button(TRASH, ui),
-                "Move file to trash",
+                if DELETE_TO_TRASH {
+                    "Move file to trash"
+                } else {
+                    "Delete file"
+                },
                 &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
                 ui,
             )
@@ -322,7 +326,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
-    use crate::shortcuts::InputEvent::*;
     let ctx = ui.ctx().clone();
 
     ui.scope(|ui| {
@@ -350,7 +353,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
             }
 
             let shift_held = ui.input(|i| i.modifiers.shift);
-            let copy_pressed = key_pressed(&ctx, state, Copy);
 
             if shift_held {
                 if let Some(path) = &state.current_path
@@ -363,12 +365,13 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                     state.send_message_info("Path copied");
                     ui.close();
                 }
+            // The keys for copy and paste are handled with the other shortcuts, also
+            // while the menu is open. Handled here as well, they did everything twice.
             } else if let Some(img) = effective_image(state)
-                && (ui
+                && ui
                     .styled_button(format!("{COPY} Copy"))
                     .on_hover_text("Copy image to clipboard")
                     .clicked()
-                    || copy_pressed)
             {
                 clipboard_copy(img);
                 ui.close();
@@ -378,7 +381,6 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                 .styled_button(format!("{CLIPBOARD} Paste"))
                 .on_hover_text("Paste image from clipboard")
                 .clicked()
-                || key_pressed(&ctx, state, Paste)
             {
                 match clipboard_to_image() {
                     Ok(img) => {
@@ -422,7 +424,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                             .unwrap_or_default();
 
                         let res = ui.horizontal(|ui| {
-                            let accent = ui.style().visuals.selection.bg_fill;
+                            let accent = accent_color(ui.ctx());
                             let (_, icon_rect) = ui.allocate_space(Vec2::splat(24.));
                             ui.painter().rect(
                                 icon_rect,
@@ -447,7 +449,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                         });
 
                         if res.inner {
-                            load_image_from_path(r, state);
+                            state.load(r);
                             ui.close();
                         }
                     }

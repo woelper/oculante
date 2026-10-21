@@ -10,7 +10,7 @@ use log::{LevelFilter, error};
 
 use oculante::app::OculanteApp;
 use oculante::appstate::OculanteState;
-use oculante::utils::{Frame, Player, open_paths, request_repaint};
+use oculante::utils::{Frame, Player, open_paths, path_from_arg, request_repaint};
 use oculante::window_config::build_window_settings;
 
 fn main() -> eframe::Result<()> {
@@ -42,6 +42,14 @@ fn main() -> eframe::Result<()> {
                 .action(clap::ArgAction::SetTrue)
                 .help("Load data from STDIN"),
         )
+        // 0.9.6 relaunched itself with -c on macOS to open files from Finder, which is
+        // done differently now. Still accepted, so launchers that pass it keep working.
+        .arg(
+            Arg::new("chainload")
+                .short('c')
+                .action(clap::ArgAction::SetTrue)
+                .hide(true),
+        )
         .get_matches_from(args);
 
     let mut state = OculanteState {
@@ -60,7 +68,7 @@ fn main() -> eframe::Result<()> {
     let paths_to_open: Vec<PathBuf> = matches
         .remove_many::<String>("INPUT")
         .unwrap_or_default()
-        .map(PathBuf::from)
+        .map(|arg| path_from_arg(&arg))
         .collect();
 
     // File names can also be piped in. They are read in the background, so the
@@ -96,7 +104,7 @@ fn main() -> eframe::Result<()> {
 
     // Load application icon from embedded ICO
     let icon = {
-        let icon_data = include_bytes!("../res/app_icons/icon.ico");
+        let icon_data = include_bytes!("../res/icons/icon.ico");
         image::load_from_memory(icon_data).ok().map(|img| {
             let rgba = img.to_rgba8();
             egui::IconData {
@@ -171,7 +179,7 @@ fn piped_paths(
             .flat_map(|line| {
                 line.unwrap_or_default()
                     .split_whitespace()
-                    .map(PathBuf::from)
+                    .map(path_from_arg)
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();

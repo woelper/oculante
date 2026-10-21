@@ -6,16 +6,9 @@ pub struct WindowSettings {
     pub title: String,
     pub width: u32,
     pub height: u32,
-    pub resizable: bool,
     pub vsync: bool,
-    pub high_dpi: bool,
     pub decorations: bool,
-    pub always_on_top: bool,
-    pub multisampling: u8,
     pub min_size: Option<(u32, u32)>,
-    pub max_size: Option<(u32, u32)>,
-    pub app_id: String,
-    pub icon_data: Option<&'static [u8]>,
 }
 
 impl Default for WindowSettings {
@@ -24,34 +17,16 @@ impl Default for WindowSettings {
             title: format!("Oculante | {}", crate::utils::app_version()),
             width: 1026,
             height: 600,
-            resizable: true,
             vsync: true,
-            high_dpi: true,
             decorations: true,
-            always_on_top: true,
-            multisampling: 0,
             min_size: None,
-            max_size: None,
-            app_id: "oculante".into(),
-            icon_data: None,
         }
     }
 }
 
 /// Build window settings from the current platform and user preferences.
 pub fn build_window_settings() -> WindowSettings {
-    let icon_data: &'static [u8] = include_bytes!("../res/app_icons/icon.ico");
-
-    let mut ws = WindowSettings {
-        icon_data: Some(icon_data),
-        ..Default::default()
-    };
-
-    // Platform-specific high DPI — NetBSD/FreeBSD don't support it
-    #[cfg(any(target_os = "netbsd", target_os = "freebsd"))]
-    {
-        ws.high_dpi = false;
-    }
+    let mut ws = WindowSettings::default();
 
     // Apply saved window geometry
     if let Ok(volatile_settings) = crate::settings::VolatileSettings::load()
@@ -76,10 +51,6 @@ pub fn build_window_settings() -> WindowSettings {
                 )
             ));
         }
-
-        // LIBHEIF_SECURITY_LIMITS needs to be set before a libheif context is created
-        #[cfg(feature = "heif")]
-        settings.decoders.heif.maybe_limits();
     }
 
     ws

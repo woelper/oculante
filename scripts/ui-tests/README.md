@@ -18,6 +18,8 @@ window fullscreen. They use `openbox` and `xprop` and are skipped without them:
 
     sudo apt install openbox x11-utils
 
+The clipboard test needs `xclip` and is skipped without it.
+
 ## Running
 
     cargo build
@@ -44,11 +46,36 @@ Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
 | `test_slider_changes_image` | A filter slider is drawn completely and can be dragged |
 | `test_measure_draws_rectangle` | Measuring with the right mouse button draws the rectangle over the image, in any direction, and not over the info panel |
 | `test_perspective_crop_handles` | The perspective crop shows its handles, they can be dragged, the crop applied, removed and added again |
+| `test_relative_file_name` | Started in the folder of the image with only its file name, the next image is the one after it |
+| `test_several_files_as_arguments` | Two files given on the command line are opened as a list: the first is shown, the next key goes to the second (#382). |
+| `test_first_and_last_image` | End shows the last image of the folder, Home the first, and Home on the first image loads nothing again. |
+| `test_sequence_of_tiff_pages` | A TIFF with three pages: the title counts them, Down and Up go through them, a page seen before comes from the cache, and the Sequence list in the info panel shows a picture of each that shows the page on a click. |
+| `test_chainload_option_is_accepted` | The app starts with `-c`, which 0.9.6 accepted, and opens the image given after it. |
+| `test_delete` | Delete asks first and moves the file to the trash, Cancel keeps it, Shift+Delete only takes the image off the list |
+| `test_lossless_rotation_keys_and_quit` | `]` and `[` turn a JPEG on disk and the turned file is shown again, `q` quits |
+| `test_settings_of_0_9_6` | The settings file 0.9.6 saved is used, with its info panel open |
+| `test_clipboard` | Ctrl+C copies the image and Ctrl+Shift+C its path, Ctrl+V shows the image from the clipboard (needs xclip) |
 | `test_key_repeat` | A key that is held down goes through the images of a folder |
 | `test_zen_mode` | Zen mode hides the bar and the info panel, leaving it brings both back |
 | `test_paint_mode` | A drag in paint mode leaves a stroke and does not move the image |
-| `test_fullscreen` | The window fills the screen and returns to its place and size (needs a window manager) |
+| `test_fullscreen` | The window fills the screen and returns to its place and size, the pixel under the pointer stays under it, with F and with a double click (needs a window manager) |
 | `test_borderless` | Without a border there is no title bar, the app's own bar moves the window and its button closes it (needs a window manager) |
+| `test_compare_list` | An image from the compare list comes back at its stored zoom and position, or keeps the current view with "persistent zoom" |
+| `test_animation_plays_and_stops` | An animated GIF plays, and stops when the next image is shown |
+| `test_animation_plays_as_often_as_the_file_asks` | A GIF that is to be played once stops on its last frame with a message |
+| `test_keep_view` | "Keep view" shows the next image at the same zoom, without it the image is fitted again |
+| `test_keep_edits` | "Keep edits" applies the filters to the next image, without it the image is shown as it is |
+| `test_image_info_is_computed_when_shown` | The numbers of the info panel are computed only while it is open, once per image, not for every edit change, and again after edits are applied |
+| `test_info_panel_resizes` | The info panel follows when its edge is dragged: no black strip while dragging narrower, no jump back when let go, and the zoom preview grows with a wider panel. |
+| `test_image_is_fitted_next_to_the_panels` | An image is fitted into the space the bar and the info panel leave, not under the panel. |
+| `test_histogram_shows_values_on_hover` | Hovering over the histogram shows the channel, the value and the number of pixels next to the pointer. |
+| `test_mipmaps_switched_on_and_off` | Mipmaps switched on and off in the preferences with an image on screen: the image is not black with them, and the same as before without them. |
+| `test_saved_edits_come_back` | Edits saved with "Save edits" are applied again when the image is opened the next time |
+| `test_single_frame_gif_is_editable` | A GIF with one frame is treated as a still image, so filters change it |
+| `test_actual_size_is_pixel_exact` | At 100% an image with an odd width and height shows exactly the pixels of the file, with linear and with nearest filtering |
+| `test_overtaken_load` | A slow image that was skipped over does not show up later |
+| `test_load_error_shows_toast` | A broken file shows an error toast and the app keeps running |
+| `test_channel_view` | A single channel changes the image and all channels restore it |
 
 ## Notes
 

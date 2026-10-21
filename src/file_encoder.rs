@@ -65,6 +65,12 @@ impl FileEncoder {
     }
 
     pub fn save(&self, image: &DynamicImage, path: &Path) -> Result<()> {
+        // PNG and AVIF take up to 16 bit per channel, floats are stored that way
+        let sixteen_bit = || match image {
+            DynamicImage::ImageRgb32F(_) => std::borrow::Cow::Owned(image.to_rgb16().into()),
+            DynamicImage::ImageRgba32F(_) => std::borrow::Cow::Owned(image.to_rgba16().into()),
+            _ => std::borrow::Cow::Borrowed(image),
+        };
         match self {
             FileEncoder::Jpg { quality } => {
                 let w = File::create(path)?;
@@ -82,11 +88,13 @@ impl FileEncoder {
                     },
                     image::codecs::png::FilterType::default(),
                 );
+                // in the layout the image has
+                let image = sixteen_bit();
                 encoder.write_image(
                     image.as_bytes(),
                     image.width(),
                     image.height(),
-                    image::ExtendedColorType::Rgba8,
+                    image.color().into(),
                 )?;
             }
             FileEncoder::Bmp => {
@@ -96,7 +104,7 @@ impl FileEncoder {
                 image.save_with_format(path, image::ImageFormat::WebP)?;
             }
             FileEncoder::Avif => {
-                image.save_with_format(path, image::ImageFormat::Avif)?;
+                sixteen_bit().save_with_format(path, image::ImageFormat::Avif)?;
             }
         }
         Ok(())

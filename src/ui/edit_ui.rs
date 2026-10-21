@@ -1,10 +1,11 @@
 use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
+use crate::image_editing::{start_from, with_pixels};
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
-use image::{ColorType, GenericImageView, RgbaImage};
+use image::{GenericImageView, RgbaImage};
 
 /// Load an RgbaImage into egui as a texture, returning the TextureId.
 /// Uses a stable URI so the texture is cached and not re-uploaded every frame.
@@ -32,25 +33,26 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
     // A flag to indicate that the image needs to be rebuilt
     let mut image_changed = false;
     let mut pixels_changed = false;
+    // Only the stroke that is being drawn changed
+    let mut stroke_changed = false;
+    // A stroke was finished, the next one is drawn on top of it
+    let mut stroke_finished = false;
 
-    if let Some(img) = &state.current_image {
-        // Ensure that edit result image is always filled
+    if state.current_image.is_some() {
+        // Ensure that the edit results are filled, by the processing below
         if state.edit_state.result_pixel_op.width() == 0 {
-            debug!("Edit state pixel comp buffer is default, cloning from image");
-            // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_pixel_op = DynamicImage::clone(img);
+            debug!("Edit state pixel comp buffer is default");
             pixels_changed = true;
         }
-        if state.edit_state.result_image_op.width() == 0 {
-            debug!("Edit state image comp buffer is default, cloning from image");
-            // FIXME This needs to go, and we need to implement operators for DynamicImage
-            state.edit_state.result_image_op = DynamicImage::clone(img);
+        if state.edit_state.keeps_image_op_result() && state.edit_state.result_image_op.width() == 0
+        {
+            debug!("Edit state image comp buffer is default");
             image_changed = true;
         }
     }
 
     // TODO: Move these to image_editing
-    let mut ops = [
+    let mut ops = vec![
         // General Image Adjustments
         ImgOpItem::new(ImageOperation::Brightness(0)),
         ImgOpItem::new(ImageOperation::Contrast(0)),
@@ -113,6 +115,12 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             original_size: state.image_geometry.dimensions,
         }),
     ];
+    let original = state
+        .current_image
+        .as_ref()
+        .map(|img| img.dimensions())
+        .unwrap_or_default();
+    state.edit_state.annotate.prepare(original);
 
     egui::Panel::right("editing")
         .default_size(PANEL_WIDTH)
@@ -202,6 +210,21 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     );
                 });
 
+            // the annotations have their own part, also when saved edits brought some
+            if state.persistent_settings.experimental_features
+                || state
+                    .edit_state
+                    .image_op_stack
+                    .iter()
+                    .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
+            {
+                ui.add_space(4.);
+                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate) {
+                    image_changed = true;
+                }
+                ui.add_space(4.);
+            }
+
 
             ui.vertical_centered_justified(|ui| {
                 if state.edit_state.painting {
@@ -221,7 +244,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     if ui
                         .add(
                             egui::Button::new("Stop painting")
-                                .fill(ui.style().visuals.selection.bg_fill),
+                                .fill(accent_color(ui.ctx())),
                         )
                         .clicked()
                     {
@@ -229,6 +252,8 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     }
                 } else if ui.button("Paint mode").clicked() {
                     state.edit_state.painting = true;
+                    // the mouse is for one of them
+                    state.edit_state.annotate.tool = None;
                 }
             });
 
@@ -236,7 +261,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 egui::Grid::new("paint").show(ui, |ui| {
                     ui.label("📜 Keep history");
                     ui.styled_checkbox(&mut state.edit_state.non_destructive_painting, "")
-                        .on_hover_text("Keeps all paint history and allows edits to it. Slower.");
+                        .on_hover_text("Keeps all strokes in the list, to change or delete them later.");
                     ui.end_row();
 
                     if let Some(stroke) = state.edit_state.paint_strokes.last_mut()
@@ -359,8 +384,11 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                             state.cursor_relative.x / state.image_geometry.dimensions.0 as f32,
                             (state.cursor_relative.y / state.image_geometry.dimensions.1 as f32),
                         );
-                        current_stroke.points.push(uv);
-                        pixels_changed = true;
+                        // holding still adds nothing
+                        if current_stroke.points.last() != Some(&uv) {
+                            current_stroke.points.push(uv);
+                            stroke_changed = true;
+                        }
                     } else if !current_stroke.is_empty() {
                         // clone last stroke to inherit settings
                         if let Some(last_stroke) = state.edit_state.paint_strokes.clone().last() {
@@ -369,6 +397,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 .paint_strokes
                                 .push(last_stroke.without_points());
                         }
+                        stroke_finished = true;
                     }
                 }
             }
@@ -388,6 +417,8 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .clicked()
                     && let Some(img) = &mut state.current_image {
                         *img = state.edit_state.result_pixel_op.clone().into();
+                        // the info panel counts the new pixels
+                        state.image_version += 1;
                         state.edit_state = Default::default();
                         // state.dimensions = img.dimensions();
                         pixels_changed = true;
@@ -402,15 +433,13 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
 
             ui.vertical_centered_justified(|ui| {
-                if let Some(path) = &state.current_path
+                if state.current_path.is_some()
                     && ui
                         .button("Reload & Restore")
                         .on_hover_text("Completely reloads the current image, destroying all edits.")
                         .clicked()
                     {
-                        state.is_loaded = false;
-                        state.player.cache.clear();
-                        state.player.load(path);
+                        state.reload();
                     }
 
 
@@ -437,7 +466,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         let image_to_save = state.edit_state.result_pixel_op.clone();
                         let msg_sender = state.message_channel.0.clone();
                         let err_sender = state.message_channel.0.clone();
-                        let image_info = state.image_metadata.clone();
+                        let source = state.current_path.clone();
 
                         std::thread::spawn(move || {
                             let file_dialog_result = rfd::FileDialog::new()
@@ -446,25 +475,22 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
                                 if let Some(file_path) = file_dialog_result {
                                     debug!("Selected File Path = {:?}", file_path);
+                                    // read before saving, the file may be the one that is overwritten
+                                    let exif = source.as_deref().and_then(crate::utils::raw_exif);
                                     match image_to_save
                                         .save(&file_path) {
                                             Ok(_) => {
                                                 _ = msg_sender.send(crate::appstate::Message::Saved(file_path.clone()));
                                                 debug!("Saved to {}", file_path.display());
                                                 // Re-apply exif
-                                                if let Some(info) = &image_info {
-                                                    debug!("Extended image info present");
-
-                                                    // before doing anything, make sure we have raw exif data
-                                                    if info.raw_exif.is_some() {
-                                                        if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
-                                                            error!("{e}");
-                                                        } else {
-                                                            info!("Saved EXIF.")
-                                                        }
+                                                if exif.is_some() {
+                                                    if let Err(e) = fix_exif(&file_path, exif) {
+                                                        error!("{e}");
                                                     } else {
-                                                        debug!("No raw exif");
+                                                        info!("Saved EXIF.")
                                                     }
+                                                } else {
+                                                    debug!("No raw exif");
                                                 }
                                             }
                                             Err(e) => {
@@ -498,7 +524,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                             key_slice.as_slice(),
                             &mut state.volatile_settings,
                             |p| {
-                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &encoders);
+                                _ = save_with_encoding(&state.edit_state.result_pixel_op, p, state.current_path.as_deref(), &encoders);
                             },
                             ctx,
                             Id::new("SAVE"),
@@ -511,7 +537,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
                     let modal = Modal::new("overwrite", ui.ctx());
                     modal.show("Overwrite?", |_|{
-                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                        _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     });
 
 
@@ -519,7 +545,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         if p.exists() {
                             modal.open();
                         } else {
-                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, &state.image_metadata, &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
+                            _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                         }
                     }
 
@@ -536,22 +562,6 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             });
         });
 
-        if state.edit_state.result_image_op.color() != ColorType::Rgba8 {
-            let op_present = state.edit_state.image_op_stack.first().map(|op| matches!(op.operation, ImageOperation::ColorConverter(_))).unwrap_or_default();
-            if !op_present {
-                state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
-                image_changed = true;
-                pixels_changed = true;
-                state.send_message_info("Color conversion operator added.");
-            }
-        }
-
-        if let Some(img) = &state.current_image
-            && img.color() != ColorType::Rgba8 {
-                ui.add_space(10.);
-                ui.small(format!("{CIRCLE_INFORMATION} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
-            }
-
         #[cfg(debug_assertions)]
         {
             ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
@@ -560,6 +570,31 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
         }
 
+
+            // Annotations: the mouse and the keys while one of their tools is picked
+            if state.edit_state.annotate.tool.is_some() {
+                state.edit_state.painting = false;
+            }
+            let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
+            match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
+                Some(annotations) => {
+                    let copy = crate::annotate::canvas_ui(
+                        ctx,
+                        annotations,
+                        &mut state.edit_state.annotate,
+                        &mapping,
+                        &state.image_geometry,
+                        state.pointer_over_ui,
+                    );
+                    // the keys go to the annotations, copying the image works still
+                    if copy && let Some(img) = effective_image(state) {
+                        clipboard_copy(img);
+                        state.send_message_info("Image copied");
+                    }
+                }
+                None => state.edit_state.annotate.stop(),
+            }
+            let annotations = crate::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
 
             // Do the processing
             //
@@ -570,31 +605,50 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;
+            let keep_image_op_result = state.edit_state.keeps_image_op_result();
+            // RGB or RGBA, the kept result is made again when an edit needs alpha now, or no longer
+            let layout = state.current_image.as_ref().map(|img| state.edit_state.layout(img));
+            if keep_image_op_result && layout != state.edit_state.result_image_op_layout {
+                image_changed = true;
+            }
             if image_changed {
-                if let Some(img) = &mut state.current_image {
+                if let Some(img) = &state.current_image
+                    && let Some(layout) = layout
+                {
                     let stamp = Instant::now();
-                    // start with a fresh copy of the unmodified image
-                    // FIXME This needs to go, and we need to implement operators for DynamicImage
-                    state.edit_state.result_image_op = DynamicImage::clone(img);
-                    for operation in &state.edit_state.image_op_stack {
-                        if !operation.active {
-                            continue;
+                    if keep_image_op_result {
+                        // start with a fresh copy of the unmodified image, in the buffer of the last one
+                        start_from(&mut state.edit_state.result_image_op, img, layout);
+                        state.edit_state.result_image_op_layout = Some(layout);
+                        for operation in &state.edit_state.image_op_stack {
+                            if !operation.active {
+                                continue;
+                            }
+                            if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
+                                error!("{e}");
+                                state.send_message_warn(&format!("{e}"));
+                            }
                         }
-                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_image_op) {
-                            error!("{e}");
-                            state.send_message_warn(&format!("{e}"));
-                        }
+                    } else {
+                        // nothing worth keeping, the conversion is done with the pixel operations
+                        state.edit_state.result_image_op = DynamicImage::default();
+                        state.edit_state.result_image_op_layout = None;
                     }
                     debug!(
                         "Image changed. Finished evaluating in {}s",
                         stamp.elapsed().as_secs_f32()
                     );
-
-                    // tag strokes as uncommitted as they need to be rendered again
-                    for stroke in &mut state.edit_state.paint_strokes {
-                        stroke.committed = false;
-                    }
                 }
+                pixels_changed = true;
+            }
+
+            // The next stroke starts anew
+            if stroke_finished || !state.edit_state.painting {
+                state.edit_state.stroke_drawing = Default::default();
+            }
+
+            // a stroke goes below the annotations, all is drawn again
+            if stroke_changed && !state.edit_state.annotate.layer.is_empty() {
                 pixels_changed = true;
             }
 
@@ -602,8 +656,20 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 // init result as a clean copy of image operation result
                 let stamp = Instant::now();
 
-                // start from the result of the image operations
-                state.edit_state.result_pixel_op = state.edit_state.result_image_op.clone();
+                // start from the result of the image operations, in the buffer of the last result
+                if keep_image_op_result {
+                    state.edit_state.result_pixel_op.clone_from(&state.edit_state.result_image_op);
+                } else if let Some(img) = &state.current_image
+                    && let Some(layout) = layout
+                {
+                    start_from(&mut state.edit_state.result_pixel_op, img, layout);
+                    // only the conversion of the color type, if there is one
+                    for operation in state.edit_state.image_op_stack.iter().filter(|op| op.active) {
+                        if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_pixel_op) {
+                            error!("{e}");
+                        }
+                    }
+                }
 
                 // only process pixel stack if it is empty so we don't run through pixels without need
                 if !state.edit_state.pixel_op_stack.is_empty() {
@@ -618,52 +684,66 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     stamp.elapsed().as_secs_f32()
                 );
 
-                // draw paint lines
-                for stroke in &state.edit_state.paint_strokes {
-                    if !stroke.committed
-                        && let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                            stroke.render(
-                                compatible_buffer,
-                                &state.edit_state.brushes,
-                            );
+                // draw paint lines, all of them, the one that is being drawn last
+                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last() {
+                    with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                        for stroke in finished.iter().filter(|s| !s.is_empty()) {
+                            stroke.render(buffer, &state.edit_state.brushes);
                         }
+                        state.edit_state.stroke_drawing = Default::default();
+                        if !current.is_empty() {
+                            state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes);
+                        }
+                    });
                 }
+
+                // the annotations on top of everything
+                state.edit_state.annotate.layer.reset();
+                with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
+                });
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
                 debug!(
                     "Done updating tex after pixel; ops in {} s",
                     stamp.elapsed().as_secs_f32()
                 );
+            } else if stroke_changed
+                && let Some(current) = state.edit_state.paint_strokes.last()
+                // only what is new of the stroke that is being drawn
+                && let Some(area) = with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes)
+                }).flatten()
+            {
+                state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }
 
-            // render uncommitted strokes if destructive to speed up painting
-            if state.edit_state.painting {
-                // render previous strokes
-                if state
+            // only what changed of the annotations
+            if !pixels_changed
+                && let Some(area) = with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
+                }).flatten()
+            {
+                state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
+            }
+
+            // without history, finished strokes leave the list
+            if state.edit_state.painting
+                && state
                     .edit_state
                     .paint_strokes
                     .iter()
                     .filter(|l| !l.points.is_empty())
                     .count()
                     > 1
-                    && !state.edit_state.non_destructive_painting
-                {
-                    let stroke_count = state.edit_state.paint_strokes.len();
+                && !state.edit_state.non_destructive_painting
+            {
+                let stroke_count = state.edit_state.paint_strokes.len();
 
-                    for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
-                        if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
-
-                            if let Some(compatible_buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                                stroke.render(
-                                    compatible_buffer,
-                                    &state.edit_state.brushes,
-                                );
-                            }
-
-
-                            stroke.committed = true;
-                            debug!("Committed stroke {}", i);
-                        }
+                for (i, stroke) in state.edit_state.paint_strokes.iter_mut().enumerate() {
+                    if i < stroke_count - 1 && !stroke.committed && !stroke.is_empty() {
+                        stroke.committed = true;
+                        debug!("Committed stroke {}", i);
                     }
                 }
             }
@@ -782,9 +862,13 @@ fn modifier_stack_ui(
     let mut delete: Option<usize> = None;
     let mut swap: Option<(usize, usize)> = None;
 
-    let stack_len = stack.len();
+    // the annotations have their own part of the panel
+    let shown: Vec<usize> = (0..stack.len())
+        .filter(|i| !matches!(stack[*i].operation, ImageOperation::Annotate(_)))
+        .collect();
 
-    for (i, operation) in stack.iter_mut().enumerate() {
+    for (n, &i) in shown.iter().enumerate() {
+        let operation = &mut stack[i];
         let frame_color = if ui.style().visuals.dark_mode {
             Color32::from_hex("#212121").unwrap()
         } else {
@@ -797,28 +881,26 @@ fn modifier_stack_ui(
             .show(ui, |ui| {
                 ui.allocate_space(vec2(ui.available_width(), 0.0));
                 ui.horizontal(|ui| {
-                    let up = i != 0;
-                    let down = i != stack_len - 1;
+                    let up = n != 0;
+                    let down = n + 1 != shown.len();
                     let caret_size = 10.;
 
                     ui.add_enabled_ui(up, |ui| {
                         let ur = ui.add(
-                            egui::Button::new(RichText::new(CHEVRON_UP).size(caret_size))
-                                .frame(false),
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
                         );
                         if ur.on_hover_text("Move up").clicked() {
-                            swap = Some(((i as i32 - 1).max(0) as usize, i));
+                            swap = Some((shown[n - 1], i));
                             *image_changed = true;
                         }
                     });
 
                     ui.add_enabled_ui(down, |ui| {
                         let dr = ui.add(
-                            egui::Button::new(RichText::new(CHEVRON_DOWN).size(caret_size))
-                                .frame(false),
+                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
                         );
                         if dr.on_hover_text("Move down").clicked() {
-                            swap = Some((i, i + 1));
+                            swap = Some((i, shown[n + 1]));
                             *image_changed = true;
                         }
                     });
@@ -834,7 +916,7 @@ fn modifier_stack_ui(
                         *image_changed = true;
                     }
 
-                    if egui::Button::new(RichText::new(X).size(caret_size))
+                    if egui::Button::new(RichText::new("").size(caret_size * 1.5))
                         .frame(false)
                         .ui(ui)
                         .on_hover_text("Remove operator")
@@ -1004,9 +1086,7 @@ fn jpg_lossless_ui(state: &mut OculanteState, ui: &mut Ui) {
                 });
 
             if reload {
-                state.is_loaded = false;
-                state.player.cache.clear();
-                state.player.load(p);
+                state.reload();
             }
         });
     }
