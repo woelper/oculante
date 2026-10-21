@@ -5,7 +5,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::annotate::{AnnotateUi, Annotation};
 use crate::icons::*;
-use crate::paint::{PaintStroke, StrokeDrawing};
+use crate::paint::{PaintStroke, Pixels, StrokeDrawing, channels};
 use crate::settings::VolatileSettings;
 use crate::ui::EguiExt;
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
@@ -19,7 +19,7 @@ use egui::{
 };
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
-use image::{ColorType, DynamicImage, Rgba, RgbaImage, imageops};
+use image::{ColorType, DynamicImage, Pixel, RgbaImage, imageops};
 use imageproc::geometric_transformations::Interpolation;
 use log::{debug, error, info};
 use nalgebra::{Vector2, Vector4};
@@ -41,6 +41,9 @@ pub struct EditState {
     #[serde(skip)]
     /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: DynamicImage,
+    #[serde(skip)]
+    /// The layout `result_image_op` was made in, see [`EditState::layout`]
+    pub result_image_op_layout: Option<ColorType>,
     #[serde(skip)]
     /// While painting: how far the stroke that is being drawn is drawn
     pub stroke_drawing: StrokeDrawing,
@@ -126,6 +129,22 @@ pub fn saved_edits(image_path: &Path) -> Option<Result<(EditState, &'static str)
 }
 
 impl EditState {
+    /// The layout the edits work in: 8 bit RGB, or RGBA if the image has alpha or an
+    /// edit can make it transparent. All edits work in both, so an image without
+    /// alpha is not given one, which takes time and a third more memory.
+    pub fn layout(&self, original: &DynamicImage) -> ColorType {
+        let transparent = self
+            .image_op_stack
+            .iter()
+            .chain(&self.pixel_op_stack)
+            .any(|op| op.active && op.operation.makes_transparency());
+        if original.color().has_alpha() || transparent {
+            ColorType::Rgba8
+        } else {
+            ColorType::Rgb8
+        }
+    }
+
     /// The result of the image operations is kept when that saves work: when
     /// there is an operation other than the conversion of the color type. The
     /// conversion alone is cheap to do again, and keeping its result would hold
@@ -147,6 +166,7 @@ impl Default for EditState {
         Self {
             result_pixel_op: Default::default(),
             result_image_op: Default::default(),
+            result_image_op_layout: None,
             stroke_drawing: Default::default(),
             annotate: Default::default(),
             painting: Default::default(),
@@ -354,6 +374,20 @@ pub fn canvas_rect(ctx: &egui::Context) -> Rect {
 }
 
 impl ImageOperation {
+    /// Whether it can make an opaque image transparent, then the edits need alpha
+    pub fn makes_transparency(&self) -> bool {
+        match self {
+            // the corners outside of the image
+            Self::CropPerspective { .. } => true,
+            // in between, the color goes over the image with its alpha
+            Self::Fill(color) => color[3] != 0 && color[3] != 255,
+            Self::ChannelSwap((to, _)) => *to == Channel::Alpha,
+            Self::Expression(expr) => build_operator_tree::<DefaultNumericTypes>(expr)
+                .is_ok_and(|tree| tree.iter_write_variable_identifiers().any(|v| v == "a")),
+            _ => false,
+        }
+    }
+
     pub fn is_per_pixel(&self) -> bool {
         !matches!(
             self,
@@ -1351,185 +1385,8 @@ impl ImageOperation {
             return Ok(());
         }
         match dyn_img {
-            DynamicImage::ImageRgba8(img) => {
-                match self {
-                    Self::Blur(amt) if *amt != 0 => {
-                        let (width, height) = img.dimensions();
-                        // Blurred as they are, transparent pixels give their color, mostly
-                        // black, to the ones around them: a dark fringe. With the color
-                        // multiplied by the alpha first they have none to give.
-                        let transparent = img.as_raw().par_chunks(4).any(|px| px[3] < 255);
-                        if transparent {
-                            premultiply(img);
-                        }
-                        // blurs the pixels in place
-                        let mut pixels = libblur::BlurImageMut::borrow(
-                            img,
-                            width,
-                            height,
-                            libblur::FastBlurChannels::Channels4,
-                        );
-                        libblur::stack_blur(
-                            &mut pixels,
-                            libblur::AnisotropicRadius::new((*amt as u32).clamp(2, 254)),
-                            libblur::ThreadingPolicy::Adaptive,
-                        )
-                        .map_err(|e| anyhow::anyhow!("Can't blur the image: {e}"))?;
-                        if transparent {
-                            unpremultiply(img);
-                        }
-                    }
-                    Self::Filter3x3(amt) => {
-                        *img = filter3x3(img, &amt.map(|a| a as f32 / 100.));
-                    }
-                    // Edits saved before the LUT became a pixel operation have it here
-                    Self::LUT(lut_name) => {
-                        let lut = hald_clut(lut_name)?;
-                        img.par_chunks_mut(4).for_each(|px| {
-                            let rgb = lut.map([px[0], px[1], px[2]]);
-                            px[..3].copy_from_slice(&rgb);
-                        });
-                    }
-                    Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
-                        let window = cropped_range(dim, &(img.width(), img.height()));
-                        let sub_img = image::imageops::crop_imm(
-                            img, window[0], window[1], window[2], window[3],
-                        );
-                        *img = sub_img.to_image();
-                    }
-                    Self::CropPerspective { points, .. } => {
-                        use imageproc::geometric_transformations::{Border, warp_into};
-                        let (projection, (width, height)) = perspective(points)
-                            .context("The corners of the perspective crop are on one line")?;
-                        // straight to the size, one resampling
-                        let mut out = RgbaImage::new(width, height);
-                        warp_into(
-                            img,
-                            projection,
-                            Interpolation::Bicubic,
-                            Border::Constant(Rgba([0, 0, 0, 0])),
-                            &mut out,
-                        );
-                        *img = out;
-                    }
-                    Self::Resize {
-                        dimensions, filter, ..
-                    } if *dimensions != Default::default() => {
-                        let filter = match filter {
-                            ScaleFilter::Box => fr::FilterType::Box,
-                            ScaleFilter::Bilinear => fr::FilterType::Bilinear,
-                            ScaleFilter::Hamming => fr::FilterType::Hamming,
-                            ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
-                            ScaleFilter::Mitchell => fr::FilterType::Mitchell,
-                            ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
-                        };
-
-                        let src_image = fr::images::ImageRef::new(
-                            img.width(),
-                            img.height(),
-                            img.as_raw(),
-                            fr::PixelType::U8x4,
-                        )?;
-
-                        // Create container for data of destination image
-                        let mut dst_image = fr::images::Image::new(
-                            dimensions.0,
-                            dimensions.1,
-                            src_image.pixel_type(),
-                        );
-
-                        let mut resizer = fr::Resizer::new();
-
-                        resizer.resize(
-                            &src_image,
-                            &mut dst_image,
-                            Some(
-                                &ResizeOptions::new()
-                                    .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
-                            ),
-                        )?;
-
-                        *img = anyhow::Context::context(
-                            image::RgbaImage::from_raw(
-                                dimensions.0,
-                                dimensions.1,
-                                dst_image.into_vec(),
-                            ),
-                            "Can't create RgbaImage",
-                        )?;
-                    }
-                    Self::Rotate(angle) => match angle {
-                        90 => *img = image::imageops::rotate90(img),
-                        -90 => *img = image::imageops::rotate270(img),
-                        270 => *img = image::imageops::rotate270(img),
-                        180 => *img = image::imageops::rotate180(img),
-                        _ => (),
-                    },
-                    Self::Flip(vert) => {
-                        if *vert {
-                            *img = image::imageops::flip_vertical(img);
-                        } else {
-                            *img = image::imageops::flip_horizontal(img);
-                        }
-                    }
-                    Self::ScaleImageMinMax => {
-                        //Step 0: Get color channel min and max values
-                        let (min, max) = img
-                            .as_raw()
-                            .par_chunks(4)
-                            .map(|px| (px[0].min(px[1]).min(px[2]), px[0].max(px[1]).max(px[2])))
-                            .reduce(|| (255, 0), |a, b| (a.0.min(b.0), a.1.max(b.1)));
-                        let min_f = min as f64;
-                        let max_f = max as f64;
-
-                        //Step 1: Don't do zero division
-                        if min != max {
-                            //Step 2: Create 8-Bit LUT
-                            let mut lut: [u8; 256] = [0u8; 256];
-
-                            for n in min..=max {
-                                let g = n as f64;
-                                lut[n as usize] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
-                            }
-
-                            //Step 3: Apply 8-Bit LUT
-                            img.par_chunks_mut(4).for_each(|px| {
-                                px[0] = lut[px[0] as usize];
-                                px[1] = lut[px[1] as usize];
-                                px[2] = lut[px[2] as usize];
-                            });
-                        }
-                    }
-                    Self::ChromaticAberration(amt) => {
-                        let center = (img.width() as i32 / 2, img.height() as i32 / 2);
-                        let img_c = img.clone();
-                        let row_len = img.width() as usize * 4;
-
-                        // row by row in parallel
-                        img.par_chunks_mut(row_len.max(1))
-                            .enumerate()
-                            .for_each(|(y, row)| {
-                                for (x, p) in row.chunks_mut(4).enumerate() {
-                                    let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
-                                    let dist_to_center = (
-                                        (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32
-                                            / 10.,
-                                        (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32
-                                            / 10.,
-                                    );
-                                    if let Some(l) = img_c.get_pixel_checked(
-                                        (x as i32 + dist_to_center.0 as i32).max(0) as u32,
-                                        (y as i32 + dist_to_center.1 as i32).max(0) as u32,
-                                    ) {
-                                        p[0] = l[0];
-                                    }
-                                }
-                            });
-                    }
-
-                    _ => (),
-                }
-            }
+            DynamicImage::ImageRgba8(img) => self.process_8bit(img)?,
+            DynamicImage::ImageRgb8(img) => self.process_8bit(img)?,
             // These must work on all types
             _ => {
                 info!("Proc with color type {:?}", dyn_img.color());
@@ -1573,6 +1430,189 @@ impl ImageOperation {
             }
         }
 
+        Ok(())
+    }
+
+    /// The image operations on 8 bit RGB or RGBA, the layouts the edits work in
+    fn process_8bit<P>(&self, img: &mut Pixels<P>) -> Result<()>
+    where
+        P: Pixel<Subpixel = u8> + Send + Sync + 'static,
+    {
+        let n = channels::<P>();
+        match self {
+            Self::Blur(amt) if *amt != 0 => {
+                let (width, height) = img.dimensions();
+                // Blurred as they are, transparent pixels give their color, mostly
+                // black, to the ones around them: a dark fringe. With the color
+                // multiplied by the alpha first they have none to give.
+                let transparent = n == 4 && img.as_raw().par_chunks(4).any(|px| px[3] < 255);
+                if transparent {
+                    premultiply(img);
+                }
+                // blurs the pixels in place
+                let mut pixels = libblur::BlurImageMut::borrow(
+                    img,
+                    width,
+                    height,
+                    if n == 3 {
+                        libblur::FastBlurChannels::Channels3
+                    } else {
+                        libblur::FastBlurChannels::Channels4
+                    },
+                );
+                libblur::stack_blur(
+                    &mut pixels,
+                    libblur::AnisotropicRadius::new((*amt as u32).clamp(2, 254)),
+                    libblur::ThreadingPolicy::Adaptive,
+                )
+                .map_err(|e| anyhow::anyhow!("Can't blur the image: {e}"))?;
+                if transparent {
+                    unpremultiply(img);
+                }
+            }
+            Self::Filter3x3(amt) => {
+                *img = filter3x3(img, &amt.map(|a| a as f32 / 100.));
+            }
+            // Edits saved before the LUT became a pixel operation have it here
+            Self::LUT(lut_name) => {
+                let lut = hald_clut(lut_name)?;
+                img.par_chunks_mut(n).for_each(|px| {
+                    let rgb = lut.map([px[0], px[1], px[2]]);
+                    px[..3].copy_from_slice(&rgb);
+                });
+            }
+            Self::Crop(dim) if *dim != [0, 0, 0, 0] => {
+                let window = cropped_range(dim, &(img.width(), img.height()));
+                let sub_img =
+                    image::imageops::crop_imm(img, window[0], window[1], window[2], window[3]);
+                *img = sub_img.to_image();
+            }
+            Self::CropPerspective { points, .. } => {
+                use imageproc::geometric_transformations::{Border, warp_into};
+                let (projection, (width, height)) = perspective(points)
+                    .context("The corners of the perspective crop are on one line")?;
+                // straight to the size, one resampling
+                let mut out = Pixels::<P>::new(width, height);
+                warp_into(
+                    img,
+                    projection,
+                    Interpolation::Bicubic,
+                    // transparent, black without alpha
+                    Border::Constant(*P::from_slice(&[0, 0, 0, 0][..n])),
+                    &mut out,
+                );
+                *img = out;
+            }
+            Self::Resize {
+                dimensions, filter, ..
+            } if *dimensions != Default::default() => {
+                let filter = match filter {
+                    ScaleFilter::Box => fr::FilterType::Box,
+                    ScaleFilter::Bilinear => fr::FilterType::Bilinear,
+                    ScaleFilter::Hamming => fr::FilterType::Hamming,
+                    ScaleFilter::CatmullRom => fr::FilterType::CatmullRom,
+                    ScaleFilter::Mitchell => fr::FilterType::Mitchell,
+                    ScaleFilter::Lanczos3 => fr::FilterType::Lanczos3,
+                };
+
+                let src_image = fr::images::ImageRef::new(
+                    img.width(),
+                    img.height(),
+                    img.as_raw(),
+                    if n == 3 {
+                        fr::PixelType::U8x3
+                    } else {
+                        fr::PixelType::U8x4
+                    },
+                )?;
+
+                // Create container for data of destination image
+                let mut dst_image =
+                    fr::images::Image::new(dimensions.0, dimensions.1, src_image.pixel_type());
+
+                let mut resizer = fr::Resizer::new();
+
+                resizer.resize(
+                    &src_image,
+                    &mut dst_image,
+                    Some(
+                        &ResizeOptions::new()
+                            .resize_alg(fast_image_resize::ResizeAlg::Convolution(filter)),
+                    ),
+                )?;
+
+                *img = Pixels::from_raw(dimensions.0, dimensions.1, dst_image.into_vec())
+                    .context("Can't create the resized image")?;
+            }
+            Self::Rotate(angle) => match angle {
+                90 => *img = image::imageops::rotate90(img),
+                -90 => *img = image::imageops::rotate270(img),
+                270 => *img = image::imageops::rotate270(img),
+                180 => *img = image::imageops::rotate180(img),
+                _ => (),
+            },
+            Self::Flip(vert) => {
+                if *vert {
+                    *img = image::imageops::flip_vertical(img);
+                } else {
+                    *img = image::imageops::flip_horizontal(img);
+                }
+            }
+            Self::ScaleImageMinMax => {
+                //Step 0: Get color channel min and max values
+                let (min, max) = img
+                    .as_raw()
+                    .par_chunks(n)
+                    .map(|px| (px[0].min(px[1]).min(px[2]), px[0].max(px[1]).max(px[2])))
+                    .reduce(|| (255, 0), |a, b| (a.0.min(b.0), a.1.max(b.1)));
+                let min_f = min as f64;
+                let max_f = max as f64;
+
+                //Step 1: Don't do zero division
+                if min != max {
+                    //Step 2: Create 8-Bit LUT
+                    let mut lut: [u8; 256] = [0u8; 256];
+
+                    for n in min..=max {
+                        let g = n as f64;
+                        lut[n as usize] = (255.0 * (g - min_f) / (max_f - min_f)) as u8;
+                    }
+
+                    //Step 3: Apply 8-Bit LUT
+                    img.par_chunks_mut(n).for_each(|px| {
+                        px[0] = lut[px[0] as usize];
+                        px[1] = lut[px[1] as usize];
+                        px[2] = lut[px[2] as usize];
+                    });
+                }
+            }
+            Self::ChromaticAberration(amt) => {
+                let center = (img.width() as i32 / 2, img.height() as i32 / 2);
+                let img_c = img.clone();
+                let row_len = img.width() as usize * n;
+
+                // row by row in parallel
+                img.par_chunks_mut(row_len.max(1))
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        for (x, p) in row.chunks_mut(n).enumerate() {
+                            let dist_to_center = (x as i32 - center.0, y as i32 - center.1);
+                            let dist_to_center = (
+                                (dist_to_center.0 as f32 / center.0 as f32) * *amt as f32 / 10.,
+                                (dist_to_center.1 as f32 / center.1 as f32) * *amt as f32 / 10.,
+                            );
+                            if let Some(l) = img_c.get_pixel_checked(
+                                (x as i32 + dist_to_center.0 as i32).max(0) as u32,
+                                (y as i32 + dist_to_center.1 as i32).max(0) as u32,
+                            ) {
+                                p[0] = l.channels()[0];
+                            }
+                        }
+                    });
+            }
+
+            _ => (),
+        }
         Ok(())
     }
 
@@ -2034,7 +2074,7 @@ impl<'a> PixelOp<'a> {
 }
 
 /// Multiplies the color of every pixel by its alpha
-fn premultiply(img: &mut RgbaImage) {
+fn premultiply(img: &mut [u8]) {
     img.par_chunks_mut(4).for_each(|px| {
         let a = px[3] as u32;
         for c in &mut px[..3] {
@@ -2044,7 +2084,7 @@ fn premultiply(img: &mut RgbaImage) {
 }
 
 /// Undoes [`premultiply`], as far as 8 bits allow
-fn unpremultiply(img: &mut RgbaImage) {
+fn unpremultiply(img: &mut [u8]) {
     img.par_chunks_mut(4).for_each(|px| {
         let a = px[3] as u32;
         for c in &mut px[..3] {
@@ -2060,7 +2100,8 @@ fn unpremultiply(img: &mut RgbaImage) {
 /// weights are divided by their sum, unless that is 0. Alpha stays as it is, so an
 /// edge filter does not make the image transparent, and so do the outermost
 /// pixels, which lack neighbours.
-fn filter3x3(img: &RgbaImage, kernel: &[f32; 9]) -> RgbaImage {
+fn filter3x3<P: Pixel<Subpixel = u8>>(img: &Pixels<P>, kernel: &[f32; 9]) -> Pixels<P> {
+    let n = channels::<P>();
     let (w, h) = (img.width() as usize, img.height() as usize);
     let mut out = img.clone();
     if w < 3 || h < 3 {
@@ -2069,7 +2110,7 @@ fn filter3x3(img: &RgbaImage, kernel: &[f32; 9]) -> RgbaImage {
     let sum: f32 = kernel.iter().sum();
     let scale = if sum == 0. { 1. } else { 1. / sum };
     let src = img.as_raw();
-    let stride = w * 4;
+    let stride = w * n;
     out.par_chunks_mut(stride)
         .enumerate()
         .skip(1)
@@ -2085,11 +2126,11 @@ fn filter3x3(img: &RgbaImage, kernel: &[f32; 9]) -> RgbaImage {
                     let mut t = 0.;
                     for (ky, r) in rows.iter().enumerate() {
                         for kx in 0..3 {
-                            t += kernel[ky * 3 + kx] * r[(x + kx - 1) * 4 + c] as f32;
+                            t += kernel[ky * 3 + kx] * r[(x + kx - 1) * n + c] as f32;
                         }
                     }
                     // `as` keeps it from 0 to 255
-                    row[x * 4 + c] = (t * scale).round() as u8;
+                    row[x * n + c] = (t * scale).round() as u8;
                 }
             }
         });
@@ -2248,6 +2289,32 @@ fn convert_color_type(image: &mut DynamicImage, t: &ColorTypeExt) {
         ColorTypeExt::Rgba32F => {
             *image = DynamicImage::ImageRgba32F(image.to_rgba32f());
         }
+    }
+}
+
+/// Runs `$body` with `$pixels` the pixels of the edited image, if it is in one of
+/// the layouts the edits work in: 8 bit RGB or RGBA. An image in another one, made
+/// with a color type operation, is not painted or annotated.
+macro_rules! with_pixels {
+    ($image:expr, |$pixels:ident| $body:expr) => {
+        match $image {
+            image::DynamicImage::ImageRgb8($pixels) => Some($body),
+            image::DynamicImage::ImageRgba8($pixels) => Some($body),
+            _ => None,
+        }
+    };
+}
+pub(crate) use with_pixels;
+
+/// Makes `target` a copy of the original image in the layout the edits work in, in
+/// the buffer it has if that fits. An 8 bit RGB image is copied as it is.
+pub fn start_from(target: &mut DynamicImage, original: &DynamicImage, layout: ColorType) {
+    if original.color() == layout {
+        target.clone_from(original);
+    } else if layout == ColorType::Rgba8 {
+        *target = DynamicImage::ImageRgba8(original.to_rgba8());
+    } else {
+        *target = DynamicImage::ImageRgb8(original.to_rgb8());
     }
 }
 
@@ -3175,5 +3242,184 @@ mod operation_tests {
         assert_eq!(mirrored.dimensions(), (8, 6));
         // corners on one line give an error
         assert!(crop([(0, 0), (16, 0), (0, 0), (16, 0)]).is_err());
+    }
+
+    /// Every operation, with settings that change the image
+    fn every_operation() -> Vec<ImageOperation> {
+        use ImageOperation::*;
+        let mut ops = vec![
+            Brightness(40),
+            Slice(128, 40, false),
+            Slice(100, 30, true),
+            Expression("r = g * 0.5; b = 1 - b".into()),
+            Desaturate(60),
+            Posterize(4),
+            Filter3x3([0, -100, 0, -100, 500, -100, 0, -100, 0]),
+            GradientMap(vec![
+                GradientStop::new(0, [155, 33, 180]),
+                GradientStop::new(128, [255, 83, 0]),
+                GradientStop::new(255, [224, 255, 0]),
+            ]),
+            Exposure(20),
+            Equalize((30, 200)),
+            ScaleImageMinMax,
+            Mult([200, 100, 50]),
+            Add([20, 0, 40]),
+            Fill([10, 200, 30, 255]),
+            Fill([10, 200, 30, 0]),
+            Contrast(60),
+            Flip(false),
+            Flip(true),
+            Noise {
+                amt: 50,
+                mono: false,
+            },
+            Rotate(90),
+            Rotate(-90),
+            Rotate(180),
+            HSV((90, 80, 110)),
+            ChromaticAberration(30),
+            ChannelSwap((Channel::Red, Channel::Blue)),
+            // from alpha it is all light
+            ChannelSwap((Channel::Green, Channel::Alpha)),
+            Invert,
+            Blur(10),
+            MMult,
+            MDiv,
+            Crop([1000, 2000, 3000, 1500]),
+            Measure { shapes: vec![] },
+            LUT("Fuji Superia 1600 2".into()),
+            Annotate(vec![]),
+        ];
+        for filter in [
+            ScaleFilter::Box,
+            ScaleFilter::Bilinear,
+            ScaleFilter::Hamming,
+            ScaleFilter::CatmullRom,
+            ScaleFilter::Mitchell,
+            ScaleFilter::Lanczos3,
+        ] {
+            ops.push(Resize {
+                dimensions: (7, 5),
+                aspect: false,
+                filter,
+            });
+        }
+        ops
+    }
+
+    /// An image without alpha is edited as it is, it is not given alpha first. Every
+    /// operation gives it the colors it gives the image with alpha.
+    #[test]
+    fn every_operation_is_the_same_without_alpha() {
+        let rgb = DynamicImage::ImageRgb8(sample().to_rgb8());
+        let rgba = DynamicImage::ImageRgba8(rgb.to_rgba8());
+        for op in every_operation() {
+            assert!(!op.makes_transparency(), "{op:?}");
+            let without = apply(op.clone(), &rgb);
+            let with = apply(op.clone(), &rgba);
+            assert_eq!(without.color(), ColorType::Rgb8, "{op:?}");
+            assert_eq!(without.to_rgb8(), with.to_rgb8(), "{op:?}");
+            assert!(
+                with.to_rgba8().pixels().all(|p| p[3] == 255),
+                "{op:?} made the image transparent"
+            );
+        }
+    }
+
+    /// What can make an opaque image transparent is done with alpha
+    #[test]
+    fn what_makes_transparency() {
+        use ImageOperation::*;
+        let opaque =
+            DynamicImage::ImageRgba8(DynamicImage::ImageRgb8(sample().to_rgb8()).to_rgba8());
+        for op in [
+            Fill([10, 200, 30, 128]),
+            ChannelSwap((Channel::Alpha, Channel::Red)),
+            Expression("a = 0.5".into()),
+            Expression("a *= r".into()),
+            // the top right corner is outside of the image
+            CropPerspective {
+                points: [(0, 0), (24, 0), (0, 12), (16, 12)],
+                original_size: (16, 12),
+            },
+        ] {
+            assert!(op.makes_transparency(), "{op:?}");
+            let out = apply(op.clone(), &opaque).to_rgba8();
+            assert!(out.pixels().any(|p| p[3] < 255), "{op:?}");
+        }
+        // reading alpha does not change it
+        assert!(!Expression("r = a * g".into()).makes_transparency());
+    }
+
+    /// The edits work in 8 bit RGB, with alpha if the image has it or an edit needs it
+    #[test]
+    fn the_layout_edits_work_in() {
+        use ColorType::*;
+        let edits = |pixel: Vec<ImageOperation>, image: Vec<ImageOperation>| EditState {
+            pixel_op_stack: pixel.into_iter().map(ImgOpItem::new).collect(),
+            image_op_stack: image.into_iter().map(ImgOpItem::new).collect(),
+            ..Default::default()
+        };
+        let none = edits(vec![], vec![]);
+        let input = sample();
+        for (image, layout) in [
+            (DynamicImage::ImageRgb8(input.to_rgb8()), Rgb8),
+            (input.clone(), Rgba8),
+            (DynamicImage::ImageLuma8(input.to_luma8()), Rgb8),
+            (DynamicImage::ImageLumaA8(input.to_luma_alpha8()), Rgba8),
+            (DynamicImage::ImageLuma16(input.to_luma16()), Rgb8),
+            (DynamicImage::ImageRgb16(input.to_rgb16()), Rgb8),
+            (DynamicImage::ImageRgba16(input.to_rgba16()), Rgba8),
+            (DynamicImage::ImageRgb32F(input.to_rgb32f()), Rgb8),
+            (DynamicImage::ImageRgba32F(input.to_rgba32f()), Rgba8),
+        ] {
+            assert_eq!(none.layout(&image), layout, "{:?}", image.color());
+        }
+        let rgb = DynamicImage::ImageRgb8(input.to_rgb8());
+        let fill = ImageOperation::Fill([1, 2, 3, 128]);
+        let perspective = ImageOperation::CropPerspective {
+            points: [(0, 0), (16, 0), (0, 12), (16, 12)],
+            original_size: (16, 12),
+        };
+        assert_eq!(
+            edits(
+                vec![ImageOperation::Brightness(9)],
+                vec![ImageOperation::Blur(4)]
+            )
+            .layout(&rgb),
+            Rgb8
+        );
+        assert_eq!(edits(vec![fill.clone()], vec![]).layout(&rgb), Rgba8);
+        assert_eq!(edits(vec![], vec![perspective]).layout(&rgb), Rgba8);
+        // switched off, it does not count
+        let mut off = edits(vec![fill], vec![]);
+        off.pixel_op_stack[0].active = false;
+        assert_eq!(off.layout(&rgb), Rgb8);
+    }
+
+    /// The copy the edits start from: as it is if it is in the layout, made 8 bit
+    /// RGB or RGBA if not
+    #[test]
+    fn edits_start_from_a_copy_in_their_layout() {
+        let rgb = DynamicImage::ImageRgb8(sample().to_rgb8());
+        let mut copy = DynamicImage::default();
+        start_from(&mut copy, &rgb, ColorType::Rgb8);
+        assert_eq!(copy, rgb);
+        start_from(&mut copy, &rgb, ColorType::Rgba8);
+        assert_eq!(copy, DynamicImage::ImageRgba8(rgb.to_rgba8()));
+        let deep = DynamicImage::ImageRgb16(rgb.to_rgb16());
+        start_from(&mut copy, &deep, ColorType::Rgb8);
+        assert_eq!(copy, rgb);
+        // gray is made RGB, so the edits can give it color
+        let gray = DynamicImage::ImageLuma8(rgb.to_luma8());
+        start_from(&mut copy, &gray, ColorType::Rgb8);
+        assert_eq!(copy.color(), ColorType::Rgb8);
+        let map = ImageOperation::GradientMap(vec![
+            GradientStop::new(0, [155, 33, 180]),
+            GradientStop::new(255, [224, 255, 0]),
+        ]);
+        process_pixels(&mut copy, &vec![map]).unwrap();
+        assert!(copy.to_rgb8().pixels().any(|p| p[0] != p[1]), "still gray");
     }
 }

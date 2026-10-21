@@ -10,15 +10,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use egui::{Color32, CursorIcon, Id, Key, Pos2, Stroke, Ui, pos2};
+use image::Pixel;
 use image::math::Rect;
-use image::{Rgba, RgbaImage};
 use imageproc::geometric_transformations::Projection;
 use serde::{Deserialize, Serialize};
 use tiny_skia::{FillRule, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, Point, Transform};
 
 use crate::appstate::ImageGeometry;
 use crate::image_editing::{ImageOperation, ImgOpItem, canvas_rect, cropped_range, perspective};
-use crate::paint::{keep_base, restore};
+use crate::paint::{Base, Pixels, channels, keep_base, restore};
 use crate::utils::rect_union;
 
 /// One annotation. Its own coordinates start where it starts, in pixels of the
@@ -715,7 +715,7 @@ fn area(a: &Annotation, t: Transform, size: (u32, u32)) -> Option<Rect> {
 }
 
 /// Draws an annotation, which reaches no further than `area`
-fn draw(img: &mut RgbaImage, a: &Annotation, t: Transform, area: Rect) {
+fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation, t: Transform, area: Rect) {
     if let Shape::Redact { style, .. } = &a.shape {
         match style {
             Redaction::Pixelate => {
@@ -723,9 +723,10 @@ fn draw(img: &mut RgbaImage, a: &Annotation, t: Transform, area: Rect) {
             }
             Redaction::Fill => {
                 let [r, g, b, _] = a.color;
+                let color = *P::from_slice(&[r, g, b, 255][..channels::<P>()]);
                 for y in area.y..area.y + area.height {
                     for x in area.x..area.x + area.width {
-                        img.put_pixel(x, y, Rgba([r, g, b, 255]));
+                        img.put_pixel(x, y, color);
                     }
                 }
             }
@@ -849,7 +850,8 @@ fn polyline(points: &[[i32; 2]]) -> Option<Path> {
 }
 
 /// Hides an area in blocks, each the average color of its pixels
-fn pixelate(img: &mut RgbaImage, area: Rect, block: u32) {
+fn pixelate<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, area: Rect, block: u32) {
+    let n = channels::<P>();
     let block = block.max(2);
     let (right, bottom) = (area.x + area.width, area.y + area.height);
     for top in (area.y..bottom).step_by(block as usize) {
@@ -859,8 +861,9 @@ fn pixelate(img: &mut RgbaImage, area: Rect, block: u32) {
             let mut sum = [0u64; 4];
             for y in top..b {
                 for x in left..r {
-                    let p = img.get_pixel(x, y).0;
-                    let alpha = p[3] as u64;
+                    let p = img.get_pixel(x, y).channels();
+                    // without alpha the image is opaque
+                    let alpha = p.get(3).map_or(255, |a| *a as u64);
                     for c in 0..3 {
                         sum[c] += p[c] as u64 * alpha;
                     }
@@ -879,7 +882,7 @@ fn pixelate(img: &mut RgbaImage, area: Rect, block: u32) {
             };
             for y in top..b {
                 for x in left..r {
-                    img.put_pixel(x, y, Rgba(color));
+                    img.put_pixel(x, y, *P::from_slice(&color[..n]));
                 }
             }
         }
@@ -887,27 +890,29 @@ fn pixelate(img: &mut RgbaImage, area: Rect, block: u32) {
 }
 
 /// Puts a layer, its colors multiplied by alpha, over a part of the image
-fn blend(img: &mut RgbaImage, layer: &Pixmap, area: Rect) {
-    let stride = img.width() as usize * 4;
+fn blend<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, layer: &Pixmap, area: Rect) {
+    let n = channels::<P>();
+    let stride = img.width() as usize * n;
     let row_length = area.width as usize * 4;
     for (row, src) in layer.data().chunks_exact(row_length).enumerate() {
-        let start = (area.y as usize + row) * stride + area.x as usize * 4;
-        let dst = &mut img.as_mut()[start..start + row_length];
-        let (dst, _) = dst.as_chunks_mut::<4>();
+        let start = (area.y as usize + row) * stride + area.x as usize * n;
+        let dst = &mut img.as_mut()[start..start + area.width as usize * n];
         let (src, _) = src.as_chunks::<4>();
-        for (d, s) in dst.iter_mut().zip(src) {
+        for (d, s) in dst.chunks_exact_mut(n).zip(src) {
             match s[3] {
                 0 => {}
-                255 => *d = *s,
+                255 => d.copy_from_slice(&s[..n]),
                 alpha => {
                     let sa = alpha as f32 / 255.;
-                    // what shows of the pixel below
-                    let below = d[3] as f32 / 255. * (1. - sa);
+                    // what shows of the pixel below, all of it without alpha
+                    let below = d.get(3).map_or(1., |a| *a as f32 / 255.) * (1. - sa);
                     let out = sa + below;
                     for c in 0..3 {
                         d[c] = ((s[c] as f32 + d[c] as f32 * below) / out).round() as u8;
                     }
-                    d[3] = (out * 255.).round() as u8;
+                    if let Some(a) = d.get_mut(3) {
+                        *a = (out * 255.).round() as u8;
+                    }
                 }
             }
         }
@@ -918,7 +923,7 @@ fn blend(img: &mut RgbaImage, layer: &Pixmap, area: Rect) {
 #[derive(Debug, Clone, Default)]
 pub struct AnnotationLayer {
     /// What was under the annotations, where `base_area` says
-    base: RgbaImage,
+    base: Base,
     base_area: Option<Rect>,
     /// The annotations as they are in the image, with the part each one drew on
     drawn: Vec<(Annotation, Option<Rect>)>,
@@ -939,9 +944,9 @@ impl AnnotationLayer {
 
     /// Brings the annotations in the image up to date. Returns the part of the image
     /// that changed.
-    pub fn update(
+    pub fn update<P: Pixel<Subpixel = u8>>(
         &mut self,
-        img: &mut RgbaImage,
+        img: &mut Pixels<P>,
         annotations: &[Annotation],
         mapping: &Mapping,
     ) -> Option<Rect> {
@@ -2617,6 +2622,7 @@ fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{Rgba, RgbaImage};
 
     fn item(operation: ImageOperation) -> ImgOpItem {
         ImgOpItem::new(operation)
@@ -2838,6 +2844,61 @@ mod tests {
         // all gone, the image as it was
         layer.update(&mut img_now, &[], &mapping);
         assert_eq!(img_now, img);
+    }
+
+    /// Drawn on an image without alpha, the annotations give it the colors they give
+    /// it with alpha, also changed one at a time
+    #[test]
+    fn drawn_without_alpha() {
+        let with = gradient(320, 240);
+        let mut without = image::DynamicImage::ImageRgba8(with.clone()).to_rgb8();
+        let mapping = Mapping::new(&[], (320, 240));
+        let mut annotations = vec![
+            Annotation::new(
+                Shape::Redact {
+                    size: [80, 60],
+                    style: Redaction::Pixelate,
+                },
+                [0, 0, 0, 255],
+                12,
+                [40, 40],
+            ),
+            Annotation::new(
+                Shape::Redact {
+                    size: [30, 30],
+                    style: Redaction::Fill,
+                },
+                [200, 10, 10, 255],
+                1,
+                [250, 10],
+            ),
+            arrow_at([20, 200], [150, -120]),
+            Annotation::new(Shape::Rect([90, 50]), [0, 255, 0, 160], 5, [150, 30]),
+            Annotation::new(
+                Shape::Text("Hello\nthere".into()),
+                [255, 255, 255, 255],
+                24,
+                [60, 150],
+            ),
+            Annotation::new(Shape::Ellipse([70, 50]), [255, 255, 0, 200], 7, [100, 100]),
+        ];
+        annotations[3].outline = 4;
+        let mut layer = AnnotationLayer::default();
+        layer.update(&mut without, &annotations, &mapping);
+        let same = |without: &image::RgbImage, annotations: &[Annotation]| {
+            let expected = drawn_at_once(&with, annotations, &mapping);
+            image::DynamicImage::ImageRgba8(expected).to_rgb8() == *without
+        };
+        assert!(same(&without, &annotations));
+        // the arrow over the redaction moves, the frame goes
+        annotations[2].offset = [60, 180];
+        layer.update(&mut without, &annotations, &mapping);
+        assert!(same(&without, &annotations), "moved");
+        annotations.remove(3);
+        layer.update(&mut without, &annotations, &mapping);
+        assert!(same(&without, &annotations), "removed");
+        layer.update(&mut without, &[], &mapping);
+        assert!(image::DynamicImage::ImageRgba8(with.clone()).to_rgb8() == without);
     }
 
     #[test]

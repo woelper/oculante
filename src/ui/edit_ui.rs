@@ -1,10 +1,11 @@
 use super::Modal;
 use super::*;
 use crate::appstate::OculanteState;
+use crate::image_editing::{start_from, with_pixels};
 use crate::utils::*;
 #[cfg(not(any(target_os = "netbsd", target_os = "freebsd")))]
 use egui::*;
-use image::{ColorType, GenericImageView, RgbaImage};
+use image::{GenericImageView, RgbaImage};
 
 /// Load an RgbaImage into egui as a texture, returning the TextureId.
 /// Uses a stable URI so the texture is cached and not re-uploaded every frame.
@@ -561,25 +562,6 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             });
         });
 
-        // the result has the color type the image operations produce
-        if state.edit_state.result_pixel_op.width() > 0
-            && state.edit_state.result_pixel_op.color() != ColorType::Rgba8
-        {
-            let op_present = state.edit_state.image_op_stack.first().map(|op| matches!(op.operation, ImageOperation::ColorConverter(_))).unwrap_or_default();
-            if !op_present {
-                state.edit_state.image_op_stack.insert(0, ImgOpItem::new(ImageOperation::ColorConverter(ColorTypeExt::Rgba8)));
-                image_changed = true;
-                pixels_changed = true;
-                state.send_message_info("Color conversion operator added.");
-            }
-        }
-
-        if let Some(img) = &state.current_image
-            && img.color() != ColorType::Rgba8 {
-                ui.add_space(10.);
-                ui.small(format!("{INFO} Your image is not 8 bit RGBA. For full editing support a conversion operator was added."));
-            }
-
         #[cfg(debug_assertions)]
         {
             ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
@@ -624,12 +606,20 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             // If expensive operations happened (modifying image geometry), process them here
             let message: Option<String> = None;
             let keep_image_op_result = state.edit_state.keeps_image_op_result();
+            // RGB or RGBA, the kept result is made again when an edit needs alpha now, or no longer
+            let layout = state.current_image.as_ref().map(|img| state.edit_state.layout(img));
+            if keep_image_op_result && layout != state.edit_state.result_image_op_layout {
+                image_changed = true;
+            }
             if image_changed {
-                if let Some(img) = &state.current_image {
+                if let Some(img) = &state.current_image
+                    && let Some(layout) = layout
+                {
                     let stamp = Instant::now();
                     if keep_image_op_result {
                         // start with a fresh copy of the unmodified image, in the buffer of the last one
-                        state.edit_state.result_image_op.clone_from(img);
+                        start_from(&mut state.edit_state.result_image_op, img, layout);
+                        state.edit_state.result_image_op_layout = Some(layout);
                         for operation in &state.edit_state.image_op_stack {
                             if !operation.active {
                                 continue;
@@ -642,6 +632,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     } else {
                         // nothing worth keeping, the conversion is done with the pixel operations
                         state.edit_state.result_image_op = DynamicImage::default();
+                        state.edit_state.result_image_op_layout = None;
                     }
                     debug!(
                         "Image changed. Finished evaluating in {}s",
@@ -668,8 +659,10 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 // start from the result of the image operations, in the buffer of the last result
                 if keep_image_op_result {
                     state.edit_state.result_pixel_op.clone_from(&state.edit_state.result_image_op);
-                } else if let Some(img) = &state.current_image {
-                    state.edit_state.result_pixel_op.clone_from(img);
+                } else if let Some(img) = &state.current_image
+                    && let Some(layout) = layout
+                {
+                    start_from(&mut state.edit_state.result_pixel_op, img, layout);
                     // only the conversion of the color type, if there is one
                     for operation in state.edit_state.image_op_stack.iter().filter(|op| op.active) {
                         if let Err(e) = operation.operation.process_image(&mut state.edit_state.result_pixel_op) {
@@ -692,23 +685,23 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 );
 
                 // draw paint lines, all of them, the one that is being drawn last
-                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last()
-                    && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
-                {
-                    for stroke in finished.iter().filter(|s| !s.is_empty()) {
-                        stroke.render(buffer, &state.edit_state.brushes);
-                    }
-                    state.edit_state.stroke_drawing = Default::default();
-                    if !current.is_empty() {
-                        state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes);
-                    }
+                if let Some((current, finished)) = state.edit_state.paint_strokes.split_last() {
+                    with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                        for stroke in finished.iter().filter(|s| !s.is_empty()) {
+                            stroke.render(buffer, &state.edit_state.brushes);
+                        }
+                        state.edit_state.stroke_drawing = Default::default();
+                        if !current.is_empty() {
+                            state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes);
+                        }
+                    });
                 }
 
                 // the annotations on top of everything
                 state.edit_state.annotate.layer.reset();
-                if let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8() {
-                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping);
-                }
+                with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
+                });
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
                 debug!(
@@ -717,17 +710,19 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 );
             } else if stroke_changed
                 && let Some(current) = state.edit_state.paint_strokes.last()
-                && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
                 // only what is new of the stroke that is being drawn
-                && let Some(area) = state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes)
+                && let Some(area) = with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.stroke_drawing.draw(current, buffer, &state.edit_state.brushes)
+                }).flatten()
             {
                 state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }
 
             // only what changed of the annotations
             if !pixels_changed
-                && let Some(buffer) = state.edit_state.result_pixel_op.as_mut_rgba8()
-                && let Some(area) = state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
+                && let Some(area) = with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
+                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
+                }).flatten()
             {
                 state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }

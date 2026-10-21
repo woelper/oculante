@@ -228,14 +228,14 @@ def test_slider_changes_image(binary):
         app.move(0.4, 0.5)
         app.settle(0.8)
         before = app.shot("before_drag")
-        # the slider sits in the row at y = 214: filled up to the handle, the
+        # the slider sits in the row at y = 118: filled up to the handle, the
         # empty rail to the right of it
-        row = (770, 210, 200, 9)
+        row = (770, 114, 200, 9)
         handle = rightmost_x(before, row, ACCENT)
         assert handle is not None, "the filled part of the slider is missing"
         rail_end = rightmost_x(before, row, RAIL, 8)
         assert rail_end is not None and rail_end > handle + 20, "the rail right of the handle is missing"
-        app.drag(handle - 4, 214, handle + 40, 214)
+        app.drag(handle - 4, 118, handle + 40, 118)
         app.move(0.4, 0.5)
         app.settle(1.5)
         after = app.shot("after_drag")
@@ -430,7 +430,7 @@ def test_save_as_writes_the_file(binary):
             app.settle(1.0)
             app.key("e")
             app.settle(1.5)
-            app.click(896, 343)  # "Save as..." in the edit panel
+            app.click(896, 266)  # "Save as..." in the edit panel
             app.settle(2.0)
             app.shot("dialog")
             if jpg:
@@ -791,7 +791,7 @@ def test_paint_mode(binary):
         assert app.wait_for_log(LOADED), "the image never loaded"
         app.key("e")
         app.settle(1.0)
-        app.click(896, 162)  # "Paint mode"
+        app.click(896, 85)  # "Paint mode"
         app.settle(0.8)
         app.move(40, 560)
         app.settle(0.8)
@@ -823,7 +823,7 @@ def test_paint_mode(binary):
         dot = app.shot("dot")
         changed = changed_pixels_in(second, dot, (180, 460, 40, 40))
         assert changed > 30, f"the click changed only {changed} pixels of the image"
-        app.click(733, 253)  # "Fade"
+        app.click(733, 176)  # "Fade"
         app.settle(0.5)
         app.drag(160, 180, 560, 180, steps=20)
         app.move(40, 560)
@@ -833,12 +833,12 @@ def test_paint_mode(binary):
         end = mean_level(faded, (500, 165, 60, 30)) - mean_level(dot, (500, 165, 60, 30))
         assert start > 20 and end < start / 3, f"the fading stroke is {start:.1f} brighter at its start and {end:.1f} at its end"
         # all edits off and on again: everything is drawn again at once
-        app.click(617, 355)  # "Disable all edits"
+        app.click(617, 278)  # "Disable all edits"
         app.move(40, 560)
         app.settle(1.0)
         off = app.shot("edits_off")
         assert changed_pixels_in(faded, off, (140, 40, 455, 480)) > 1000, "the edits did not go off"
-        app.click(617, 355)
+        app.click(617, 278)
         app.move(40, 560)
         app.settle(1.5)
         again = app.shot("drawn_again")
@@ -897,10 +897,10 @@ ANNOTATE_BUTTON = (790, 108, 210, 18)
 OUTLINE = (255, 200, 40)
 # the header of the Annotations in the edit panel of moss.jpg, and the button to
 # select and the tiles of the tools below it once it is open, scrolled to the top
-ANNOTATIONS_HEADER = (890, 167)
-SELECT_BUTTON = (780, 192, 222, 32)
+ANNOTATIONS_HEADER = (890, 90)
+SELECT_BUTTON = (780, 115, 222, 32)
 ANNOTATE_TOOLS = {
-    name: (815 + 80 * (i % 3), 250 + 46 * (i // 3))
+    name: (815 + 80 * (i % 3), 173 + 46 * (i // 3))
     for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
 
@@ -935,7 +935,7 @@ def test_annotate(binary):
         app.click(*ANNOTATIONS_HEADER)
         app.move(40, 560)
         app.settle(0.8)
-        tiles = (790, 185, 230, 100)
+        tiles = (790, 108, 230, 100)
         changed = changed_pixels_in(closed, app.shot("opened"), tiles)
         assert changed > 3000, f"opening the Annotations shows no tools ({changed} pixels)"
         app.click(*ANNOTATE_TOOLS["arrow"])
@@ -1072,11 +1072,11 @@ def test_annotate(binary):
         app.settle(2.0)
         reopened = app.shot("reopened")
         # the edits open the panel with a card for each annotation, the tools folded
-        cards = count_color(reopened, (780, 185, 220, 95), (33, 33, 33), 2)
+        cards = count_color(reopened, (780, 108, 220, 95), (33, 33, 33), 2)
         assert cards > 10000, f"the cards of the saved annotations have only {cards} pixels"
         # the image is placed differently than before. Its only edits that show are
         # the annotations.
-        app.click(785, 327)  # "Disable all edits"
+        app.click(785, 250)  # "Disable all edits"
         app.move(40, 560)
         app.settle(1.0)
         off = app.shot("edits_off")
@@ -1310,7 +1310,7 @@ def test_image_info_is_computed_when_shown(binary):
         assert app.log().count(computed) == 1, "not computed when the info panel opened"
         brighten(app)
         assert app.log().count(computed) == 1, "computed again for every change of an edit"
-        app.click(890, 306)  # "Apply all edits"
+        app.click(890, 210)  # "Apply all edits"
         app.settle(1.5)
         assert app.log().count(computed) == 2, "not computed again after the edits were applied"
 
@@ -1432,7 +1432,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 513, 894, 513, steps=6)
+        app.drag(876, 436, 894, 436, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1446,7 +1446,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(803, 417)  # "Send backward" on the card of the circle
+        app.click(803, 340)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
@@ -1454,17 +1454,17 @@ def test_annotation_cards(binary):
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
         corner = (470, 90, 25, 25)
-        app.click(822, 417)
+        app.click(822, 340)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(822, 417)
+        app.click(822, 340)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(842, 465)
+        app.click(842, 388)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1481,10 +1481,10 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 501)  # its font
+        app.click(980, 424)  # its font
         app.settle(0.8)
         listed = app.shot("list")
-        assert changed_pixels_in(text, listed, (790, 280, 230, 200)) > 1000, "no list of fonts"
+        assert changed_pixels_in(text, listed, (790, 203, 230, 200)) > 1000, "no list of fonts"
         app.key("Escape")
         app.move(40, 560)
         app.settle(1.0)
@@ -1502,9 +1502,9 @@ def test_annotation_cards(binary):
         app.move(40, 560)
         app.settle(1.0)
         folded = app.shot("folded")
-        tools = changed_pixels_in(unselected, folded, (780, 190, 225, 90))
+        tools = changed_pixels_in(unselected, folded, (780, 113, 225, 90))
         assert tools > 5000, f"folding changed only {tools} pixels of the tools"
-        cards = count_color(folded, (780, 180, 220, 300), (33, 33, 33), 2)
+        cards = count_color(folded, (780, 103, 220, 300), (33, 33, 33), 2)
         assert cards > 10000, f"the folded Annotations have only {cards} pixels of cards"
         assert changed_pixels_in(unselected, folded, image_box) == 0, "folding changed the image"
 
@@ -1694,7 +1694,7 @@ def test_saved_edits_come_back(binary):
     with start(binary, "saved_edits", path) as app:
         plain = app.shot("plain")
         brighten(app)
-        app.click(890, 486)  # "Save edits"
+        app.click(890, 390)  # "Save edits"
         app.settle(1.0)
         fit_again(app)
         edited = app.shot("edited")
@@ -1724,6 +1724,22 @@ def test_single_frame_gif_is_editable(binary):
         edited = app.shot("edited")
         changed = changed_pixels_in(plain, edited, area)
         assert changed > 50_000, f"the filter changed only {changed} pixels of a single-frame GIF"
+
+
+def test_jpeg_is_edited_without_alpha(binary):
+    """A JPEG is edited in RGB, as it is: the edit panel adds no operation that gives
+    it alpha first, and the edited image goes to the GPU as RGB. With alpha added,
+    every change took longer and a third more memory."""
+    with start(binary, "edited_without_alpha", image("moss.jpg")) as app:
+        area = (120, 40, 640, 470)
+        plain = app.shot("plain")
+        brighten(app)
+        edited = app.shot("edited")
+        changed = changed_pixels_in(plain, edited, area)
+        assert changed > 50_000, f"the filter changed only {changed} pixels"
+        uploads = [l.split("Uploading ")[1].strip() for l in app.log().splitlines() if "Uploading " in l]
+    assert len(uploads) >= 2, f"the edited image was not uploaded: {uploads}"
+    assert all(u == "Rgb8 as Rgb8" for u in uploads), f"uploaded as {uploads}"
 
 
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
@@ -1940,6 +1956,7 @@ TESTS = [
     test_keep_view,
     test_keep_edits,
     test_single_frame_gif_is_editable,
+    test_jpeg_is_edited_without_alpha,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,

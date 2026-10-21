@@ -1,11 +1,20 @@
 use egui::Pos2;
-use image::RgbaImage;
 use image::math::Rect;
+use image::{ImageBuffer, Pixel, RgbaImage};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+
+/// 8 bit pixels, as RGB or RGBA: what the edits work in, paint strokes and
+/// annotations are drawn into them. Without alpha the image is opaque.
+pub(crate) type Pixels<P> = ImageBuffer<P, Vec<u8>>;
+
+/// How many bytes a pixel has
+pub(crate) fn channels<P: Pixel<Subpixel = u8>>() -> usize {
+    P::CHANNEL_COUNT as usize
+}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PaintStroke {
@@ -43,7 +52,7 @@ impl PaintStroke {
     }
 
     // render brush stroke
-    pub fn render(&self, img: &mut RgbaImage, brushes: &[RgbaImage]) {
+    pub fn render<P: Pixel<Subpixel = u8>>(&self, img: &mut Pixels<P>, brushes: &[RgbaImage]) {
         let mut drawing = StrokeDrawing::start(self, img, brushes);
         drawing.walk(self);
         drawing.draw_dots(self, img, 0);
@@ -83,13 +92,17 @@ pub struct StrokeDrawing {
     size: (u32, u32),
     /// The image without the stroke, a fading stroke is drawn on it again. Only where
     /// the stroke is, the rest stays empty.
-    base: RgbaImage,
+    base: Base,
     /// The part of `base` that is filled in
     base_area: Option<Rect>,
 }
 
 impl StrokeDrawing {
-    fn start(stroke: &PaintStroke, img: &RgbaImage, brushes: &[RgbaImage]) -> Self {
+    fn start<P: Pixel<Subpixel = u8>>(
+        stroke: &PaintStroke,
+        img: &Pixels<P>,
+        brushes: &[RgbaImage],
+    ) -> Self {
         // The brush is a fraction of the shorter side of the image
         let size = (stroke.width * img.width().min(img.height()) as f32) as u32;
         let mut brush = if size == 0 {
@@ -124,10 +137,10 @@ impl StrokeDrawing {
 
     /// Draw what is new of the stroke that is being drawn. Returns the part of the
     /// image that changed.
-    pub fn draw(
+    pub fn draw<P: Pixel<Subpixel = u8>>(
         &mut self,
         stroke: &PaintStroke,
-        img: &mut RgbaImage,
+        img: &mut Pixels<P>,
         brushes: &[RgbaImage],
     ) -> Option<Rect> {
         if self.points == 0 || self.points > stroke.points.len() || self.size != img.dimensions() {
@@ -192,7 +205,12 @@ impl StrokeDrawing {
     }
 
     /// Draw the dots from `first` on. Returns the part of the image they cover.
-    fn draw_dots(&self, stroke: &PaintStroke, img: &mut RgbaImage, first: usize) -> Option<Rect> {
+    fn draw_dots<P: Pixel<Subpixel = u8>>(
+        &self,
+        stroke: &PaintStroke,
+        img: &mut Pixels<P>,
+        first: usize,
+    ) -> Option<Rect> {
         let alpha = stroke.brush_color()[3];
         let mut table = times_table(alpha);
         let mut area = None;
@@ -214,33 +232,46 @@ impl StrokeDrawing {
     }
 }
 
+/// A copy of the image where something is drawn on it, to draw there again
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Base {
+    pixels: Vec<u8>,
+    /// Width, height and channels of the image it is a copy of
+    layout: (u32, u32, usize),
+}
+
 /// Keeps what is in the image where `base_area` grew to `area`, before something is
 /// drawn there. `area` holds the area that is kept already.
-pub(crate) fn keep_base(
-    base: &mut RgbaImage,
+pub(crate) fn keep_base<P: Pixel<Subpixel = u8>>(
+    base: &mut Base,
     base_area: &mut Option<Rect>,
-    img: &RgbaImage,
+    img: &Pixels<P>,
     area: Rect,
 ) {
-    if base.dimensions() != img.dimensions() {
+    let n = channels::<P>();
+    let layout = (img.width(), img.height(), n);
+    if base.layout != layout {
         // zeroed memory, only the part that is filled in is ever touched
-        *base = RgbaImage::new(img.width(), img.height());
+        *base = Base {
+            pixels: vec![0; img.as_raw().len()],
+            layout,
+        };
         *base_area = None;
     }
-    let stride = img.width() as usize * 4;
+    let stride = img.width() as usize * n;
     for y in area.y..area.y + area.height {
         let row = y as usize * stride;
         let (left, right) = (
-            row + area.x as usize * 4,
-            row + (area.x + area.width) as usize * 4,
+            row + area.x as usize * n,
+            row + (area.x + area.width) as usize * n,
         );
         // the area only grows, what it was is kept already
         let kept = base_area
             .filter(|kept| (kept.y..kept.y + kept.height).contains(&y))
             .map(|kept| {
                 (
-                    row + kept.x as usize * 4,
-                    row + (kept.x + kept.width) as usize * 4,
+                    row + kept.x as usize * n,
+                    row + (kept.x + kept.width) as usize * n,
                 )
             });
         let parts = match kept {
@@ -248,21 +279,22 @@ pub(crate) fn keep_base(
             None => [left..right, right..right],
         };
         for part in parts {
-            base.as_mut()[part.clone()].copy_from_slice(&img.as_raw()[part]);
+            base.pixels[part.clone()].copy_from_slice(&img.as_raw()[part]);
         }
     }
     *base_area = Some(area);
 }
 
 /// Puts what was kept back into a part of the image
-pub(crate) fn restore(img: &mut RgbaImage, base: &RgbaImage, area: Rect) {
-    let row = area.width as usize * 4;
-    let stride = img.width() as usize * 4;
-    let start = area.y as usize * stride + area.x as usize * 4;
+pub(crate) fn restore<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, base: &Base, area: Rect) {
+    let n = channels::<P>();
+    let row = area.width as usize * n;
+    let stride = img.width() as usize * n;
+    let start = area.y as usize * stride + area.x as usize * n;
     let rows = start..start + (area.height as usize - 1) * stride + row;
     img.as_mut()[rows.clone()]
         .par_chunks_mut(stride)
-        .zip(base.as_raw()[rows].par_chunks(stride))
+        .zip(base.pixels[rows].par_chunks(stride))
         .for_each(|(out, base)| out[..row].copy_from_slice(&base[..row]));
 }
 
@@ -335,22 +367,27 @@ fn dab_area(size: (u32, u32), brush: (u32, u32), pos: Pos2) -> Option<Rect> {
 }
 
 /// Blend the brush onto the image, centered at `pos`. Returns the part it covers.
-fn dab(img: &mut RgbaImage, brush: &RgbaImage, pos: Pos2, alpha: &[u8; 256]) -> Option<Rect> {
+fn dab<P: Pixel<Subpixel = u8>>(
+    img: &mut Pixels<P>,
+    brush: &RgbaImage,
+    pos: Pos2,
+    alpha: &[u8; 256],
+) -> Option<Rect> {
     let area = dab_area(img.dimensions(), brush.dimensions(), pos)?;
     // where the brush starts, it can be outside of the image
     let bx = area.x as i64 - (pos.x - brush.width() as f32 / 2.).floor() as i64;
     let by = area.y as i64 - (pos.y - brush.height() as f32 / 2.).floor() as i64;
-    let stride = img.width() as usize * 4;
+    let n = channels::<P>();
+    let stride = img.width() as usize * n;
     let brush_row = brush.width() as usize * 4;
     let brush = brush.as_raw();
     let rows =
         &mut img.as_mut()[area.y as usize * stride..(area.y + area.height) as usize * stride];
     let row = |(i, row): (usize, &mut [u8])| {
-        let out = &mut row[area.x as usize * 4..(area.x + area.width) as usize * 4];
+        let out = &mut row[area.x as usize * n..(area.x + area.width) as usize * n];
         let start = (by as usize + i) * brush_row + bx as usize * 4;
-        let (out, _) = out.as_chunks_mut::<4>();
         let (from, _) = brush[start..start + area.width as usize * 4].as_chunks::<4>();
-        for (o, b) in out.iter_mut().zip(from) {
+        for (o, b) in out.chunks_exact_mut(n).zip(from) {
             blend(o, b, alpha);
         }
     };
@@ -362,18 +399,21 @@ fn dab(img: &mut RgbaImage, brush: &RgbaImage, pos: Pos2, alpha: &[u8; 256]) -> 
     Some(area)
 }
 
-/// The brush over the image, like `Rgba::blend` but in whole numbers
-fn blend(out: &mut [u8; 4], brush: &[u8; 4], alpha: &[u8; 256]) {
+/// The brush over a pixel of the image, like `Rgba::blend` but in whole numbers. A
+/// pixel without alpha is opaque.
+fn blend(out: &mut [u8], brush: &[u8; 4], alpha: &[u8; 256]) {
     let fa = alpha[brush[3] as usize] as u32;
     if fa == 0 {
         return;
     }
     if fa == 255 {
         out[..3].copy_from_slice(&brush[..3]);
-        out[3] = 255;
+        if let Some(a) = out.get_mut(3) {
+            *a = 255;
+        }
         return;
     }
-    let ba = out[3] as u32;
+    let ba = out.get(3).map_or(255, |a| *a as u32);
     if ba == 255 {
         for c in 0..3 {
             out[c] = ((brush[c] as u32 * fa + out[c] as u32 * (255 - fa)) / 255) as u8;
@@ -471,6 +511,37 @@ mod tests {
             assert!(
                 at_once == drawn,
                 "fade {fade} flip {flip_random}: not the same"
+            );
+        }
+    }
+
+    /// Painted on an image without alpha, it gets the colors it gets with alpha. A
+    /// fading stroke is drawn again on what was under it, drawn point by point.
+    #[test]
+    fn painted_without_alpha() {
+        let brushes = brushes();
+        let with = RgbaImage::from_fn(400, 300, |x, y| {
+            Rgba([(x % 256) as u8, (y % 256) as u8, 90, 255])
+        });
+        let without = image::DynamicImage::ImageRgba8(with.clone()).to_rgb8();
+        for fade in [false, true] {
+            let whole = PaintStroke {
+                fade,
+                ..stroke(&path())
+            };
+            let mut at_once = with.clone();
+            whole.render(&mut at_once, &brushes);
+            let mut drawn = without.clone();
+            let mut drawing = StrokeDrawing::default();
+            let mut growing = whole.without_points();
+            for p in &whole.points {
+                growing.points.push(*p);
+                drawing.draw(&growing, &mut drawn, &brushes);
+            }
+            assert!(at_once != with, "fade {fade}: nothing drawn");
+            assert!(
+                image::DynamicImage::ImageRgba8(at_once).to_rgb8() == drawn,
+                "fade {fade}: not the same"
             );
         }
     }

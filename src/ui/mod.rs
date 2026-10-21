@@ -41,8 +41,7 @@ use crate::{
     appstate::{ImageGeometry, OculanteState},
     file_encoder::FileEncoder,
     image_editing::{
-        Channel, ColorTypeExt, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter,
-        process_pixels,
+        Channel, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter, process_pixels,
     },
     paint::PaintStroke,
     settings::{ColorTheme, PersistentSettings, VolatileSettings, set_system_theme},
