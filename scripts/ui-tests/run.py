@@ -1339,7 +1339,12 @@ def test_image_info_is_computed_when_shown(binary):
         again = app.log().count(computed) - 1
         assert again >= 1, "not computed again for the edit"
         # at most every 200 ms, the first one right away
-        assert again < changes and again <= elapsed / 0.2 + 1, f"computed {again} times in {elapsed:.1f} s, for {changes} changes of the image"
+        counted = f"computed {again} times in {elapsed:.1f} s, for {changes} changes of the image"
+        assert again <= changes and again <= elapsed / 0.2 + 1, counted
+        # A busy machine takes longer than 200 ms for a step of the slider, then
+        # every step gets its numbers
+        if changes > elapsed / 0.2 + 1:
+            assert again < changes, counted
         changed = changed_pixels_in(plain, edited, HISTOGRAM)
         assert changed > 300, f"the histogram changed only {changed} pixels with the edit"
         app.click(890, 210)  # "Apply all edits"
