@@ -1565,7 +1565,7 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
                 }
                 if ui
                     .add(
-                        egui::Button::new(egui::RichText::new(crate::icons::X).size(size * 1.5))
+                        egui::Button::new(egui::RichText::new(crate::icons::X).size(size * 0.8))
                             .frame(false),
                     )
                     .on_hover_text("Remove")
