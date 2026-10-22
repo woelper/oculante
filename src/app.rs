@@ -375,12 +375,16 @@ impl OculanteApp {
             Arc::new(FontData::from_static(BOLD_FONT)),
         );
 
-        // Icon font
+        // Icon font. Its icons sit in the middle of their box, but it asks for a line
+        // gap of 9 % below them (svg2ttf, which fantasticon uses, adds one by default).
+        // egui centres the box with the gap on the text, so they sat 4.5 % of their
+        // size too high, a point in the top bar.
         fonts.font_data.insert(
             "icons".to_owned(),
             Arc::new(
                 FontData::from_static(include_bytes!("../res/fonts/ui_icons.ttf")).tweak(FontTweak {
                     scale: 1.2,
+                    y_offset_factor: 0.045,
                     ..Default::default()
                 }),
             ),
