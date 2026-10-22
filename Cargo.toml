@@ -6,7 +6,7 @@ exclude = [
     ".github/*",
     "res/fonts/NotoSansSC-Regular.ttf",
     # icon.ico is compiled into the app
-    "res/icons/*.png",
+    "res/icons/app/*.png",
     "res/*.svg",
     "res/premult.png",
     "res/screen*.png",
@@ -26,7 +26,7 @@ version = "1.0.0-rc.2"
 rust-version = "1.98"
 
 [package.metadata.bundle]
-icon = ["res/icons/icon.ico"]
+icon = ["res/icons/app/icon.ico"]
 identifier = "com.github.woelper.oculante"
 name = "oculante"
 
@@ -35,7 +35,7 @@ section = "graphics"
 assets = [
     ["target/release/oculante", "usr/bin/", "755"],
     ["res/oculante.desktop", "usr/share/applications/", "644"],
-    ["res/icons/icon.png", "usr/share/icons/hicolor/256x256/apps/oculante.png", "644"],
+    ["res/icons/app/icon.png", "usr/share/icons/hicolor/256x256/apps/oculante.png", "644"],
     ["README.md", "usr/share/doc/oculante/", "644"],
 ]
 

@@ -2,7 +2,7 @@ cd $(git rev-parse --show-toplevel)
 
 # Keep up to date, pinned for reproducibility sake
 npm install fantasticon@4.1.0
-npx fantasticon ./res/ui_icons/ -o ./res/fonts/ -t ttf -g css --name ui_icons
+npx fantasticon ./res/icons/ui/ -o ./res/fonts/ -t ttf -g css --name ui_icons
 
 # Generates src/icons.rs from the CSS that fantasticon outputs.
 set -euo pipefail

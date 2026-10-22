@@ -18,7 +18,7 @@ pub(crate) mod file_sort;
 pub(crate) mod annotate;
 #[cfg_attr(feature = "file_open", allow(dead_code))]
 pub(crate) mod filebrowser;
-// Written by scripts/generate_icons.sh from every icon in res/ui_icons, not all are used
+// Written by scripts/generate_icons.sh from every icon in res/icons/ui, not all are used
 #[allow(dead_code)]
 pub(crate) mod icons;
 pub mod net;
