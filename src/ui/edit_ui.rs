@@ -887,7 +887,7 @@ fn modifier_stack_ui(
 
                     ui.add_enabled_ui(up, |ui| {
                         let ur = ui.add(
-                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                            egui::Button::new(RichText::new(CHEVRON_UP).size(caret_size)).frame(false),
                         );
                         if ur.on_hover_text("Move up").clicked() {
                             swap = Some((shown[n - 1], i));
@@ -897,7 +897,7 @@ fn modifier_stack_ui(
 
                     ui.add_enabled_ui(down, |ui| {
                         let dr = ui.add(
-                            egui::Button::new(RichText::new("").size(caret_size)).frame(false),
+                            egui::Button::new(RichText::new(CHEVRON_DOWN).size(caret_size)).frame(false),
                         );
                         if dr.on_hover_text("Move down").clicked() {
                             swap = Some((i, shown[n + 1]));
@@ -916,7 +916,7 @@ fn modifier_stack_ui(
                         *image_changed = true;
                     }
 
-                    if egui::Button::new(RichText::new("").size(caret_size * 1.5))
+                    if egui::Button::new(RichText::new(X).size(caret_size))
                         .frame(false)
                         .ui(ui)
                         .on_hover_text("Remove operator")

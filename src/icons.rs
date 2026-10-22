@@ -64,5 +64,3 @@ pub const PEN: &str = "\u{f104}";
 pub const TERMINAL: &str = "\u{f103}";
 pub const EYE: &str = "\u{f102}";
 pub const EYE_OFF: &str = "\u{f101}";
-
-pub const ARROW_U_UP_LEFT: &str = "⤴";

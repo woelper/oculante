@@ -880,7 +880,7 @@ impl ImageOperation {
                 let painter = handle_painter.with_clip_rect(canvas_rect(ui.ctx()));
 
                 if ui.data(|r| r.get_temp::<bool>(id)).is_some() {
-                    if ui.button(format!("{ARROW_U_UP_LEFT} Reset")).clicked() {
+                    if ui.button(format!("{UNDO} Reset")).clicked() {
                         ui.data_mut(|w| w.remove_temp::<bool>(id));
                         r.mark_changed();
                         *points = [
