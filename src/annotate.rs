@@ -1,4 +1,5 @@
-//! Arrows, frames, text, pen lines and hidden areas on top of the edited image.
+//! Arrows, frames, circles, check marks, text, pen lines and hidden areas on top of
+//! the edited image.
 //!
 //! Annotations are kept in pixels of the image as it was loaded. Crops, resizes,
 //! rotations and flips take them along with what they point at. Each one keeps its
@@ -85,6 +86,8 @@ pub enum Shape {
     Rect([i32; 2]),
     /// A circle, or an ellipse, in a box this large
     Ellipse([i32; 2]),
+    /// A check mark in a box this large
+    Check([i32; 2]),
     /// Lines of text, the first one starts at the top left
     Text(String),
     /// A line through these points, the first one is where it starts
@@ -209,9 +212,10 @@ impl Annotation {
         };
         match &self.shape {
             Shape::Arrow(to) => around(&[[0, 0], *to]),
-            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
-                around(&[[0, 0], *size])
-            }
+            Shape::Rect(size)
+            | Shape::Ellipse(size)
+            | Shape::Check(size)
+            | Shape::Redact { size, .. } => around(&[[0, 0], *size]),
             Shape::Pen(points) => around(points),
             Shape::Text(text) => text_layout(text, self).map(|l| l.bounds),
         }
@@ -227,7 +231,7 @@ impl Annotation {
                 let length = (to[0] as f32).hypot(to[1] as f32);
                 half.max(arrow_head(self.line_width(), length).1) + outline
             }
-            Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half + outline,
+            Shape::Rect(_) | Shape::Ellipse(_) | Shape::Check(_) | Shape::Pen(_) => half + outline,
             Shape::Text(_) => outline,
             Shape::Redact { .. } => 0.,
         }
@@ -259,9 +263,10 @@ impl Annotation {
     fn is_empty(&self) -> bool {
         match &self.shape {
             Shape::Arrow(to) => to[0].abs().max(to[1].abs()) < 2,
-            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
-                size[0] < 2 || size[1] < 2
-            }
+            Shape::Rect(size)
+            | Shape::Ellipse(size)
+            | Shape::Check(size)
+            | Shape::Redact { size, .. } => size[0] < 2 || size[1] < 2,
             Shape::Pen(points) => points.is_empty(),
             Shape::Text(text) => text.trim().is_empty(),
         }
@@ -305,6 +310,7 @@ impl Annotation {
             Shape::Arrow(_) => "Arrow".into(),
             Shape::Rect(_) => "Frame".into(),
             Shape::Ellipse(_) => "Circle".into(),
+            Shape::Check(_) => "Check".into(),
             Shape::Pen(_) => "Pen".into(),
             Shape::Redact { .. } => "Redacted".into(),
             Shape::Text(text) => {
@@ -786,6 +792,11 @@ fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation, t: Transfo
                     layer.stroke_path(&oval, &paint, &stroke, t, None);
                 }
             }
+            Shape::Check(size) => {
+                if let Some(check) = check_path(*size) {
+                    layer.stroke_path(&check, &paint, &stroke, t, None);
+                }
+            }
             Shape::Pen(points) => {
                 if let [only] = points.as_slice() {
                     let dot =
@@ -834,6 +845,27 @@ fn frame_path(size: [i32; 2], radius: f32) -> Option<Path> {
     }
     frame.close();
     frame.finish()
+}
+
+/// The corners of a check mark in a box this large: where it starts on the left,
+/// the bottom, and the top right where it ends
+fn check_points(size: [i32; 2]) -> [Point; 3] {
+    let (w, h) = (size[0] as f32, size[1] as f32);
+    [
+        Point::from_xy(0., h * 0.55),
+        Point::from_xy(w * 0.37, h),
+        Point::from_xy(w, 0.),
+    ]
+}
+
+/// A check mark in a box this large, one line
+fn check_path(size: [i32; 2]) -> Option<Path> {
+    let [start, bottom, end] = check_points(size);
+    let mut check = PathBuilder::new();
+    check.move_to(start.x, start.y);
+    check.line_to(bottom.x, bottom.y);
+    check.line_to(end.x, end.y);
+    check.finish()
 }
 
 /// A line through the points of a pen
@@ -1040,6 +1072,7 @@ pub enum Tool {
     Arrow,
     Frame,
     Circle,
+    Check,
     Text,
     Pen,
     Redact,
@@ -1047,10 +1080,11 @@ pub enum Tool {
 
 impl Tool {
     /// Those that draw, a tile each
-    const ALL: [Tool; 6] = [
+    const ALL: [Tool; 7] = [
         Tool::Arrow,
         Tool::Frame,
         Tool::Circle,
+        Tool::Check,
         Tool::Text,
         Tool::Pen,
         Tool::Redact,
@@ -1062,6 +1096,7 @@ impl Tool {
             Tool::Arrow => "Arrow",
             Tool::Frame => "Frame",
             Tool::Circle => "Circle",
+            Tool::Check => "Check",
             Tool::Text => "Text",
             Tool::Pen => "Pen",
             Tool::Redact => "Redact",
@@ -1074,6 +1109,7 @@ impl Tool {
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
             Tool::Frame => "Drag a frame around something, with Shift a square",
             Tool::Circle => "Drag a circle around something, with Shift a round one",
+            Tool::Check => "Drag a check mark over something, with Shift as wide as high",
             Tool::Text => "Click where the text goes, click a text to change it",
             Tool::Pen => "Draw freely",
             Tool::Redact => "Drag over what nobody should see",
@@ -1086,6 +1122,7 @@ impl Tool {
             Tool::Arrow => Icon::Arrow,
             Tool::Frame => Icon::Frame,
             Tool::Circle => Icon::Circle,
+            Tool::Check => Icon::Check,
             Tool::Text => Icon::Text,
             Tool::Pen => Icon::Pen,
             Tool::Redact => Icon::Pixelate,
@@ -1100,6 +1137,7 @@ enum Icon {
     Arrow,
     Frame,
     Circle,
+    Check,
     Text,
     Pen,
     Pixelate,
@@ -1140,6 +1178,10 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
         }
         Icon::Circle => {
             painter.circle_stroke(at(8., 8.), 5.8 * scale, stroke);
+        }
+        Icon::Check => {
+            let points = vec![at(2.5, 8.5), at(6.5, 12.5), at(13.5, 3.5)];
+            painter.add(egui::Shape::line(points, stroke));
         }
         Icon::Text => {
             painter.text(
@@ -1284,6 +1326,7 @@ impl AnnotateUi {
             Tool::Arrow => (Shape::Arrow([0, 0]), self.color, self.width),
             Tool::Frame => (Shape::Rect([0, 0]), self.color, self.width),
             Tool::Circle => (Shape::Ellipse([0, 0]), self.color, self.width),
+            Tool::Check => (Shape::Check([0, 0]), self.color, self.width),
             Tool::Pen => (Shape::Pen(vec![[0, 0]]), self.color, self.width),
             Tool::Text => (Shape::Text(String::new()), self.color, self.text_size),
             Tool::Redact => {
@@ -1328,7 +1371,9 @@ impl AnnotateUi {
                 self.width = a.width;
                 self.radius = a.radius;
             }
-            Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => self.width = a.width,
+            Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Check(_) | Shape::Pen(_) => {
+                self.width = a.width
+            }
         }
         self.color = a.color;
         self.outline = a.outline;
@@ -1408,8 +1453,8 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
                         picked = Some(Tool::Select);
                     }
                     let spacing = ui.spacing().item_spacing.x;
-                    let width = ((ui.available_width() - spacing * 2.) / 3.).floor();
-                    for row in Tool::ALL.chunks(3) {
+                    let width = ((ui.available_width() - spacing * 3.) / 4.).floor();
+                    for row in Tool::ALL.chunks(4) {
                         ui.horizontal(|ui| {
                             for &tool in row {
                                 let button = egui::Button::new("").min_size(egui::vec2(width, 40.));
@@ -1688,7 +1733,7 @@ fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
     use crate::icons::{ARROWS_OUT, ARROWS_OUT_SIMPLE, PALETTE, PENCIL_SIMPLE_LINE};
     let before = a.clone();
     match &mut a.shape {
-        Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => {
+        Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Check(_) | Shape::Pen(_) => {
             slider_row(
                 ui,
                 format!("{PENCIL_SIMPLE_LINE} Width"),
@@ -2133,7 +2178,12 @@ pub fn canvas_ui(
                 Some(Drag::Draw { index, from }) => {
                     if let Some(a) = annotations.get_mut(*index) {
                         let mut d = [o[0] - from[0], o[1] - from[1]];
-                        if shift && matches!(a.shape, Shape::Rect(_) | Shape::Ellipse(_)) {
+                        if shift
+                            && matches!(
+                                a.shape,
+                                Shape::Rect(_) | Shape::Ellipse(_) | Shape::Check(_)
+                            )
+                        {
                             // as wide as high
                             let side = d[0].abs().max(d[1].abs());
                             d = [side.copysign(d[0]), side.copysign(d[1])];
@@ -2142,7 +2192,10 @@ pub fn canvas_ui(
                         let size = round([d[0].abs(), d[1].abs()]);
                         match &mut a.shape {
                             Shape::Arrow(to) => *to = round(d),
-                            Shape::Rect(s) | Shape::Ellipse(s) | Shape::Redact { size: s, .. } => {
+                            Shape::Rect(s)
+                            | Shape::Ellipse(s)
+                            | Shape::Check(s)
+                            | Shape::Redact { size: s, .. } => {
                                 *s = size;
                                 a.set_start(round(corner), original);
                             }
@@ -2384,6 +2437,7 @@ fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
         }
         Shape::Ellipse(size) => tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
             .and_then(PathBuilder::from_oval),
+        Shape::Check(size) => check_path(*size),
         Shape::Pen(points) => match points.as_slice() {
             // a dot
             [only] => {
@@ -2608,6 +2662,10 @@ fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
                 return to_line([0, 0], *size) <= near;
             }
             ellipse_distance(rx, ry, q.x - rx, q.y - ry) <= near
+        }
+        Shape::Check(size) => {
+            let [start, bottom, end] = check_points(*size);
+            segment_distance(q, start, bottom) <= near || segment_distance(q, bottom, end) <= near
         }
         Shape::Pen(points) => match points.as_slice() {
             [only] => to_line(*only, *only) <= near,
@@ -3078,6 +3136,8 @@ mod tests {
             Shape::Arrow([500, -375]),
             Shape::Rect([50, 30]),
             Shape::Ellipse([50, 30]),
+            Shape::Check([50, 30]),
+            Shape::Check([80, 8]),
             Shape::Pen(vec![[0, 0], [20, 10], [40, -5]]),
             // as drawn by hand, in small steps that turn a lot
             Shape::Pen(
@@ -3254,6 +3314,7 @@ mod tests {
             Shape::Arrow([120, -60]),
             Shape::Rect([80, 50]),
             Shape::Ellipse([80, 50]),
+            Shape::Check([80, 50]),
             Shape::Pen(vec![[0, 0], [40, 30], [90, -10]]),
             Shape::Pen(vec![[0, 0]]),
             Shape::Text("Hi".into()),
@@ -3278,6 +3339,32 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn check_marks_are_drawn_and_hit() {
+        let img = RgbaImage::from_pixel(100, 100, Rgba([0, 0, 0, 255]));
+        let mapping = Mapping::new(&[], (100, 100));
+        let check = Annotation::new(Shape::Check([60, 40]), [255, 0, 0, 255], 4, [20, 30]);
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&check), &mapping);
+        // where it starts on the left, the bottom and the top right
+        for (x, y) in [(21, 52), (42, 69), (79, 31)] {
+            assert!(drawn.get_pixel(x, y)[0] > 200, "no line at {x},{y}");
+        }
+        for (x, y) in [(22, 32), (78, 68)] {
+            assert_eq!(
+                drawn.get_pixel(x, y).0,
+                [0, 0, 0, 255],
+                "in a corner of its box, {x},{y}"
+            );
+        }
+        assert!(hits(&check, &mapping, [42., 69.], 2.));
+        assert!(hits(&check, &mapping, [61., 50.], 2.), "on the long line");
+        assert!(!hits(&check, &mapping, [22., 32.], 2.));
+        assert!(
+            !hits(&check, &mapping, [70., 65.], 2.),
+            "below the long line"
+        );
     }
 
     #[test]

@@ -900,8 +900,8 @@ OUTLINE = (255, 200, 40)
 ANNOTATIONS_HEADER = (890, 90)
 SELECT_BUTTON = (780, 115, 222, 32)
 ANNOTATE_TOOLS = {
-    name: (815 + 80 * (i % 3), 173 + 46 * (i // 3))
-    for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
+    name: (805 + 60 * (i % 4), 173 + 46 * (i // 4))
+    for i, name in enumerate(("arrow", "frame", "circle", "check", "text", "pen", "redact"))
 }
 
 
@@ -1550,6 +1550,45 @@ def test_annotation_cards(binary):
 
 
 
+def test_annotation_check_mark(binary):
+    """The Check tool draws a check mark in the box that is dragged: from the left
+    down to near the bottom, then up to the top right, the corners of the box stay
+    as they were. With Shift the box is as wide as high."""
+    red = (235, 40, 40)
+    with App(binary, "annotation_check", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.click(*ANNOTATE_TOOLS["check"])
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        app.drag(200, 150, 400, 300, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        drawn = app.shot("check")
+        # where it starts, the middle of the short line, the bottom, the middle of
+        # the long line and where it ends
+        for x, y in [(203, 232), (237, 266), (274, 296), (337, 225), (396, 154)]:
+            assert region_has_color(drawn, (x - 3, y - 3, 7, 7), red, 50), f"no check mark at {x},{y}"
+        for corner in [(203, 153, 30, 30), (367, 267, 30, 30)]:
+            changed = changed_pixels_in(before, drawn, corner)
+            assert changed == 0, f"{changed} pixels changed in a corner of its box, {corner}"
+        # dragged 100 to the right and 30 down with Shift, its box is 100 high
+        app.move(450, 100)
+        app.x("xdotool", "keydown", "shift")
+        app.drag(450, 100, 550, 130, steps=10)
+        app.x("xdotool", "keyup", "shift")
+        app.move(40, 560)
+        app.settle(1.0)
+        square = app.shot("square")
+        assert region_has_color(square, (484, 194, 7, 7), red, 50), "the box of a check mark with Shift is not square"
+        assert not region_has_color(square, (484, 124, 7, 7), red, 50), "the check mark with Shift ends at the mouse"
+
+
 def test_annotation_select(binary):
     """With nothing selected Esc goes from a tool that draws to Select, which is
     tinted. In it a box selects what lies wholly inside, also with Shift on top of
@@ -1987,6 +2026,7 @@ TESTS = [
     test_paint_on_transparency,
     test_annotate,
     test_annotation_cards,
+    test_annotation_check_mark,
     test_annotation_select,
     test_fullscreen,
     test_borderless,
