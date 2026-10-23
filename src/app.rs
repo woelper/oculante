@@ -858,9 +858,11 @@ impl eframe::App for OculanteApp {
             self.state.image_geometry.offset += self.state.mouse_delta;
         }
 
-        // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch zooms
+        // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch on a
+        // trackpad zooms, and so do two fingers on a touchscreen
         let scroll_delta = ctx.input(|i| i.smooth_scroll_delta.y);
         let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events));
+        let pinch = pinch * ctx.input(touch_zoom);
         if !self.state.pointer_over_ui {
             match browse {
                 1 => next_image(&mut self.state),
