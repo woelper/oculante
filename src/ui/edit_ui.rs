@@ -91,6 +91,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
         ImgOpItem::new(ImageOperation::Noise {
             amt: 50,
             mono: false,
+            seed: 0,
         }),
         ImgOpItem::new(ImageOperation::ChromaticAberration(15)),
         // Geometry and Transformations
