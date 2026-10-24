@@ -175,7 +175,7 @@ Measured on the OptiPlex with release builds and photos of 24 megapixels from Wi
 Done:
 - [x] Info panel numbers only while it is open, once per image, in parallel: 24 MP 27 -> 6 ms, 144 MP 189 -> 24 ms, 16 bit gray 155 -> 20 ms. Before, every edit slider tick computed them again.
 - [x] EXIF read for display without reading the file twice (288 MB for a 144 MB EXR), TIFF 45 -> 12 ms, EXR 90 -> 0 ms. Saving takes the EXIF from the source file.
-- [x] Cache keeps to a memory budget (1/16 of RAM, 256 MB to 1 GB): 30 photos 2.1 GB -> levels off at about 1.4 GB in total.
+- [x] Cache keeps to a memory budget (1/16 of RAM, 256 MB to 1 GB): 30 photos 2.1 GB -> levels off at about 1.4 GB in total. The settings did not say so, the cache setting counts images only: its description gives the budget now (Stoppedpuma in #799, 2026-10-24).
 - [x] Editing keeps one RGBA copy instead of two: one filter on 24 MP +245 MB -> +122 MB.
 - [x] EXIF orientation in parallel: 75 -> 16 ms for a turned 24 MP photo.
 - [x] Bugs found on the way: saved edits were never read again, false extension warning on every .heic, crash of pixel filters on float RGBA, saving as PNG crashed for everything but 8 bit RGBA, delete said "Deleted" when it failed, every image was opened as DICOM.
