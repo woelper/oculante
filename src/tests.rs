@@ -950,6 +950,7 @@ fn ci_settings_of_0_9_6_are_read() {
         persistent.trackpad_pans,
         "one that is newer has its default"
     );
+    assert_eq!(persistent.cache_memory, crate::cache::CacheMemory::Auto);
     // the file has the default shortcuts of 0.9.6, which are the ones of now
     assert_eq!(persistent.shortcuts.len(), 36);
     let defaults = default_shortcuts();
