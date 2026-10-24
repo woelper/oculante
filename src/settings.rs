@@ -1,4 +1,7 @@
-use crate::{file_encoder::FileEncoder, file_sort::FileSort, shortcuts::*, utils::ColorChannel};
+use crate::{
+    cache::CacheMemory, file_encoder::FileEncoder, file_sort::FileSort, shortcuts::*,
+    utils::ColorChannel,
+};
 use anyhow::{Result, anyhow};
 use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
@@ -50,6 +53,8 @@ pub struct PersistentSettings {
     pub compare_keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
+    /// How much memory the images in the cache may take
+    pub cache_memory: CacheMemory,
     /// How many recent images to keep track of
     pub max_recents: u8,
     pub show_scrub_bar: bool,
@@ -99,6 +104,7 @@ impl Default for PersistentSettings {
             keep_view: Default::default(),
             compare_keep_view: Default::default(),
             max_cache: 30,
+            cache_memory: CacheMemory::Auto,
             max_recents: 12,
             show_scrub_bar: Default::default(),
             wrap_folder: true,

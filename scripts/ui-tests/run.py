@@ -1678,10 +1678,11 @@ def test_mipmaps_switched_on_and_off(binary):
         app.move(480, 300)
         for _ in range(12):
             app.x("xdotool", "click", "4")
-        app.scroll_down(480, 300, 4)
-        app.click(752, 350)  # "Use mipmaps"
+        # a row of the settings is one notch, an item added above it needs one more
+        app.scroll_down(480, 300, 5)
+        app.click(752, 367)  # "Use mipmaps"
         app.settle(0.8)
-        checked = region_has_color(app.shot(f"mipmaps_{on}"), (742, 340, 20, 20), ACCENT, 60)
+        checked = region_has_color(app.shot(f"mipmaps_{on}"), (742, 357, 20, 20), ACCENT, 60)
         assert checked == on, f"the mipmap setting is {'off' if on else 'on'}"
         app.click(777, 32)  # close the preferences
         app.move(300, 560)
@@ -1810,6 +1811,39 @@ def test_new_noise(binary):
         # same place without this one opens paint mode, the panel grows over the image
         level, wanted = mean_level(new, area), mean_level(noisy, area)
         assert abs(level - wanted) < 2, f"more than the noise changed ({level:.1f} instead of {wanted:.1f})"
+
+
+def test_memory_for_the_cache(binary):
+    """The memory for the cache is a setting: with little of it the oldest images go,
+    and what is picked in the preferences is saved."""
+    folder = folder_of("cache_memory_images", [("00.jpg", "moss.jpg"), ("01.jpg", "moss.jpg"), ("02.jpg", "moss.jpg")])
+    first = os.path.join(folder, "00.jpg")
+    # moss.jpg takes 2.25 MB in memory, one MB holds only the one shown
+    for memory, evicted in (("Auto", False), ({"Megabytes": 1}, True)):
+        with start(binary, f"cache_memory_{evicted}", first, settings={"cache_memory": memory}) as app:
+            for _ in range(2):
+                app.key("Right")
+                app.settle(1.5)
+            assert shown_file(app) == "02.jpg", f"the images were not gone through: {shown_file(app)}"
+            hit = "Cache limit hit" in app.log()
+        assert hit == evicted, f"with {memory} images went from the cache: {hit}"
+    with start(binary, "cache_memory_setting", first) as app:
+        app.click(1005, 18)  # the menu
+        app.settle(1.0)
+        app.click(940, 218)  # Preferences
+        app.settle(1.5)
+        app.click(715, 397)  # the drop-down of the memory for the cache
+        app.settle(1.0)
+        app.click(700, 457)  # Percent
+        app.settle(1.0)
+        app.shot("percent")
+        app.click(778, 33)  # close the preferences
+        app.settle(1.0)
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config.json")) as f:
+            saved = json.load(f).get("cache_memory")
+    assert isinstance(saved, dict) and 1 <= saved.get("Percent", 0) <= 90, f"saved as {saved}"
 
 
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
@@ -2028,6 +2062,7 @@ TESTS = [
     test_single_frame_gif_is_editable,
     test_jpeg_is_edited_without_alpha,
     test_new_noise,
+    test_memory_for_the_cache,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,

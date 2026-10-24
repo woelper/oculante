@@ -7,6 +7,7 @@ use std::{
 
 use image::DynamicImage;
 use log::debug;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct Cache {
@@ -16,6 +17,33 @@ pub struct Cache {
     pub cache_size: usize,
     /// How much memory the kept images may take, in bytes
     pub byte_budget: usize,
+    /// The memory of the machine, in bytes
+    pub total_memory: u64,
+}
+
+/// How much memory the cached images may take, a setting
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum CacheMemory {
+    /// A sixteenth of the memory of the machine, at least 256 MB and at most 1 GB.
+    /// A photo of 24 megapixels takes about 72 MB.
+    #[default]
+    Auto,
+    /// This many percent of the memory of the machine
+    Percent(u8),
+    /// This many megabytes
+    Megabytes(u32),
+}
+
+impl CacheMemory {
+    /// In bytes, on a machine with this much memory
+    pub fn bytes(self, total_memory: u64) -> usize {
+        const MB: u64 = 1024 * 1024;
+        (match self {
+            Self::Auto => (total_memory / 16).clamp(256 * MB, 1024 * MB),
+            Self::Percent(percent) => total_memory * percent as u64 / 100,
+            Self::Megabytes(megabytes) => megabytes as u64 * MB,
+        }) as usize
+    }
 }
 
 #[derive(Debug)]
@@ -27,11 +55,21 @@ pub struct CachedImage {
 
 impl Cache {
     pub fn new(cache_size: usize) -> Self {
+        let mut system = sysinfo::System::new();
+        system.refresh_memory();
+        let total_memory = system.total_memory();
         Self {
             data: Default::default(),
             cache_size,
-            byte_budget: default_byte_budget(),
+            byte_budget: CacheMemory::Auto.bytes(total_memory),
+            total_memory,
         }
+    }
+
+    /// Keeps to the memory of the settings, the oldest images go if they no longer fit
+    pub fn set_memory(&mut self, memory: CacheMemory) {
+        self.byte_budget = memory.bytes(self.total_memory);
+        self.trim();
     }
 
     pub fn get(&self, path: &Path, item: usize) -> Option<Arc<DynamicImage>> {
@@ -57,8 +95,12 @@ impl Cache {
                 created: std::time::Instant::now(),
             },
         );
-        // The oldest images go until the cache fits both limits. The new one stays,
-        // it is shown anyway.
+        self.trim();
+    }
+
+    /// The oldest images go until the cache fits both limits. The newest one stays,
+    /// it is shown anyway.
+    fn trim(&mut self) {
         while self.data.len() > 1
             && (self.data.len() > self.cache_size || self.bytes() > self.byte_budget)
         {
@@ -86,15 +128,6 @@ impl Cache {
     fn bytes(&self) -> usize {
         self.data.values().map(|c| c.data.as_bytes().len()).sum()
     }
-}
-
-/// A sixteenth of the memory of the machine, at least 256 MB and at most 1 GB.
-/// A photo of 24 megapixels takes about 72 MB.
-fn default_byte_budget() -> usize {
-    const MB: u64 = 1024 * 1024;
-    let mut system = sysinfo::System::new();
-    system.refresh_memory();
-    (system.total_memory() / 16).clamp(256 * MB, 1024 * MB) as usize
 }
 
 #[cfg(test)]
@@ -154,9 +187,41 @@ mod tests {
         assert!(cache.get(Path::new("b"), 0).is_some());
     }
 
+    /// The memory for the cache: by itself a sixteenth of the machine's, 256 MB to
+    /// 1 GB, or a percent of it or megabytes from the settings
     #[test]
-    fn budget_is_within_bounds() {
-        let budget = default_byte_budget();
+    fn memory_for_the_cache() {
+        const GB: u64 = 1 << 30;
+        let auto = |total| CacheMemory::Auto.bytes(total) >> 20;
+        assert_eq!(
+            (auto(2 * GB), auto(8 * GB), auto(64 * GB)),
+            (256, 512, 1024)
+        );
+        let budget = Cache::new(10).byte_budget;
         assert!((256 << 20..=1 << 30).contains(&budget), "{budget}");
+        assert_eq!(CacheMemory::Percent(25).bytes(16 * GB) as u64, 4 * GB);
+        assert_eq!(CacheMemory::Megabytes(300).bytes(16 * GB), 300 << 20);
+        // less of it, the oldest images go
+        let mut cache = Cache::new(10);
+        cache.total_memory = 8_000_000;
+        for name in ["a", "b", "c"] {
+            cache.insert(Path::new(name), 0, image());
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert_eq!(cache.data.len(), 3);
+        // 80 000 bytes, two images
+        cache.set_memory(CacheMemory::Percent(1));
+        assert_eq!(cache.data.len(), 2);
+        assert!(
+            cache.get(Path::new("a"), 0).is_none(),
+            "the oldest image was kept"
+        );
+        // saved in the settings like this
+        let saved = serde_json::to_string(&CacheMemory::Percent(10)).expect("saved");
+        assert_eq!(saved, r#"{"Percent":10}"#);
+        assert_eq!(
+            serde_json::from_str::<CacheMemory>(&saved).expect("read"),
+            CacheMemory::Percent(10)
+        );
     }
 }
