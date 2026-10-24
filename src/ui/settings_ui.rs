@@ -107,7 +107,8 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
+                                    let cache_mb = state.player.cache.byte_budget / (1024 * 1024);
+                                    configuration_item_ui("Number of images to cache", &format!("Keeps up to this many images in memory for faster opening, in at most {cache_mb} MB: a sixteenth of the memory, 256 MB to 1 GB."), |ui| {
                                         if ui
                                         .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).range(0..=10000))
                                         .changed()
