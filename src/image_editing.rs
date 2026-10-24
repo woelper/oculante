@@ -1069,7 +1069,7 @@ impl ImageOperation {
                             painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 14),
                             );
 
                             painter.text(
