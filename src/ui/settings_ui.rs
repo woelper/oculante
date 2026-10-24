@@ -162,6 +162,11 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).range(0.05..=10.0).speed(0.01));
                                     }, ui);
 
+                                    #[cfg(target_os = "macos")]
+                                    configuration_item_ui("Pan with two fingers", "Two fingers on the trackpad move the image and a pinch zooms. Off, two fingers zoom like the mouse wheel, as on other systems.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.trackpad_pans, "");
+                                    }, ui);
+
                                     configuration_item_ui(
                                         "Auto scale to fit",
                                         "Automatically scale images up to fit the window.",

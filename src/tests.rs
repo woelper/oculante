@@ -946,6 +946,10 @@ fn ci_settings_of_0_9_6_are_read() {
     let text = std::fs::read_to_string("res/tests/settings-0.9.6/config.json").unwrap();
     let persistent: PersistentSettings = serde_json::from_str(&text).unwrap();
     assert!(persistent.info_enabled, "a value that was set");
+    assert!(
+        persistent.trackpad_pans,
+        "one that is newer has its default"
+    );
     // the file has the default shortcuts of 0.9.6, which are the ones of now
     assert_eq!(persistent.shortcuts.len(), 36);
     let defaults = default_shortcuts();

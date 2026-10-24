@@ -692,6 +692,30 @@ pub fn browse_and_pinch(events: &[egui::Event]) -> (i32, f32) {
     (direction, pinch)
 }
 
+/// How far two fingers on a trackpad move the image in this frame. Trackpads scroll
+/// in points and mouse wheels in lines, `trackpad` keeps which one scrolled last: egui
+/// smooths the scrolling of a wheel over the next frames, a trackpad's must not zoom
+/// there. With Ctrl or Cmd held the scrolling goes through the images instead.
+pub fn trackpad_pan(events: &[egui::Event], trackpad: &mut bool) -> egui::Vec2 {
+    let mut pan = egui::Vec2::ZERO;
+    for event in events {
+        if let egui::Event::MouseWheel {
+            unit,
+            delta,
+            modifiers,
+            ..
+        } = event
+            && !(modifiers.ctrl || modifiers.command)
+        {
+            *trackpad = *unit == egui::MouseWheelUnit::Point;
+            if *trackpad {
+                pan += *delta;
+            }
+        }
+    }
+    pan
+}
+
 /// The factor two fingers on a touchscreen zoom by in this frame, 1 without them.
 /// The first finger moves the pointer as the mouse does, so the image follows it
 /// and the zoom keeps the pixel under it where it is.
@@ -1383,6 +1407,37 @@ mod tests {
         assert!((zoom(touch(1, Move, 260.)) - 0.5).abs() < 1e-5);
         assert_eq!(zoom(touch(1, End, 260.)), 1.);
         assert_eq!(zoom(touch(0, Move, 300.)), 1.);
+    }
+
+    /// Two fingers on a trackpad move the image, the wheel of a mouse does not, and
+    /// neither does a trackpad with Ctrl or Cmd held
+    #[test]
+    fn two_fingers_on_a_trackpad_pan() {
+        let wheel = |unit, x, y, modifiers| egui::Event::MouseWheel {
+            unit,
+            delta: egui::vec2(x, y),
+            phase: egui::TouchPhase::Move,
+            modifiers,
+        };
+        let none = egui::Modifiers::NONE;
+        let (points, lines) = (egui::MouseWheelUnit::Point, egui::MouseWheelUnit::Line);
+        let mut trackpad = false;
+        let pan = trackpad_pan(
+            &[wheel(points, 3., -4., none), wheel(points, 1., -2., none)],
+            &mut trackpad,
+        );
+        assert_eq!((pan, trackpad), (egui::vec2(4., -6.), true));
+        // a frame without scrolling, where egui still smooths what came before
+        assert_eq!(trackpad_pan(&[], &mut trackpad), egui::Vec2::ZERO);
+        assert!(trackpad, "the trackpad scrolled last");
+        // through the images
+        for held in [egui::Modifiers::CTRL, egui::Modifiers::COMMAND] {
+            let pan = trackpad_pan(&[wheel(points, 0., 5., held)], &mut trackpad);
+            assert_eq!(pan, egui::Vec2::ZERO);
+        }
+        assert!(trackpad, "browsing leaves it");
+        let pan = trackpad_pan(&[wheel(lines, 0., 1., none)], &mut trackpad);
+        assert_eq!((pan, trackpad), (egui::Vec2::ZERO, false));
     }
 
     /// A pinch keeps the pixel under the cursor where it is
