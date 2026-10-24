@@ -1,0 +1,6 @@
+NDims = 3
+DimSize = 181 217 3
+ElementType = MET_UCHAR
+ElementSpacing = 1.0 1.0 1.0
+ElementByteOrderMSB = False
+ElementDataFile = BrainProtonDensity3Slices.raw

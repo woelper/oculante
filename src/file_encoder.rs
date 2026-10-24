@@ -4,10 +4,10 @@
 
 use crate::ui::EguiExt;
 use anyhow::Result;
+use egui::Ui;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, PngEncoder};
 use image::{DynamicImage, ImageEncoder};
-use notan::egui::Ui;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufWriter;
@@ -17,9 +17,9 @@ use strum::{Display, EnumIter};
 #[derive(Default, Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Display, EnumIter)]
 
 pub enum CompressionLevel {
-    Best,
     #[default]
     Default,
+    Best,
     Fast,
 }
 
@@ -29,6 +29,7 @@ pub enum FileEncoder {
     Png { compressionlevel: CompressionLevel },
     Bmp,
     WebP,
+    Avif,
 }
 
 impl Default for FileEncoder {
@@ -64,6 +65,12 @@ impl FileEncoder {
     }
 
     pub fn save(&self, image: &DynamicImage, path: &Path) -> Result<()> {
+        // PNG and AVIF take up to 16 bit per channel, floats are stored that way
+        let sixteen_bit = || match image {
+            DynamicImage::ImageRgb32F(_) => std::borrow::Cow::Owned(image.to_rgb16().into()),
+            DynamicImage::ImageRgba32F(_) => std::borrow::Cow::Owned(image.to_rgba16().into()),
+            _ => std::borrow::Cow::Borrowed(image),
+        };
         match self {
             FileEncoder::Jpg { quality } => {
                 let w = File::create(path)?;
@@ -81,11 +88,13 @@ impl FileEncoder {
                     },
                     image::codecs::png::FilterType::default(),
                 );
+                // in the layout the image has
+                let image = sixteen_bit();
                 encoder.write_image(
                     image.as_bytes(),
                     image.width(),
                     image.height(),
-                    image::ExtendedColorType::Rgba8,
+                    image.color().into(),
                 )?;
             }
             FileEncoder::Bmp => {
@@ -94,8 +103,10 @@ impl FileEncoder {
             FileEncoder::WebP => {
                 image.save_with_format(path, image::ImageFormat::WebP)?;
             }
+            FileEncoder::Avif => {
+                sixteen_bit().save_with_format(path, image::ImageFormat::Avif)?;
+            }
         }
-
         Ok(())
     }
 
@@ -105,11 +116,36 @@ impl FileEncoder {
                 ui.label("Quality");
                 ui.styled_slider(quality, 0..=100);
             }
-            FileEncoder::Png {
-                compressionlevel: _,
-            } => {}
+            FileEncoder::Png { compressionlevel } => {
+                ui.label("Compression Level");
+                ui.horizontal_centered(|ui| {
+                    let mut level = match *compressionlevel {
+                        CompressionLevel::Fast => 0,
+                        CompressionLevel::Default => 1,
+                        CompressionLevel::Best => 2,
+                    };
+
+                    ui.styled_slider(&mut level, 0..=2);
+
+                    let label = match level {
+                        0 => "(Fast)",
+                        1 => "(Default)",
+                        2 => "(Best)",
+                        _ => unreachable!(),
+                    };
+
+                    *compressionlevel = match level {
+                        0 => CompressionLevel::Fast,
+                        1 => CompressionLevel::Default,
+                        _ => CompressionLevel::Best,
+                    };
+
+                    ui.label(label);
+                });
+            }
             FileEncoder::Bmp => {}
             FileEncoder::WebP => {}
+            FileEncoder::Avif => {}
         }
     }
 }
