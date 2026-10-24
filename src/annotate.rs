@@ -674,17 +674,29 @@ fn extent(a: &Annotation, t: Transform, grow: f32) -> Option<[f32; 4]> {
     )
 }
 
-/// The ones that are shown and lie wholly inside the box between two corners in the
-/// edited image, their lines not counted
+/// The ones that are shown and have at least half of their area inside the box between two
+/// corners in the edited image, with their lines not counted. The area is that of the bounding
+/// box of the points they cover. One with no height or no width is in or out along that side,
+/// depending on whether it lies within the box.
 fn in_box(annotations: &[Annotation], mapping: &Mapping, a: [f32; 2], b: [f32; 2]) -> Vec<usize> {
     let (left, top) = (a[0].min(b[0]), a[1].min(b[1]));
     let (right, bottom) = (a[0].max(b[0]), a[1].max(b[1]));
+    // the part of lo..hi within from..to, 0 to 1; a flat one is in or out
+    let covered = |lo: f32, hi: f32, from: f32, to: f32| {
+        let overlap = hi.min(to) - lo.max(from);
+        if hi > lo {
+            overlap.max(0.) / (hi - lo)
+        } else {
+            f32::from(overlap >= 0.)
+        }
+    };
     (0..annotations.len())
-        .filter(|i| {
-            let x = &annotations[*i];
+        .filter(|&i| {
+            let x = &annotations[i];
             !x.hidden
-                && extent(x, x.transform(mapping), 0.)
-                    .is_some_and(|e| e[0] >= left && e[1] >= top && e[2] <= right && e[3] <= bottom)
+                && extent(x, x.transform(mapping), 0.).is_some_and(|e| {
+                    covered(e[0], e[2], left, right) * covered(e[1], e[3], top, bottom) >= 0.5
+                })
         })
         .collect()
 }
@@ -1070,7 +1082,7 @@ impl Tool {
 
     fn hint(self) -> &'static str {
         match self {
-            Tool::Select => "Click what to change, drag a box around what to select",
+            Tool::Select => "Click what to change, drag a box over what to select",
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
             Tool::Frame => "Drag a frame around something, with Shift a square",
             Tool::Circle => "Drag a circle around something, with Shift a round one",
@@ -2705,29 +2717,57 @@ mod tests {
     }
 
     #[test]
-    fn a_box_selects_what_is_wholly_in_it() {
+    fn a_box_selects_what_is_mostly_in_it() {
         let mapping = Mapping::new(&[], (400, 300));
+        let pick = |list: &[Annotation], a: [f32; 2], b: [f32; 2]| in_box(list, &mapping, a, b);
         let mut annotations = vec![
+            // Covers 10,10 to 50,40
             arrow_at([10, 10], [40, 30]),
+            // Covers 200,100 to 300,200
             arrow_at([200, 100], [100, 100]),
         ];
-        // around the first, over half of the second
-        assert_eq!(
-            in_box(&annotations, &mapping, [0., 0.], [250., 150.]),
-            vec![0]
-        );
-        // from any corner
-        assert_eq!(
-            in_box(&annotations, &mapping, [400., 300.], [0., 0.]),
-            vec![0, 1]
-        );
+
+        // How much of the second arrow is in the box
+        // A quarter: half across, half down
+        assert_eq!(pick(&annotations, [0., 0.], [250., 150.]), vec![0]);
+        // Slightly less than half: 0.49 across, all down
+        assert_eq!(pick(&annotations, [0., 0.], [249., 200.]), vec![0]);
+        // Half: all across, half down
+        assert_eq!(pick(&annotations, [0., 0.], [300., 150.]), vec![0, 1]);
+        // Half: half across, all down
+        assert_eq!(pick(&annotations, [0., 0.], [250., 200.]), vec![0, 1]);
+        // All: both arrows entirely in the box
+        assert_eq!(pick(&annotations, [0., 0.], [400., 300.]), vec![0, 1]);
+
+        // A flat arrow has no height, so it is either in or out vertically
+        // Covers 20,50 to 120,50
+        let flat = [arrow_at([20, 50], [100, 0])];
+        // Half of its length, within the box vertically
+        assert_eq!(pick(&flat, [0., 0.], [70., 100.]), vec![0]);
+        // Slightly less than half of its length
+        assert!(pick(&flat, [0., 0.], [69., 100.]).is_empty());
+        // All of its length, but the box is below it
+        assert!(pick(&flat, [0., 60.], [200., 100.]).is_empty());
+
+        // The same for an upright arrow, which has no width
+        // Covers 50,20 to 50,120
+        let upright = [arrow_at([50, 20], [0, 100])];
+        // Half of its length, within the box horizontally
+        assert_eq!(pick(&upright, [0., 0.], [100., 70.]), vec![0]);
+        // Slightly less than half of its length
+        assert!(pick(&upright, [0., 0.], [100., 69.]).is_empty());
+        // All of its length, but the box is to the right of it
+        assert!(pick(&upright, [60., 0.], [100., 200.]).is_empty());
+
+        // The corners of the box can be given in any order
+        assert_eq!(pick(&annotations, [400., 300.], [0., 0.]), vec![0, 1]);
+
+        // Hidden annotations are left out
         annotations[1].hidden = true;
-        assert_eq!(
-            in_box(&annotations, &mapping, [0., 0.], [400., 300.]),
-            vec![0]
-        );
-        // the box is in the edited image, here a quarter narrower on the left
+        assert_eq!(pick(&annotations, [0., 0.], [400., 300.]), vec![0]);
         annotations[1].hidden = false;
+
+        // The box is in the edited image, here cropped a quarter off the left
         let crop = [item(ImageOperation::Crop([2500, 0, 0, 0]))];
         let cropped = Mapping::new(&crop, (400, 300));
         assert_eq!(
