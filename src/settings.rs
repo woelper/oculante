@@ -73,6 +73,9 @@ pub struct PersistentSettings {
     pub use_mipmaps: bool,
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
+    /// Two fingers on a trackpad move the image instead of zooming, on macOS where a
+    /// pinch zooms
+    pub trackpad_pans: bool,
     /// Automatically scale/zoom the image to fit the frame
     pub auto_scale: bool,
     pub borderless: bool,
@@ -116,6 +119,7 @@ impl Default for PersistentSettings {
             use_mipmaps: true,
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
+            trackpad_pans: true,
             auto_scale: false,
             borderless: false,
             min_window_size: (100, 100),

@@ -54,6 +54,8 @@ pub struct OculanteApp {
     /// True if egui owned the pointer when the current press started.
     /// Prevents image drag for the entire press duration.
     egui_started_press: bool,
+    /// True if two fingers on a trackpad scrolled last, not a mouse wheel
+    trackpad_scrolled: bool,
     /// Updates system theme during runtime
     last_system_theme: Option<egui::Theme>,
     /// When the current file was last checked for changes on disk
@@ -180,6 +182,7 @@ impl OculanteApp {
             compare_geometry: None,
             last_frame_was_compared_image: false,
             egui_started_press: false,
+            trackpad_scrolled: false,
             last_system_theme: None,
             last_file_check: Instant::now(),
             system_fonts: SystemFonts::Loaded,
@@ -859,8 +862,20 @@ impl eframe::App for OculanteApp {
         }
 
         // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch on a
-        // trackpad zooms, and so do two fingers on a touchscreen
-        let scroll_delta = ctx.input(|i| i.smooth_scroll_delta.y);
+        // trackpad zooms, and so do two fingers on a touchscreen. On macOS, where the
+        // pinch works, two fingers on a trackpad move the image instead, unless the
+        // settings say they zoom as everywhere else.
+        let pan = if cfg!(target_os = "macos") && self.state.persistent_settings.trackpad_pans {
+            ctx.input(|i| trackpad_pan(&i.events, &mut self.trackpad_scrolled))
+        } else {
+            self.trackpad_scrolled = false;
+            egui::Vec2::ZERO
+        };
+        let scroll_delta = if self.trackpad_scrolled {
+            0.
+        } else {
+            ctx.input(|i| i.smooth_scroll_delta.y)
+        };
         let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events));
         let pinch = pinch * ctx.input(touch_zoom);
         if !self.state.pointer_over_ui {
@@ -869,6 +884,7 @@ impl eframe::App for OculanteApp {
                 -1 => prev_image(&mut self.state),
                 _ => {}
             }
+            self.state.image_geometry.offset += Vector2::new(pan.x, pan.y);
             if scroll_delta != 0.0 {
                 let divisor = if cfg!(target_os = "macos") { 1.5 } else { 10. };
                 let delta = zoomratio(
