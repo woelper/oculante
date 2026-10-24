@@ -1782,6 +1782,36 @@ def test_jpeg_is_edited_without_alpha(binary):
     assert all(u == "Rgb8 as Rgb8" for u in uploads), f"uploaded as {uploads}"
 
 
+def test_new_noise(binary):
+    """The noise stays as it is until "New noise" rolls a new seed."""
+    with start(binary, "new_noise", image("moss.jpg")) as app:
+        open_edit_panel(app)
+        app.click(850, 86)  # the search of the filter list
+        app.settle(0.5)
+        app.x("xdotool", "type", "--delay", "80", "noise")
+        app.settle(0.8)
+        app.click(891, 120)  # add "Noise", the only one found
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        # the image, above the frame counter of a debug build
+        area = (140, 40, 600, 450)
+        noisy = app.shot("noisy")
+        app.move(0.3, 0.6)
+        app.settle(1.5)
+        still = changed_pixels_in(noisy, app.shot("still"), area)
+        assert still < 500, f"the noise changed by itself ({still} pixels)"
+        app.click(893, 176)  # "New noise"
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        new = app.shot("new")
+        changed = changed_pixels_in(noisy, new, area)
+        assert changed > 50_000, f"new noise changed only {changed} pixels"
+        # the same image with other noise, where it was: the button that is in the
+        # same place without this one opens paint mode, the panel grows over the image
+        level, wanted = mean_level(new, area), mean_level(noisy, area)
+        assert abs(level - wanted) < 2, f"more than the noise changed ({level:.1f} instead of {wanted:.1f})"
+
+
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
     """Pixels of an image file that differ on screen, where it fits best within margin of x, y."""
     crop = screenshot[:-4] + "_at.png"
@@ -1997,6 +2027,7 @@ TESTS = [
     test_keep_edits,
     test_single_frame_gif_is_editable,
     test_jpeg_is_edited_without_alpha,
+    test_new_noise,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,
