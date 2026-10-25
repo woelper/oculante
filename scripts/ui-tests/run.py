@@ -1552,8 +1552,8 @@ def test_annotation_cards(binary):
 
 def test_annotation_select(binary):
     """With nothing selected Esc goes from a tool that draws to Select, which is
-    tinted. In it a box selects what lies wholly inside, also with Shift on top of
-    what is selected, a click besides everything drops the selection, and the cards
+    tinted. In it a box selects what is at least half inside, also with Shift on top
+    of what is selected, a click besides everything drops the selection, and the cards
     of what is selected are tinted. Esc then stops annotating, as folding the
     Annotations does, and opening them again selects as long as there are any."""
     tint = (77, 26, 41)
@@ -1611,6 +1611,20 @@ def test_annotation_select(binary):
         app.settle(1.0)
         dropped = app.shot("dropped")
         assert not any(selected(dropped, box) for box in frames), "a click besides them kept the frames"
+        # a box over more than half of the first frame takes it, over less it does not
+        app.drag(180, 80, 265, 190, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        most = app.shot("most")
+        assert selected(most, frames[0]), "a box over two thirds of the frame did not select it"
+        assert not selected(most, frames[1]), "a box besides the second frame selected it"
+        app.click(650, 500)
+        app.drag(180, 80, 235, 190, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        less = app.shot("less")
+        assert not selected(less, frames[0]), "a box over a third of the frame selected it"
+        app.click(650, 500)
         # the circle by a click on its line, then the frames with Shift on top
         app.click(250, 350)
         app.x("xdotool", "keydown", "shift")
