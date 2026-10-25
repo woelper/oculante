@@ -107,13 +107,55 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         }
                                     }, ui);
 
-                                    configuration_item_ui("Number of images to cache", "Keeps this many images in memory for faster opening.", |ui| {
+                                    configuration_item_ui("Number of images to cache", "Keeps up to this many images in memory for faster opening, as many as fit into the memory for the cache.", |ui| {
                                         if ui
                                         .add(egui::DragValue::new(&mut state.persistent_settings.max_cache).range(0..=10000))
                                         .changed()
                                         {
                                             state.player.cache.cache_size = state.persistent_settings.max_cache;
                                             state.player.cache.clear();
+                                        }
+                                    }, ui);
+
+                                    let cache_mb = (state.player.cache.byte_budget >> 20) as u32;
+                                    configuration_item_ui("Maximum cache memory", &format!("How much memory the cached images may take, {cache_mb} MB now. Automatic is a sixteenth of the memory, 256 MB to 1 GB."), |ui| {
+                                        use crate::cache::CacheMemory;
+                                        let total = state.player.cache.total_memory.max(1);
+                                        let total_mb = ((total >> 20) as u32).max(64);
+                                        let memory = &mut state.persistent_settings.cache_memory;
+                                        let before = *memory;
+                                        // the other units start with the memory there is now
+                                        let percent = match *memory {
+                                            CacheMemory::Percent(percent) => percent,
+                                            _ => (state.player.cache.byte_budget as u64 * 100 / total).clamp(1, 90) as u8,
+                                        };
+                                        let megabytes = match *memory {
+                                            CacheMemory::Megabytes(megabytes) => megabytes,
+                                            _ => cache_mb.clamp(64, total_mb),
+                                        };
+                                        let unit = match memory {
+                                            CacheMemory::Auto => "Automatic",
+                                            CacheMemory::Percent(_) => "Percent",
+                                            CacheMemory::Megabytes(_) => "Megabytes",
+                                        };
+                                        egui::ComboBox::from_id_salt("Cache memory")
+                                        .selected_text(unit)
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(memory, CacheMemory::Auto, "Automatic");
+                                            ui.selectable_value(memory, CacheMemory::Percent(percent), "Percent");
+                                            ui.selectable_value(memory, CacheMemory::Megabytes(megabytes), "Megabytes");
+                                        });
+                                        match memory {
+                                            CacheMemory::Auto => {}
+                                            CacheMemory::Percent(percent) => {
+                                                ui.add(egui::DragValue::new(percent).range(1..=90).suffix(" %"));
+                                            }
+                                            CacheMemory::Megabytes(megabytes) => {
+                                                ui.add(egui::DragValue::new(megabytes).range(64..=total_mb).suffix(" MB"));
+                                            }
+                                        }
+                                        if *memory != before {
+                                            state.player.cache.set_memory(*memory);
                                         }
                                     }, ui);
 
@@ -160,6 +202,11 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 
                                     configuration_item_ui("Zoom multiplier", "Multiplier of how fast the image will change size when using your mouse wheel or trackpad.", |ui| {
                                         ui.add(egui::DragValue::new(&mut state.persistent_settings.zoom_multiplier).range(0.05..=10.0).speed(0.01));
+                                    }, ui);
+
+                                    #[cfg(target_os = "macos")]
+                                    configuration_item_ui("Pan with two fingers", "Two fingers on the trackpad move the image and a pinch zooms. Off, two fingers zoom like the mouse wheel, as on other systems.", |ui| {
+                                        ui.styled_checkbox(&mut state.persistent_settings.trackpad_pans, "");
                                     }, ui);
 
                                     configuration_item_ui(

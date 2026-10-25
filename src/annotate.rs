@@ -1,4 +1,5 @@
-//! Arrows, frames, text, pen lines and hidden areas on top of the edited image.
+//! Arrows, frames, circles, stamps, text, pen lines and hidden areas on top of the
+//! edited image.
 //!
 //! Annotations are kept in pixels of the image as it was loaded. Crops, resizes,
 //! rotations and flips take them along with what they point at. Each one keeps its
@@ -91,6 +92,73 @@ pub enum Shape {
     Pen(Vec<[i32; 2]>),
     /// Hides what is below it
     Redact { size: [i32; 2], style: Redaction },
+    /// A symbol of the icon font in a square as large as the annotation is wide
+    Stamp(Stamp),
+}
+
+/// The symbols of stamps. Saved by name, the icon font may change.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+pub enum Stamp {
+    Check,
+    Cross,
+    Warning,
+    Error,
+    Info,
+    Plus,
+    Pin,
+    Clock,
+    Eye,
+    Search,
+}
+
+impl Stamp {
+    pub const ALL: [Stamp; 10] = [
+        Stamp::Check,
+        Stamp::Cross,
+        Stamp::Warning,
+        Stamp::Error,
+        Stamp::Info,
+        Stamp::Plus,
+        Stamp::Pin,
+        Stamp::Clock,
+        Stamp::Eye,
+        Stamp::Search,
+    ];
+
+    /// On the tiles until others are picked
+    pub const TILES: [Stamp; 3] = [Stamp::Check, Stamp::Cross, Stamp::Warning];
+
+    fn name(self) -> &'static str {
+        match self {
+            Stamp::Check => "Check",
+            Stamp::Cross => "Cross",
+            Stamp::Warning => "Warning",
+            Stamp::Error => "Error",
+            Stamp::Info => "Info",
+            Stamp::Plus => "Plus",
+            Stamp::Pin => "Pin",
+            Stamp::Clock => "Clock",
+            Stamp::Eye => "Eye",
+            Stamp::Search => "Search",
+        }
+    }
+
+    /// Its letter in the icon font
+    fn glyph(self) -> &'static str {
+        use crate::icons::*;
+        match self {
+            Stamp::Check => CHECK,
+            Stamp::Cross => X,
+            Stamp::Warning => WARNING_CIRCLE,
+            Stamp::Error => ERROR_CIRCLE,
+            Stamp::Info => INFO,
+            Stamp::Plus => PLUS,
+            Stamp::Pin => LOCATION_PIN,
+            Stamp::Clock => CLOCK,
+            Stamp::Eye => EYE,
+            Stamp::Search => SEARCH,
+        }
+    }
 }
 
 /// How a redaction hides what is below it
@@ -214,6 +282,7 @@ impl Annotation {
             }
             Shape::Pen(points) => around(points),
             Shape::Text(text) => text_layout(text, self).map(|l| l.bounds),
+            Shape::Stamp(_) => around(&[[0, 0], [self.width as i32; 2]]),
         }
     }
 
@@ -228,7 +297,7 @@ impl Annotation {
                 half.max(arrow_head(self.line_width(), length).1) + outline
             }
             Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half + outline,
-            Shape::Text(_) => outline,
+            Shape::Text(_) | Shape::Stamp(_) => outline,
             Shape::Redact { .. } => 0.,
         }
     }
@@ -264,7 +333,18 @@ impl Annotation {
             }
             Shape::Pen(points) => points.is_empty(),
             Shape::Text(text) => text.trim().is_empty(),
+            Shape::Stamp(_) => self.width < 2,
         }
+    }
+
+    /// Puts its middle at `centre` in the image as it was loaded
+    fn centre_at(&mut self, centre: [f32; 2], original: (u32, u32)) {
+        let Some(b) = self.bounds() else { return };
+        self.set_start([0, 0], original);
+        let mut middle = Point::from_xy((b[0] + b[2]) / 2., (b[1] + b[3]) / 2.);
+        self.placement(original).map_point(&mut middle);
+        let start = [centre[0] - middle.x, centre[1] - middle.y];
+        self.set_start([start[0].round() as i32, start[1].round() as i32], original);
     }
 
     /// After it was drawn or moved: the anchor nearest to it, with the same start
@@ -307,6 +387,7 @@ impl Annotation {
             Shape::Ellipse(_) => "Circle".into(),
             Shape::Pen(_) => "Pen".into(),
             Shape::Redact { .. } => "Redacted".into(),
+            Shape::Stamp(stamp) => stamp.name().into(),
             Shape::Text(text) => {
                 let line = text.lines().next().unwrap_or_default();
                 let mut short: String = line.chars().take(16).collect();
@@ -674,17 +755,29 @@ fn extent(a: &Annotation, t: Transform, grow: f32) -> Option<[f32; 4]> {
     )
 }
 
-/// The ones that are shown and lie wholly inside the box between two corners in the
-/// edited image, their lines not counted
+/// The ones that are shown and have at least half of their area inside the box between two
+/// corners in the edited image, with their lines not counted. The area is that of the bounding
+/// box of the points they cover. One with no height or no width is in or out along that side,
+/// depending on whether it lies within the box.
 fn in_box(annotations: &[Annotation], mapping: &Mapping, a: [f32; 2], b: [f32; 2]) -> Vec<usize> {
     let (left, top) = (a[0].min(b[0]), a[1].min(b[1]));
     let (right, bottom) = (a[0].max(b[0]), a[1].max(b[1]));
+    // the part of lo..hi within from..to, 0 to 1; a flat one is in or out
+    let covered = |lo: f32, hi: f32, from: f32, to: f32| {
+        let overlap = hi.min(to) - lo.max(from);
+        if hi > lo {
+            overlap.max(0.) / (hi - lo)
+        } else {
+            f32::from(overlap >= 0.)
+        }
+    };
     (0..annotations.len())
-        .filter(|i| {
-            let x = &annotations[*i];
+        .filter(|&i| {
+            let x = &annotations[i];
             !x.hidden
-                && extent(x, x.transform(mapping), 0.)
-                    .is_some_and(|e| e[0] >= left && e[1] >= top && e[2] <= right && e[3] <= bottom)
+                && extent(x, x.transform(mapping), 0.).is_some_and(|e| {
+                    covered(e[0], e[2], left, right) * covered(e[1], e[3], top, bottom) >= 0.5
+                })
         })
         .collect()
 }
@@ -803,6 +896,20 @@ fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation, t: Transfo
                     resvg::render(&layout.tree, t, &mut layer.as_mut());
                 }
             }
+            Shape::Stamp(stamp) => {
+                if let Some(glyph) = stamp_path(*stamp, a.width as f32) {
+                    // around it, under the symbol as around a text
+                    if outline > 0. {
+                        let around = tiny_skia::Stroke {
+                            width: outline * 2.,
+                            ..stroke
+                        };
+                        layer.stroke_path(&glyph, &paint, &around, t, None);
+                    } else {
+                        layer.fill_path(&glyph, &paint, FillRule::Winding, t, None);
+                    }
+                }
+            }
             Shape::Text(_) | Shape::Redact { .. } => {}
         }
     }
@@ -834,6 +941,48 @@ fn frame_path(size: [i32; 2], radius: f32) -> Option<Path> {
     }
     frame.close();
     frame.finish()
+}
+
+/// The icon font, read once
+static ICONS: LazyLock<Option<ttf_parser::Face<'static>>> =
+    LazyLock::new(|| ttf_parser::Face::parse(crate::ICON_FONT, 0).ok());
+
+/// A stamp in a square this large, in the middle of it, as wide or as high
+fn stamp_path(stamp: Stamp, size: f32) -> Option<Path> {
+    struct Outline(PathBuilder);
+    impl ttf_parser::OutlineBuilder for Outline {
+        fn move_to(&mut self, x: f32, y: f32) {
+            self.0.move_to(x, y);
+        }
+        fn line_to(&mut self, x: f32, y: f32) {
+            self.0.line_to(x, y);
+        }
+        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+            self.0.quad_to(x1, y1, x, y);
+        }
+        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+            self.0.cubic_to(x1, y1, x2, y2, x, y);
+        }
+        fn close(&mut self) {
+            self.0.close();
+        }
+    }
+    let face = ICONS.as_ref()?;
+    let glyph = face.glyph_index(stamp.glyph().chars().next()?)?;
+    let mut outline = Outline(PathBuilder::new());
+    let b = face.outline_glyph(glyph, &mut outline)?;
+    let (w, h) = (b.width() as f32, b.height() as f32);
+    let scale = size / w.max(h).max(1.);
+    // the font goes up from its baseline
+    let fit = Transform::from_row(
+        scale,
+        0.,
+        0.,
+        -scale,
+        (size - w * scale) / 2. - b.x_min as f32 * scale,
+        (size - h * scale) / 2. + b.y_max as f32 * scale,
+    );
+    outline.0.finish()?.transform(fit)
 }
 
 /// A line through the points of a pen
@@ -1043,6 +1192,7 @@ pub enum Tool {
     Text,
     Pen,
     Redact,
+    Stamp(Stamp),
 }
 
 impl Tool {
@@ -1065,18 +1215,22 @@ impl Tool {
             Tool::Text => "Text",
             Tool::Pen => "Pen",
             Tool::Redact => "Redact",
+            Tool::Stamp(stamp) => stamp.name(),
         }
     }
 
     fn hint(self) -> &'static str {
         match self {
-            Tool::Select => "Click what to change, drag a box around what to select",
+            Tool::Select => "Click what to change, drag a box over what to select",
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
             Tool::Frame => "Drag a frame around something, with Shift a square",
             Tool::Circle => "Drag a circle around something, with Shift a round one",
             Tool::Text => "Click where the text goes, click a text to change it",
             Tool::Pen => "Draw freely",
             Tool::Redact => "Drag over what nobody should see",
+            Tool::Stamp(_) => {
+                "Click where it goes or drag how large, right-click for another symbol"
+            }
         }
     }
 
@@ -1089,6 +1243,7 @@ impl Tool {
             Tool::Text => Icon::Text,
             Tool::Pen => Icon::Pen,
             Tool::Redact => Icon::Pixelate,
+            Tool::Stamp(stamp) => Icon::Stamp(stamp),
         }
     }
 }
@@ -1104,6 +1259,7 @@ enum Icon {
     Pen,
     Pixelate,
     Fill,
+    Stamp(Stamp),
 }
 
 /// Draws an icon in the middle of `rect`, in lines as thick as those of the icon
@@ -1179,6 +1335,15 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
         Icon::Fill => {
             painter.rect_filled(square, 1., color);
         }
+        Icon::Stamp(stamp) => {
+            painter.text(
+                at(8., 8.),
+                egui::Align2::CENTER_CENTER,
+                stamp.glyph(),
+                egui::FontId::proportional(14. * scale),
+                color,
+            );
+        }
     }
 }
 
@@ -1209,6 +1374,8 @@ pub struct AnnotateUi {
     pub width: u32,
     /// For new text
     pub text_size: u32,
+    /// For a new stamp that is clicked, not dragged
+    stamp_size: u32,
     pub redaction: Redaction,
     /// The rest of what new annotations look like, as the one changed last
     outline: u32,
@@ -1245,6 +1412,7 @@ impl Default for AnnotateUi {
             color: [235, 40, 40, 255],
             width: 0,
             text_size: 0,
+            stamp_size: 0,
             redaction: Redaction::Pixelate,
             outline: 0,
             outline_color: white(),
@@ -1273,6 +1441,7 @@ impl AnnotateUi {
         if self.width == 0 && original.0 > 0 && original.1 > 0 {
             self.width = (original.0.min(original.1) / 120).clamp(3, 80);
             self.text_size = self.width * 6;
+            self.stamp_size = self.width * 8;
             self.blocks = (self.width * 3).max(8);
         }
     }
@@ -1286,6 +1455,7 @@ impl AnnotateUi {
             Tool::Circle => (Shape::Ellipse([0, 0]), self.color, self.width),
             Tool::Pen => (Shape::Pen(vec![[0, 0]]), self.color, self.width),
             Tool::Text => (Shape::Text(String::new()), self.color, self.text_size),
+            Tool::Stamp(stamp) => (Shape::Stamp(stamp), self.color, self.stamp_size),
             Tool::Redact => {
                 let style = self.redaction;
                 let shape = Shape::Redact {
@@ -1329,6 +1499,7 @@ impl AnnotateUi {
                 self.radius = a.radius;
             }
             Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => self.width = a.width,
+            Shape::Stamp(_) => self.stamp_size = a.width,
         }
         self.color = a.color;
         self.outline = a.outline;
@@ -1383,10 +1554,15 @@ impl AnnotateUi {
 }
 
 /// The annotations part of the edit panel: a button to select and a tile for each
-/// tool in a box that folds away, then a card for each annotation, the one in front
-/// first. Like the cards of the filters they stay when it is folded, as they are
-/// still on the image. Returns whether the edits changed.
-pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi) -> bool {
+/// tool in a box that folds away, a row of three `stamps` below, then a card for each
+/// annotation, the one in front first. Like the cards of the filters they stay when
+/// it is folded, as they are still on the image. Returns whether the edits changed.
+pub fn panel_ui(
+    ui: &mut Ui,
+    stack: &mut Vec<ImgOpItem>,
+    state: &mut AnnotateUi,
+    stamps: &mut [Stamp; 3],
+) -> bool {
     let mut changed = false;
     state.pointed_card = None;
     // before the lists of this frame are shown, which close on Esc
@@ -1425,6 +1601,33 @@ pub fn panel_ui(ui: &mut Ui, stack: &mut Vec<ImgOpItem>, state: &mut AnnotateUi)
                             }
                         });
                     }
+                    // the stamps, a right-click picks another symbol for a tile
+                    ui.horizontal(|ui| {
+                        for slot in stamps.iter_mut() {
+                            let tool = Tool::Stamp(*slot);
+                            let button = egui::Button::new("").min_size(egui::vec2(width, 40.));
+                            let response = lit(ui, state.tool == Some(tool), button);
+                            let color = ui.style().interact(&response).fg_stroke.color;
+                            paint_icon(ui.painter(), response.rect, tool.icon(), color, 1.5);
+                            let response =
+                                response.on_hover_text(format!("{}\n{}", tool.name(), tool.hint()));
+                            if response.clicked() {
+                                picked = Some(tool);
+                            }
+                            response.context_menu(|ui| {
+                                for stamp in Stamp::ALL {
+                                    let name = format!("{}  {}", stamp.glyph(), stamp.name());
+                                    if ui.selectable_label(*slot == stamp, name).clicked() {
+                                        if state.tool == Some(tool) {
+                                            state.tool = Some(Tool::Stamp(stamp));
+                                        }
+                                        *slot = stamp;
+                                        ui.close();
+                                    }
+                                }
+                            });
+                        }
+                    });
                     if let Some(tool) = picked {
                         let (annotations, created) = annotations_or_new(stack);
                         changed |= created;
@@ -1718,6 +1921,27 @@ fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
                 4..=400,
             );
             font_ui(ui, &mut a.font, id);
+        }
+        Shape::Stamp(stamp) => {
+            // the tiles pick the next one
+            if id != usize::MAX {
+                ui.horizontal_wrapped(|ui| {
+                    for other in Stamp::ALL {
+                        if icon_button(ui, *stamp == other, Icon::Stamp(other))
+                            .on_hover_text(other.name())
+                            .clicked()
+                        {
+                            *stamp = other;
+                        }
+                    }
+                });
+            }
+            slider_row(
+                ui,
+                format!("{PENCIL_SIMPLE_LINE} Size"),
+                &mut a.width,
+                8..=1000,
+            );
         }
         Shape::Redact { style, .. } => {
             ui.horizontal(|ui| {
@@ -2118,6 +2342,10 @@ pub fn canvas_ui(
                     None => {
                         if let Some(mut a) = state.template(tool) {
                             a.offset = round(o);
+                            if matches!(a.shape, Shape::Stamp(_)) {
+                                a.stand_upright(mapping);
+                                a.centre_at(o, original);
+                            }
                             annotations.push(a);
                             let index = annotations.len() - 1;
                             state.selected = vec![index];
@@ -2151,6 +2379,20 @@ pub fn canvas_ui(
                                 if points.last() != Some(&at) {
                                     points.push(at);
                                 }
+                            }
+                            // a square from where the drag started, a click places one
+                            // as large as the last
+                            Shape::Stamp(_) => {
+                                let side = d[0].abs().max(d[1].abs());
+                                let centre = if side * geo.scale < 4. {
+                                    a.width = state.stamp_size;
+                                    *from
+                                } else {
+                                    a.width = side.round() as u32;
+                                    let half = |d: f32| (side / 2.).copysign(d);
+                                    [from[0] + half(d[0]), from[1] + half(d[1])]
+                                };
+                                a.centre_at(centre, original);
                             }
                             Shape::Text(_) => {}
                         }
@@ -2215,6 +2457,9 @@ pub fn canvas_ui(
                     state.remove(annotations, vec![index]);
                 } else if let Some(a) = annotations.get_mut(index) {
                     a.reanchor(original);
+                    if matches!(a.shape, Shape::Stamp(_)) {
+                        state.stamp_size = a.width;
+                    }
                 }
             }
             Drag::Move { .. } => {
@@ -2395,7 +2640,7 @@ fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
             }
             points => polyline(points),
         },
-        Shape::Text(_) | Shape::Redact { .. } => {
+        Shape::Text(_) | Shape::Redact { .. } | Shape::Stamp(_) => {
             let Some(b) = a.bounds() else { return vec![] };
             let by = gap + o;
             let (l, t, r, b) = (b[0] - by, b[1] - by, b[2] + by, b[3] + by);
@@ -2613,7 +2858,7 @@ fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
             [only] => to_line(*only, *only) <= near,
             points => points.windows(2).any(|w| to_line(w[0], w[1]) <= near),
         },
-        Shape::Text(_) | Shape::Redact { .. } => a.bounds().is_some_and(|b| {
+        Shape::Text(_) | Shape::Redact { .. } | Shape::Stamp(_) => a.bounds().is_some_and(|b| {
             q.x >= b[0] - slack && q.y >= b[1] - slack && q.x <= b[2] + slack && q.y <= b[3] + slack
         }),
     }
@@ -2705,29 +2950,57 @@ mod tests {
     }
 
     #[test]
-    fn a_box_selects_what_is_wholly_in_it() {
+    fn a_box_selects_what_is_mostly_in_it() {
         let mapping = Mapping::new(&[], (400, 300));
+        let pick = |list: &[Annotation], a: [f32; 2], b: [f32; 2]| in_box(list, &mapping, a, b);
         let mut annotations = vec![
+            // Covers 10,10 to 50,40
             arrow_at([10, 10], [40, 30]),
+            // Covers 200,100 to 300,200
             arrow_at([200, 100], [100, 100]),
         ];
-        // around the first, over half of the second
-        assert_eq!(
-            in_box(&annotations, &mapping, [0., 0.], [250., 150.]),
-            vec![0]
-        );
-        // from any corner
-        assert_eq!(
-            in_box(&annotations, &mapping, [400., 300.], [0., 0.]),
-            vec![0, 1]
-        );
+
+        // How much of the second arrow is in the box
+        // A quarter: half across, half down
+        assert_eq!(pick(&annotations, [0., 0.], [250., 150.]), vec![0]);
+        // Slightly less than half: 0.49 across, all down
+        assert_eq!(pick(&annotations, [0., 0.], [249., 200.]), vec![0]);
+        // Half: all across, half down
+        assert_eq!(pick(&annotations, [0., 0.], [300., 150.]), vec![0, 1]);
+        // Half: half across, all down
+        assert_eq!(pick(&annotations, [0., 0.], [250., 200.]), vec![0, 1]);
+        // All: both arrows entirely in the box
+        assert_eq!(pick(&annotations, [0., 0.], [400., 300.]), vec![0, 1]);
+
+        // A flat arrow has no height, so it is either in or out vertically
+        // Covers 20,50 to 120,50
+        let flat = [arrow_at([20, 50], [100, 0])];
+        // Half of its length, within the box vertically
+        assert_eq!(pick(&flat, [0., 0.], [70., 100.]), vec![0]);
+        // Slightly less than half of its length
+        assert!(pick(&flat, [0., 0.], [69., 100.]).is_empty());
+        // All of its length, but the box is below it
+        assert!(pick(&flat, [0., 60.], [200., 100.]).is_empty());
+
+        // The same for an upright arrow, which has no width
+        // Covers 50,20 to 50,120
+        let upright = [arrow_at([50, 20], [0, 100])];
+        // Half of its length, within the box horizontally
+        assert_eq!(pick(&upright, [0., 0.], [100., 70.]), vec![0]);
+        // Slightly less than half of its length
+        assert!(pick(&upright, [0., 0.], [100., 69.]).is_empty());
+        // All of its length, but the box is to the right of it
+        assert!(pick(&upright, [60., 0.], [100., 200.]).is_empty());
+
+        // The corners of the box can be given in any order
+        assert_eq!(pick(&annotations, [400., 300.], [0., 0.]), vec![0, 1]);
+
+        // Hidden annotations are left out
         annotations[1].hidden = true;
-        assert_eq!(
-            in_box(&annotations, &mapping, [0., 0.], [400., 300.]),
-            vec![0]
-        );
-        // the box is in the edited image, here a quarter narrower on the left
+        assert_eq!(pick(&annotations, [0., 0.], [400., 300.]), vec![0]);
         annotations[1].hidden = false;
+
+        // The box is in the edited image, here cropped a quarter off the left
         let crop = [item(ImageOperation::Crop([2500, 0, 0, 0]))];
         let cropped = Mapping::new(&crop, (400, 300));
         assert_eq!(
@@ -2825,6 +3098,18 @@ mod tests {
             Box::new(|a| a[1].offset = [10, 10]),
             Box::new(|a| a[1].font.weight = 700),
             Box::new(|a| a[1].outline = 0),
+            // a stamp, another symbol, larger, with an outline
+            Box::new(|a| {
+                a.push(Annotation::new(
+                    Shape::Stamp(Stamp::Check),
+                    [255, 0, 255, 255],
+                    50,
+                    [230, 20],
+                ))
+            }),
+            Box::new(|a| a[6].shape = Shape::Stamp(Stamp::Warning)),
+            Box::new(|a| a[6].width = 80),
+            Box::new(|a| a[6].outline = 5),
         ];
         for (i, change) in changes.iter().enumerate() {
             change(&mut annotations);
@@ -3092,6 +3377,7 @@ mod tests {
                 size: [30, 20],
                 style: Redaction::Fill,
             },
+            Shape::Stamp(Stamp::Check),
         ];
         let looks = [(0, 0), (4, 0), (0, 10), (4, 100)];
         for (shape, (thick, radius)) in shapes
@@ -3257,9 +3543,16 @@ mod tests {
             Shape::Pen(vec![[0, 0], [40, 30], [90, -10]]),
             Shape::Pen(vec![[0, 0]]),
             Shape::Text("Hi".into()),
+            Shape::Stamp(Stamp::Warning),
         ];
         for shape in shapes {
-            let mut a = Annotation::new(shape, [255, 0, 0, 255], 6, [100, 100]);
+            // as large as a stamp is, the width of a line for the others
+            let width = if matches!(shape, Shape::Stamp(_)) {
+                60
+            } else {
+                6
+            };
+            let mut a = Annotation::new(shape, [255, 0, 0, 255], width, [100, 100]);
             a.outline = 5;
             a.radius = 10;
             let t = a.transform(&mapping);
@@ -3357,6 +3650,126 @@ mod tests {
         assert!(
             state.template(Tool::Select).is_none(),
             "selecting draws nothing"
+        );
+    }
+
+    #[test]
+    fn every_stamp_fills_the_middle_of_its_square() {
+        for stamp in Stamp::ALL {
+            let path = stamp_path(stamp, 100.).unwrap_or_else(|| panic!("{stamp:?} has no glyph"));
+            let b = path.bounds();
+            let (w, h) = (b.width(), b.height());
+            assert!((w.max(h) - 100.).abs() < 0.5, "{stamp:?} is {w}x{h}");
+            assert!(w.min(h) > 30., "{stamp:?} is {w}x{h}");
+            let middle = ((b.left() + b.right()) / 2., (b.top() + b.bottom()) / 2.);
+            assert!(
+                (middle.0 - 50.).abs() < 0.5 && (middle.1 - 50.).abs() < 0.5,
+                "{stamp:?} is around {middle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn stamps_are_drawn_in_their_square_with_their_outline() {
+        let img = RgbaImage::from_pixel(100, 100, Rgba([255; 4]));
+        let mapping = Mapping::new(&[], (100, 100));
+        let mut stamp =
+            Annotation::new(Shape::Stamp(Stamp::Warning), [255, 0, 0, 255], 60, [20, 20]);
+        let count = |drawn: &RgbaImage, color: [u8; 4], inside: [u32; 2]| {
+            let mut count = [0, 0];
+            for (x, y, p) in drawn.enumerate_pixels() {
+                if p.0 == color {
+                    let within =
+                        (inside[0]..inside[1]).contains(&x) && (inside[0]..inside[1]).contains(&y);
+                    count[within as usize] += 1;
+                }
+            }
+            count
+        };
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&stamp), &mapping);
+        let [outside, inside] = count(&drawn, [255, 0, 0, 255], [20, 80]);
+        assert!(inside > 800, "only {inside} pixels in its color");
+        assert_eq!(outside, 0, "pixels in its color outside of its square");
+        let changed = drawn
+            .enumerate_pixels()
+            .filter(|(x, y, p)| p.0 != [255; 4] && !((19..81).contains(x) && (19..81).contains(y)));
+        assert_eq!(changed.count(), 0, "changed outside of its square");
+        // a black line 4 pixels wide around it
+        stamp.outline = 4;
+        stamp.outline_color = [0, 0, 0, 255];
+        let outlined = drawn_at_once(&img, &[stamp], &mapping);
+        let [outside, inside] = count(&outlined, [0, 0, 0, 255], [16, 84]);
+        assert!(inside > 400, "only {inside} pixels of its outline");
+        assert_eq!(outside, 0, "its outline reaches out too far");
+        let [_, red] = count(&outlined, [255, 0, 0, 255], [20, 80]);
+        assert!(
+            red > 400,
+            "the outline covers the stamp, {red} pixels in its color are left"
+        );
+    }
+
+    #[test]
+    fn stamps_are_saved_by_name() {
+        let shape = Shape::Stamp(Stamp::Warning);
+        assert_eq!(
+            serde_json::to_string(&shape).unwrap(),
+            r#"{"Stamp":"Warning"}"#
+        );
+        let op = ImageOperation::Annotate(vec![Annotation::new(shape, [1, 2, 3, 4], 50, [6, 7])]);
+        let json = serde_json::to_string(&op).expect("saved");
+        let back: ImageOperation = serde_json::from_str(&json).expect("read");
+        assert_eq!(op, back);
+    }
+
+    #[test]
+    fn stamps_are_hit_in_their_square_and_stand_upright() {
+        let mapping = Mapping::new(&[], (300, 300));
+        let stamp = Annotation::new(Shape::Stamp(Stamp::Check), [0; 4], 40, [100, 100]);
+        assert!(hits(&stamp, &mapping, [120., 120.], 0.), "the middle");
+        assert!(
+            hits(&stamp, &mapping, [101., 139.], 0.),
+            "a corner, where a check has no line"
+        );
+        assert!(!hits(&stamp, &mapping, [145., 120.], 2.), "besides it");
+        // on a turned image it reads the right way, its middle where it was put
+        let ops = [item(ImageOperation::Rotate(90))];
+        let turned = Mapping::new(&ops, (200, 100));
+        let mut stamp = Annotation::new(Shape::Stamp(Stamp::Check), [0; 4], 40, [0, 0]);
+        stamp.stand_upright(&turned);
+        stamp.centre_at([50., 30.], turned.original);
+        let t = stamp.transform(&turned);
+        assert!(
+            t.sx > 0.99 && t.sy > 0.99 && t.kx.abs() < 0.01 && t.ky.abs() < 0.01,
+            "{t:?}"
+        );
+        let b = stamp.bounds().unwrap();
+        let mut middle = Point::from_xy((b[0] + b[2]) / 2., (b[1] + b[3]) / 2.);
+        stamp.placement(turned.original).map_point(&mut middle);
+        assert!(
+            (middle.x - 50.).abs() < 1. && (middle.y - 30.).abs() < 1.,
+            "its middle is at {middle:?}"
+        );
+    }
+
+    #[test]
+    fn new_stamps_are_as_large_as_the_last() {
+        let mut state = AnnotateUi::default();
+        state.prepare((1200, 900));
+        let stamp = |state: &AnnotateUi| state.template(Tool::Stamp(Stamp::Eye)).unwrap();
+        assert_eq!(
+            stamp(&state).width,
+            7 * 8,
+            "eight times the width of a line"
+        );
+        assert_eq!(stamp(&state).shape, Shape::Stamp(Stamp::Eye));
+        let mut larger = stamp(&state);
+        larger.width = 300;
+        state.remember(&larger);
+        assert_eq!(stamp(&state).width, 300);
+        assert_eq!(
+            state.template(Tool::Frame).unwrap().width,
+            7,
+            "lines keep their width"
         );
     }
 }

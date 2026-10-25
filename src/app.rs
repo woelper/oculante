@@ -54,6 +54,8 @@ pub struct OculanteApp {
     /// True if egui owned the pointer when the current press started.
     /// Prevents image drag for the entire press duration.
     egui_started_press: bool,
+    /// True if two fingers on a trackpad scrolled last, not a mouse wheel
+    trackpad_scrolled: bool,
     /// Updates system theme during runtime
     last_system_theme: Option<egui::Theme>,
     /// When the current file was last checked for changes on disk
@@ -180,6 +182,7 @@ impl OculanteApp {
             compare_geometry: None,
             last_frame_was_compared_image: false,
             egui_started_press: false,
+            trackpad_scrolled: false,
             last_system_theme: None,
             last_file_check: Instant::now(),
             system_fonts: SystemFonts::Loaded,
@@ -865,15 +868,30 @@ impl eframe::App for OculanteApp {
             self.state.image_geometry.offset += self.state.mouse_delta;
         }
 
-        // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch zooms
-        let scroll_delta = ctx.input(|i| i.smooth_scroll_delta.y);
+        // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch on a
+        // trackpad zooms, and so do two fingers on a touchscreen. On macOS, where the
+        // pinch works, two fingers on a trackpad move the image instead, unless the
+        // settings say they zoom as everywhere else.
+        let pan = if cfg!(target_os = "macos") && self.state.persistent_settings.trackpad_pans {
+            ctx.input(|i| trackpad_pan(&i.events, &mut self.trackpad_scrolled))
+        } else {
+            self.trackpad_scrolled = false;
+            egui::Vec2::ZERO
+        };
+        let scroll_delta = if self.trackpad_scrolled {
+            0.
+        } else {
+            ctx.input(|i| i.smooth_scroll_delta.y)
+        };
         let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events));
+        let pinch = pinch * ctx.input(touch_zoom);
         if !self.state.pointer_over_ui {
             match browse {
                 1 => next_image(&mut self.state),
                 -1 => prev_image(&mut self.state),
                 _ => {}
             }
+            self.state.image_geometry.offset += Vector2::new(pan.x, pan.y);
             if scroll_delta != 0.0 {
                 let divisor = if cfg!(target_os = "macos") { 1.5 } else { 10. };
                 let delta = zoomratio(
@@ -1412,11 +1430,22 @@ impl eframe::App for OculanteApp {
             self.state.new_image_loaded = false;
         }
 
-        // Save window geometry into volatile settings for persistence
-        if let Some(outer) = ctx.input(|i| i.viewport().outer_rect) {
-            self.state.volatile_settings.window_geometry = (
-                (outer.left() as u32, outer.top() as u32),
-                (outer.width() as u32, outer.height() as u32),
+        // Save window geometry into volatile settings for persistence. The window opens
+        // with the size inside its frame, Wayland tells no position. Minimized or in full
+        // screen it keeps the size it had before.
+        let (outer, minimized, fullscreen) = ctx.input(|i| {
+            let viewport = i.viewport();
+            (viewport.outer_rect, viewport.minimized, viewport.fullscreen)
+        });
+        if minimized != Some(true) && fullscreen != Some(true) && self.state.window_size.min() >= 1.
+        {
+            let geometry = &mut self.state.volatile_settings.window_geometry;
+            if let Some(outer) = outer {
+                geometry.0 = (outer.left() as u32, outer.top() as u32);
+            }
+            geometry.1 = (
+                self.state.window_size.x as u32,
+                self.state.window_size.y as u32,
             );
         }
     }

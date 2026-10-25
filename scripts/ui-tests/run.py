@@ -903,6 +903,8 @@ ANNOTATE_TOOLS = {
     name: (815 + 80 * (i % 3), 173 + 46 * (i // 3))
     for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
+# the row of stamps below the tools
+ANNOTATE_STAMPS = [(815 + 80 * i, 265) for i in range(3)]
 
 
 def test_annotate(binary):
@@ -1339,7 +1341,12 @@ def test_image_info_is_computed_when_shown(binary):
         again = app.log().count(computed) - 1
         assert again >= 1, "not computed again for the edit"
         # at most every 200 ms, the first one right away
-        assert again < changes and again <= elapsed / 0.2 + 1, f"computed {again} times in {elapsed:.1f} s, for {changes} changes of the image"
+        counted = f"computed {again} times in {elapsed:.1f} s, for {changes} changes of the image"
+        assert again <= changes and again <= elapsed / 0.2 + 1, counted
+        # A busy machine takes longer than 200 ms for a step of the slider, then
+        # every step gets its numbers
+        if changes > elapsed / 0.2 + 1:
+            assert again < changes, counted
         changed = changed_pixels_in(plain, edited, HISTOGRAM)
         assert changed > 300, f"the histogram changed only {changed} pixels with the edit"
         app.click(890, 210)  # "Apply all edits"
@@ -1467,7 +1474,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 436, 894, 436, steps=6)
+        app.drag(876, 482, 894, 482, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1481,7 +1488,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(803, 340)  # "Send backward" on the card of the circle
+        app.click(803, 386)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
@@ -1489,17 +1496,17 @@ def test_annotation_cards(binary):
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
         corner = (470, 90, 25, 25)
-        app.click(822, 340)
+        app.click(822, 386)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(822, 340)
+        app.click(822, 386)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(842, 388)
+        app.click(842, 434)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1516,7 +1523,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 424)  # its font
+        app.click(980, 470)  # its font
         app.settle(0.8)
         listed = app.shot("list")
         assert changed_pixels_in(text, listed, (790, 203, 230, 200)) > 1000, "no list of fonts"
@@ -1547,8 +1554,8 @@ def test_annotation_cards(binary):
 
 def test_annotation_select(binary):
     """With nothing selected Esc goes from a tool that draws to Select, which is
-    tinted. In it a box selects what lies wholly inside, also with Shift on top of
-    what is selected, a click besides everything drops the selection, and the cards
+    tinted. In it a box selects what is at least half inside, also with Shift on top
+    of what is selected, a click besides everything drops the selection, and the cards
     of what is selected are tinted. Esc then stops annotating, as folding the
     Annotations does, and opening them again selects as long as there are any."""
     tint = (77, 26, 41)
@@ -1606,6 +1613,20 @@ def test_annotation_select(binary):
         app.settle(1.0)
         dropped = app.shot("dropped")
         assert not any(selected(dropped, box) for box in frames), "a click besides them kept the frames"
+        # a box over more than half of the first frame takes it, over less it does not
+        app.drag(180, 80, 265, 190, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        most = app.shot("most")
+        assert selected(most, frames[0]), "a box over two thirds of the frame did not select it"
+        assert not selected(most, frames[1]), "a box besides the second frame selected it"
+        app.click(650, 500)
+        app.drag(180, 80, 235, 190, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        less = app.shot("less")
+        assert not selected(less, frames[0]), "a box over a third of the frame selected it"
+        app.click(650, 500)
         # the circle by a click on its line, then the frames with Shift on top
         app.click(250, 350)
         app.x("xdotool", "keydown", "shift")
@@ -1641,6 +1662,78 @@ def test_annotation_select(binary):
         changed = changed_pixels_in(before, deleted, circle_box)
         assert changed > 500, f"the circle changed only {changed} pixels, it should stay"
 
+def test_annotation_stamps(binary):
+    """The third row of the tools has three stamps, check, cross and warning at first.
+    A click puts one on the image, a drag makes it as large as the drag. A right-click
+    on a tile picks another symbol for it, which the settings keep."""
+    red = (235, 40, 40)
+    tile = lambda i: (ANNOTATE_STAMPS[i][0] - 30, ANNOTATE_STAMPS[i][1] - 15, 60, 30)
+    clicked_box = (240, 140, 120, 120)
+    dragged_box = (400, 250, 161, 161)
+
+    def red_in(shot, box):
+        return count_color(shot, box, red, 12)
+
+    with App(binary, "annotation_stamps", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        # another symbol for the second tile
+        app.x("xdotool", "mousemove", str(ANNOTATE_STAMPS[1][0]), str(ANNOTATE_STAMPS[1][1]), "click", "3")
+        app.settle(1.0)
+        app.shot("menu")
+        app.click(944, 373)  # "Error"
+        app.move(40, 560)
+        app.settle(1.0)
+        picked = app.shot("picked")
+        changed = changed_pixels_in(before, picked, tile(1))
+        assert changed > 40, f"the tile shows the same symbol, {changed} pixels changed"
+        assert changed_pixels_in(before, picked, tile(0)) == 0, "the first tile changed too"
+        # a check where the click is, then a larger one as large as the drag
+        app.click(*ANNOTATE_STAMPS[0])
+        app.click(300, 200)
+        app.move(40, 560)
+        app.settle(1.0)
+        clicked = app.shot("clicked")
+        small = red_in(clicked, clicked_box) - red_in(before, clicked_box)
+        assert small > 40, f"a click put no stamp there, {small} red pixels"
+        app.drag(400, 250, 560, 400, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        dragged = app.shot("dragged")
+        large = red_in(dragged, dragged_box) - red_in(clicked, dragged_box)
+        assert large > 4 * small, f"the dragged stamp is not larger: {large} red pixels, the clicked one {small}"
+        outside = red_in(dragged, (140, 40, 620, 480)) - red_in(clicked, (140, 40, 620, 480)) - large
+        assert outside < 20, f"{outside} red pixels outside of the square that was dragged"
+        # while annotating the keys are for the annotations: no selection, Select, none
+        for _ in range(3):
+            app.key("Escape")
+            app.settle(0.5)
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config.json")) as f:
+            saved = json.load(f)
+    assert saved.get("stamps") == ["Check", "Error", "Warning"], f"saved as {saved.get('stamps')}"
+    with App(binary, "annotation_stamps_again", [image("moss.jpg")], settings=saved) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        # the edit panel is still open
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        again = app.shot("again")
+    changed = changed_pixels_in(picked, again, tile(1))
+    assert changed < 10, f"the picked symbol is gone after a restart, {changed} pixels differ"
+
+
 def test_histogram_shows_values_on_hover(binary):
     """Hovering over the histogram shows the channel, the value and the number of
     pixels. egui_plot 0.37 shows them only with a label formatter, they were gone."""
@@ -1673,10 +1766,11 @@ def test_mipmaps_switched_on_and_off(binary):
         app.move(480, 300)
         for _ in range(12):
             app.x("xdotool", "click", "4")
-        app.scroll_down(480, 300, 4)
-        app.click(752, 350)  # "Use mipmaps"
+        # a row of the settings is one notch, an item added above it needs one more
+        app.scroll_down(480, 300, 5)
+        app.click(752, 367)  # "Use mipmaps"
         app.settle(0.8)
-        checked = region_has_color(app.shot(f"mipmaps_{on}"), (742, 340, 20, 20), ACCENT, 60)
+        checked = region_has_color(app.shot(f"mipmaps_{on}"), (742, 357, 20, 20), ACCENT, 60)
         assert checked == on, f"the mipmap setting is {'off' if on else 'on'}"
         app.click(777, 32)  # close the preferences
         app.move(300, 560)
@@ -1775,6 +1869,69 @@ def test_jpeg_is_edited_without_alpha(binary):
         uploads = [l.split("Uploading ")[1].strip() for l in app.log().splitlines() if "Uploading " in l]
     assert len(uploads) >= 2, f"the edited image was not uploaded: {uploads}"
     assert all(u == "Rgb8 as Rgb8" for u in uploads), f"uploaded as {uploads}"
+
+
+def test_new_noise(binary):
+    """The noise stays as it is until "New noise" rolls a new seed."""
+    with start(binary, "new_noise", image("moss.jpg")) as app:
+        open_edit_panel(app)
+        app.click(850, 86)  # the search of the filter list
+        app.settle(0.5)
+        app.x("xdotool", "type", "--delay", "80", "noise")
+        app.settle(0.8)
+        app.click(891, 120)  # add "Noise", the only one found
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        # the image, above the frame counter of a debug build
+        area = (140, 40, 600, 450)
+        noisy = app.shot("noisy")
+        app.move(0.3, 0.6)
+        app.settle(1.5)
+        still = changed_pixels_in(noisy, app.shot("still"), area)
+        assert still < 500, f"the noise changed by itself ({still} pixels)"
+        app.click(893, 176)  # "New noise"
+        app.move(0.4, 0.5)
+        app.settle(1.5)
+        new = app.shot("new")
+        changed = changed_pixels_in(noisy, new, area)
+        assert changed > 50_000, f"new noise changed only {changed} pixels"
+        # the same image with other noise, where it was: the button that is in the
+        # same place without this one opens paint mode, the panel grows over the image
+        level, wanted = mean_level(new, area), mean_level(noisy, area)
+        assert abs(level - wanted) < 2, f"more than the noise changed ({level:.1f} instead of {wanted:.1f})"
+
+
+def test_memory_for_the_cache(binary):
+    """The memory for the cache is a setting: with little of it the oldest images go,
+    and what is picked in the preferences is saved."""
+    folder = folder_of("cache_memory_images", [("00.jpg", "moss.jpg"), ("01.jpg", "moss.jpg"), ("02.jpg", "moss.jpg")])
+    first = os.path.join(folder, "00.jpg")
+    # moss.jpg takes 2.25 MB in memory, one MB holds only the one shown
+    for memory, evicted in (("Auto", False), ({"Megabytes": 1}, True)):
+        with start(binary, f"cache_memory_{evicted}", first, settings={"cache_memory": memory}) as app:
+            for _ in range(2):
+                app.key("Right")
+                app.settle(1.5)
+            assert shown_file(app) == "02.jpg", f"the images were not gone through: {shown_file(app)}"
+            hit = "Cache limit hit" in app.log()
+        assert hit == evicted, f"with {memory} images went from the cache: {hit}"
+    with start(binary, "cache_memory_setting", first) as app:
+        app.click(1005, 18)  # the menu
+        app.settle(1.0)
+        app.click(940, 218)  # Preferences
+        app.settle(1.5)
+        app.click(715, 397)  # the drop-down of the memory for the cache
+        app.settle(1.0)
+        app.click(700, 457)  # Percent
+        app.settle(1.0)
+        app.shot("percent")
+        app.click(778, 33)  # close the preferences
+        app.settle(1.0)
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config.json")) as f:
+            saved = json.load(f).get("cache_memory")
+    assert isinstance(saved, dict) and 1 <= saved.get("Percent", 0) <= 90, f"saved as {saved}"
 
 
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
@@ -1953,6 +2110,33 @@ def test_borderless(binary):
         assert not app.running(), "the close button did not close the app"
 
 
+def test_window_size_is_saved(binary):
+    """The window opens again as large as it was. Its size was saved with the title
+    bar and the border and given back as the size inside them, so it grew a bit with
+    every start, and on Wayland it was not saved at all."""
+    needs_window_manager()
+    with App(binary, "window_size", [image("moss.jpg")], window_manager=True) as app:
+        app.wait_window()
+        assert app.frame_extents()[2] > 0, "no title bar, the window manager does not decorate"
+        app.x("xdotool", "windowsize", app.win, "800", "500")
+        app.settle(1.0)
+        size = app.update_geometry()
+        size = (size["WIDTH"], size["HEIGHT"])
+        assert size == (800, 500), f"the window manager made it {size}"
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config_volatile.json")) as f:
+            volatile = json.load(f)
+    saved = tuple(volatile["window_geometry"][1])
+    assert saved == size, f"saved as {saved}, the window was {size}"
+    with App(binary, "window_size_again", [image("moss.jpg")], volatile=volatile, window_manager=True) as app:
+        app.wait_window()
+        app.settle(1.0)
+        again = app.update_geometry()
+        again = (again["WIDTH"], again["HEIGHT"])
+    assert again == size, f"the window came back as {again}, it was {size}"
+
+
 TESTS = [
     test_perspective_crop_handles,
     test_shortcuts,
@@ -1983,8 +2167,10 @@ TESTS = [
     test_annotate,
     test_annotation_cards,
     test_annotation_select,
+    test_annotation_stamps,
     test_fullscreen,
     test_borderless,
+    test_window_size_is_saved,
     test_compare_list,
     test_animation_plays_and_stops,
     test_animation_plays_as_often_as_the_file_asks,
@@ -1992,6 +2178,8 @@ TESTS = [
     test_keep_edits,
     test_single_frame_gif_is_editable,
     test_jpeg_is_edited_without_alpha,
+    test_new_noise,
+    test_memory_for_the_cache,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,

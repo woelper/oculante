@@ -33,6 +33,16 @@ fn paint_texture_load_result(
     }
 }
 
+/// The URI egui loads a file from. On Windows egui 0.36 takes `file://C:\x` for a path
+/// on the network, 0.31 of 0.9.6 did not: `file:///C:\x` is `C:\x`.
+pub fn file_uri(path: &Path) -> String {
+    if cfg!(windows) {
+        format!("file:///{}", path.display())
+    } else {
+        format!("file://{}", path.display())
+    }
+}
+
 /// The thumbnail of a file in `rect`, or its extension while there is none
 pub fn paint_thumbnail(
     ui: &Ui,
@@ -44,7 +54,7 @@ pub fn paint_thumbnail(
 ) {
     match thumbnails.get(path) {
         Ok(tp) => {
-            let image = egui::Image::new(format!("file://{}", tp.display()))
+            let image = egui::Image::new(file_uri(&tp))
                 .corner_radius(rounding)
                 .show_loading_spinner(true);
 
@@ -54,7 +64,7 @@ pub fn paint_thumbnail(
             if load_result.is_err() {
                 // If an image could not be loaded, reload. This is usually because the image
                 // is being written while loading.
-                ui.ctx().forget_image(&format!("file://{}", tp.display()));
+                ui.ctx().forget_image(&file_uri(&tp));
             }
         }
         Err(_) => {

@@ -278,6 +278,9 @@ pub enum ImageOperation {
     Noise {
         amt: u8,
         mono: bool,
+        /// Rolled by a button for new noise, 0 in edits saved before it
+        #[serde(default)]
+        seed: u32,
     },
     Rotate(i16),
     HSV((u16, i32, i32)),
@@ -655,9 +658,17 @@ impl ImageOperation {
                 r
             }
             Self::Blur(val) => ui.styled_slider(val, 0..=254),
-            Self::Noise { amt, mono } => {
+            Self::Noise { amt, mono, seed } => {
                 let mut r = ui.styled_slider(amt, 0..=100);
                 if ui.styled_checkbox(mono, "Grey").changed() {
+                    r.mark_changed();
+                }
+                if ui
+                    .button("New noise")
+                    .on_hover_text("Rolls a new random seed, the same seed gives the same noise")
+                    .clicked()
+                {
+                    *seed = rand::rng().random();
                     r.mark_changed();
                 }
                 r
@@ -1069,7 +1080,7 @@ impl ImageOperation {
                             painter.rect_filled(
                                 rect,
                                 0.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 2),
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 14),
                             );
 
                             painter.text(
@@ -2035,11 +2046,12 @@ impl<'a> PixelOp<'a> {
                 .map(Self::Expression)
                 .unwrap_or(Self::Nothing),
             ImageOperation::LUT(name) => Self::Lut(hald_clut(name)?),
-            // two noise operations give different noise
-            ImageOperation::Noise { amt, mono } => Self::Noise {
+            // two noise operations give different noise, a seed of 0 the noise there
+            // was before the seeds
+            ImageOperation::Noise { amt, mono, seed } => Self::Noise {
                 amount: *amt as f32 / 100.,
                 mono: *mono,
-                seed: index as u64,
+                seed: (*seed as u64) << 32 | index as u64,
             },
             op => Self::Plain(op),
         })
@@ -2643,6 +2655,7 @@ mod operation_tests {
             ImageOperation::Noise {
                 amt: 0,
                 mono: false,
+                seed: 0,
             },
             ImageOperation::Blur(0),
             ImageOperation::Rotate(0),
@@ -2859,6 +2872,7 @@ mod operation_tests {
             ImageOperation::Noise {
                 amt: 50,
                 mono: true,
+                seed: 0,
             },
             &gray,
         )
@@ -2870,10 +2884,29 @@ mod operation_tests {
             ImageOperation::Noise {
                 amt: 50,
                 mono: true,
+                seed: 0,
             },
             &gray,
         );
         assert_eq!(again, DynamicImage::ImageRgba8(mono));
+        // a new seed gives new noise, the same seed the same again
+        let seeded = |seed| {
+            apply(
+                ImageOperation::Noise {
+                    amt: 50,
+                    mono: true,
+                    seed,
+                },
+                &gray,
+            )
+        };
+        assert_ne!(seeded(7), again);
+        assert_eq!(seeded(7), seeded(7));
+        assert_ne!(seeded(7), seeded(8));
+        // edits saved before the seeds have none and keep their noise
+        let saved: ImageOperation =
+            serde_json::from_str(r#"{"Noise":{"amt":50,"mono":true}}"#).expect("read");
+        assert_eq!(apply(saved, &gray), again);
     }
 
     #[test]
@@ -3281,6 +3314,7 @@ mod operation_tests {
             Noise {
                 amt: 50,
                 mono: false,
+                seed: 0,
             },
             Rotate(90),
             Rotate(-90),

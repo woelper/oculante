@@ -63,6 +63,10 @@ fn main() -> eframe::Result<()> {
         state.message_channel.0.clone(),
         state.persistent_settings.decoders,
     );
+    state
+        .player
+        .cache
+        .set_memory(state.persistent_settings.cache_memory);
 
     // Parse input paths
     let paths_to_open: Vec<PathBuf> = matches

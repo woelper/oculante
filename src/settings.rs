@@ -1,4 +1,7 @@
-use crate::{file_encoder::FileEncoder, file_sort::FileSort, shortcuts::*, utils::ColorChannel};
+use crate::{
+    annotate::Stamp, cache::CacheMemory, file_encoder::FileEncoder, file_sort::FileSort,
+    shortcuts::*, utils::ColorChannel,
+};
 use anyhow::{Result, anyhow};
 use egui::{Context, Theme, Visuals};
 use log::{debug, info, trace};
@@ -50,6 +53,8 @@ pub struct PersistentSettings {
     pub compare_keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
+    /// How much memory the images in the cache may take
+    pub cache_memory: CacheMemory,
     /// How many recent images to keep track of
     pub max_recents: u8,
     pub show_scrub_bar: bool,
@@ -73,6 +78,11 @@ pub struct PersistentSettings {
     pub use_mipmaps: bool,
     pub fit_image_on_window_resize: bool,
     pub zoom_multiplier: f32,
+    /// Two fingers on a trackpad move the image instead of zooming, on macOS where a
+    /// pinch zooms
+    pub trackpad_pans: bool,
+    /// The symbols on the three stamp tiles of the annotations
+    pub stamps: [Stamp; 3],
     /// Automatically scale/zoom the image to fit the frame
     pub auto_scale: bool,
     pub borderless: bool,
@@ -96,6 +106,7 @@ impl Default for PersistentSettings {
             keep_view: Default::default(),
             compare_keep_view: Default::default(),
             max_cache: 30,
+            cache_memory: CacheMemory::Auto,
             max_recents: 12,
             show_scrub_bar: Default::default(),
             wrap_folder: true,
@@ -116,6 +127,8 @@ impl Default for PersistentSettings {
             use_mipmaps: true,
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
+            trackpad_pans: true,
+            stamps: Stamp::TILES,
             auto_scale: false,
             borderless: false,
             min_window_size: (100, 100),
