@@ -1423,11 +1423,22 @@ impl eframe::App for OculanteApp {
             self.state.new_image_loaded = false;
         }
 
-        // Save window geometry into volatile settings for persistence
-        if let Some(outer) = ctx.input(|i| i.viewport().outer_rect) {
-            self.state.volatile_settings.window_geometry = (
-                (outer.left() as u32, outer.top() as u32),
-                (outer.width() as u32, outer.height() as u32),
+        // Save window geometry into volatile settings for persistence. The window opens
+        // with the size inside its frame, Wayland tells no position. Minimized or in full
+        // screen it keeps the size it had before.
+        let (outer, minimized, fullscreen) = ctx.input(|i| {
+            let viewport = i.viewport();
+            (viewport.outer_rect, viewport.minimized, viewport.fullscreen)
+        });
+        if minimized != Some(true) && fullscreen != Some(true) && self.state.window_size.min() >= 1.
+        {
+            let geometry = &mut self.state.volatile_settings.window_geometry;
+            if let Some(outer) = outer {
+                geometry.0 = (outer.left() as u32, outer.top() as u32);
+            }
+            geometry.1 = (
+                self.state.window_size.x as u32,
+                self.state.window_size.y as u32,
             );
         }
     }

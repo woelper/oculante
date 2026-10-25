@@ -2036,6 +2036,33 @@ def test_borderless(binary):
         assert not app.running(), "the close button did not close the app"
 
 
+def test_window_size_is_saved(binary):
+    """The window opens again as large as it was. Its size was saved with the title
+    bar and the border and given back as the size inside them, so it grew a bit with
+    every start, and on Wayland it was not saved at all."""
+    needs_window_manager()
+    with App(binary, "window_size", [image("moss.jpg")], window_manager=True) as app:
+        app.wait_window()
+        assert app.frame_extents()[2] > 0, "no title bar, the window manager does not decorate"
+        app.x("xdotool", "windowsize", app.win, "800", "500")
+        app.settle(1.0)
+        size = app.update_geometry()
+        size = (size["WIDTH"], size["HEIGHT"])
+        assert size == (800, 500), f"the window manager made it {size}"
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config_volatile.json")) as f:
+            volatile = json.load(f)
+    saved = tuple(volatile["window_geometry"][1])
+    assert saved == size, f"saved as {saved}, the window was {size}"
+    with App(binary, "window_size_again", [image("moss.jpg")], volatile=volatile, window_manager=True) as app:
+        app.wait_window()
+        app.settle(1.0)
+        again = app.update_geometry()
+        again = (again["WIDTH"], again["HEIGHT"])
+    assert again == size, f"the window came back as {again}, it was {size}"
+
+
 TESTS = [
     test_perspective_crop_handles,
     test_shortcuts,
@@ -2068,6 +2095,7 @@ TESTS = [
     test_annotation_select,
     test_fullscreen,
     test_borderless,
+    test_window_size_is_saved,
     test_compare_list,
     test_animation_plays_and_stops,
     test_animation_plays_as_often_as_the_file_asks,
