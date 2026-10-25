@@ -3904,6 +3904,7 @@ dependencies = [
  "tiff",
  "tiny-skia",
  "trash",
+ "ttf-parser",
  "turbojpeg",
  "unicode-segmentation",
  "usvg",

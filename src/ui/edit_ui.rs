@@ -220,7 +220,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
             {
                 ui.add_space(4.);
-                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate) {
+                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
                     image_changed = true;
                 }
                 ui.add_space(4.);

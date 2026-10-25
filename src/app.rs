@@ -381,9 +381,7 @@ impl OculanteApp {
         // Icon font
         fonts.font_data.insert(
             "icons".to_owned(),
-            Arc::new(FontData::from_static(include_bytes!(
-                "../res/fonts/icons.ttf"
-            ))),
+            Arc::new(FontData::from_static(crate::ICON_FONT)),
         );
 
         // Font families: icons first, then inter (so icon codepoints resolve to icon font)

@@ -1,6 +1,6 @@
 use crate::{
-    cache::CacheMemory, file_encoder::FileEncoder, file_sort::FileSort, shortcuts::*,
-    utils::ColorChannel,
+    annotate::Stamp, cache::CacheMemory, file_encoder::FileEncoder, file_sort::FileSort,
+    shortcuts::*, utils::ColorChannel,
 };
 use anyhow::{Result, anyhow};
 use egui::{Context, Theme, Visuals};
@@ -81,6 +81,8 @@ pub struct PersistentSettings {
     /// Two fingers on a trackpad move the image instead of zooming, on macOS where a
     /// pinch zooms
     pub trackpad_pans: bool,
+    /// The symbols on the three stamp tiles of the annotations
+    pub stamps: [Stamp; 3],
     /// Automatically scale/zoom the image to fit the frame
     pub auto_scale: bool,
     pub borderless: bool,
@@ -126,6 +128,7 @@ impl Default for PersistentSettings {
             fit_image_on_window_resize: false,
             zoom_multiplier: 1.0,
             trackpad_pans: true,
+            stamps: Stamp::TILES,
             auto_scale: false,
             borderless: false,
             min_window_size: (100, 100),

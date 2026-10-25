@@ -903,6 +903,8 @@ ANNOTATE_TOOLS = {
     name: (815 + 80 * (i % 3), 173 + 46 * (i // 3))
     for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
+# the row of stamps below the tools
+ANNOTATE_STAMPS = [(815 + 80 * i, 265) for i in range(3)]
 
 
 def test_annotate(binary):
@@ -1472,7 +1474,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 436, 894, 436, steps=6)
+        app.drag(876, 482, 894, 482, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1486,7 +1488,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(803, 340)  # "Send backward" on the card of the circle
+        app.click(803, 386)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
@@ -1494,17 +1496,17 @@ def test_annotation_cards(binary):
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
         corner = (470, 90, 25, 25)
-        app.click(822, 340)
+        app.click(822, 386)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(822, 340)
+        app.click(822, 386)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(842, 388)
+        app.click(842, 434)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1521,7 +1523,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 424)  # its font
+        app.click(980, 470)  # its font
         app.settle(0.8)
         listed = app.shot("list")
         assert changed_pixels_in(text, listed, (790, 203, 230, 200)) > 1000, "no list of fonts"
@@ -1659,6 +1661,78 @@ def test_annotation_select(binary):
             assert changed == 0, f"{changed} pixels of the deleted frames are left at {box}"
         changed = changed_pixels_in(before, deleted, circle_box)
         assert changed > 500, f"the circle changed only {changed} pixels, it should stay"
+
+def test_annotation_stamps(binary):
+    """The third row of the tools has three stamps, check, cross and warning at first.
+    A click puts one on the image, a drag makes it as large as the drag. A right-click
+    on a tile picks another symbol for it, which the settings keep."""
+    red = (235, 40, 40)
+    tile = lambda i: (ANNOTATE_STAMPS[i][0] - 30, ANNOTATE_STAMPS[i][1] - 15, 60, 30)
+    clicked_box = (240, 140, 120, 120)
+    dragged_box = (400, 250, 161, 161)
+
+    def red_in(shot, box):
+        return count_color(shot, box, red, 12)
+
+    with App(binary, "annotation_stamps", [image("moss.jpg")], settings={"experimental_features": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        before = app.shot("before")
+        # another symbol for the second tile
+        app.x("xdotool", "mousemove", str(ANNOTATE_STAMPS[1][0]), str(ANNOTATE_STAMPS[1][1]), "click", "3")
+        app.settle(1.0)
+        app.shot("menu")
+        app.click(944, 373)  # "Error"
+        app.move(40, 560)
+        app.settle(1.0)
+        picked = app.shot("picked")
+        changed = changed_pixels_in(before, picked, tile(1))
+        assert changed > 40, f"the tile shows the same symbol, {changed} pixels changed"
+        assert changed_pixels_in(before, picked, tile(0)) == 0, "the first tile changed too"
+        # a check where the click is, then a larger one as large as the drag
+        app.click(*ANNOTATE_STAMPS[0])
+        app.click(300, 200)
+        app.move(40, 560)
+        app.settle(1.0)
+        clicked = app.shot("clicked")
+        small = red_in(clicked, clicked_box) - red_in(before, clicked_box)
+        assert small > 40, f"a click put no stamp there, {small} red pixels"
+        app.drag(400, 250, 560, 400, steps=10)
+        app.move(40, 560)
+        app.settle(1.0)
+        dragged = app.shot("dragged")
+        large = red_in(dragged, dragged_box) - red_in(clicked, dragged_box)
+        assert large > 4 * small, f"the dragged stamp is not larger: {large} red pixels, the clicked one {small}"
+        outside = red_in(dragged, (140, 40, 620, 480)) - red_in(clicked, (140, 40, 620, 480)) - large
+        assert outside < 20, f"{outside} red pixels outside of the square that was dragged"
+        # while annotating the keys are for the annotations: no selection, Select, none
+        for _ in range(3):
+            app.key("Escape")
+            app.settle(0.5)
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config.json")) as f:
+            saved = json.load(f)
+    assert saved.get("stamps") == ["Check", "Error", "Warning"], f"saved as {saved.get('stamps')}"
+    with App(binary, "annotation_stamps_again", [image("moss.jpg")], settings=saved) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        # the edit panel is still open
+        app.settle(1.0)
+        app.click(*ANNOTATIONS_HEADER)
+        app.move(40, 560)
+        app.settle(1.0)
+        again = app.shot("again")
+    changed = changed_pixels_in(picked, again, tile(1))
+    assert changed < 10, f"the picked symbol is gone after a restart, {changed} pixels differ"
+
 
 def test_histogram_shows_values_on_hover(binary):
     """Hovering over the histogram shows the channel, the value and the number of
@@ -2093,6 +2167,7 @@ TESTS = [
     test_annotate,
     test_annotation_cards,
     test_annotation_select,
+    test_annotation_stamps,
     test_fullscreen,
     test_borderless,
     test_window_size_is_saved,
