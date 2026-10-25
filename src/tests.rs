@@ -1364,12 +1364,22 @@ fn ci_fullscreen_keeps_the_image_in_proportion() {
     assert_eq!(geometry.offset, Vector2::new(1000., 500.));
 }
 
+/// Arguments become paths: plain ones as they are, `file://` URIs decoded. CI runs
+/// this on Windows too.
 #[test]
-fn file_uri_args_become_paths() {
+fn ci_file_uri_args_become_paths() {
     use crate::utils::path_from_arg;
     // `Exec=oculante %U` makes file managers pass URIs
     assert_eq!(path_from_arg("/tmp/a b.png"), PathBuf::from("/tmp/a b.png"));
     assert_eq!(path_from_arg("rel/a.png"), PathBuf::from("rel/a.png"));
+    // Explorer passes plain paths, with spaces and umlauts, also on a network share
+    for plain in [
+        r"C:\Users\Jö Doe\a b.png",
+        r"\\server\share\a.png",
+        r"C:\a#%20.png",
+    ] {
+        assert_eq!(path_from_arg(plain), PathBuf::from(plain));
+    }
     #[cfg(unix)]
     {
         assert_eq!(
@@ -1386,10 +1396,54 @@ fn file_uri_args_become_paths() {
         );
     }
     #[cfg(windows)]
-    assert_eq!(
-        path_from_arg("file:///C:/Users/a%20b.png"),
-        PathBuf::from("C:/Users/a b.png")
-    );
+    {
+        assert_eq!(
+            path_from_arg("file:///C:/Users/a%20b.png"),
+            PathBuf::from(r"C:\Users\a b.png")
+        );
+        assert_eq!(
+            path_from_arg("file:///C:/Users/J%C3%B6/a.png"),
+            PathBuf::from(r"C:\Users\Jö\a.png")
+        );
+    }
+}
+
+/// egui loads the thumbnails of the file browser from their URI. On Windows it took
+/// `file://C:\...` for a path on the network, each one showed a red triangle (#813).
+/// An image in a folder with a space and an umlaut, as user names have them, and its
+/// thumbnail where the file browser keeps it. CI runs this on Windows too.
+#[test]
+fn ci_thumbnails_load_from_their_uri() {
+    let folder = std::env::temp_dir().join("oculante test ü");
+    std::fs::create_dir_all(&folder).unwrap();
+    let source = folder.join("thumbnail uri.png");
+    image::RgbaImage::new(4, 3).save(&source).unwrap();
+    let cached = crate::thumbnails::get_cached_path(&source);
+    std::fs::create_dir_all(cached.parent().unwrap()).unwrap();
+    crate::thumbnails::from_existing(&cached, &image::open(&source).unwrap()).unwrap();
+    let ctx = egui::Context::default();
+    egui_extras::install_image_loaders(&ctx);
+    for (path, size) in [(&source, [4, 3]), (&cached, [120, 90])] {
+        let uri = crate::ui::file_uri(path);
+        let start = std::time::Instant::now();
+        loop {
+            match ctx.try_load_image(&uri, egui::SizeHint::default()) {
+                Ok(egui::load::ImagePoll::Ready { image }) => {
+                    assert_eq!(image.size, size, "{uri}");
+                    break;
+                }
+                Ok(egui::load::ImagePoll::Pending { .. }) => {
+                    assert!(
+                        start.elapsed() < Duration::from_secs(10),
+                        "{uri} never loaded"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(e) => panic!("{uri} did not load: {e}"),
+            }
+        }
+    }
+    _ = std::fs::remove_file(&cached);
 }
 
 /// The desktop entries must hand the file to the app, or double clicking an

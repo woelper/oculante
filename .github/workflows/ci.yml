@@ -56,6 +56,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
+
+      # paths are different here: the thumbnails broke on Windows alone (#813)
+      - name: Tests
+        run: cargo test ci_
+
       - name: Build
         run: cargo build
 
