@@ -149,9 +149,9 @@ impl Stamp {
         match self {
             Stamp::Check => CHECK,
             Stamp::Cross => X,
-            Stamp::Warning => WARNING_CIRCLE,
-            Stamp::Error => ERROR_CIRCLE,
-            Stamp::Info => INFO,
+            Stamp::Warning => CIRCLE_WARNING,
+            Stamp::Error => CIRCLE_X,
+            Stamp::Info => CIRCLE_INFORMATION,
             Stamp::Plus => PLUS,
             Stamp::Pin => LOCATION_PIN,
             Stamp::Clock => CLOCK,
@@ -1938,7 +1938,7 @@ fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
             }
             slider_row(
                 ui,
-                format!("{PENCIL_SIMPLE_LINE} Size"),
+                format!("{EDIT} Size"),
                 &mut a.width,
                 8..=1000,
             );

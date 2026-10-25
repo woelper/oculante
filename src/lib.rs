@@ -12,7 +12,7 @@ pub mod utils;
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 pub const BOLD_FONT: &[u8; 344152] = include_bytes!("../res/fonts/Inter-Bold.ttf");
 /// The icons of the UI, and the symbols of the stamps in annotations
-pub const ICON_FONT: &[u8] = include_bytes!("../res/fonts/icons.ttf");
+pub const ICON_FONT: &[u8] = include_bytes!("../res/fonts/ui_icons.ttf");
 pub(crate) mod file_encoder;
 pub(crate) mod file_sort;
 // With file_open the system file dialog replaces the built-in browser, what only
