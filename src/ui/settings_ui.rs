@@ -118,7 +118,7 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                     }, ui);
 
                                     let cache_mb = (state.player.cache.byte_budget >> 20) as u32;
-                                    configuration_item_ui("Memory for the cache", &format!("How much memory the cached images may take, {cache_mb} MB now. Automatic is a sixteenth of the memory, 256 MB to 1 GB."), |ui| {
+                                    configuration_item_ui("Maximum cache memory", &format!("How much memory the cached images may take, {cache_mb} MB now. Automatic is a sixteenth of the memory, 256 MB to 1 GB."), |ui| {
                                         use crate::cache::CacheMemory;
                                         let total = state.player.cache.total_memory.max(1);
                                         let total_mb = ((total >> 20) as u32).max(64);
