@@ -178,6 +178,7 @@ pub struct VolatileSettings {
     pub window_geometry: ((u32, u32), (u32, u32)),
     pub last_open_directory: PathBuf,
     pub folder_bookmarks: BTreeSet<PathBuf>,
+    #[serde(deserialize_with = "crate::file_encoder::deserialize_encoders")]
     pub encoding_options: Vec<FileEncoder>,
     /// The order of the files in the file browser and of the next and previous image
     pub file_sort: FileSort,
@@ -193,19 +194,7 @@ impl Default for VolatileSettings {
             window_geometry: Default::default(),
             last_open_directory: Default::default(),
             folder_bookmarks: Default::default(),
-            encoding_options: [
-                // ("jpg".to_string(), FileEncoder::Jpg { quality: 75 }),
-                // ("png".to_string(), FileEncoder::WebP),
-                FileEncoder::Jpg { quality: 75 },
-                FileEncoder::WebP,
-                FileEncoder::Png {
-                    compressionlevel: crate::file_encoder::CompressionLevel::Default,
-                },
-                FileEncoder::Bmp,
-                FileEncoder::Avif,
-            ]
-            .into_iter()
-            .collect(),
+            encoding_options: FileEncoder::all(),
             file_sort: Default::default(),
             browser_list: false,
         }

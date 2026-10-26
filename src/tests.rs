@@ -983,7 +983,11 @@ fn ci_settings_of_0_9_6_are_read() {
         volatile.recent_images.front(),
         Some(&PathBuf::from("/photos/test.png"))
     );
-    assert_eq!(volatile.encoding_options.len(), 4);
+    // the formats of 0.9.6 as they were saved, and AVIF, which came later
+    assert_eq!(
+        volatile.encoding_options,
+        crate::file_encoder::FileEncoder::all()
+    );
 }
 
 /// The default shortcuts survive saving, and no two of them are the same keys
@@ -1037,6 +1041,32 @@ fn ci_modifiers_are_no_keys_of_a_shortcut() {
         default_shortcuts()
             .values()
             .all(|s| !s.keys.iter().any(is_modifier_key))
+    );
+}
+
+/// Formats that came after the settings were saved can be picked when saving, the
+/// saved ones keep their options
+#[test]
+fn ci_saved_formats_get_the_new_ones() {
+    use crate::file_encoder::FileEncoder;
+    use crate::settings::VolatileSettings;
+    let volatile: VolatileSettings =
+        serde_json::from_str(r#"{"encoding_options": [{"Jpg": {"quality": 90}}, "Bmp"]}"#).unwrap();
+    assert_eq!(
+        volatile.encoding_options[0],
+        FileEncoder::Jpg { quality: 90 }
+    );
+    assert_eq!(
+        volatile
+            .encoding_options
+            .iter()
+            .map(FileEncoder::ext)
+            .collect::<Vec<_>>(),
+        ["jpg", "bmp", "webp", "png", "avif"]
+    );
+    assert_eq!(
+        FileEncoder::matching_variant(&PathBuf::from("a.avif"), &volatile.encoding_options),
+        FileEncoder::Avif
     );
 }
 

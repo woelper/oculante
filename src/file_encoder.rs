@@ -32,6 +32,21 @@ pub enum FileEncoder {
     Avif,
 }
 
+/// Reads the saved options of the formats and adds the formats that came after they
+/// were saved. Settings of 0.9.6 have no AVIF, which then could not be picked when
+/// saving, and a file named .avif was saved as PNG.
+pub fn deserialize_encoders<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<FileEncoder>, D::Error> {
+    let mut encoders = Vec::<FileEncoder>::deserialize(deserializer)?;
+    for encoder in FileEncoder::all() {
+        if !encoders.iter().any(|saved| saved.ext() == encoder.ext()) {
+            encoders.push(encoder);
+        }
+    }
+    Ok(encoders)
+}
+
 impl Default for FileEncoder {
     fn default() -> Self {
         Self::Png {
@@ -41,6 +56,19 @@ impl Default for FileEncoder {
 }
 
 impl FileEncoder {
+    /// The formats a file can be saved in, with their default options
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Jpg { quality: 75 },
+            Self::WebP,
+            Self::Png {
+                compressionlevel: CompressionLevel::Default,
+            },
+            Self::Bmp,
+            Self::Avif,
+        ]
+    }
+
     pub fn matching_variant(path: &Path, variants: &Vec<Self>) -> Self {
         let ext = path
             .extension()
