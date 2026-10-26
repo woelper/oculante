@@ -56,6 +56,8 @@ pub struct OculanteApp {
     egui_started_press: bool,
     /// True if two fingers on a trackpad scrolled last, not a mouse wheel
     trackpad_scrolled: bool,
+    /// A pinch on a touchpad that Windows gives as Ctrl and the wheel
+    wheel_pinch: WheelPinch,
     /// Updates system theme during runtime
     last_system_theme: Option<egui::Theme>,
     /// When the current file was last checked for changes on disk
@@ -183,6 +185,7 @@ impl OculanteApp {
             last_frame_was_compared_image: false,
             egui_started_press: false,
             trackpad_scrolled: false,
+            wheel_pinch: WheelPinch::default(),
             last_system_theme: None,
             last_file_check: Instant::now(),
             system_fonts: SystemFonts::Loaded,
@@ -869,9 +872,10 @@ impl eframe::App for OculanteApp {
         }
 
         // Scroll zoom, Ctrl or Cmd and the wheel go through the images, a pinch on a
-        // trackpad zooms, and so do two fingers on a touchscreen. On macOS, where the
-        // pinch works, two fingers on a trackpad move the image instead, unless the
-        // settings say they zoom as everywhere else.
+        // trackpad zooms (on Windows it comes as Ctrl and the wheel), and so do two
+        // fingers on a touchscreen. On macOS, where the pinch works, two fingers on a
+        // trackpad move the image instead, unless the settings say they zoom as
+        // everywhere else.
         let pan = if cfg!(target_os = "macos") && self.state.persistent_settings.trackpad_pans {
             ctx.input(|i| trackpad_pan(&i.events, &mut self.trackpad_scrolled))
         } else {
@@ -883,7 +887,8 @@ impl eframe::App for OculanteApp {
         } else {
             ctx.input(|i| i.smooth_scroll_delta.y)
         };
-        let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events));
+        let wheel_pinch = cfg!(target_os = "windows").then_some(&mut self.wheel_pinch);
+        let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events, i.time, wheel_pinch));
         let pinch = pinch * ctx.input(touch_zoom);
         if !self.state.pointer_over_ui {
             match browse {
