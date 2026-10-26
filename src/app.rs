@@ -405,7 +405,7 @@ impl OculanteApp {
         self.system_fonts = SystemFonts::NotLoaded(Box::new(fonts.clone()));
 
         apply_theme(&mut self.state, ctx);
-        self.last_system_theme = ctx.system_theme();
+        self.last_system_theme = crate::settings::system_theme(ctx);
         ctx.set_fonts(fonts);
 
         // Load checker texture for transparency grid (once)
@@ -653,7 +653,7 @@ impl eframe::App for OculanteApp {
                 self.renderer = Some(renderer);
             }
         } else if self.state.persistent_settings.theme == ColorTheme::System {
-            let current_system_theme = ctx.system_theme();
+            let current_system_theme = crate::settings::system_theme(ctx);
             if current_system_theme != self.last_system_theme {
                 self.last_system_theme = current_system_theme;
                 apply_theme(&mut self.state, ctx);

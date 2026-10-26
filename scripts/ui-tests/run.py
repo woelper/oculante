@@ -1125,9 +1125,9 @@ def shown_file(app):
     return os.path.basename(found.group(1)) if found else title.strip()
 
 
-def start(binary, name, path, settings=None, screen=SCREEN):
+def start(binary, name, path, settings=None, screen=SCREEN, env=None):
     """The app with an image on screen. Closes it if that fails, so nothing is left behind."""
-    app = App(binary, name, [path], settings=settings, screen=screen)
+    app = App(binary, name, [path], settings=settings, screen=screen, env=env)
     try:
         app.wait_window()
         app.move(0.6, 0.6)
@@ -1970,6 +1970,123 @@ def test_assign_a_shortcut_with_shift(binary):
     assert fired, "Shift+X did not open the info panel"
 
 
+PORTAL = "/usr/libexec/xdg-desktop-portal"
+PORTAL_GTK = "/usr/libexec/xdg-desktop-portal-gtk"
+
+
+class DesktopPortal:
+    """The desktop portal on a D-Bus session of its own. Its GTK backend tells the color
+    scheme from a GSettings key file in a folder of its own: nothing of the session of
+    whoever runs the tests is used or changed."""
+
+    def __init__(self, name, scheme):
+        self.dir = os.path.join(OUT, name)
+        shutil.rmtree(self.dir, ignore_errors=True)
+        folders = {var: os.path.join(self.dir, var.lower()) for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR")}
+        for folder in folders.values():
+            os.makedirs(folder, mode=0o700)
+        os.makedirs(os.path.join(folders["XDG_CONFIG_HOME"], "xdg-desktop-portal"))
+        with open(os.path.join(folders["XDG_CONFIG_HOME"], "xdg-desktop-portal", "portals.conf"), "w") as f:
+            f.write("[preferred]\ndefault=gtk\n")
+        self.address = f"unix:path={folders['XDG_RUNTIME_DIR']}/bus"
+        self.env = dict(os.environ, **folders, GSETTINGS_BACKEND="keyfile", XDG_CURRENT_DESKTOP="X-Test")
+        self.env.pop("WAYLAND_DISPLAY", None)
+        # the GTK backend needs a display
+        self.env.update(DISPLAY=":96", DBUS_SESSION_BUS_ADDRESS=self.address)
+        self.procs = []
+        subprocess.run(["pkill", "-f", "^Xvfb :96 "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.log = open(os.path.join(self.dir, "portal.log"), "w")
+        try:
+            self._spawn(["Xvfb", ":96", "-screen", "0", "640x480x24", "-nolisten", "tcp"])
+            time.sleep(0.5)
+            self._spawn(["dbus-daemon", "--session", "--nofork", f"--address={self.address}"])
+            for _ in range(30):
+                if os.path.exists(self.address.split("=", 1)[1]):
+                    break
+                time.sleep(0.1)
+            self.set(scheme)
+            self._spawn([PORTAL_GTK])
+            time.sleep(0.5)
+            self._spawn([PORTAL])
+            for _ in range(50):
+                if self.read() is not None:
+                    break
+                time.sleep(0.1)
+            else:
+                raise AssertionError("the desktop portal never answered")
+        except Exception:
+            self.close()
+            raise
+
+    def _spawn(self, command):
+        self.procs.append(subprocess.Popen(command, env=self.env, stdout=self.log, stderr=self.log))
+
+    def set(self, scheme):
+        """default, prefer-dark or prefer-light"""
+        subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", scheme], env=self.env, check=True)
+
+    def read(self):
+        call = ["gdbus", "call", "--session", "--dest", "org.freedesktop.portal.Desktop",
+                "--object-path", "/org/freedesktop/portal/desktop", "--method",
+                "org.freedesktop.portal.Settings.ReadOne", "org.freedesktop.appearance", "color-scheme"]
+        result = subprocess.run(call, env=self.env, capture_output=True, text=True)
+        found = re.search(r"uint32 (\d)", result.stdout)
+        return int(found.group(1)) if found else None
+
+    def close(self):
+        for proc in reversed(self.procs):
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        self.log.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+
+def test_same_as_system_follows_the_desktop(binary):
+    """"Same as system" takes the theme of the Linux desktop and follows it. winit does
+    not tell it there: the app was dark on every Linux desktop, 0.9.6 asked the portal
+    once at the start. A picked theme stays, without a portal it is dark as before."""
+    missing = [p for p in (PORTAL, PORTAL_GTK) if not os.path.exists(p)]
+    missing += [t for t in ("dbus-daemon", "gsettings", "gdbus") if not shutil.which(t)]
+    if missing:
+        raise Skip("needs " + ", ".join(missing))
+    bar = (300, 4, 600, 28)  # the top bar between its buttons
+    light, dark = 150, 80
+    levels = {}
+    with DesktopPortal("theme_portal", "prefer-light") as portal:
+        env = {"DBUS_SESSION_BUS_ADDRESS": portal.address}
+        with start(binary, "theme_system", image("moss.jpg"), settings={"theme": "System"}, env=env) as app:
+            app.settle(1.5)
+            levels["light desktop"] = mean_level(app.shot("light"), bar)
+            portal.set("prefer-dark")
+            app.settle(2.0)
+            levels["dark desktop"] = mean_level(app.shot("dark"), bar)
+            portal.set("prefer-light")
+            app.settle(2.0)
+            levels["light again"] = mean_level(app.shot("light_again"), bar)
+            asked = "The desktop's color scheme is 2" in app.log()
+        with start(binary, "theme_dark_picked", image("moss.jpg"), settings={"theme": "Dark"}, env=env) as app:
+            app.settle(1.5)
+            levels["Dark picked"] = mean_level(app.shot("dark_picked"), bar)
+    nowhere = {"DBUS_SESSION_BUS_ADDRESS": "unix:path=" + os.path.join(OUT, "no_bus_here")}
+    with start(binary, "theme_no_portal", image("moss.jpg"), settings={"theme": "System"}, env=nowhere) as app:
+        app.settle(1.5)
+        levels["no portal"] = mean_level(app.shot("no_portal"), bar)
+    shown = ", ".join(f"{k} {v:.0f}" for k, v in levels.items())
+    assert levels["light desktop"] > light and levels["light again"] > light, f"not light: {shown}"
+    assert levels["dark desktop"] < dark, f"did not follow to dark: {shown}"
+    assert levels["Dark picked"] < dark and levels["no portal"] < dark, f"not dark: {shown}"
+    assert asked, "the app did not log the desktop's color scheme"
+
+
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
     """Pixels of an image file that differ on screen, where it fits best within margin of x, y."""
     crop = screenshot[:-4] + "_at.png"
@@ -2217,6 +2334,7 @@ TESTS = [
     test_new_noise,
     test_memory_for_the_cache,
     test_assign_a_shortcut_with_shift,
+    test_same_as_system_follows_the_desktop,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,

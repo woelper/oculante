@@ -237,8 +237,15 @@ impl VolatileSettings {
     }
 }
 
+/// The theme of the system. On Linux and the BSDs winit does not tell it, there it is
+/// the one the desktop portal tells.
+pub fn system_theme(ctx: &Context) -> Option<Theme> {
+    ctx.system_theme().or_else(crate::desktop_theme::preferred)
+}
+
 pub fn set_system_theme(ctx: &Context) {
-    match ctx.system_theme() {
+    crate::desktop_theme::watch(ctx);
+    match system_theme(ctx) {
         Some(Theme::Dark) => ctx.set_visuals(Visuals::dark()),
         Some(Theme::Light) => ctx.set_visuals(Visuals::light()),
         None => ctx.set_visuals(Visuals::dark()),

@@ -2,6 +2,7 @@ pub mod app;
 pub mod appstate;
 pub(crate) mod cache;
 pub(crate) mod comparelist;
+pub(crate) mod desktop_theme;
 pub(crate) mod glow_renderer;
 pub mod image_editing;
 pub mod image_loader;
