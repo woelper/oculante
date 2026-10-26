@@ -82,6 +82,8 @@ icns = "0.5"
 # dicom needs to be the same version
 dicom-pixeldata = { version = "0.10", features = ["image"] }
 dicom-object = "0.10"
+# the encoding of DICOM files without a file meta header
+dicom-transfer-syntax-registry = "0.10"
 gif-dispose = "6.0"
 
 # === FILTER CRATES
@@ -150,7 +152,9 @@ avif_native = ["avif-decode", "bytemuck"]
 dav1d = ["avif_native"]
 file_open = ["rfd"]
 turbo = ["turbojpeg"]
-j2k = ["jpeg2k"]
+# also JPEG 2000 in DICOM files, through the same C library. Not with
+# "dicom-pixeldata/openjp2": its 0.6.1 frees a null pointer on every image
+j2k = ["jpeg2k", "dicom-pixeldata/openjpeg-sys"]
 # colour management for JPEG XL, in pure Rust (moxcms)
 jxlcms = ["jxl-oxide/moxcms"]
 hdr = []

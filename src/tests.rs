@@ -1393,6 +1393,84 @@ fn ci_dicom_frames() {
     std::fs::remove_file(&path).unwrap();
 }
 
+/// A DICOM file that is only the data set, without preamble, `DICM` and file
+/// meta header, so its format is not detected. In palette colours, which
+/// dicom-pixeldata gives as gray indices.
+#[test]
+fn ci_dicom_without_meta_header_in_palette_colour() {
+    use dicom_core::{DataElement, PrimitiveValue, Tag, VR};
+    use dicom_object::InMemDicomObject;
+    let mut object = InMemDicomObject::new_empty();
+    let text = |group, element, vr, value: &str| {
+        DataElement::new(Tag(group, element), vr, PrimitiveValue::from(value))
+    };
+    let number = |group, element, value: u16| {
+        DataElement::new(Tag(group, element), VR::US, PrimitiveValue::from(value))
+    };
+    let words = |group, element, value: Vec<u16>| {
+        DataElement::new(
+            Tag(group, element),
+            VR::OW,
+            PrimitiveValue::U16(value.into()),
+        )
+    };
+    object.put(text(0x0008, 0x0016, VR::UI, "1.2.840.10008.5.1.4.1.1.7"));
+    object.put(text(0x0008, 0x0018, VR::UI, "1.2.3.4.5"));
+    object.put(number(0x0028, 0x0002, 1));
+    object.put(text(0x0028, 0x0004, VR::CS, "PALETTE COLOR"));
+    object.put(number(0x0028, 0x0010, 2));
+    object.put(number(0x0028, 0x0011, 2));
+    object.put(number(0x0028, 0x0100, 8));
+    object.put(number(0x0028, 0x0101, 8));
+    object.put(number(0x0028, 0x0102, 7));
+    object.put(number(0x0028, 0x0103, 0));
+    // three entries of 16 bit from index 10: red, green, blue
+    for (descriptor, data, entries) in [
+        (0x1101, 0x1201, vec![0xFFFF, 0, 0]),
+        (0x1102, 0x1202, vec![0, 0xFFFF, 0]),
+        (0x1103, 0x1203, vec![0, 0, 0xFFFF]),
+    ] {
+        object.put(DataElement::new(
+            Tag(0x0028, descriptor),
+            VR::US,
+            PrimitiveValue::from([3u16, 10, 16]),
+        ));
+        object.put(words(0x0028, data, entries));
+    }
+    // below the first index, the three entries, past the last
+    object.put(DataElement::new(
+        Tag(0x7FE0, 0x0010),
+        VR::OB,
+        PrimitiveValue::from(vec![0u8, 11, 12, 200]),
+    ));
+    let path = std::env::temp_dir().join("oculante_test_no_meta.dcm");
+    let implicit_le = dicom_transfer_syntax_registry::entries::IMPLICIT_VR_LITTLE_ENDIAN.erased();
+    object
+        .write_dataset_with_ts(std::fs::File::create(&path).unwrap(), &implicit_le)
+        .unwrap();
+
+    let image = load_item(&path, 0).to_rgb8();
+    let colours: Vec<[u8; 3]> = image.pixels().map(|p| p.0).collect();
+    assert_eq!(
+        colours,
+        [[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 0, 255]]
+    );
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// JPEG 2000 in DICOM, the same MR image as the RLE one, both lossless
+#[cfg(feature = "j2k")]
+#[test]
+fn ci_dicom_jpeg2000() {
+    let jpeg2000 = load_item(
+        std::path::Path::new("res/tests/dicom/MR_small_jp2klossless.dcm"),
+        0,
+    );
+    let rle = load_item(std::path::Path::new("res/tests/dicom/MR_small_RLE.dcm"), 0);
+    assert_eq!((jpeg2000.width(), jpeg2000.height()), (64, 64));
+    assert_eq!(jpeg2000.as_bytes(), rle.as_bytes());
+}
+
 /// Without a window position (Wayland) fullscreen keeps the image at the same fraction
 /// of the canvas, the area the panels leave for it
 #[test]

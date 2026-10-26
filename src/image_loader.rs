@@ -103,7 +103,11 @@ pub fn open_image_item(
 
     if let Ok(fmt) = FileFormat::from_file(&img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
-        if canonical_extension(fmt.extension()) != extension {
+        // "Arbitrary Binary Data" is what is left when no signature matched, which
+        // says nothing against the extension, for example DICOM without its preamble
+        if canonical_extension(fmt.extension()) != extension
+            && fmt != FileFormat::ArbitraryBinaryData
+        {
             if unchecked_extensions.contains(&extension.as_str()) {
                 info!("Extension {extension} skipped check.")
             } else {
@@ -139,9 +143,12 @@ pub fn open_image_item(
         }
         "dcm" | "ima" => {
             use dicom_pixeldata::PixelDecoder;
-            let obj = dicom_object::open_file(img_location)?;
+            let obj = open_dicom(&img_location)?;
             let image = obj.decode_pixel_data_frame(item as u32)?;
-            let dynamic_image = image.to_dynamic_image(0)?;
+            let dynamic_image = match palette_color(&obj, &image) {
+                Some(image) => image,
+                None => image.to_dynamic_image(0)?,
+            };
             _ = sender.send(Frame::new_still(dynamic_image));
         }
         "ktx2" => {
@@ -989,6 +996,115 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// A DICOM file, also one that is only the data set: no preamble, no `DICM` and
+/// no file meta header with the transfer syntax. That is older files and those
+/// some devices write, in the default transfer syntax, Implicit VR Little Endian.
+fn open_dicom(path: &Path) -> Result<dicom_object::DefaultDicomObject> {
+    let error = match dicom_object::open_file(path) {
+        Ok(object) => return Ok(object),
+        Err(error) => error,
+    };
+    let data_set = || -> Result<dicom_object::DefaultDicomObject> {
+        let implicit_le =
+            dicom_transfer_syntax_registry::entries::IMPLICIT_VR_LITTLE_ENDIAN.erased();
+        let object = dicom_object::InMemDicomObject::read_dataset_with_ts(
+            BufReader::new(File::open(path)?),
+            &implicit_le,
+        )?;
+        let uid = |tag| {
+            object
+                .element(tag)
+                .ok()
+                .and_then(|uid| uid.to_str().ok())
+                .map(|uid| uid.trim_end_matches('\0').to_string())
+        };
+        let mut meta = dicom_object::FileMetaTableBuilder::new().transfer_syntax(implicit_le.uid());
+        if let Some(class) = uid(dicom_object::Tag(0x0008, 0x0016)) {
+            meta = meta.media_storage_sop_class_uid(class);
+        }
+        if let Some(instance) = uid(dicom_object::Tag(0x0008, 0x0018)) {
+            meta = meta.media_storage_sop_instance_uid(instance);
+        }
+        Ok(object.with_meta(meta)?)
+    };
+    data_set().map_err(|data_set_error| {
+        debug!("Not a DICOM data set either: {data_set_error}");
+        error.into()
+    })
+}
+
+/// A `PALETTE COLOR` DICOM image in its colours. dicom-pixeldata gives the
+/// indices as gray. `None` for other images and when the palette can't be read.
+fn palette_color(
+    object: &dicom_object::DefaultDicomObject,
+    image: &dicom_pixeldata::DecodedPixelData,
+) -> Option<DynamicImage> {
+    use dicom_pixeldata::PhotometricInterpretation;
+    if *image.photometric_interpretation() != PhotometricInterpretation::PaletteColor
+        || image.samples_per_pixel() != 1
+    {
+        return None;
+    }
+    // per channel: Descriptor (entries, 0 for 65536, the first index and the bits
+    // of an entry) and the entries as words. 8 bit entries are in the low byte.
+    let lut = |descriptor, data| -> Option<(u32, Vec<u8>)> {
+        let descriptor = object
+            .element(dicom_object::Tag(0x0028, descriptor))
+            .ok()?
+            .to_multi_int::<i32>()
+            .ok()?;
+        let [entries, first, bits] = descriptor[..] else {
+            return None;
+        };
+        let entries = if entries == 0 {
+            65536
+        } else {
+            entries as usize
+        };
+        let words = object
+            .element(dicom_object::Tag(0x0028, data))
+            .ok()?
+            .uint16_slice()
+            .ok()?
+            .to_vec();
+        let shift = if bits > 8 { 8 } else { 0 };
+        let entries: Vec<u8> = words
+            .iter()
+            .take(entries)
+            .map(|w| (w >> shift) as u8)
+            .collect();
+        (!entries.is_empty()).then_some((first as u16 as u32, entries))
+    };
+    let (first, red) = lut(0x1101, 0x1201)?;
+    let (_, green) = lut(0x1102, 0x1202)?;
+    let (_, blue) = lut(0x1103, 0x1203)?;
+    let pixels = image.columns() as usize * image.rows() as usize;
+    let data = image.frame_data(0).ok()?;
+    let indices: Vec<u32> = match image.bits_allocated() {
+        8 => data.iter().take(pixels).map(|&i| i as u32).collect(),
+        16 => data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .take(pixels)
+            .map(|&i| u16::from_le_bytes(i) as u32)
+            .collect(),
+        _ => return None,
+    };
+    if indices.len() != pixels {
+        return None;
+    }
+    let entry = |lut: &[u8], index: u32| {
+        // indices below the first take the first entry, those after the last the last
+        lut[(index.saturating_sub(first) as usize).min(lut.len() - 1)]
+    };
+    let rgb: Vec<u8> = indices
+        .iter()
+        .flat_map(|&i| [entry(&red, i), entry(&green, i), entry(&blue, i)])
+        .collect();
+    image::RgbImage::from_raw(image.columns(), image.rows(), rgb).map(DynamicImage::ImageRgb8)
 }
 
 /// How often an animation is to be played, `None` for forever
