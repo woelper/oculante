@@ -32,6 +32,7 @@ from uitest import (  # noqa: E402
     panel_edge,
     region_has_color,
     rightmost_x,
+    start_xvfb,
 )
 
 # what the app logs once an image is on screen
@@ -2017,14 +2018,13 @@ class DesktopPortal:
         self.address = f"unix:path={folders['XDG_RUNTIME_DIR']}/bus"
         self.env = dict(os.environ, **folders, GSETTINGS_BACKEND="keyfile", XDG_CURRENT_DESKTOP="X-Test")
         self.env.pop("WAYLAND_DISPLAY", None)
-        # the GTK backend needs a display
-        self.env.update(DISPLAY=":96", DBUS_SESSION_BUS_ADDRESS=self.address)
+        self.env.update(DBUS_SESSION_BUS_ADDRESS=self.address)
         self.procs = []
-        subprocess.run(["pkill", "-f", "^Xvfb :96 "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.log = open(os.path.join(self.dir, "portal.log"), "w")
         try:
-            self._spawn(["Xvfb", ":96", "-screen", "0", "640x480x24", "-nolisten", "tcp"])
-            time.sleep(0.5)
+            # the GTK backend needs a display, and the bus has to know it before it starts the backend
+            xvfb, self.env["DISPLAY"] = start_xvfb((640, 480), log=self.log)
+            self.procs.append(xvfb)
             self._spawn(["dbus-daemon", "--session", "--nofork", f"--address={self.address}"])
             for _ in range(30):
                 if os.path.exists(self.address.split("=", 1)[1]):

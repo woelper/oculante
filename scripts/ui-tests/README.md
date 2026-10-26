@@ -30,7 +30,11 @@ Run a single test by name, or test another binary:
     python3 scripts/ui-tests/run.py test_shortcuts
     python3 scripts/ui-tests/run.py --binary path/to/oculante
 
-Screenshots and the app log of each test end up in `target/ui-tests/<test>/`.
+Screenshots, the app log and the log of the X server of each test end up in
+`target/ui-tests/<test>/`.
+
+Each test starts an X server of its own on the first free display from `:100`
+on, so runs in other checkouts can go on at the same time.
 
 ## What is covered
 
