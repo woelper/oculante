@@ -1454,6 +1454,32 @@ def test_info_panel_holds_still(binary):
         assert changed == 0, f"the panel changed with the scroll bar ({changed} pixels)"
 
 
+def test_typing_chinese_into_a_field(binary):
+    """Typing a character the built-in fonts lack into a text field loads the fonts of
+    the system, and the app goes on. It asked for a repaint while egui's input was held
+    and froze for good the first time."""
+    with App(binary, "typing_chinese", [image("moss.jpg")]) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the image never loaded"
+        app.key("e")
+        app.settle(1.0)
+        app.click(896, 50)  # "Filters"
+        app.click(896, 82)  # its search field
+        app.x("xdotool", "type", "--delay", "80", "日")
+        app.settle(1.0)
+        app.key("Escape")
+        app.click(450, 300)  # on the image, out of the field
+        app.settle(1.0)
+        since = len(app.log())
+        app.key("i")
+        app.settle(1.0)
+        answered = "InfoMode" in app.matched_shortcuts(since)
+        wanted = "System fonts are needed" in app.log()
+    assert wanted, "the typed character did not ask for the fonts of the system"
+    assert answered, "the app did not answer after 日 was typed"
+
+
 def test_annotation_cards(binary):
     """Each annotation has a card in the edit panel, the one in front first. What is
     set while nothing is selected is for the next one, an outline here. A card sends
@@ -2335,6 +2361,7 @@ TESTS = [
     test_memory_for_the_cache,
     test_assign_a_shortcut_with_shift,
     test_same_as_system_follows_the_desktop,
+    test_typing_chinese_into_a_field,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,

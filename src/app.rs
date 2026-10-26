@@ -205,17 +205,26 @@ impl OculanteApp {
             for path in &self.state.volatile_settings.recent_images {
                 want_system_fonts_for(&path.to_string_lossy());
             }
-            ctx.input(|i| {
-                for event in &i.events {
-                    match event {
-                        egui::Event::Text(text) | egui::Event::Paste(text) => {
-                            want_system_fonts_for(text)
-                        }
-                        egui::Event::Ime(_) => want_system_fonts_for_ime(),
-                        _ => {}
-                    }
-                }
+            // Looked at outside of `input`: wanting the fonts asks for a repaint, which
+            // needs the context `input` holds. Typing 日 into a text field froze the app.
+            let (typed, composing) = ctx.input(|i| {
+                let typed: Vec<String> = i
+                    .events
+                    .iter()
+                    .filter_map(|event| match event {
+                        egui::Event::Text(text) | egui::Event::Paste(text) => Some(text.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                let composing = i.events.iter().any(|e| matches!(e, egui::Event::Ime(_)));
+                (typed, composing)
             });
+            for text in &typed {
+                want_system_fonts_for(text);
+            }
+            if composing {
+                want_system_fonts_for_ime();
+            }
             if !system_fonts_wanted() {
                 return;
             }
