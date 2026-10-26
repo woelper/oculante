@@ -664,19 +664,53 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+/// Windows gives a pinch on a touchpad to the app as Ctrl and the wheel, in parts
+/// of a notch. Those zoom, and whole notches too while a pinch goes on: one of
+/// exactly a notch would go to another image in the middle of it.
+#[derive(Default)]
+pub struct WheelPinch {
+    /// when the last part of a notch came, on egui's clock
+    last: Option<f64>,
+}
+
+impl WheelPinch {
+    /// How long after a part of a notch whole ones still zoom, in seconds
+    const AFTER: f64 = 0.5;
+
+    fn is_pinch(&mut self, delta: f32, now: f64) -> bool {
+        if delta.fract() != 0. {
+            self.last = Some(now);
+        }
+        self.last.is_some_and(|last| now - last < Self::AFTER)
+    }
+}
+
 /// What the wheel and the trackpad ask for in one frame, besides scrolling: the
 /// direction to go through the images (Ctrl or Cmd and the wheel, 1 is the next
 /// one, -1 the one before) and the factor a pinch on a trackpad zooms by.
 /// egui turns Ctrl and the wheel into zooming and leaves its scroll delta at
-/// zero then, so both are read from the events.
-pub fn browse_and_pinch(events: &[egui::Event]) -> (i32, f32) {
+/// zero then, so both are read from the events. `wheel_pinch` is there on Windows.
+pub fn browse_and_pinch(
+    events: &[egui::Event],
+    now: f64,
+    mut wheel_pinch: Option<&mut WheelPinch>,
+) -> (i32, f32) {
     let mut browse = 0.;
     let mut pinch = 1.;
     for event in events {
         match event {
             egui::Event::MouseWheel {
                 delta, modifiers, ..
-            } if modifiers.ctrl || modifiers.command => browse -= delta.y,
+            } if modifiers.ctrl || modifiers.command => {
+                if let Some(wheel_pinch) = wheel_pinch.as_deref_mut()
+                    && wheel_pinch.is_pinch(delta.y, now)
+                {
+                    // as fast as egui zooms with Ctrl and the wheel, about 22 % a notch
+                    pinch *= (delta.y * 0.2).exp();
+                } else {
+                    browse -= delta.y;
+                }
+            }
             egui::Event::Zoom(factor) => pinch *= factor,
             _ => {}
         }
@@ -1341,6 +1375,7 @@ mod tests {
             command: true,
             ..Default::default()
         };
+        let browse_and_pinch = |events: &[egui::Event]| browse_and_pinch(events, 0., None);
         assert_eq!(browse_and_pinch(&[wheel(-1., ctrl)]), (1, 1.));
         assert_eq!(browse_and_pinch(&[wheel(1., cmd)]), (-1, 1.));
         // X11 sends a notch in two events
@@ -1356,6 +1391,35 @@ mod tests {
         let (browse, pinch) = browse_and_pinch(&[egui::Event::Zoom(1.25), egui::Event::Zoom(2.)]);
         assert_eq!((browse, pinch), (0, 2.5));
         assert_eq!(browse_and_pinch(&[]), (0, 1.));
+        // a part of a notch goes through the images too, where a pinch does not come as the wheel
+        assert_eq!(browse_and_pinch(&[wheel(0.25, ctrl)]), (-1, 1.));
+    }
+
+    /// On Windows a pinch on a touchpad comes as Ctrl and the wheel, in parts of a
+    /// notch. It zoomed nowhere and went through the whole folder instead.
+    #[test]
+    fn a_pinch_as_ctrl_and_the_wheel_zooms() {
+        let ctrl = egui::Modifiers::CTRL;
+        let mut wheel_pinch = WheelPinch::default();
+        let mut frame =
+            |events: &[egui::Event], now| browse_and_pinch(events, now, Some(&mut wheel_pinch));
+        // whole notches go through the images
+        assert_eq!(frame(&[wheel(-1., ctrl)], 1.), (1, 1.));
+        // fingers apart zoom in, together zoom out
+        let (browse, pinch) = frame(&[wheel(0.1, ctrl), wheel(0.15, ctrl)], 2.);
+        assert_eq!(browse, 0);
+        assert!((pinch - 0.05f32.exp()).abs() < 1e-6, "{pinch}");
+        let (browse, pinch) = frame(&[wheel(-0.4, ctrl)], 2.1);
+        assert_eq!(browse, 0);
+        assert!(pinch < 1., "{pinch}");
+        // exactly a notch in the middle of a pinch zooms as well
+        let (browse, pinch) = frame(&[wheel(1., ctrl)], 2.3);
+        assert_eq!(browse, 0);
+        assert!(pinch > 1., "{pinch}");
+        // and when it is over, a notch goes to the next image again
+        assert_eq!(frame(&[wheel(-1., ctrl)], 3.), (1, 1.));
+        // the wheel alone still does neither
+        assert_eq!(frame(&[wheel(0.2, egui::Modifiers::NONE)], 3.1), (0, 1.));
     }
 
     /// Two fingers on a touchscreen zoom by how far they spread, one finger does not.

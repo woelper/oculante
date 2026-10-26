@@ -7,6 +7,7 @@ input with xdotool and takes screenshots with ImageMagick. Needs `Xvfb`,
 import json
 import os
 import re
+import select
 import shutil
 import subprocess
 import time
@@ -16,6 +17,8 @@ IMAGES = os.path.join(REPO, "res", "tests")
 OUT = os.path.join(REPO, "target", "ui-tests")
 SCREEN = (1400, 900)
 WINDOW_MANAGER = "openbox"
+# far above the displays of a desktop, so a test never takes one of them
+FIRST_DISPLAY = 100
 
 
 def has_window_manager():
@@ -26,6 +29,32 @@ def image(name):
     return os.path.join(IMAGES, name)
 
 
+def start_xvfb(screen, display=None, log=subprocess.DEVNULL):
+    """Start Xvfb and wait until it takes connections. Without a display it takes the
+    first free one from FIRST_DISPLAY on, so test runs of other checkouts or sessions
+    can go on at the same time. Returns the process and the display."""
+    numbers = [display.lstrip(":")] if display else range(FIRST_DISPLAY, FIRST_DISPLAY + 200)
+    for number in numbers:
+        read_end, write_end = os.pipe()
+        # Xvfb writes the number here once it is ready, or exits if the display is taken
+        proc = subprocess.Popen(
+            ["Xvfb", f":{number}", "-displayfd", str(write_end), "-screen", "0", f"{screen[0]}x{screen[1]}x24", "-nolisten", "tcp"],
+            pass_fds=(write_end,),
+            stdout=log,
+            stderr=log,
+        )
+        os.close(write_end)
+        ready, _, _ = select.select([read_end], [], [], 10)
+        answer = os.read(read_end, 16) if ready else b""
+        os.close(read_end)
+        if answer.strip():
+            return proc, f":{number}"
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+    raise RuntimeError(f"Xvfb did not start on {display or 'any free display'}")
+
+
 class App:
     """One running instance of the app on its own display."""
 
@@ -34,7 +63,7 @@ class App:
         binary,
         name,
         args,
-        display=":97",
+        display=None,
         stdin=subprocess.DEVNULL,
         settings=None,
         volatile=None,
@@ -47,15 +76,12 @@ class App:
         self.out = os.path.join(OUT, name)
         shutil.rmtree(self.out, ignore_errors=True)
         os.makedirs(self.out)
-        # a display left behind by a test that died would swallow the keys of this one
-        subprocess.run(["pkill", "-f", f"^Xvfb {display} "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(0.3)
-        self.xvfb = subprocess.Popen(
-            ["Xvfb", display, "-screen", "0", f"{screen[0]}x{screen[1]}x24", "-nolisten", "tcp"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        time.sleep(1.0)
+        if display is not None:
+            # a display left behind by a test that died would swallow the keys of this one
+            subprocess.run(["pkill", "-f", f"^Xvfb {display} "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.3)
+        self.xvfb_log = open(os.path.join(self.out, "xvfb.log"), "w")
+        self.xvfb, display = start_xvfb(screen, display, self.xvfb_log)
         self.display = display
         extra_env = env or {}
         env = dict(os.environ)
@@ -201,6 +227,7 @@ class App:
                 except subprocess.TimeoutExpired:
                     proc.kill()
         self.logfile.close()
+        self.xvfb_log.close()
 
 
 def changed_pixels(a, b, fuzz=0):
