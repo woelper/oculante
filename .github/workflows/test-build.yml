@@ -1,0 +1,32 @@
+name: Test build
+
+# Release builds of this branch for Windows and Linux, to try before a release
+# candidate. The binaries are artifacts of the run, nothing is released.
+on:
+  push:
+    branches: [test-build]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            file: target/release/oculante.exe
+            name: oculante-windows-x64
+          # an older glibc than the release build, so it runs on more systems
+          - os: ubuntu-22.04
+            file: target/release/oculante
+            name: oculante-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+      - run: rustup update
+      - name: Build
+        run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.file }}
