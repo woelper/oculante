@@ -444,14 +444,19 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
 }
 
 fn keybinding_ui(state: &mut OculanteState, ui: &mut Ui) {
-    use crate::shortcuts::{Shortcut, keypresses_as_string};
+    use crate::shortcuts::{Shortcut, is_modifier_key, keypresses_as_string};
 
     state.key_grab = true;
 
     // Build the shortcut from the keys and modifiers that are held down right now
     let ctx = ui.ctx();
     let current = ctx.input(|i| Shortcut {
-        keys: i.keys_down.iter().copied().collect(),
+        keys: i
+            .keys_down
+            .iter()
+            .copied()
+            .filter(|key| !is_modifier_key(key))
+            .collect(),
         // Outside of macOS ctrl is reported as the command key as well. Only keep
         // the key itself, like the default shortcuts do.
         modifiers: egui::Modifiers {

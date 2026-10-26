@@ -1005,6 +1005,41 @@ fn ci_default_shortcuts() {
     }
 }
 
+/// Since egui 0.36 Shift, Ctrl and Alt are held keys as well. A shortcut assigned with
+/// them had them among its keys and never fired. Reading the settings drops them.
+#[test]
+fn ci_modifiers_are_no_keys_of_a_shortcut() {
+    use crate::shortcuts::{
+        InputEvent, Shortcut, default_shortcuts, deserialize_shortcuts, is_modifier_key,
+    };
+    use egui::{Key, Modifiers};
+    use std::collections::BTreeSet;
+    let assigned = Shortcut {
+        keys: BTreeSet::from([Key::ShiftLeft, Key::ArrowRight, Key::ControlRight]),
+        modifiers: Modifiers::SHIFT | Modifiers::CTRL,
+    };
+    let only_a_modifier = Shortcut {
+        keys: BTreeSet::from([Key::AltLeft]),
+        modifiers: Modifiers::ALT,
+    };
+    let saved = serde_json::json!({"NextImage": assigned, "Quit": only_a_modifier});
+    let shortcuts = deserialize_shortcuts(saved).unwrap();
+    assert_eq!(
+        shortcuts[&InputEvent::NextImage],
+        Shortcut {
+            keys: BTreeSet::from([Key::ArrowRight]),
+            modifiers: Modifiers::SHIFT | Modifiers::CTRL,
+        }
+    );
+    // no shortcut is left, so Quit keeps its default
+    assert!(!shortcuts.contains_key(&InputEvent::Quit));
+    assert!(
+        default_shortcuts()
+            .values()
+            .all(|s| !s.keys.iter().any(is_modifier_key))
+    );
+}
+
 /// The warnings the loader sends while opening a file
 fn warnings_for(path: &str) -> Vec<String> {
     let (message_sender, messages) = std::sync::mpsc::channel();

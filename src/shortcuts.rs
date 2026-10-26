@@ -122,10 +122,28 @@ impl Shortcut {
 
 pub type Shortcuts = BTreeMap<InputEvent, Shortcut>;
 
+/// Shift, Ctrl, Alt and the Super key. Since egui 0.36 they are keys of their own as
+/// well, a shortcut has them only as modifiers: with them among its keys it never fires.
+pub fn is_modifier_key(key: &Key) -> bool {
+    use Key::*;
+    matches!(
+        key,
+        ShiftLeft
+            | ShiftRight
+            | ControlLeft
+            | ControlRight
+            | AltLeft
+            | AltRight
+            | SuperLeft
+            | SuperRight
+    )
+}
+
 /// Reads the shortcuts as they are saved now, and as 0.9.6 and older saved
 /// them: a list of key names with the modifiers among them, like
 /// ["LShift", "Right"]. Those could not be read, and with them nothing of the
-/// settings. A shortcut that can not be read keeps its default.
+/// settings. A shortcut that can not be read keeps its default. Modifiers saved among
+/// the keys, as the 1.0 release candidates assigned them, are dropped from the keys.
 pub fn deserialize_shortcuts<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Shortcuts, D::Error> {
@@ -140,7 +158,12 @@ pub fn deserialize_shortcuts<'de, D: serde::Deserializer<'de>>(
             .ok()
             .or_else(|| {
                 shortcut_from_key_names(&serde_json::from_value::<Vec<String>>(value).ok()?)
-            });
+            })
+            .map(|mut shortcut| {
+                shortcut.keys.retain(|key| !is_modifier_key(key));
+                shortcut
+            })
+            .filter(|shortcut| !shortcut.keys.is_empty());
         if let Some(shortcut) = shortcut {
             shortcuts.insert(event, shortcut);
         }

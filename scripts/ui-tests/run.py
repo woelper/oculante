@@ -1934,6 +1934,42 @@ def test_memory_for_the_cache(binary):
     assert isinstance(saved, dict) and 1 <= saved.get("Percent", 0) <= 90, f"saved as {saved}"
 
 
+def test_assign_a_shortcut_with_shift(binary):
+    """A shortcut assigned with Shift held fires with Shift. Since egui 0.36 Shift is a
+    held key as well, it was saved among the keys and the shortcut never fired."""
+    with start(binary, "assign_shortcut", image("moss.jpg")) as app:
+        app.click(1005, 18)  # the menu
+        app.settle(1.0)
+        app.click(940, 218)  # Preferences
+        app.settle(1.5)
+        app.click(73, 154)  # Input
+        app.settle(1.5)
+        app.x("xdotool", "windowfocus", app.win)
+        app.x("xdotool", "keydown", "shift")
+        time.sleep(0.3)
+        app.x("xdotool", "keydown", "x")
+        app.settle(1.0)
+        app.shot("held")
+        app.click(700, 196)  # assign to InfoMode, the third row
+        app.x("xdotool", "keyup", "x")
+        app.x("xdotool", "keyup", "shift")
+        app.settle(1.0)
+        app.click(1005, 18)  # the menu
+        app.settle(1.0)
+        app.click(940, 218)  # Preferences, closes them
+        app.settle(1.5)
+        since = len(app.log())
+        app.key("shift+x")
+        fired = "InfoMode" in app.matched_shortcuts(since)
+        app.key("q")
+        app.settle(2.0)
+        with open(os.path.join(app.env["XDG_DATA_HOME"], "oculante", "config.json")) as f:
+            saved = json.load(f)["shortcuts"]["InfoMode"]
+    assert saved["keys"] == ["X"], f"saved as {saved}"
+    assert saved["modifiers"]["shift"], f"saved as {saved}"
+    assert fired, "Shift+X did not open the info panel"
+
+
 def differing_pixels_near(screenshot, expected, x, y, width, height, margin=2):
     """Pixels of an image file that differ on screen, where it fits best within margin of x, y."""
     crop = screenshot[:-4] + "_at.png"
@@ -2180,6 +2216,7 @@ TESTS = [
     test_jpeg_is_edited_without_alpha,
     test_new_noise,
     test_memory_for_the_cache,
+    test_assign_a_shortcut_with_shift,
     test_saved_edits_come_back,
     test_image_info_is_computed_when_shown,
     test_info_panel_resizes,
