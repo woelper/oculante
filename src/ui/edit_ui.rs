@@ -57,6 +57,10 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
         ImgOpItem::new(ImageOperation::Brightness(0)),
         ImgOpItem::new(ImageOperation::Contrast(0)),
         ImgOpItem::new(ImageOperation::Exposure(0)),
+        ImgOpItem::new(ImageOperation::Levels(Default::default())),
+        ImgOpItem::new(ImageOperation::Curves(std::array::from_fn(|_| {
+            crate::tone::straight_curve()
+        }))),
         ImgOpItem::new(ImageOperation::Desaturate(0)),
         ImgOpItem::new(ImageOperation::Invert),
         // Colour and Hue
@@ -641,6 +645,25 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     );
                 }
                 pixels_changed = true;
+            }
+
+            // The histogram behind Levels and Curves: of the image the pixel
+            // operations start from, made again for a new image or other image operations
+            let has_tone = state.edit_state.pixel_op_stack.iter().any(|op| {
+                matches!(op.operation, ImageOperation::Levels(_) | ImageOperation::Curves(_))
+            });
+            let histogram_is_old = state.edit_state.histogram.as_ref().map(|h| h.0) != Some(state.image_version);
+            if has_tone && (image_changed || histogram_is_old) {
+                let start = if keep_image_op_result {
+                    Some(&state.edit_state.result_image_op)
+                } else {
+                    state.current_image.as_deref()
+                };
+                if let Some(image) = start.filter(|image| image.width() > 0) {
+                    let histogram = std::sync::Arc::new(crate::tone::Histogram::of(image));
+                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(crate::tone::HISTOGRAM), histogram.clone()));
+                    state.edit_state.histogram = Some((state.image_version, histogram));
+                }
             }
 
             // The next stroke starts anew
