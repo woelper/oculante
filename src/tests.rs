@@ -1128,6 +1128,74 @@ fn ci_load_psd() {
     assert_valid_image(&frame);
 }
 
+/// Camera RAW files from raw.pixls.us, too big for the repository: run
+/// scripts/raw-samples.sh first. Each shows the largest preview the camera put
+/// into it, the right way round, or is developed when there is no big one.
+/// quickraw alone read none of the Canon, Pentax and newer Fujifilm files, and the
+/// detection took the NEF for an ARW and the PEF for a TIFF.
+#[cfg(feature = "rawler")]
+#[test]
+#[ignore = "needs the files of scripts/raw-samples.sh"]
+fn raw_samples() {
+    let samples = [
+        ("Nikon-D850-14bit-compressed.NEF", 8256, 5504),
+        ("DSC_0750.NEF", 6048, 4024),
+        ("B13A0729.CR2", 6720, 4480),
+        ("Canon_EOS_R5_CRAW_ISO_100_nocrop_nodual.CR3", 8192, 5464),
+        ("Canon_EOS_R6_RAW_ISO_100_nocrop_nodual.CR3", 5472, 3648),
+        ("_DSC0009.ARW", 1616, 1080),
+        ("AFXT2720.RAF", 4416, 2944),
+        ("_T012010.RW2", 1920, 1440),
+        ("R0000357.DNG", 6000, 4000),
+        // rawler finds no preview, quickraw does
+        ("Olympus_EM1mk2_Standard_20MP.ORF", 3200, 2400),
+        // developed, the preview is 720x480
+        ("IMGP8550.PEF", 7360, 4912),
+        // the thumbnail is full size, and turned upright
+        ("IMG_1361.DNG", 3024, 4032),
+    ];
+    let mut failures = vec![];
+    for (name, width, height) in samples {
+        let path = std::path::Path::new("target/raw-samples").join(name);
+        assert!(
+            path.exists(),
+            "{} is missing, run scripts/raw-samples.sh",
+            path.display()
+        );
+        let (frames, warnings) = match load_all(&path) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                failures.push(format!("{name}: {e:#}"));
+                continue;
+            }
+        };
+        let Some(image) = frames.first().and_then(|f| f.get_image()) else {
+            failures.push(format!("{name}: no image"));
+            continue;
+        };
+        if (image.width(), image.height()) != (width, height) {
+            failures.push(format!(
+                "{name}: {}x{}, expected {width}x{height}",
+                image.width(),
+                image.height()
+            ));
+        }
+        if !warnings.is_empty() {
+            failures.push(format!("{name}: {warnings:?}"));
+        }
+        // a picture, not one colour
+        let luma = image.thumbnail(64, 64).to_luma8();
+        let mean = luma.iter().map(|&v| v as f64).sum::<f64>() / luma.len() as f64;
+        let deviation = (luma.iter().map(|&v| (v as f64 - mean).powi(2)).sum::<f64>()
+            / luma.len() as f64)
+            .sqrt();
+        if deviation < 10. {
+            failures.push(format!("{name}: flat, deviation {deviation:.1}"));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
 #[test]
 fn ci_load_svg() {
     let frame = load_first_frame("res/tests/johnny_automatic_lobster.svg");

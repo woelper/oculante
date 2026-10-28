@@ -174,7 +174,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - psd (via `psd`)
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
-- RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
+- RAW (via `rawler` from dnglab, `quickraw` for the rest - cr2, cr3, crw, nef, nrw, arw, srf, sr2, raf, rw2, orf, pef, dng, srw, 3fr, fff, iiq, mos, mef, mrw, kdc, erf, x3f, ari, arq, braw, r3d, ori, rwl, raw). The preview the camera made is shown, files without a big one are developed. Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
 - HEIC/HEIF (via `heic-rs`, in pure Rust), with every image a file holds, camera HIF (4:2:2) included
 - qoi
