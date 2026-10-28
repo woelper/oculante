@@ -1304,26 +1304,65 @@ pub type ExtendedInfoChannel = (
     Receiver<(InfoVersion, ExtendedImageInfo)>,
 );
 
-/// The EXIF data of a file, to write into a copy of the image that is saved
+/// The EXIF data of a file, to write into a copy of the image that is saved.
+/// Only what is about the photo goes along, not what is about the file: the
+/// copy is saved upright and maybe smaller, the thumbnail would be the old one,
+/// a maker note points into the old file. A TIFF or RAW file is its own EXIF
+/// block, pixels and all, which made a JPEG copy panic and a PNG copy as big as
+/// the RAW.
 pub fn raw_exif(path: &Path) -> Option<Bytes> {
-    let input: Bytes = std::fs::read(path).ok()?.into();
-    if let Ok(Some(image)) = DynImage::from_bytes(input.clone())
-        && let Some(exif) = image.exif()
-    {
-        return Some(exif);
+    use exif::{In, Tag};
+    let mut reader = std::io::BufReader::new(std::fs::File::open(path).ok()?);
+    let exif = exif::Reader::new()
+        .continue_on_error(true)
+        .read_from_container(&mut reader)
+        .or_else(|e| {
+            e.distill_partial_result(|errors| debug!("EXIF of {}: {errors:?}", path.display()))
+        })
+        .ok()?;
+    let about_the_photo = |field: &&exif::Field| {
+        field.ifd_num == In::PRIMARY
+            && field.tag.description().is_some()
+            && !matches!(field.value, exif::Value::Unknown(..))
+            && match field.tag {
+                Tag::Orientation | Tag::PixelXDimension | Tag::PixelYDimension | Tag::MakerNote => {
+                    false
+                }
+                Tag(exif::Context::Tiff, _) => matches!(
+                    field.tag,
+                    Tag::ImageDescription
+                        | Tag::Make
+                        | Tag::Model
+                        | Tag::Software
+                        | Tag::DateTime
+                        | Tag::Artist
+                        | Tag::Copyright
+                ),
+                Tag(exif::Context::Exif | exif::Context::Gps, _) => true,
+                _ => false,
+            }
+    };
+    let mut fields = exif.fields().filter(about_the_photo).peekable();
+    fields.peek()?;
+    let mut writer = exif::experimental::Writer::new();
+    fields.for_each(|field| writer.push_field(field));
+    let mut buf = Cursor::new(Vec::new());
+    if let Err(e) = writer.write(&mut buf, exif.little_endian()) {
+        debug!("EXIF of {} not kept: {e}", path.display());
+        return None;
     }
-    // Other formats, DNG for example: the EXIF block as the reader finds it.
-    // It is kept across formats when it is written again.
-    exif::Reader::new()
-        .read_from_container(&mut Cursor::new(&input[..]))
-        .ok()
-        .map(|exif| exif.buf().to_vec().into())
+    Some(buf.into_inner().into())
 }
 
 pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     use std::fs::{self, File};
     let input = fs::read(p)?;
     let mut dynimage = DynImage::from_bytes(input.into())?.context("Unsupported EXIF format")?;
+    // A JPEG holds it in one segment of up to 64 KB, img-parts panics on more
+    if matches!(dynimage, DynImage::Jpeg(_)) && exif.as_ref().is_some_and(|e| e.len() > 65527) {
+        info!("The EXIF data is too big for a JPEG, saved without it");
+        return Ok(());
+    }
     dynimage.set_exif(exif);
     let output = File::create(p)?;
     dynimage.encoder().write_to(output)?;
