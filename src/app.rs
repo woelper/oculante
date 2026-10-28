@@ -1411,6 +1411,10 @@ impl eframe::App for OculanteApp {
                         }
                     }
                 }
+                // over the image and below windows, like the top bar it goes in zen mode
+                if !self.state.persistent_settings.zen_mode {
+                    channel_notice(ui, &self.state);
+                }
             });
 
         // Automatically hide cursor after a period of inactivity in zen mode

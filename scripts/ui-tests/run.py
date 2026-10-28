@@ -21,6 +21,7 @@ from uitest import (  # noqa: E402
     SCREEN,
     WINDOW_MANAGER,
     App,
+    changed_middle_x,
     changed_pixels,
     changed_pixels_in,
     color_center,
@@ -2194,6 +2195,41 @@ def test_channel_view(binary):
         assert changed_pixels_in(rgba, back, IMAGE_AREA) == 0, "the full image did not come back"
 
 
+def test_channel_notice(binary):
+    """While one channel is shown, a note at the bottom of the image area says so, in
+    the middle of what the info panel leaves. The top bar drew it and cut it off, also
+    in 0.9.6 (#816). A small image stays at 100 %, nothing else is down there. The
+    note is 26 to 58 pixels above the bottom, the rows looked at stay below the fps
+    of debug builds, 60 above it."""
+    with start(binary, "channel-notice", image("141x121-target.png")) as app:
+        width, height = app.geom["WIDTH"], app.geom["HEIGHT"]
+        band = (0, height - 48, width, 18)
+        rgba = app.shot("rgba")
+        app.key("r")
+        red = app.shot("red")
+        assert changed_pixels_in(rgba, red, band) > 100, "no note at the bottom with the red channel"
+        middle = changed_middle_x(rgba, red, band)
+        assert abs(middle - width // 2) <= 10, f"the note is at x {middle}, the image area's middle is {width // 2}"
+
+        app.key("c")
+        app.key("i")
+        app.settle(1.0)
+        info = app.shot("info")
+        edge = panel_edge(info)
+        assert edge, "no info panel"
+        app.key("r")
+        red_info = app.shot("red_info")
+        band = (edge + 2, height - 48, width - edge - 2, 18)
+        assert changed_pixels_in(info, red_info, band) > 100, "no note with the info panel open"
+        middle = changed_middle_x(info, red_info, band)
+        expected = (edge + width) // 2
+        assert abs(middle - expected) <= 10, f"the note is at x {middle} with the info panel, should be at {expected}"
+
+        app.key("c")
+        back = app.shot("back")
+        assert changed_pixels_in(info, back, band) == 0, "the note stayed after going back to all channels"
+
+
 def test_transparent_edges_when_zoomed_out(binary):
     """Zoomed out, the color under transparent pixels does not show at the edges of
     what is opaque, with and without a color. A channel on its own still shows it."""
@@ -2373,6 +2409,7 @@ TESTS = [
     test_overtaken_load,
     test_load_error_shows_toast,
     test_channel_view,
+    test_channel_notice,
     test_transparent_edges_when_zoomed_out,
 ]
 
