@@ -875,14 +875,17 @@ impl eframe::App for OculanteApp {
         // trackpad zooms (on Windows it comes as Ctrl and the wheel), and so do two
         // fingers on a touchscreen. On macOS, where the pinch works, two fingers on a
         // trackpad move the image instead, unless the settings say they zoom as
-        // everywhere else.
-        let pan = if cfg!(target_os = "macos") && self.state.persistent_settings.trackpad_pans {
-            ctx.input(|i| trackpad_pan(&i.events, &mut self.trackpad_scrolled))
+        // everywhere else. `trackpad_scrolled` keeps whether a trackpad or a wheel
+        // scrolled last there.
+        let trackpad_pans =
+            cfg!(target_os = "macos") && self.state.persistent_settings.trackpad_pans;
+        let pan = if cfg!(target_os = "macos") {
+            let pan = ctx.input(|i| trackpad_pan(&i.events, &mut self.trackpad_scrolled));
+            if trackpad_pans { pan } else { egui::Vec2::ZERO }
         } else {
-            self.trackpad_scrolled = false;
             egui::Vec2::ZERO
         };
-        let scroll_delta = if self.trackpad_scrolled {
+        let scroll_delta = if self.trackpad_scrolled && trackpad_pans {
             0.
         } else {
             ctx.input(|i| i.smooth_scroll_delta.y)
@@ -898,10 +901,10 @@ impl eframe::App for OculanteApp {
             }
             self.state.image_geometry.offset += Vector2::new(pan.x, pan.y);
             if scroll_delta != 0.0 {
-                let divisor = if cfg!(target_os = "macos") { 1.5 } else { 10. };
-                let delta = zoomratio(
-                    ((scroll_delta / divisor) * self.state.persistent_settings.zoom_multiplier)
-                        .clamp(-5.0, 5.0),
+                let delta = scroll_zoom(
+                    scroll_delta,
+                    self.trackpad_scrolled,
+                    self.state.persistent_settings.zoom_multiplier,
                     self.state.image_geometry.scale,
                 );
                 zoom_at_cursor(&mut self.state, delta);

@@ -679,6 +679,15 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+/// How much scrolling in this frame changes the scale. A notch of a mouse wheel is
+/// 40 points in egui and zooms by about half, on every platform as in 0.9.6. A
+/// trackpad on macOS scrolls in fewer points and zooms more for each. In the rc a
+/// wheel zoomed there by the trackpad's measure, several times too fast (#813).
+pub fn scroll_zoom(scroll: f32, trackpad_on_macos: bool, multiplier: f32, scale: f32) -> f32 {
+    let divisor = if trackpad_on_macos { 1.5 } else { 10. };
+    zoomratio(((scroll / divisor) * multiplier).clamp(-5.0, 5.0), scale)
+}
+
 /// Windows gives a pinch on a touchpad to the app as Ctrl and the wheel, in parts
 /// of a notch. Those zoom, and whole notches too while a pinch goes on: one of
 /// exactly a notch would go to another image in the middle of it.
@@ -1517,6 +1526,26 @@ mod tests {
         assert!(trackpad, "browsing leaves it");
         let pan = trackpad_pan(&[wheel(lines, 0., 1., none)], &mut trackpad);
         assert_eq!((pan, trackpad), (egui::Vec2::ZERO, false));
+    }
+
+    /// A notch of a mouse wheel zooms by about half as in 0.9.6, also on macOS,
+    /// where it zoomed several times as much in the rc (#813)
+    #[test]
+    fn a_notch_of_the_wheel_zooms_by_half() {
+        // egui makes a notch 40 points and spreads them over the next frames
+        let notch = |points: f32, trackpad, multiplier| {
+            let mut scale = 1.;
+            for _ in 0..10 {
+                scale += scroll_zoom(points / 10., trackpad, multiplier, scale);
+            }
+            scale
+        };
+        assert!((notch(40., false, 1.) - 1.48).abs() < 0.01);
+        assert!((notch(-40., false, 1.) - 0.66).abs() < 0.01);
+        // the multiplier of the settings
+        assert!((notch(40., false, 0.5) - 1.22).abs() < 0.01);
+        // a trackpad on macOS scrolls in fewer points
+        assert!((notch(6., true, 1.) - 1.48).abs() < 0.01);
     }
 
     /// A pinch keeps the pixel under the cursor where it is
