@@ -50,10 +50,15 @@ jobs:
           /tmp/venv/bin/pip install --quiet aiohttp tomlkit
           /tmp/venv/bin/python /tmp/flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
       - run: flatpak install -y --noninteractive flathub org.flatpak.Builder
-      # the linter runs in its sandbox and needs to write next to the manifest
+      # The linter runs flatpak-builder in its sandbox, which needs to write next to
+      # the manifest, and it may not in the checkout
       - name: Lint the manifest
         if: always()
-        run: flatpak run --filesystem="$PWD" --command=flatpak-builder-lint org.flatpak.Builder manifest flatpak/io.github.woelper.Oculante.json
+        run: |
+          mkdir -p "$HOME/lint"
+          cp -r flatpak "$HOME/lint/"
+          cd "$HOME/lint/flatpak"
+          flatpak run --filesystem="$HOME/lint" --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.woelper.Oculante.json
       - name: Lint the metainfo
         if: always()
         run: flatpak run --filesystem="$PWD" --command=flatpak-builder-lint org.flatpak.Builder appstream res/flathub/io.github.woelper.Oculante.metainfo.xml
