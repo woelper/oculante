@@ -1,0 +1,47 @@
+{
+  "app-id": "io.github.woelper.Oculante",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "26.08",
+  "sdk": "org.freedesktop.Sdk",
+  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+  "command": "oculante",
+  "finish-args": [
+    "--share=ipc",
+    "--share=network",
+    "--device=dri",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--filesystem=home"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin"
+  },
+  "modules": [
+    {
+      "name": "oculante",
+      "buildsystem": "simple",
+      "build-options": {
+        "env": {
+          "CARGO_HOME": "/run/build/oculante/cargo",
+          "CARGO_NET_OFFLINE": "true"
+        }
+      },
+      "build-commands": [
+        "cargo --offline fetch --manifest-path Cargo.toml --verbose",
+        "cargo --offline build --release --locked --verbose",
+        "install -Dm644 ./res/flathub/$FLATPAK_ID.desktop /app/share/applications/$FLATPAK_ID.desktop",
+        "install -Dm644 ./res/flathub/$FLATPAK_ID.metainfo.xml /app/share/metainfo/$FLATPAK_ID.metainfo.xml",
+        "install -Dm644 ./res/icons/icon.png /app/share/icons/hicolor/256x256/apps/$FLATPAK_ID.png",
+        "install -Dm755 ./target/release/oculante -t /app/bin/"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "..",
+          "skip": [".git", ".flatpak-builder", "flatpak_app", "repo", "flatpak", "target"]
+        },
+        "cargo-sources.json"
+      ]
+    }
+  ]
+}

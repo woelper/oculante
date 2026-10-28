@@ -1,0 +1,41 @@
+name: Flatpak test
+
+# The Flathub build of this branch, to try before the pull request to
+# flathub/io.github.woelper.Oculante. The manifest there takes the tag's archive
+# instead of this checkout. Nothing is published, the bundle is an artifact.
+on:
+  push:
+    branches: [flatpak-test]
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo sources from Cargo.lock
+        run: |
+          curl -sSfL -o /tmp/flatpak-cargo-generator.py https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/9d86d336a39b9af38b86f114b6ce5820fe260f91/cargo/flatpak-cargo-generator.py
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet aiohttp tomlkit
+          /tmp/venv/bin/python /tmp/flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-sources
+          path: flatpak/cargo-sources.json
+      - name: Lint the manifest and the metainfo
+        continue-on-error: true
+        run: |
+          flatpak install -y --noninteractive flathub org.flatpak.Builder
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest flatpak/io.github.woelper.Oculante.json
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream res/flathub/io.github.woelper.Oculante.metainfo.xml
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: oculante.flatpak
+          manifest-path: flatpak/io.github.woelper.Oculante.json
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Lint the build
+        continue-on-error: true
+        run: flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo
