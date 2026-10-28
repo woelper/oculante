@@ -110,19 +110,21 @@ scoop install extras/oculante
 
 ## Build Dependencies
 
+Rust 1.98 or newer, nasm, cmake and a C compiler. No system libraries are needed.
+
 Linux (Debian):
 
-`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake`
+`sudo apt-get install build-essential nasm cmake`
 
 Windows:
-Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
+Install Nasm from https://www.nasm.us and CMake from https://cmake.org
 
 Mac:
 `brew install nasm cmake`
 
 ## Updates
 
-Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date you can use the update button in settings, or download the new release executable. Updates are also managed through your package manager if you installed through one.
+Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date, download the new release from the releases page. Updates are also managed through your package manager if you installed through one.
 
 ## Uninstalling
 
