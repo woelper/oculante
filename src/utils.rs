@@ -688,6 +688,28 @@ pub fn scroll_zoom(scroll: f32, trackpad_on_macos: bool, multiplier: f32, scale:
     zoomratio(((scroll / divisor) * multiplier).clamp(-5.0, 5.0), scale)
 }
 
+/// The notches of a mouse wheel in this frame, in points, each at most one notch.
+/// macOS speeds up a wheel that is spun fast, a notch then comes as several lines,
+/// and egui's smoothed scroll zoomed by all of them, far too fast (#813). 0.9.6
+/// zoomed at most a notch for each of the wheel's events. `line` is egui's points
+/// per line.
+pub fn wheel_notches(events: &[egui::Event], line: f32) -> Vec<f32> {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta,
+                modifiers,
+                ..
+            } if !(modifiers.ctrl || modifiers.command) && delta.y != 0. => {
+                Some(delta.y.clamp(-1., 1.) * line)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Windows gives a pinch on a touchpad to the app as Ctrl and the wheel, in parts
 /// of a notch. Those zoom, and whole notches too while a pinch goes on: one of
 /// exactly a notch would go to another image in the middle of it.
@@ -1585,6 +1607,45 @@ mod tests {
         assert!((notch(40., false, 0.5) - 1.22).abs() < 0.01);
         // a trackpad on macOS scrolls in fewer points
         assert!((notch(6., true, 1.) - 1.48).abs() < 0.01);
+    }
+
+    /// A wheel spun fast on macOS zooms a notch for each of its events, as in 0.9.6.
+    /// macOS speeds it up and sends a notch as several lines then, in rc.3 that
+    /// zoomed far too fast (#813).
+    #[test]
+    fn a_wheel_spun_fast_zooms_a_notch_an_event() {
+        let none = egui::Modifiers::NONE;
+        let notches = |events: &[egui::Event]| wheel_notches(events, 40.);
+        assert_eq!(notches(&[wheel(1., none), wheel(-0.5, none)]), [40., -20.]);
+        // sped up by macOS
+        assert_eq!(notches(&[wheel(6., none), wheel(-12., none)]), [40., -40.]);
+        // through the images
+        assert!(
+            notches(&[
+                wheel(1., egui::Modifiers::CTRL),
+                wheel(1., egui::Modifiers::COMMAND)
+            ])
+            .is_empty()
+        );
+        // a trackpad
+        let trackpad = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0., 30.),
+            phase: egui::TouchPhase::Move,
+            modifiers: none,
+        };
+        assert!(notches(&[trackpad]).is_empty());
+        // five fast events zoom as much as five notches, about 1.4 times each
+        let zoom = |notches: Vec<f32>| {
+            let mut scale = 1.;
+            for notch in notches {
+                scale += scroll_zoom(notch, false, 1., scale);
+            }
+            scale
+        };
+        let fast = zoom(notches(&vec![wheel(6., none); 5]));
+        assert!((fast - 1.4f32.powi(5)).abs() < 0.01, "{fast}");
+        assert_eq!(fast, zoom(notches(&vec![wheel(1., none); 5])));
     }
 
     /// A pinch keeps the pixel under the cursor where it is

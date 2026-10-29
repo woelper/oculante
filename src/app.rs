@@ -885,11 +885,19 @@ impl eframe::App for OculanteApp {
         } else {
             egui::Vec2::ZERO
         };
-        let scroll_delta = if self.trackpad_scrolled && trackpad_pans {
-            0.
+        // On macOS a wheel zooms by its events, at most a notch each, see `wheel_notches`
+        let wheel_notches = if cfg!(target_os = "macos") {
+            let line = ctx.options(|o| o.input_options.line_scroll_speed);
+            ctx.input(|i| wheel_notches(&i.events, line))
         } else {
-            ctx.input(|i| i.smooth_scroll_delta.y)
+            vec![]
         };
+        let scroll_delta =
+            if cfg!(target_os = "macos") && (!self.trackpad_scrolled || trackpad_pans) {
+                0.
+            } else {
+                ctx.input(|i| i.smooth_scroll_delta.y)
+            };
         let wheel_pinch = cfg!(target_os = "windows").then_some(&mut self.wheel_pinch);
         let (browse, pinch) = ctx.input(|i| browse_and_pinch(&i.events, i.time, wheel_pinch));
         let pinch = pinch * ctx.input(touch_zoom);
@@ -904,6 +912,15 @@ impl eframe::App for OculanteApp {
                 let delta = scroll_zoom(
                     scroll_delta,
                     self.trackpad_scrolled,
+                    self.state.persistent_settings.zoom_multiplier,
+                    self.state.image_geometry.scale,
+                );
+                zoom_at_cursor(&mut self.state, delta);
+            }
+            for notch in wheel_notches {
+                let delta = scroll_zoom(
+                    notch,
+                    false,
                     self.state.persistent_settings.zoom_multiplier,
                     self.state.image_geometry.scale,
                 );
