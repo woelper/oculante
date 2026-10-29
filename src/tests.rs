@@ -1764,6 +1764,49 @@ fn desktop_entries_pass_files() {
     }
 }
 
+/// The Windows installer puts Oculante into "Open with" and the default apps for
+/// every format it reads. A format added to the app needs its three lines there.
+#[test]
+fn ci_the_windows_installer_registers_every_format() {
+    use std::collections::BTreeSet;
+    let script = std::fs::read_to_string("res/windows/oculante.iss").unwrap();
+    let registered = |prefix: &str, suffix: &str| -> BTreeSet<String> {
+        script
+            .lines()
+            .filter_map(|l| l.strip_prefix(prefix)?.split_once(suffix))
+            .map(|(ext, _)| ext.to_string())
+            .collect()
+    };
+    let open_with = registered(
+        r#"Root: HKA; Subkey: "Software\Classes\."#,
+        r#"\OpenWithProgids""#,
+    );
+    let supported = registered(
+        r#"Root: HKA; Subkey: "Software\Classes\Applications\oculante.exe\SupportedTypes"; ValueType: string; ValueName: "."#,
+        r#"""#,
+    );
+    let default_apps = registered(
+        r#"Root: HKA; Subkey: "Software\Oculante\Capabilities\FileAssociations"; ValueType: string; ValueName: "."#,
+        r#"""#,
+    );
+    let formats: BTreeSet<String> = crate::utils::SUPPORTED_EXTENSIONS
+        .iter()
+        .map(|e| e.to_string())
+        .collect();
+    for (what, list) in [
+        ("Open with", &open_with),
+        ("SupportedTypes", &supported),
+        ("FileAssociations", &default_apps),
+    ] {
+        let missing: Vec<_> = formats.difference(list).collect();
+        let extra: Vec<_> = list.difference(&formats).collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "res/windows/oculante.iss, {what}: missing {missing:?}, not read by the app {extra:?}"
+        );
+    }
+}
+
 /// Run one frame of the confirmation modal with the given key pressed.
 /// Returns whether it accepted, and whether it is still open.
 fn modal_frame(ctx: &egui::Context, key: Option<egui::Key>) -> (bool, bool) {

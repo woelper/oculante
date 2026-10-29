@@ -90,6 +90,16 @@ jobs:
       run: cargo build --release
       if: matrix.os == 'windows-2025'
 
+    # the same oculante.exe, with the installer around it (res/windows/oculante.iss)
+    - name: Build Windows installer
+      if: matrix.os == 'windows-2025'
+      run: |
+        $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+        $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+        & $iscc /Qp "/DAppVersion=$version" "/DNumericVersion=$($version.Split('-')[0])" "/DExe=$PWD\target\release\oculante.exe" "/O$PWD\dist" res\windows\oculante.iss
+        if ($LASTEXITCODE) { exit 1 }
+
 
     - name: Build Linux classic Application
       run: |
@@ -254,6 +264,17 @@ jobs:
         asset_path: target/release/oculante.exe
         asset_name: oculante.exe
         asset_content_type: application/zip
+
+    - name: Upload Windows installer
+      if: matrix.os == 'windows-2025'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_path: dist/oculante_setup.exe
+        asset_name: oculante_setup.exe
+        asset_content_type: application/octet-stream
 
   publish_release:
     name: Publish release

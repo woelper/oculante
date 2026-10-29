@@ -102,6 +102,8 @@ pkgin install oculante
 
 ### Windows
 
+- Installer: `oculante_setup.exe` on the [releases](https://github.com/woelper/oculante/releases/latest) page. It installs Oculante for you alone, without admin rights (or for everyone, if you choose), adds it to "Open with" for every format it reads and to the default apps of Windows, and removes all of it again when uninstalled. `oculante.exe` next to it runs without installing.
+
 - Scoop
 
 ```sh
@@ -128,7 +130,7 @@ Oculante only gets updated when it improves something for you. You'll still see 
 
 ## Uninstalling
 
-To uninstall Oculante, simply delete the executable file and the data folder. You can find the data folder in the relevant location for your operating system below.
+To uninstall Oculante, simply delete the executable file and the data folder (installed with `oculante_setup.exe` on Windows: uninstall it in the settings of Windows, then delete the data folder). You can find the data folder in the relevant location for your operating system below.
 
 - Windows: `~/AppData/Local/.oculante`
 - Mac: `~/Library/Application Support/oculante`
@@ -216,9 +218,10 @@ UI Design:
 ## Privacy pledge
 
 Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics. Oculante is and will remain free and open-source. There will never be ads.
-There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
-- Updating the application (must be triggered manually from settings)
+There is only one instance where oculante interacts with the network, and it never happens without being triggered by the user:
 - Listening for incoming images on a custom port (must be set on command line)
+
+Links in the app, like the one to the project page, open in your browser when you click them.
 
 In addition, Oculante saves some settings locally, for example:
 - UI accent color
