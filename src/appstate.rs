@@ -90,6 +90,8 @@ pub struct OculanteState {
     pub current_path: Option<PathBuf>,
     /// Shared with the cache and the threads that look at the image
     pub current_image: Option<std::sync::Arc<DynamicImage>>,
+    /// The image shown is a frame of an animation that has more than one
+    pub animated: bool,
     pub settings_enabled: bool,
     pub image_metadata: Option<ExtendedImageInfo>,
     pub tiling: usize,
@@ -239,6 +241,7 @@ impl Default for OculanteState {
             edit_version: 0,
             mouse_delta: Default::default(),
             current_image: Default::default(),
+            animated: false,
             current_path: Default::default(),
             settings_enabled: Default::default(),
             image_metadata: Default::default(),

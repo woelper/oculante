@@ -57,6 +57,10 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
         ImgOpItem::new(ImageOperation::Brightness(0)),
         ImgOpItem::new(ImageOperation::Contrast(0)),
         ImgOpItem::new(ImageOperation::Exposure(0)),
+        ImgOpItem::new(ImageOperation::Levels(Default::default())),
+        ImgOpItem::new(ImageOperation::Curves(std::array::from_fn(|_| {
+            crate::tone::straight_curve()
+        }))),
         ImgOpItem::new(ImageOperation::Desaturate(0)),
         ImgOpItem::new(ImageOperation::Invert),
         // Colour and Hue
@@ -537,12 +541,17 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
                     let modal = Modal::new("overwrite", ui.ctx());
-                    modal.show("Overwrite?", |_|{
+                    modal.show(overwrite_question(state.animated), |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     });
 
-
-                    if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
+                    // Any other format became a PNG under the old name: a GIF, a TIFF, a camera RAW file (#821)
+                    let writable = FileEncoder::for_path(p, &state.volatile_settings.encoding_options).is_some();
+                    let format = p.extension().map(|e| e.to_string_lossy().to_uppercase()).unwrap_or_default();
+                    if ui.add_enabled(writable, Button::new(text))
+                        .on_hover_text("Saves the image. This will create a new file or overwrite an existing one.")
+                        .on_disabled_hover_text(format!("Oculante can't write {format} files, this one would become a PNG. Use Save as instead."))
+                        .clicked() {
                         if p.exists() {
                             modal.open();
                         } else {
@@ -641,6 +650,25 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     );
                 }
                 pixels_changed = true;
+            }
+
+            // The histogram behind Levels and Curves: of the image the pixel
+            // operations start from, made again for a new image or other image operations
+            let has_tone = state.edit_state.pixel_op_stack.iter().any(|op| {
+                matches!(op.operation, ImageOperation::Levels(_) | ImageOperation::Curves(_))
+            });
+            let histogram_is_old = state.edit_state.histogram.as_ref().map(|h| h.0) != Some(state.image_version);
+            if has_tone && (image_changed || histogram_is_old) {
+                let start = if keep_image_op_result {
+                    Some(&state.edit_state.result_image_op)
+                } else {
+                    state.current_image.as_deref()
+                };
+                if let Some(image) = start.filter(|image| image.width() > 0) {
+                    let histogram = std::sync::Arc::new(crate::tone::Histogram::of(image));
+                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(crate::tone::HISTOGRAM), histogram.clone()));
+                    state.edit_state.histogram = Some((state.image_version, histogram));
+                }
             }
 
             // The next stroke starts anew

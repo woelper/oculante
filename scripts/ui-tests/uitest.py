@@ -249,6 +249,13 @@ def changed_pixels_in(a, b, box, fuzz=0):
     return changed_pixels(*crops, fuzz=fuzz)
 
 
+def changed_middle_x(a, b, box):
+    """The x halfway between the leftmost and the rightmost pixel that differs inside
+    box (x, y, w, h) of two screenshots, or None."""
+    xs = [x for (x, _, ca), (_, _, cb) in zip(_pixels(a, box), _pixels(b, box)) if ca != cb]
+    return (min(xs) + max(xs)) // 2 if xs else None
+
+
 def _pixels(path, box):
     x, y, w, h = box
     out = subprocess.run(

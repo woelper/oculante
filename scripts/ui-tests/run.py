@@ -21,6 +21,7 @@ from uitest import (  # noqa: E402
     SCREEN,
     WINDOW_MANAGER,
     App,
+    changed_middle_x,
     changed_pixels,
     changed_pixels_in,
     color_center,
@@ -420,18 +421,28 @@ def test_save_as_writes_the_file(binary):
     """Save as shows the name of the file and the button to save below the files, and
     writes the file, with thumbnails and with the list. The format is picked from a
     list, Escape closes that list and not the dialog. The files took all the height
-    of the dialog for a while, the row to save was cut off."""
-    for name, list_mode, jpg in (("save_as", False, False), ("save_as_list", True, True)):
-        folder = folder_of(f"{name}_images", [("moss.jpg", "moss.jpg")])
+    of the dialog for a while, the row to save was cut off. A TIFF file is its own EXIF
+    block, pixels and all: saved as a JPEG, the app ended and left 108 bytes."""
+    for name, list_mode, jpg, source in (
+        ("save_as", False, False, "moss.jpg"),
+        ("save_as_list", True, True, "moss.jpg"),
+        ("save_as_tiff", True, True, "big.tif"),
+    ):
+        if source.endswith(".tif"):
+            folder = folder_of(f"{name}_images", [])
+            write_tiff(os.path.join(folder, source), 400, 300)
+        else:
+            folder = folder_of(f"{name}_images", [(source, source)])
         volatile = {"last_open_directory": folder, "browser_list": list_mode}
-        with App(binary, name, [os.path.join(folder, "moss.jpg")], volatile=volatile) as app:
+        with App(binary, name, [os.path.join(folder, source)], volatile=volatile) as app:
             app.wait_window()
             app.move(0.5, 0.5)
             assert app.wait_for_log(LOADED), "the image never loaded"
             app.settle(1.0)
             app.key("e")
             app.settle(1.5)
-            app.click(896, 266)  # "Save as..." in the edit panel
+            # "Save as..." in the edit panel, a JPEG has the row for lossless edits above
+            app.click(896, 266 if source.endswith(".jpg") else 236)
             app.settle(2.0)
             app.shot("dialog")
             if jpg:
@@ -460,6 +471,44 @@ def test_save_as_writes_the_file(binary):
             magic = b"\xff\xd8\xff" if jpg else b"\x89PNG\r\n\x1a\n"
             with open(saved, "rb") as f:
                 assert f.read(len(magic)) == magic, f"{os.path.basename(saved)} is not what it says"
+            if source.endswith(".tif"):
+                # the EXIF goes in after the pixels
+                app.settle(1.5)
+                assert app.running(), "the app ended while saving"
+                with open(saved, "rb") as f:
+                    data = f.read()
+                assert len(data) > 1000 and data.endswith(b"\xff\xd9"), f"{len(data)} bytes, not a whole JPEG"
+                assert b"Oculante" in data, "the camera name did not go along"
+
+
+def test_overwrite_only_where_the_format_is_written(binary):
+    """Overwrite in the edit panel saves over a PNG. A GIF, like every format Oculante
+    can't write, is not offered: it became a PNG under its old name, with one frame of
+    the animation, and so did a camera RAW file, also in 0.9.6 (#821)."""
+    folder = folder_of("overwrite_images", [("still.png", "test.png")])
+    make_animation(os.path.join(folder, "anim.gif"))
+    for name, written in (("anim.gif", False), ("still.png", True)):
+        path = os.path.join(folder, name)
+        before = open(path, "rb").read()
+        mtime = os.stat(path).st_mtime_ns
+        with App(binary, "overwrite_" + name.split(".")[0], [path]) as app:
+            app.wait_window()
+            app.move(0.5, 0.5)
+            assert app.wait_for_log("Animation start" if name.endswith(".gif") else LOADED), "the image never loaded"
+            app.settle(1.0)
+            app.key("e")
+            app.settle(1.5)
+            app.click(896, 266)  # Overwrite, below Save as
+            app.settle(1.0)
+            app.shot("asked")
+            app.key("Return")  # Yes, if it asks
+            app.settle(2.0)
+        after = open(path, "rb").read()
+        if written:
+            assert os.stat(path).st_mtime_ns != mtime, "Overwrite did not save the PNG"
+            assert after.startswith(b"\x89PNG"), "the PNG is no PNG any more"
+        else:
+            assert after == before, f"{name} was overwritten, it starts with {after[:8]!r} now"
 
 
 def test_file_browser_list_and_sort(binary):
@@ -1117,6 +1166,36 @@ def folder_of(name, files):
     for new_name, source in files:
         shutil.copy(image(source), os.path.join(folder, new_name))
     return folder
+
+
+def write_tiff(path, width, height):
+    """An uncompressed RGB TIFF with a camera name in it, the pixels a gradient."""
+    import struct
+
+    make = b"Oculante\0"
+    pixels = bytes(
+        v for y in range(height) for x in range(width) for v in (x * 255 // width, y * 255 // height, 128)
+    )
+    entries = 10
+    extra = 8 + 2 + entries * 12 + 4
+    bits, make_at, pixels_at = extra, extra + 6, extra + 6 + len(make)
+    short = lambda tag, value: struct.pack("<HHIHH", tag, 3, 1, value, 0)  # noqa: E731
+    long = lambda tag, typ, count, value: struct.pack("<HHII", tag, typ, count, value)  # noqa: E731
+    ifd = [
+        short(256, width),
+        short(257, height),
+        long(258, 3, 3, bits),
+        short(259, 1),  # not compressed
+        short(262, 2),  # RGB
+        long(271, 2, len(make), make_at),
+        long(273, 4, 1, pixels_at),
+        short(277, 3),
+        short(278, height),
+        long(279, 4, 1, len(pixels)),
+    ]
+    with open(path, "wb") as f:
+        f.write(b"II*\0" + struct.pack("<I", 8) + struct.pack("<H", entries) + b"".join(ifd))
+        f.write(struct.pack("<I", 0) + struct.pack("<HHH", 8, 8, 8) + make + pixels)
 
 
 def shown_file(app):
@@ -2194,6 +2273,41 @@ def test_channel_view(binary):
         assert changed_pixels_in(rgba, back, IMAGE_AREA) == 0, "the full image did not come back"
 
 
+def test_channel_notice(binary):
+    """While one channel is shown, a note at the bottom of the image area says so, in
+    the middle of what the info panel leaves. The top bar drew it and cut it off, also
+    in 0.9.6 (#816). A small image stays at 100 %, nothing else is down there. The
+    note is 26 to 58 pixels above the bottom, the rows looked at stay below the fps
+    of debug builds, 60 above it."""
+    with start(binary, "channel-notice", image("141x121-target.png")) as app:
+        width, height = app.geom["WIDTH"], app.geom["HEIGHT"]
+        band = (0, height - 48, width, 18)
+        rgba = app.shot("rgba")
+        app.key("r")
+        red = app.shot("red")
+        assert changed_pixels_in(rgba, red, band) > 100, "no note at the bottom with the red channel"
+        middle = changed_middle_x(rgba, red, band)
+        assert abs(middle - width // 2) <= 10, f"the note is at x {middle}, the image area's middle is {width // 2}"
+
+        app.key("c")
+        app.key("i")
+        app.settle(1.0)
+        info = app.shot("info")
+        edge = panel_edge(info)
+        assert edge, "no info panel"
+        app.key("r")
+        red_info = app.shot("red_info")
+        band = (edge + 2, height - 48, width - edge - 2, 18)
+        assert changed_pixels_in(info, red_info, band) > 100, "no note with the info panel open"
+        middle = changed_middle_x(info, red_info, band)
+        expected = (edge + width) // 2
+        assert abs(middle - expected) <= 10, f"the note is at x {middle} with the info panel, should be at {expected}"
+
+        app.key("c")
+        back = app.shot("back")
+        assert changed_pixels_in(info, back, band) == 0, "the note stayed after going back to all channels"
+
+
 def test_transparent_edges_when_zoomed_out(binary):
     """Zoomed out, the color under transparent pixels does not show at the edges of
     what is opaque, with and without a color. A channel on its own still shows it."""
@@ -2333,6 +2447,7 @@ TESTS = [
     test_first_and_last_image,
     test_ctrl_and_the_wheel_go_through_the_images,
     test_save_as_writes_the_file,
+    test_overwrite_only_where_the_format_is_written,
     test_file_browser_list_and_sort,
     test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
@@ -2373,6 +2488,7 @@ TESTS = [
     test_overtaken_load,
     test_load_error_shows_toast,
     test_channel_view,
+    test_channel_notice,
     test_transparent_edges_when_zoomed_out,
 ]
 

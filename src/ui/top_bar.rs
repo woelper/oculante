@@ -108,35 +108,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
         // Channel changes are picked up by the renderer each frame via
         // persistent_settings.current_channel — no GPU state update needed here.
 
-        let label_rect = ui.ctx().content_rect().shrink(50.);
-
-        // TODO Center toast to image viewing area (Shift to the left / Right if the info or edit panel gets opened)
-        if state.persistent_settings.current_channel != ColorChannel::Rgba {
-            let mut job = LayoutJob::simple(
-                format!(
-                    "Viewing {} channel. Press '{}' to revert.",
-                    state.persistent_settings.current_channel,
-                    ColorChannel::Rgba.hotkey(&state.persistent_settings.shortcuts)
-                ),
-                FontId::proportional(13.),
-                ui.style().visuals.text_color(),
-                1000.,
-            );
-            job.halign = Align::Center;
-            let galley = ui.painter().layout_job(job);
-            let tr = galley
-                .rect
-                .translate(label_rect.center_bottom().to_vec2())
-                .expand(8.);
-            ui.painter().rect_filled(
-                tr,
-                ui.get_rounding(BUTTON_HEIGHT_SMALL),
-                ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
-            );
-            ui.painter()
-                .galley(label_rect.center_bottom(), galley, Color32::RED);
-        }
-
         if state.current_image.is_some() && window_x > ui.cursor().left() + 80. {
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
@@ -323,6 +294,34 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             );
         }
     });
+}
+
+/// While one channel is shown, a note at the bottom of the image area says which
+/// and how to get back, in the middle of what the panels leave. The top bar drew it
+/// before and cut it off, also in 0.9.6 (#816).
+pub fn channel_notice(ui: &Ui, state: &OculanteState) {
+    if state.persistent_settings.current_channel == ColorChannel::Rgba {
+        return;
+    }
+    let mut job = LayoutJob::simple(
+        format!(
+            "Viewing {} channel. Press '{}' to revert.",
+            state.persistent_settings.current_channel,
+            ColorChannel::Rgba.hotkey(&state.persistent_settings.shortcuts)
+        ),
+        FontId::proportional(13.),
+        ui.style().visuals.text_color(),
+        1000.,
+    );
+    job.halign = Align::Center;
+    let galley = ui.painter().layout_job(job);
+    let pos = ui.max_rect().shrink(50.).center_bottom();
+    ui.painter().rect_filled(
+        galley.rect.translate(pos.to_vec2()).expand(8.),
+        ui.get_rounding(BUTTON_HEIGHT_SMALL),
+        ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
+    );
+    ui.painter().galley(pos, galley, Color32::RED);
 }
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {

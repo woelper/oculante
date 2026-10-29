@@ -30,6 +30,7 @@ pub(crate) mod sequence;
 #[cfg_attr(feature = "file_open", allow(dead_code))]
 pub(crate) mod thumbnails;
 pub(crate) mod toasts;
+pub(crate) mod tone;
 pub(crate) mod ui;
 pub mod window_config;
 

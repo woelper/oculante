@@ -64,6 +64,9 @@ pub struct EditState {
     pub pixel_op_stack: Vec<ImgOpItem>,
     pub image_op_stack: Vec<ImgOpItem>,
     pub export_extension: String,
+    #[serde(skip)]
+    /// Behind Levels and Curves, for the image of this `image_version`
+    pub histogram: Option<(u64, Arc<crate::tone::Histogram>)>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -187,6 +190,7 @@ impl Default for EditState {
             image_op_stack: vec![],
             skip_processing: false,
             export_extension: "png".into(),
+            histogram: None,
         }
     }
 }
@@ -268,6 +272,10 @@ pub enum ImageOperation {
     Filter3x3([i32; 9]),
     GradientMap(Vec<GradientStop>),
     Exposure(i32),
+    /// For all colors, red, green and blue, see [`crate::tone`]
+    Levels([crate::tone::Levels; 4]),
+    /// The points of a curve for all colors, red, green and blue, see [`crate::tone`]
+    Curves([Vec<(u8, u8)>; 4]),
     Equalize((i32, i32)),
     ScaleImageMinMax,
     Mult([u8; 3]),
@@ -346,6 +354,8 @@ impl fmt::Display for ImageOperation {
             Self::Posterize(_) => write!(f, "Posterize"),
             Self::Contrast(_) => write!(f, "Contrast"),
             Self::Exposure(_) => write!(f, "Exposure"),
+            Self::Levels(_) => write!(f, "Levels"),
+            Self::Curves(_) => write!(f, "Curves"),
             Self::Equalize(_) => write!(f, "Equalize"),
             Self::Mult(_) => write!(f, "Mult color"),
             Self::Add(_) => write!(f, "Add color"),
@@ -459,6 +469,8 @@ impl ImageOperation {
                 x
             }
             Self::Exposure(val) => ui.styled_slider(val, -100..=100),
+            Self::Levels(levels) => crate::tone::levels_ui(ui, levels, item_id),
+            Self::Curves(curves) => crate::tone::curves_ui(ui, curves, item_id),
             Self::ChromaticAberration(val) => ui.styled_slider(val, 0..=255),
             Self::Filter3x3(val) => {
                 let mut x = ui.allocate_response(vec2(0.0, 0.0), Sense::click_and_drag());
@@ -2017,6 +2029,8 @@ enum PixelOp<'a> {
     },
     /// Steps from black to white, one less than the levels
     Posterize(f32),
+    /// Levels or Curves, for red, green and blue
+    Tone([Curve; 3]),
     Expression(Node<DefaultNumericTypes>),
     Lut(Arc<HaldClut>),
     Noise {
@@ -2041,6 +2055,16 @@ impl<'a> PixelOp<'a> {
                 }
             }
             ImageOperation::Posterize(levels) => Self::Posterize((*levels).max(2) as f32 - 1.),
+            // the channel first, then all colors
+            ImageOperation::Levels(levels) => {
+                Self::Tone([1, 2, 3].map(|c| Curve::new(|v| levels[0].map(levels[c].map(v)))))
+            }
+            ImageOperation::Curves(curves) => {
+                let splines = curves
+                    .each_ref()
+                    .map(|points| crate::tone::Spline::new(points));
+                Self::Tone([1, 2, 3].map(|c| Curve::new(|v| splines[0].at(splines[c].at(v)))))
+            }
             // the panel says why it does not parse
             ImageOperation::Expression(expr) => build_operator_tree(expr)
                 .map(Self::Expression)
@@ -2071,6 +2095,12 @@ impl<'a> PixelOp<'a> {
             Self::Posterize(steps) => {
                 for c in 0..3 {
                     p[c] = (p[c] * steps).round() / steps;
+                }
+            }
+            // outside of 0 to 1, as at the ends. NaN stays out of the table.
+            Self::Tone(curves) => {
+                for c in 0..3 {
+                    p[c] = curves[c].at(p[c].clamp(0., 1.), |_| 0.);
                 }
             }
             Self::Expression(expression) => {
@@ -2644,6 +2674,8 @@ mod operation_tests {
         for op in [
             ImageOperation::Brightness(0),
             ImageOperation::Exposure(0),
+            ImageOperation::Levels(Default::default()),
+            ImageOperation::Curves(std::array::from_fn(|_| crate::tone::straight_curve())),
             ImageOperation::Contrast(0),
             ImageOperation::Equalize((0, 255)),
             ImageOperation::Desaturate(0),
@@ -3070,6 +3102,64 @@ mod operation_tests {
     }
 
     /// Posterize gives as many levels as it says, it gave one more
+    /// A channel's own setting first, then the one for all colors
+    #[test]
+    fn levels_and_curves_by_channel() {
+        let invert = crate::tone::Levels {
+            out_black: 255,
+            out_white: 0,
+            ..Default::default()
+        };
+        let mut levels = [crate::tone::Levels::default(); 4];
+        levels[1] = invert;
+        assert_each(ImageOperation::Levels(levels), |p| {
+            [255 - p[0], p[1], p[2], p[3]]
+        });
+        // red twice, the others once
+        levels[0] = invert;
+        assert_each(ImageOperation::Levels(levels), |p| {
+            [p[0], 255 - p[1], 255 - p[2], p[3]]
+        });
+
+        let straight = crate::tone::straight_curve;
+        let down = vec![(0, 255), (255, 0)];
+        let mut curves = std::array::from_fn(|_| straight());
+        curves[2] = down.clone();
+        assert_each(ImageOperation::Curves(curves.clone()), |p| {
+            [p[0], 255 - p[1], p[2], p[3]]
+        });
+        curves[0] = down;
+        assert_each(ImageOperation::Curves(curves), |p| {
+            [255 - p[0], p[1], 255 - p[2], p[3]]
+        });
+    }
+
+    /// They are kept with the edits of an image
+    #[test]
+    fn levels_and_curves_are_saved() {
+        for op in [
+            ImageOperation::Levels(
+                [crate::tone::Levels {
+                    black: 3,
+                    white: 250,
+                    gamma: 123,
+                    out_black: 7,
+                    out_white: 200,
+                }; 4],
+            ),
+            ImageOperation::Curves(std::array::from_fn(|i| {
+                vec![(0, 0), (100, 100 + i as u8), (255, 255)]
+            })),
+        ] {
+            let json = serde_json::to_string(&op).unwrap();
+            assert_eq!(
+                serde_json::from_str::<ImageOperation>(&json).unwrap(),
+                op,
+                "{json}"
+            );
+        }
+    }
+
     #[test]
     fn posterize_gives_the_levels_asked_for() {
         let ramp = DynamicImage::ImageRgba8(RgbaImage::from_fn(256, 1, |x, _| {
@@ -3302,6 +3392,30 @@ mod operation_tests {
                 GradientStop::new(255, [224, 255, 0]),
             ]),
             Exposure(20),
+            Levels([
+                crate::tone::Levels {
+                    black: 20,
+                    white: 230,
+                    gamma: 140,
+                    out_black: 10,
+                    out_white: 250,
+                },
+                crate::tone::Levels {
+                    out_black: 40,
+                    ..Default::default()
+                },
+                Default::default(),
+                crate::tone::Levels {
+                    gamma: 60,
+                    ..Default::default()
+                },
+            ]),
+            Curves([
+                vec![(0, 0), (64, 40), (192, 220), (255, 255)],
+                vec![(0, 30), (255, 255)],
+                vec![(0, 0), (255, 255)],
+                vec![(0, 0), (128, 100), (255, 230)],
+            ]),
             Equalize((30, 200)),
             ScaleImageMinMax,
             Mult([200, 100, 50]),

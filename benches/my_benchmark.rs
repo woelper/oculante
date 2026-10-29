@@ -21,6 +21,7 @@ fn pixel_ops() -> Vec<ImageOperation> {
         ImageOperation::Noise {
             amt: 50,
             mono: false,
+            seed: 0,
         },
     ]
 }

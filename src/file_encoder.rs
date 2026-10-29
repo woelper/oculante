@@ -70,22 +70,21 @@ impl FileEncoder {
     }
 
     pub fn matching_variant(path: &Path, variants: &Vec<Self>) -> Self {
+        Self::for_path(path, variants).unwrap_or(Self::Png {
+            compressionlevel: CompressionLevel::Default,
+        })
+    }
+
+    /// The format a file with this name is written in, `None` when Oculante can't
+    /// write it: a GIF, a TIFF or a RAW file
+    pub fn for_path(path: &Path, variants: &[Self]) -> Option<Self> {
         let ext = path
             .extension()
             .map(|e| e.to_string_lossy().to_string())
             .unwrap_or_default()
             .to_lowercase()
             .replace("jpeg", "jpg");
-
-        for v in variants {
-            if v.ext() == ext {
-                return v.clone();
-            }
-        }
-
-        Self::Png {
-            compressionlevel: CompressionLevel::Default,
-        }
+        variants.iter().find(|v| v.ext() == ext).cloned()
     }
 
     pub fn ext(&self) -> String {

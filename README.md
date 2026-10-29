@@ -110,19 +110,21 @@ scoop install extras/oculante
 
 ## Build Dependencies
 
+Rust 1.98 or newer, nasm, cmake and a C compiler. No system libraries are needed.
+
 Linux (Debian):
 
-`sudo apt-get install libxcb-shape0-dev libxcb-xfixes0-dev libgtk-3-dev libasound2-dev nasm cmake`
+`sudo apt-get install build-essential nasm cmake`
 
 Windows:
-Install Nasm from https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/
+Install Nasm from https://www.nasm.us and CMake from https://cmake.org
 
 Mac:
 `brew install nasm cmake`
 
 ## Updates
 
-Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date you can use the update button in settings, or download the new release executable. Updates are also managed through your package manager if you installed through one.
+Oculante only gets updated when it improves something for you. You'll still see new releases about every month or two! To stay up to date, download the new release from the releases page. Updates are also managed through your package manager if you installed through one.
 
 ## Uninstalling
 
@@ -174,7 +176,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - psd (via `psd`)
 - svg (via `resvg`)
 - exr (via `exr-rs`), tonemapped
-- RAW (via `quickraw` - nef, cr2, dng, mos, erf, raf, arw, 3fr, ari, srf, sr2, braw, r3d, nrw, raw). Since raw is a complex field without true standards, not all camera models are supported.
+- RAW (via `rawler` from dnglab, `quickraw` for the rest - cr2, cr3, crw, nef, nrw, arw, srf, sr2, raf, rw2, orf, pef, dng, srw, 3fr, fff, iiq, mos, mef, mrw, kdc, erf, x3f, ari, arq, braw, r3d, ori, rwl, raw). The preview the camera made is shown, files without a big one are developed. Since raw is a complex field without true standards, not all camera models are supported.
 - ppm
 - HEIC/HEIF (via `heic-rs`, in pure Rust), with every image a file holds, camera HIF (4:2:2) included
 - qoi

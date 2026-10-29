@@ -65,6 +65,21 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "icns",
     "nrw",
     "raw",
+    "cr3",
+    "crw",
+    "rw2",
+    "rwl",
+    "orf",
+    "ori",
+    "pef",
+    "srw",
+    "mrw",
+    "iiq",
+    "fff",
+    "kdc",
+    "mef",
+    "x3f",
+    "arq",
     "avif",
     "jxl",
     "ppm",
@@ -664,6 +679,37 @@ pub fn zoomratio(i: f32, s: f32) -> f32 {
     i * s * 0.1
 }
 
+/// How much scrolling in this frame changes the scale. A notch of a mouse wheel is
+/// 40 points in egui and zooms by about half, on every platform as in 0.9.6. A
+/// trackpad on macOS scrolls in fewer points and zooms more for each. In the rc a
+/// wheel zoomed there by the trackpad's measure, several times too fast (#813).
+pub fn scroll_zoom(scroll: f32, trackpad_on_macos: bool, multiplier: f32, scale: f32) -> f32 {
+    let divisor = if trackpad_on_macos { 1.5 } else { 10. };
+    zoomratio(((scroll / divisor) * multiplier).clamp(-5.0, 5.0), scale)
+}
+
+/// The notches of a mouse wheel in this frame, in points, each at most one notch.
+/// macOS speeds up a wheel that is spun fast, a notch then comes as several lines,
+/// and egui's smoothed scroll zoomed by all of them, far too fast (#813). 0.9.6
+/// zoomed at most a notch for each of the wheel's events. `line` is egui's points
+/// per line.
+pub fn wheel_notches(events: &[egui::Event], line: f32) -> Vec<f32> {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta,
+                modifiers,
+                ..
+            } if !(modifiers.ctrl || modifiers.command) && delta.y != 0. => {
+                Some(delta.y.clamp(-1., 1.) * line)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Windows gives a pinch on a touchpad to the app as Ctrl and the wheel, in parts
 /// of a notch. Those zoom, and whole notches too while a pinch goes on: one of
 /// exactly a notch would go to another image in the middle of it.
@@ -780,6 +826,17 @@ pub fn delete_question(name: &str, to_trash: bool) -> String {
         format!("Move \"{name}\" to the trash?")
     } else {
         format!("Delete \"{name}\"? This can't be undone.")
+    }
+}
+
+/// What the app asks before it saves over the file shown. Only the frame shown is
+/// written, an animation loses the others (#821, also in 0.9.6). Files of several
+/// images are of formats Oculante can't write, it doesn't offer to save over them.
+pub fn overwrite_question(animated: bool) -> &'static str {
+    if animated {
+        "Overwrite? Only the frame shown is saved, the other frames of the animation are lost."
+    } else {
+        "Overwrite?"
     }
 }
 
@@ -1280,26 +1337,65 @@ pub type ExtendedInfoChannel = (
     Receiver<(InfoVersion, ExtendedImageInfo)>,
 );
 
-/// The EXIF data of a file, to write into a copy of the image that is saved
+/// The EXIF data of a file, to write into a copy of the image that is saved.
+/// Only what is about the photo goes along, not what is about the file: the
+/// copy is saved upright and maybe smaller, the thumbnail would be the old one,
+/// a maker note points into the old file. A TIFF or RAW file is its own EXIF
+/// block, pixels and all, which made a JPEG copy panic and a PNG copy as big as
+/// the RAW.
 pub fn raw_exif(path: &Path) -> Option<Bytes> {
-    let input: Bytes = std::fs::read(path).ok()?.into();
-    if let Ok(Some(image)) = DynImage::from_bytes(input.clone())
-        && let Some(exif) = image.exif()
-    {
-        return Some(exif);
+    use exif::{In, Tag};
+    let mut reader = std::io::BufReader::new(std::fs::File::open(path).ok()?);
+    let exif = exif::Reader::new()
+        .continue_on_error(true)
+        .read_from_container(&mut reader)
+        .or_else(|e| {
+            e.distill_partial_result(|errors| debug!("EXIF of {}: {errors:?}", path.display()))
+        })
+        .ok()?;
+    let about_the_photo = |field: &&exif::Field| {
+        field.ifd_num == In::PRIMARY
+            && field.tag.description().is_some()
+            && !matches!(field.value, exif::Value::Unknown(..))
+            && match field.tag {
+                Tag::Orientation | Tag::PixelXDimension | Tag::PixelYDimension | Tag::MakerNote => {
+                    false
+                }
+                Tag(exif::Context::Tiff, _) => matches!(
+                    field.tag,
+                    Tag::ImageDescription
+                        | Tag::Make
+                        | Tag::Model
+                        | Tag::Software
+                        | Tag::DateTime
+                        | Tag::Artist
+                        | Tag::Copyright
+                ),
+                Tag(exif::Context::Exif | exif::Context::Gps, _) => true,
+                _ => false,
+            }
+    };
+    let mut fields = exif.fields().filter(about_the_photo).peekable();
+    fields.peek()?;
+    let mut writer = exif::experimental::Writer::new();
+    fields.for_each(|field| writer.push_field(field));
+    let mut buf = Cursor::new(Vec::new());
+    if let Err(e) = writer.write(&mut buf, exif.little_endian()) {
+        debug!("EXIF of {} not kept: {e}", path.display());
+        return None;
     }
-    // Other formats, DNG for example: the EXIF block as the reader finds it.
-    // It is kept across formats when it is written again.
-    exif::Reader::new()
-        .read_from_container(&mut Cursor::new(&input[..]))
-        .ok()
-        .map(|exif| exif.buf().to_vec().into())
+    Some(buf.into_inner().into())
 }
 
 pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
     use std::fs::{self, File};
     let input = fs::read(p)?;
     let mut dynimage = DynImage::from_bytes(input.into())?.context("Unsupported EXIF format")?;
+    // A JPEG holds it in one segment of up to 64 KB, img-parts panics on more
+    if matches!(dynimage, DynImage::Jpeg(_)) && exif.as_ref().is_some_and(|e| e.len() > 65527) {
+        info!("The EXIF data is too big for a JPEG, saved without it");
+        return Ok(());
+    }
     dynimage.set_exif(exif);
     let output = File::create(p)?;
     dynimage.encoder().write_to(output)?;
@@ -1504,6 +1600,65 @@ mod tests {
         assert_eq!((pan, trackpad), (egui::Vec2::ZERO, false));
     }
 
+    /// A notch of a mouse wheel zooms by about half as in 0.9.6, also on macOS,
+    /// where it zoomed several times as much in the rc (#813)
+    #[test]
+    fn a_notch_of_the_wheel_zooms_by_half() {
+        // egui makes a notch 40 points and spreads them over the next frames
+        let notch = |points: f32, trackpad, multiplier| {
+            let mut scale = 1.;
+            for _ in 0..10 {
+                scale += scroll_zoom(points / 10., trackpad, multiplier, scale);
+            }
+            scale
+        };
+        assert!((notch(40., false, 1.) - 1.48).abs() < 0.01);
+        assert!((notch(-40., false, 1.) - 0.66).abs() < 0.01);
+        // the multiplier of the settings
+        assert!((notch(40., false, 0.5) - 1.22).abs() < 0.01);
+        // a trackpad on macOS scrolls in fewer points
+        assert!((notch(6., true, 1.) - 1.48).abs() < 0.01);
+    }
+
+    /// A wheel spun fast on macOS zooms a notch for each of its events, as in 0.9.6.
+    /// macOS speeds it up and sends a notch as several lines then, in rc.3 that
+    /// zoomed far too fast (#813).
+    #[test]
+    fn a_wheel_spun_fast_zooms_a_notch_an_event() {
+        let none = egui::Modifiers::NONE;
+        let notches = |events: &[egui::Event]| wheel_notches(events, 40.);
+        assert_eq!(notches(&[wheel(1., none), wheel(-0.5, none)]), [40., -20.]);
+        // sped up by macOS
+        assert_eq!(notches(&[wheel(6., none), wheel(-12., none)]), [40., -40.]);
+        // through the images
+        assert!(
+            notches(&[
+                wheel(1., egui::Modifiers::CTRL),
+                wheel(1., egui::Modifiers::COMMAND)
+            ])
+            .is_empty()
+        );
+        // a trackpad
+        let trackpad = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0., 30.),
+            phase: egui::TouchPhase::Move,
+            modifiers: none,
+        };
+        assert!(notches(&[trackpad]).is_empty());
+        // five fast events zoom as much as five notches, about 1.4 times each
+        let zoom = |notches: Vec<f32>| {
+            let mut scale = 1.;
+            for notch in notches {
+                scale += scroll_zoom(notch, false, 1., scale);
+            }
+            scale
+        };
+        let fast = zoom(notches(&vec![wheel(6., none); 5]));
+        assert!((fast - 1.4f32.powi(5)).abs() < 0.01, "{fast}");
+        assert_eq!(fast, zoom(notches(&vec![wheel(1., none); 5])));
+    }
+
     /// A pinch keeps the pixel under the cursor where it is
     #[test]
     fn zooming_keeps_the_pixel_under_the_cursor() {
@@ -1551,6 +1706,29 @@ mod tests {
             DELETE_TO_TRASH,
             !cfg!(any(target_os = "netbsd", target_os = "freebsd"))
         );
+    }
+
+    /// Saving over an animation keeps only the frame shown, the question says so.
+    /// Only formats Oculante writes are saved over, any other file became a PNG
+    /// under its old name, a camera RAW file too (#821).
+    #[test]
+    fn overwrite_says_what_is_lost_and_only_where_it_can_write() {
+        assert_eq!(overwrite_question(false), "Overwrite?");
+        assert!(overwrite_question(true).contains("other frames of the animation are lost"));
+        let encoders = crate::file_encoder::FileEncoder::all();
+        let writes = |name: &str| {
+            crate::file_encoder::FileEncoder::for_path(Path::new(name), &encoders).map(|e| e.ext())
+        };
+        assert_eq!(writes("a.jpg").as_deref(), Some("jpg"));
+        assert_eq!(writes("A.JPEG").as_deref(), Some("jpg"));
+        for name in ["a.png", "a.webp", "a.bmp", "a.avif"] {
+            assert!(writes(name).is_some(), "{name}");
+        }
+        for name in [
+            "a.gif", "a.tif", "a.heic", "a.cr3", "a.nef", "a.dcm", "a.exr", "a",
+        ] {
+            assert_eq!(writes(name), None, "{name}");
+        }
     }
 
     /// Only DICOM files are read as DICOM. Every image was tried before.

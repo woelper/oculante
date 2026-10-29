@@ -105,7 +105,7 @@ pub fn open_image_item(
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
         // "Arbitrary Binary Data" is what is left when no signature matched, which
         // says nothing against the extension, for example DICOM without its preamble
-        if canonical_extension(fmt.extension()) != extension
+        if detection_wins(&extension, &canonical_extension(fmt.extension()))
             && fmt != FileFormat::ArbitraryBinaryData
         {
             if unchecked_extensions.contains(&extension.as_str()) {
@@ -335,13 +335,9 @@ pub fn open_image_item(
                 }
             }
         }
-        "nef" | "cr2" | "dng" | "mos" | "erf" | "raf" | "arw" | "3fr" | "ari" | "srf" | "sr2"
-        | "braw" | "r3d" | "nrw" | "raw" => {
+        raw if is_raw(raw) => {
             debug!("Loading RAW");
-            let buf = load_raw(&img_location)?;
-            let i = DynamicImage::ImageRgba8(buf);
-
-            _ = sender.send(Frame::new_still(i));
+            _ = sender.send(Frame::new_still(load_raw(&img_location)?));
             return Ok(receiver);
         }
         "jxl" => {
@@ -556,9 +552,7 @@ pub fn open_image_item(
                 return Ok(receiver);
             }
             Err(tiff_error) => match load_raw(&img_location) {
-                Ok(buf) => {
-                    let i = DynamicImage::ImageRgba8(buf);
-
+                Ok(i) => {
                     info!("This image is a raw image with tiff format.");
                     _ = sender.send(Frame::new_still(i));
                     return Ok(receiver);
@@ -660,40 +654,99 @@ fn u16_to_u8(p: u16) -> u8 {
     ((p as f32 / u16::MAX as f32) * u8::MAX as f32) as u8
 }
 
-fn load_raw(img_location: &Path) -> Result<RgbaImage> {
-    let raw_data = std::fs::read(img_location)?;
-    let (thumbnail_data, _orientation) = Export::export_thumbnail_data(&raw_data)?;
+/// The extensions of camera RAW files. Most of them are TIFF inside.
+pub const RAW_EXTENSIONS: &[&str] = &[
+    "3fr", "ari", "arq", "arw", "braw", "cr2", "cr3", "crw", "dng", "erf", "fff", "iiq", "kdc",
+    "mef", "mos", "mrw", "nef", "nrw", "orf", "ori", "pef", "r3d", "raf", "raw", "rw2", "rwl",
+    "sr2", "srf", "srw", "x3f",
+];
 
-    let i = image::load_from_memory(thumbnail_data)?;
-    Ok(i.to_rgba8())
+pub fn is_raw(extension: &str) -> bool {
+    RAW_EXTENSIONS.contains(&extension)
+}
 
-    // let export_job = Export::new(
-    //     Input::ByFile(&img_location.to_string_lossy()),
-    //     Output::new(
-    //         DemosaicingMethod::SuperPixel,
-    //         data::XYZ2SRGB,
-    //         data::GAMMA_SRGB,
-    //         OutputType::Raw16,
-    //         true,
-    //         true,
-    //     ),
-    // )?;
+/// Whether the detected format is taken over the extension. RAW files that are
+/// TIFF inside differ only in their tags and the detection guesses between them,
+/// a NEF comes out as an ARW, a PEF as a TIFF: they keep their extension.
+fn detection_wins(extension: &str, detected: &str) -> bool {
+    detected != extension && !(is_raw(extension) && (is_raw(detected) || detected == "tif"))
+}
 
-    // let mut buf = vec![];
-    // let x = quickraw::Export::export_thumbnail_data(&buf)?;
-    // image::load_from_memory(&buf)?;
+/// The image of a camera RAW file: the largest preview the camera put into it,
+/// turned the right way. rawler knows more cameras, quickraw is tried when rawler
+/// finds no big preview or is not built in. Files with only a thumbnail are
+/// developed by rawler, which looks flatter than what the camera makes.
+fn load_raw(img_location: &Path) -> Result<DynamicImage> {
+    // read and not mapped: a mapped file that gets shorter while it is read ends the app
+    let data = std::sync::Arc::new(std::fs::read(img_location)?);
+    // smaller ones are thumbnails
+    let big = |image: &DynamicImage| image.width().max(image.height()) >= 1000;
+    let mut thumbnail = None;
+    #[cfg(feature = "rawler")]
+    match std::panic::catch_unwind(|| rawler_image(&data, false)) {
+        Ok(Ok(image)) if big(&image) => return Ok(image),
+        Ok(Ok(image)) => thumbnail = Some(image),
+        Ok(Err(e)) => info!("rawler: {e:#}, trying quickraw"),
+        Err(_) => error!("rawler panicked, trying quickraw"),
+    }
+    let quickraw = Export::export_thumbnail_data(&data)
+        .map_err(anyhow::Error::from)
+        .and_then(|(thumbnail_data, _orientation)| {
+            let mut image = image::load_from_memory(thumbnail_data)?;
+            // the orientation in the EXIF of the file, found in those that are TIFF inside
+            if let Ok(orientation) = orientation_of(img_location) {
+                reorient(&mut image, orientation);
+            }
+            Ok(image)
+        });
+    match quickraw {
+        Ok(image) if big(&image) || cfg!(not(feature = "rawler")) => return Ok(image),
+        Ok(image) => _ = thumbnail.get_or_insert(image),
+        Err(e) if cfg!(not(feature = "rawler")) => return Err(e),
+        Err(e) => info!("quickraw: {e:#}"),
+    }
+    #[cfg(feature = "rawler")]
+    match std::panic::catch_unwind(|| rawler_image(&data, true)) {
+        Ok(Ok(image)) => return Ok(image),
+        Ok(Err(e)) => info!("rawler can't develop it: {e:#}"),
+        Err(_) => error!("rawler panicked while developing"),
+    }
+    // the thumbnail rather than nothing
+    thumbnail.context("Neither rawler nor quickraw can read this RAW file")
+}
 
-    // let (image, width, height) = export_job.export_16bit_image();
-    // let image = image
-    //     .into_par_iter()
-    //     .map(|x| tonemap_f32(x as f32 / 65536.))
-    //     .collect::<Vec<_>>();
-
-    // // Construct rgb image
-    // let x = RgbImage::from_raw(width as u32, height as u32, image)
-    //     .context("can't decode raw output as image")?;
-    // // make it a Dynamic image
-    // Ok(DynamicImage::ImageRgb8(x).to_rgba8())
+/// With rawler the largest preview of a RAW file, or the file developed from the
+/// sensor data, turned the right way
+#[cfg(feature = "rawler")]
+fn rawler_image(data: &std::sync::Arc<Vec<u8>>, develop: bool) -> Result<DynamicImage> {
+    use rawler::{decoders::RawDecodeParams, imgop::develop::RawDevelop, rawsource::RawSource};
+    let source = RawSource::new_from_shared_vec(data.clone());
+    let decoder = rawler::get_decoder(&source)?;
+    let params = RawDecodeParams::default();
+    let mut image = if develop {
+        let raw = decoder.raw_image(&source, &params, false)?;
+        RawDevelop::default()
+            .develop_intermediate(&raw)?
+            .to_dynamic_image()
+            .context("developed to the wrong size")?
+    } else {
+        // an iPhone keeps its full size preview as the thumbnail
+        [
+            decoder.preview_image(&source, &params),
+            decoder.thumbnail_image(&source, &params),
+        ]
+        .into_iter()
+        .filter_map(|image| image.ok().flatten())
+        .max_by_key(|image| image.width() * image.height())
+        .context("no preview in the file")?
+    };
+    let orientation = decoder.raw_metadata(&source, &params)?.exif.orientation;
+    if let Some(orientation) =
+        orientation.and_then(|o| image::metadata::Orientation::from_exif(o as u8))
+    {
+        reorient(&mut image, orientation);
+    }
+    Ok(image)
 }
 
 /// A decoder at a page of a TIFF, the first is 0
@@ -1216,6 +1269,11 @@ pub fn load_heif_native(path: &Path, item: usize) -> Result<DynamicImage> {
 }
 
 pub fn rotate_dynimage(di: &mut DynamicImage, path: &Path) -> Result<()> {
+    // load_raw turns RAW files, rawler knows where they keep the orientation
+    let extension = path.extension().unwrap_or_default().to_string_lossy();
+    if is_raw(&canonical_extension(&extension)) {
+        return Ok(());
+    }
     reorient(di, orientation_of(path)?);
     Ok(())
 }

@@ -21,7 +21,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 # avif-decode 3 needs it, checked with 1.98.0
 rust-version = "1.98"
 
@@ -56,6 +56,8 @@ bytemuck = { version = "1", optional = true }
 turbojpeg = { version = "1.5", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
+# Camera RAW files, from dnglab: more cameras than quickraw, which stays for when it fails
+rawler = { version = "0.8.0", optional = true }
 tiff = "0.11"
 jxl-oxide = "0.12"
 # These 3 need to be updated together
@@ -140,7 +142,10 @@ image-extras = { version = "0.1.1", default-features = false, features = [
 ] }
 
 [features]
-default = ["turbo", "avif_native", "j2k", "jxlcms", "heif_native"]
+default = ["turbo", "avif_native", "j2k", "jxlcms", "heif_native", "rawler"]
+# Camera RAW files read with rawler first, quickraw when it fails. Without it
+# quickraw alone, as up to 1.0
+rawler = ["dep:rawler"]
 # HEIC and HEIF in pure Rust, on by default
 heif_native = ["dep:heic-rs"]
 # libheif was used with this one until 1.0. It stays so builds that ask for it
@@ -228,6 +233,12 @@ debug-assertions = false
 [profile.dev.package.yuv]
 opt-level = 2
 debug-assertions = false
+
+# RAW files: decoding and developing them is heavy work, like for the AVIF decoder
+[profile.dev.package.rawler]
+opt-level = 2
+debug-assertions = false
+overflow-checks = false
 
 
 [[bench]]

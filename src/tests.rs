@@ -383,6 +383,39 @@ pub(crate) fn write_jpeg_with_orientation(path: &std::path::Path, orientation: u
     crate::utils::fix_exif(path, Some(exif_with_orientation(orientation).into())).unwrap();
 }
 
+/// TIFF data with these fields, and pixels when there are some
+fn exif_with(fields: &[exif::Field], pixels: Option<&[u8]>) -> Vec<u8> {
+    let strips = pixels.map(|pixels| [pixels]);
+    let mut writer = exif::experimental::Writer::new();
+    fields.iter().for_each(|field| writer.push_field(field));
+    if let Some(strips) = &strips {
+        writer.set_strips(strips, exif::In::PRIMARY);
+    }
+    let mut buf = std::io::Cursor::new(Vec::new());
+    writer.write(&mut buf, true).unwrap();
+    buf.into_inner()
+}
+
+/// What a camera writes, and what is about the file and not the photo
+fn camera_fields() -> Vec<exif::Field> {
+    use exif::{Field, In, Tag, Value};
+    let field = |tag, value| Field {
+        tag,
+        ifd_num: In::PRIMARY,
+        value,
+    };
+    vec![
+        field(Tag::Make, Value::Ascii(vec![b"Oculante".to_vec()])),
+        field(Tag::Orientation, Value::Short(vec![6])),
+        field(Tag::ImageWidth, Value::Long(vec![400])),
+        field(
+            Tag::DateTimeOriginal,
+            Value::Ascii(vec![b"2026:10:28 12:00:00".to_vec()]),
+        ),
+        field(Tag::MakerNote, Value::Undefined(vec![7; 1000], 0)),
+    ]
+}
+
 /// EXIF is read for the info panel, and kept when a copy is saved in another
 /// format, also now that it is taken from the file at the time of saving
 #[test]
@@ -393,6 +426,7 @@ fn ci_exif_is_read_and_kept_when_saving() {
     _ = std::fs::create_dir_all(&dir);
     let source = dir.join("photo.jpg");
     write_jpeg_with_orientation(&source, 6);
+    fix_exif(&source, Some(exif_with(&camera_fields(), None).into())).unwrap();
 
     let mut info = ExtendedImageInfo::default();
     info.with_exif(&source).unwrap();
@@ -415,6 +449,51 @@ fn ci_exif_is_read_and_kept_when_saving() {
     .unwrap();
     fix_exif(&copy, Some(exif.clone())).unwrap();
     assert_eq!(raw_exif(&copy), Some(exif));
+
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&copy).unwrap();
+    assert!(info.exif.contains_key("Make"), "{:?}", info.exif);
+    assert!(
+        info.exif.contains_key("DateTimeOriginal"),
+        "{:?}",
+        info.exif
+    );
+    // the pixels are saved upright, other viewers would turn them again
+    assert!(!info.exif.contains_key("Orientation"), "{:?}", info.exif);
+    assert!(!info.exif.contains_key("MakerNote"), "{:?}", info.exif);
+    _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A TIFF file is its own EXIF block, pixels and all. Saving a copy as a JPEG
+/// panicked when that was more than 64 KB, as a PNG it was as big as the file.
+#[test]
+fn ci_exif_of_a_tiff_is_small_when_saving() {
+    use crate::utils::{ExtendedImageInfo, fix_exif, raw_exif};
+    let dir = std::env::temp_dir().join("oculante_test_exif_tiff");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.tif");
+    std::fs::write(&source, exif_with(&camera_fields(), Some(&[1; 400_000]))).unwrap();
+
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    assert!(exif.len() < 1000, "{} bytes", exif.len());
+    let copy = dir.join("copy.jpg");
+    image::RgbImage::new(4, 2).save(&copy).unwrap();
+    fix_exif(&copy, Some(exif)).unwrap();
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&copy).unwrap();
+    assert!(info.exif.contains_key("Make"), "{:?}", info.exif);
+    assert!(!info.exif.contains_key("ImageWidth"), "{:?}", info.exif);
+
+    // more than fits into a JPEG: saved without it, and not a panic
+    let comment = exif::Field {
+        tag: exif::Tag::UserComment,
+        ifd_num: exif::In::PRIMARY,
+        value: exif::Value::Undefined(vec![b'a'; 70_000], 0),
+    };
+    std::fs::write(&source, exif_with(&[comment], None)).unwrap();
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    fix_exif(&copy, Some(exif)).unwrap();
+    assert!(image::open(&copy).is_ok());
     _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -1126,6 +1205,80 @@ fn ci_load_exr_float() {
 fn ci_load_psd() {
     let frame = load_first_frame("res/tests/test.psd");
     assert_valid_image(&frame);
+}
+
+/// Camera RAW files from raw.pixls.us, too big for the repository: run
+/// scripts/raw-samples.sh first. Each shows the largest preview the camera put
+/// into it, the right way round, or is developed when there is no big one.
+/// quickraw alone read none of the Canon, Pentax and newer Fujifilm files, and the
+/// detection took the NEF for an ARW and the PEF for a TIFF.
+#[cfg(feature = "rawler")]
+#[test]
+#[ignore = "needs the files of scripts/raw-samples.sh"]
+fn raw_samples() {
+    let samples = [
+        ("Nikon-D850-14bit-compressed.NEF", 8256, 5504),
+        ("DSC_0750.NEF", 6048, 4024),
+        ("B13A0729.CR2", 6720, 4480),
+        ("Canon_EOS_R5_CRAW_ISO_100_nocrop_nodual.CR3", 8192, 5464),
+        ("Canon_EOS_R6_RAW_ISO_100_nocrop_nodual.CR3", 5472, 3648),
+        ("_DSC0009.ARW", 1616, 1080),
+        ("AFXT2720.RAF", 4416, 2944),
+        ("_T012010.RW2", 1920, 1440),
+        ("R0000357.DNG", 6000, 4000),
+        // rawler finds no preview, quickraw does
+        ("Olympus_EM1mk2_Standard_20MP.ORF", 3200, 2400),
+        // developed, the preview is 720x480
+        ("IMGP8550.PEF", 7360, 4912),
+        // the thumbnail is full size, and turned upright
+        ("IMG_1361.DNG", 3024, 4032),
+    ];
+    let mut failures = vec![];
+    for (name, width, height) in samples {
+        let path = std::path::Path::new("target/raw-samples").join(name);
+        assert!(
+            path.exists(),
+            "{} is missing, run scripts/raw-samples.sh",
+            path.display()
+        );
+        let (frames, warnings) = match load_all(&path) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                failures.push(format!("{name}: {e:#}"));
+                continue;
+            }
+        };
+        let Some(image) = frames.first().and_then(|f| f.get_image()) else {
+            failures.push(format!("{name}: no image"));
+            continue;
+        };
+        if (image.width(), image.height()) != (width, height) {
+            failures.push(format!(
+                "{name}: {}x{}, expected {width}x{height}",
+                image.width(),
+                image.height()
+            ));
+        }
+        if !warnings.is_empty() {
+            failures.push(format!("{name}: {warnings:?}"));
+        }
+        // a picture, not one colour
+        let luma = image.thumbnail(64, 64).to_luma8();
+        let mean = luma.iter().map(|&v| v as f64).sum::<f64>() / luma.len() as f64;
+        let deviation = (luma.iter().map(|&v| (v as f64 - mean).powi(2)).sum::<f64>()
+            / luma.len() as f64)
+            .sqrt();
+        if deviation < 10. {
+            failures.push(format!("{name}: flat, deviation {deviation:.1}"));
+        }
+        // what a saved copy gets, it has to fit into a JPEG
+        let exif = crate::utils::raw_exif(&path);
+        eprintln!("{name}: EXIF {:?} bytes", exif.as_ref().map(|e| e.len()));
+        if exif.as_ref().is_some_and(|e| e.len() > 65527) {
+            failures.push(format!("{name}: EXIF too big for a JPEG"));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }
 
 #[test]
