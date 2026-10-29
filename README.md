@@ -102,6 +102,8 @@ pkgin install oculante
 
 ### Windows
 
+- Installer: `oculante_setup.exe` on the [releases](https://github.com/woelper/oculante/releases/latest) page. It installs Oculante for you alone, without admin rights (or for everyone, if you choose), adds it to "Open with" for every format it reads and to the default apps of Windows, and removes all of it again when uninstalled. `oculante.exe` next to it runs without installing.
+
 - Scoop
 
 ```sh
@@ -128,7 +130,7 @@ Oculante only gets updated when it improves something for you. You'll still see 
 
 ## Uninstalling
 
-To uninstall Oculante, simply delete the executable file and the data folder. You can find the data folder in the relevant location for your operating system below.
+To uninstall Oculante, simply delete the executable file and the data folder (installed with `oculante_setup.exe` on Windows: uninstall it in the settings of Windows, then delete the data folder). You can find the data folder in the relevant location for your operating system below.
 
 - Windows: `~/AppData/Local/.oculante`
 - Mac: `~/Library/Application Support/oculante`
