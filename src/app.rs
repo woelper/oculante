@@ -959,6 +959,10 @@ impl eframe::App for OculanteApp {
         }
 
         // ===== EGUI UI =====
+        self.state.animated = self
+            .animation
+            .as_ref()
+            .is_some_and(|animation| animation.frames.len() > 1);
         let state = &mut self.state;
 
         state.toasts.show(ctx);

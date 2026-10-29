@@ -541,12 +541,17 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
                     let modal = Modal::new("overwrite", ui.ctx());
-                    modal.show("Overwrite?", |_|{
+                    modal.show(overwrite_question(state.animated), |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     });
 
-
-                    if ui.button(text).on_hover_text("Saves the image. This will create a new file or overwrite an existing one.").clicked() {
+                    // Any other format became a PNG under the old name: a GIF, a TIFF, a camera RAW file (#821)
+                    let writable = FileEncoder::for_path(p, &state.volatile_settings.encoding_options).is_some();
+                    let format = p.extension().map(|e| e.to_string_lossy().to_uppercase()).unwrap_or_default();
+                    if ui.add_enabled(writable, Button::new(text))
+                        .on_hover_text("Saves the image. This will create a new file or overwrite an existing one.")
+                        .on_disabled_hover_text(format!("Oculante can't write {format} files, this one would become a PNG. Use Save as instead."))
+                        .clicked() {
                         if p.exists() {
                             modal.open();
                         } else {

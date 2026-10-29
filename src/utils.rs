@@ -829,6 +829,17 @@ pub fn delete_question(name: &str, to_trash: bool) -> String {
     }
 }
 
+/// What the app asks before it saves over the file shown. Only the frame shown is
+/// written, an animation loses the others (#821, also in 0.9.6). Files of several
+/// images are of formats Oculante can't write, it doesn't offer to save over them.
+pub fn overwrite_question(animated: bool) -> &'static str {
+    if animated {
+        "Overwrite? Only the frame shown is saved, the other frames of the animation are lost."
+    } else {
+        "Overwrite?"
+    }
+}
+
 pub fn delete_file(state: &mut OculanteState) {
     if let Some(p) = state.current_path.clone() {
         let name = p
@@ -1695,6 +1706,29 @@ mod tests {
             DELETE_TO_TRASH,
             !cfg!(any(target_os = "netbsd", target_os = "freebsd"))
         );
+    }
+
+    /// Saving over an animation keeps only the frame shown, the question says so.
+    /// Only formats Oculante writes are saved over, any other file became a PNG
+    /// under its old name, a camera RAW file too (#821).
+    #[test]
+    fn overwrite_says_what_is_lost_and_only_where_it_can_write() {
+        assert_eq!(overwrite_question(false), "Overwrite?");
+        assert!(overwrite_question(true).contains("other frames of the animation are lost"));
+        let encoders = crate::file_encoder::FileEncoder::all();
+        let writes = |name: &str| {
+            crate::file_encoder::FileEncoder::for_path(Path::new(name), &encoders).map(|e| e.ext())
+        };
+        assert_eq!(writes("a.jpg").as_deref(), Some("jpg"));
+        assert_eq!(writes("A.JPEG").as_deref(), Some("jpg"));
+        for name in ["a.png", "a.webp", "a.bmp", "a.avif"] {
+            assert!(writes(name).is_some(), "{name}");
+        }
+        for name in [
+            "a.gif", "a.tif", "a.heic", "a.cr3", "a.nef", "a.dcm", "a.exr", "a",
+        ] {
+            assert_eq!(writes(name), None, "{name}");
+        }
     }
 
     /// Only DICOM files are read as DICOM. Every image was tried before.

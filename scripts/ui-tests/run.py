@@ -481,6 +481,36 @@ def test_save_as_writes_the_file(binary):
                 assert b"Oculante" in data, "the camera name did not go along"
 
 
+def test_overwrite_only_where_the_format_is_written(binary):
+    """Overwrite in the edit panel saves over a PNG. A GIF, like every format Oculante
+    can't write, is not offered: it became a PNG under its old name, with one frame of
+    the animation, and so did a camera RAW file, also in 0.9.6 (#821)."""
+    folder = folder_of("overwrite_images", [("still.png", "test.png")])
+    make_animation(os.path.join(folder, "anim.gif"))
+    for name, written in (("anim.gif", False), ("still.png", True)):
+        path = os.path.join(folder, name)
+        before = open(path, "rb").read()
+        mtime = os.stat(path).st_mtime_ns
+        with App(binary, "overwrite_" + name.split(".")[0], [path]) as app:
+            app.wait_window()
+            app.move(0.5, 0.5)
+            assert app.wait_for_log("Animation start" if name.endswith(".gif") else LOADED), "the image never loaded"
+            app.settle(1.0)
+            app.key("e")
+            app.settle(1.5)
+            app.click(896, 266)  # Overwrite, below Save as
+            app.settle(1.0)
+            app.shot("asked")
+            app.key("Return")  # Yes, if it asks
+            app.settle(2.0)
+        after = open(path, "rb").read()
+        if written:
+            assert os.stat(path).st_mtime_ns != mtime, "Overwrite did not save the PNG"
+            assert after.startswith(b"\x89PNG"), "the PNG is no PNG any more"
+        else:
+            assert after == before, f"{name} was overwritten, it starts with {after[:8]!r} now"
+
+
 def test_file_browser_list_and_sort(binary):
     """The file browser shows a list. A click on a column sorts by it, a second one turns
     the order around, the folder stays first. The menu above sorts the thumbnails. The
@@ -2417,6 +2447,7 @@ TESTS = [
     test_first_and_last_image,
     test_ctrl_and_the_wheel_go_through_the_images,
     test_save_as_writes_the_file,
+    test_overwrite_only_where_the_format_is_written,
     test_file_browser_list_and_sort,
     test_sequence_of_tiff_pages,
     test_chainload_option_is_accepted,
