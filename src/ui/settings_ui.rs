@@ -391,6 +391,20 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
                                         },
                                         ui,
                                     );
+                                    configuration_item_ui(
+                                        "Color management",
+                                        "Images with a color profile, like photos from phones in Display P3, are converted to sRGB, so their colors are right. Off, the colors are shown as they are stored in the file.",
+                                        |ui| {
+                                            if ui
+                                                .styled_checkbox(&mut state.persistent_settings.decoders.color_management, "")
+                                                .changed()
+                                            {
+                                                state.player.set_decoder_opts(state.persistent_settings.decoders);
+                                                state.reload();
+                                            }
+                                        },
+                                        ui,
+                                    );
                                 });
 
                                 let debug = ui.heading("Debug");

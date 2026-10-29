@@ -409,6 +409,9 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             ),
         );
         info_row(ui, |ui| ui.label("Pixels"), format!("{}", info.num_pixels));
+        if let Some(name) = &info.color_profile {
+            info_row(ui, |ui| ui.label("Color profile"), name);
+        }
 
         if !info.exif.is_empty() {
             ui.styled_collapsing("EXIF", |ui| {

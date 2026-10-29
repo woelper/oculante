@@ -152,6 +152,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - Metadata and Metafile support: Load EXIF data and save metafile edit stacks.
 - Focused on Performance: Threaded image loading, configurable image caching, Low cpu usage, pretty fast startup / loading time.
 - Color Channel support: Display individual RGBA channels, unassociated / unpremultiplied alpha.
+- Color management: images with a color profile, like photos from phones in Display P3, are shown in sRGB with the right colors. Can be turned off in the settings.
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode, listening on that port.
 - Load files from stdin: pipe your data with `cat image | oculante -s`.
 
@@ -229,6 +230,17 @@ In addition, Oculante saves some settings locally, for example:
 - Vsync preferences
 - Whether the directory index bar is displayed
 - Recent files
+
+## Code signing policy
+
+The Windows downloads, `oculante.exe` and `oculante_setup.exe`, are signed. Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+- Committers and reviewers: [woelper](https://github.com/woelper), [Stoppedpuma](https://github.com/Stoppedpuma), [0323pin](https://github.com/0323pin), [B-LechCode](https://github.com/B-LechCode)
+- Approvers: [woelper](https://github.com/woelper), [Stoppedpuma](https://github.com/Stoppedpuma)
+
+Only what the release workflow of this repository builds from its source gets signed, and every release is approved by hand before it is signed. Everyone with access to the repository or to SignPath uses multi-factor authentication.
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, see the privacy pledge above.
 
 ## License
 
