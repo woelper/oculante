@@ -30,3 +30,16 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.file }}
+      - name: Installer
+        if: runner.os == 'Windows'
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          & $iscc /Qp "/DAppVersion=$version-test" "/DNumericVersion=$($version.Split('-')[0])" "/DExe=$PWD\target\release\oculante.exe" "/O$PWD\dist" res\windows\oculante.iss
+          if ($LASTEXITCODE) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: oculante-windows-setup
+          path: dist/oculante_setup.exe
