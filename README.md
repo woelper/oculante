@@ -218,9 +218,10 @@ UI Design:
 ## Privacy pledge
 
 Oculante does in no way collect or send anonymous or non-anonynmous user data or statistics. Oculante is and will remain free and open-source. There will never be ads.
-There are only two instances where oculante interacts with the network, and both never happen without being triggered by the user:
-- Updating the application (must be triggered manually from settings)
+There is only one instance where oculante interacts with the network, and it never happens without being triggered by the user:
 - Listening for incoming images on a custom port (must be set on command line)
+
+Links in the app, like the one to the project page, open in your browser when you click them.
 
 In addition, Oculante saves some settings locally, for example:
 - UI accent color
