@@ -1,6 +1,7 @@
 pub mod app;
 pub mod appstate;
 pub(crate) mod cache;
+pub(crate) mod color_profile;
 pub(crate) mod comparelist;
 pub(crate) mod desktop_theme;
 pub(crate) mod glow_renderer;

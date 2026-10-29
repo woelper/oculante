@@ -1,6 +1,6 @@
 use crate::settings::DecoderSettings;
 use crate::utils::{Frame, fit};
-use crate::{FONT, appstate::Message, ktx2_loader};
+use crate::{FONT, appstate::Message, color_profile, ktx2_loader};
 use log::{debug, error, info, warn};
 use psd::Psd;
 
@@ -78,16 +78,31 @@ pub fn image_count(path: &Path) -> usize {
     count().unwrap_or(1).max(1)
 }
 
-/// Like `open_image`, for one of the images of a file, see `image_count`
+/// Like `open_image`, for one of the images of a file, see `image_count`. Images
+/// with a color profile come in sRGB, unless color management is off.
 pub fn open_image_item(
     img_location: &Path,
     item: usize,
     message_sender: Option<Sender<Message>>,
     decoder_opts: Option<DecoderSettings>,
 ) -> Result<Receiver<Frame>> {
-    let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
-    let img_location = (*img_location).to_owned();
+    let extension = loaded_as(img_location, message_sender.as_ref());
+    let to_srgb = decoder_opts
+        .unwrap_or_default()
+        .color_management
+        .then(|| color_profile::icc_profile(img_location, &extension))
+        .flatten()
+        .and_then(|icc| color_profile::ToSrgb::new(&icc));
+    let receiver = decode_item(img_location, extension, item, message_sender, decoder_opts)?;
+    Ok(match to_srgb {
+        Some(to_srgb) => to_srgb.frames(receiver),
+        None => receiver,
+    })
+}
 
+/// The format a file is loaded as: the one of its extension, unless its content
+/// says otherwise
+fn loaded_as(img_location: &Path, message_sender: Option<&Sender<Message>>) -> String {
     use file_format::FileFormat;
 
     let mut extension = canonical_extension(
@@ -101,7 +116,7 @@ pub fn open_image_item(
     // These are detected incorrectly, for example svg is xml etc
     let unchecked_extensions = ["svg", "kra", "ora", "tga", "dng"];
 
-    if let Ok(fmt) = FileFormat::from_file(&img_location) {
+    if let Ok(fmt) = FileFormat::from_file(img_location) {
         debug!("Detected as {:?} {}", fmt.name(), fmt.extension());
         // "Arbitrary Binary Data" is what is left when no signature matched, which
         // says nothing against the extension, for example DICOM without its preamble
@@ -111,7 +126,7 @@ pub fn open_image_item(
             if unchecked_extensions.contains(&extension.as_str()) {
                 info!("Extension {extension} skipped check.")
             } else {
-                message_sender.as_ref().map(|s| {
+                message_sender.map(|s| {
                     s.send(Message::Warning(format!(
                         "Extension mismatch. This image is loaded as {}",
                         fmt.extension()
@@ -123,6 +138,19 @@ pub fn open_image_item(
     } else {
         error!("Can't determine image type")
     }
+    extension
+}
+
+/// Decodes one of the images of a file as the format it is loaded as
+fn decode_item(
+    img_location: &Path,
+    extension: String,
+    item: usize,
+    message_sender: Option<Sender<Message>>,
+    decoder_opts: Option<DecoderSettings>,
+) -> Result<Receiver<Frame>> {
+    let (sender, receiver): (Sender<Frame>, Receiver<Frame>) = channel();
+    let img_location = (*img_location).to_owned();
 
     debug!("matching '{extension}'");
 
@@ -937,7 +965,7 @@ fn load_jxl(img_location: &Path, frame_sender: Sender<Frame>) -> Result<()> {
     let mut image = JxlImage::builder()
         .open(img_location)
         .map_err(|e| anyhow!("{e}"))?;
-    //TODO: Disable when colormanagement support exists
+    // the decoder converts to sRGB itself, so color_profile leaves JPEG XL alone
     let colorencoding = jxl_oxide::EnumColourEncoding::srgb(jxl_oxide::RenderingIntent::Perceptual);
     image.request_color_encoding(colorencoding);
 

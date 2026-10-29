@@ -120,6 +120,8 @@ pub struct ExtendedImageInfo {
     pub blue_histogram: Vec<(i32, u64)>,
     pub exif: HashMap<String, String>,
     pub dicom: Option<DicomData>,
+    /// The name of the color profile of the file
+    pub color_profile: Option<String>,
 }
 
 impl ExtendedImageInfo {
@@ -272,6 +274,7 @@ impl ExtendedImageInfo {
             red_histogram: histogram(&counts.histograms[0]),
             exif: Default::default(),
             dicom: Default::default(),
+            color_profile: None,
         }
     }
 }
@@ -1038,18 +1041,28 @@ pub fn send_extended_info(
     channel: &ExtendedInfoChannel,
 ) {
     let sender = channel.0.clone();
-    let known = known.map(|info| (info.exif.clone(), info.dicom.clone()));
+    let known = known.map(|info| {
+        (
+            info.exif.clone(),
+            info.dicom.clone(),
+            info.color_profile.clone(),
+        )
+    });
     thread::spawn(move || {
         let mut e_info = ExtendedImageInfo::from_dynamic_image(&img);
         match known {
-            Some((exif, dicom)) => {
+            Some((exif, dicom, color_profile)) => {
                 e_info.exif = exif;
                 e_info.dicom = dicom;
+                e_info.color_profile = color_profile;
             }
             None => {
                 if let Some(p) = path {
                     _ = e_info.with_exif(&p);
                     _ = e_info.with_dicom(&p);
+                    let extension = p.extension().and_then(|e| e.to_str()).unwrap_or_default();
+                    e_info.color_profile = crate::color_profile::icc_profile(&p, extension)
+                        .map(|icc| crate::color_profile::name(&icc));
                 }
             }
         }

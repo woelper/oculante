@@ -1849,3 +1849,114 @@ fn confirmation_modal_keys() {
     // closed, Enter does nothing
     assert_eq!(modal_frame(&ctx, Some(egui::Key::Enter)), (false, false));
 }
+
+/// The color at 12 o'clock of the ring of the ColorSpin test image. Its profile
+/// turns blue into red, so red is there only when the profile is used.
+fn color_at_twelve(path: &std::path::Path, color_management: bool) -> image::Rgb<u8> {
+    let settings = crate::settings::DecoderSettings {
+        color_management,
+        ..Default::default()
+    };
+    let receiver = crate::image_loader::open_image_item(path, 0, None, Some(settings)).unwrap();
+    let frame = receiver.recv_timeout(Duration::from_secs(30)).unwrap();
+    *frame.get_image().unwrap().to_rgb8().get_pixel(400, 92)
+}
+
+fn write_with_profile(encoder: impl image::ImageEncoder, image: &image::DynamicImage, icc: &[u8]) {
+    let mut encoder = encoder;
+    encoder.set_icc_profile(icc.to_vec()).unwrap();
+    image.write_with_encoder(encoder).unwrap();
+}
+
+/// Images with a color profile come in sRGB, in all formats that carry one, in 8
+/// and 16 bits and with alpha. With color management off they come as stored.
+#[test]
+fn ci_color_profiles_are_converted_to_srgb() {
+    use image::ImageDecoder;
+    let tests = std::path::Path::new("res/tests");
+    let mut files: Vec<PathBuf> = [
+        "red-at-12-oclock-with-color-profile.jpg",
+        "red-at-12-oclock-with-color-profile.png",
+        "red-at-12-oclock-with-color-profile.heic",
+        "red-at-12-oclock-with-color-profile-8bpc.avif",
+        "red-at-12-oclock-with-color-profile-10bpc.avif",
+        "red-at-12-oclock-with-color-profile-12bpc.avif",
+        "red-at-12-oclock-with-color-profile-lossy.avif",
+    ]
+    .iter()
+    .map(|name| tests.join(name))
+    .collect();
+
+    // the others written with the same profile
+    let source =
+        std::fs::File::open(tests.join("red-at-12-oclock-with-color-profile.png")).unwrap();
+    let mut decoder = image::codecs::png::PngDecoder::new(std::io::BufReader::new(source)).unwrap();
+    let icc = decoder.icc_profile().unwrap().unwrap();
+    let rgb = image::DynamicImage::from_decoder(decoder).unwrap();
+    let rgb16 = image::DynamicImage::ImageRgb16(rgb.to_rgb16());
+    let rgba = image::DynamicImage::ImageRgba8(rgb.to_rgba8());
+    let mut file = |name: &str| {
+        let path = std::env::temp_dir().join(format!("oculante_test_profile_{name}"));
+        files.push(path.clone());
+        std::fs::File::create(path).unwrap()
+    };
+    use image::codecs::{png::PngEncoder, tiff::TiffEncoder, webp::WebPEncoder};
+    write_with_profile(PngEncoder::new(file("16bit.png")), &rgb16, &icc);
+    write_with_profile(PngEncoder::new(file("rgba.png")), &rgba, &icc);
+    write_with_profile(TiffEncoder::new(file("8bit.tif")), &rgb, &icc);
+    write_with_profile(TiffEncoder::new(file("16bit.tif")), &rgb16, &icc);
+    write_with_profile(WebPEncoder::new_lossless(file("rgba.webp")), &rgba, &icc);
+
+    // the AVIFs store a slightly different blue, it becomes (255, 0, 98), as with
+    // littleCMS
+    let red = |c: image::Rgb<u8>| c[0] > 200 && c[1] < 60 && c[2] < 128;
+    let blue = |c: image::Rgb<u8>| c[0] < 60 && c[1] < 128 && c[2] > 200;
+    for path in &files {
+        let managed = color_at_twelve(path, true);
+        let stored = color_at_twelve(path, false);
+        assert!(
+            red(managed),
+            "{}: {managed:?} at 12 o'clock, not red",
+            path.display()
+        );
+        assert!(
+            blue(stored),
+            "{}: {stored:?} as stored, not blue",
+            path.display()
+        );
+    }
+    for path in files
+        .iter()
+        .filter(|path| path.starts_with(std::env::temp_dir()))
+    {
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// sRGB profiles, also the small ones of images from the web, change nothing, so
+/// those images are not converted. Display P3 is.
+#[test]
+fn ci_srgb_profiles_are_left_alone() {
+    use crate::color_profile::{ToSrgb, icc_profile, name};
+    use moxcms::ColorProfile;
+    for file in [
+        "mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        "mohsen-karimi.webp",
+        "AR-اختبار.png",
+        "141x121-target.png",
+    ] {
+        let path = std::path::Path::new("res/tests").join(file);
+        let extension = path.extension().unwrap().to_str().unwrap();
+        let icc = icc_profile(&path, extension).unwrap_or_else(|| panic!("{file} has a profile"));
+        assert!(
+            ToSrgb::new(&icc).is_none(),
+            "{file} ({}) is converted",
+            name(&icc)
+        );
+    }
+    let srgb = ColorProfile::new_srgb().encode().unwrap();
+    assert!(ToSrgb::new(&srgb).is_none());
+    let p3 = ColorProfile::new_display_p3().encode().unwrap();
+    assert!(ToSrgb::new(&p3).is_some());
+    assert_eq!(name(&p3), "Display P3");
+}

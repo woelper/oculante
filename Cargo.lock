@@ -4013,6 +4013,7 @@ dependencies = [
  "log",
  "lutgen",
  "mouse_position",
+ "moxcms",
  "nalgebra",
  "num-integer",
  "objc2 0.6.5",

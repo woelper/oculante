@@ -152,6 +152,7 @@ You can see what we're currently working on in our [Release Plan](https://github
 - Metadata and Metafile support: Load EXIF data and save metafile edit stacks.
 - Focused on Performance: Threaded image loading, configurable image caching, Low cpu usage, pretty fast startup / loading time.
 - Color Channel support: Display individual RGBA channels, unassociated / unpremultiplied alpha.
+- Color management: images with a color profile, like photos from phones in Display P3, are shown in sRGB with the right colors. Can be turned off in the settings.
 - Network listen mode: Start with `oculante -l port` and oculante will switch to receive mode, listening on that port.
 - Load files from stdin: pipe your data with `cat image | oculante -s`.
 

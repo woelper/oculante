@@ -481,6 +481,23 @@ def test_save_as_writes_the_file(binary):
                 assert b"Oculante" in data, "the camera name did not go along"
 
 
+def test_color_profile(binary):
+    """An image with a color profile is shown in sRGB. The profile of this one turns
+    blue into red: red is at 12 o'clock only when it is used, blue is there when
+    color management is off."""
+    path = image("red-at-12-oclock-with-color-profile.png")
+    box = (0, 60, SCREEN[0], SCREEN[1] - 120)
+    for managed in (True, False):
+        settings = {"decoders": {"color_management": managed}}
+        with start(binary, f"color_profile_{managed}", path, settings=settings) as app:
+            shot = app.shot("shown")
+        red = color_center(shot, box, (255, 0, 0), tolerance=60)
+        blue = color_center(shot, box, (0, 0, 255), tolerance=60)
+        assert red and blue, f"red {red} and blue {blue} not both found"
+        on_top = "red" if red[1] < blue[1] else "blue"
+        assert on_top == ("red" if managed else "blue"), f"{on_top} is on top (color management {managed})"
+
+
 def test_overwrite_only_where_the_format_is_written(binary):
     """Overwrite in the edit panel saves over a PNG. A GIF, like every format Oculante
     can't write, is not offered: it became a PNG under its old name, with one frame of
@@ -2447,6 +2464,7 @@ TESTS = [
     test_first_and_last_image,
     test_ctrl_and_the_wheel_go_through_the_images,
     test_save_as_writes_the_file,
+    test_color_profile,
     test_overwrite_only_where_the_format_is_written,
     test_file_browser_list_and_sort,
     test_sequence_of_tiff_pages,

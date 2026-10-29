@@ -66,9 +66,13 @@ impl Thumbnails {
     }
 }
 
+/// Thumbnails made before are made again: 2 converts colors to sRGB
+const VERSION: u8 = 2;
+
 pub fn path_to_id<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut hasher = DefaultHasher::new();
     path.as_ref().hash(&mut hasher);
+    VERSION.hash(&mut hasher);
     let size = File::open(path)
         .and_then(|f| f.metadata().map(|m| m.len()))
         .unwrap_or_default();

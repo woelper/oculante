@@ -259,12 +259,15 @@ pub const DEFAULT_SVG_SCALE: f32 = 2.0;
 #[serde(default)]
 pub struct DecoderSettings {
     pub svg_scale: f32,
+    /// Images with a color profile are converted to sRGB
+    pub color_management: bool,
 }
 
 impl Default for DecoderSettings {
     fn default() -> Self {
         Self {
             svg_scale: DEFAULT_SVG_SCALE,
+            color_management: true,
         }
     }
 }
