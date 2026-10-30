@@ -27,19 +27,62 @@ jobs:
       - name: Build
         run: cargo build --release
       - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.file }}
+      # On Windows the exe is signed with SignPath's test certificate, the installer
+      # is made of the signed exe and signed too. Each is uploaded as the file itself
+      # (archive: false), signed, and the signed one replaces it.
+      - uses: actions/upload-artifact@v7
+        id: exe
+        if: runner.os == 'Windows'
+        with:
+          path: target/release/oculante.exe
+          archive: false
+      - uses: signpath/github-action-submit-signing-request@v2
+        if: runner.os == 'Windows'
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 4171ac00-07c8-466d-b3e5-92a37e3eb2f9
+          project-slug: oculante
+          signing-policy-slug: test-signing
+          github-artifact-id: ${{ steps.exe.outputs.artifact-id }}
+          output-artifact-directory: signed
+          skip-decompress: true
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          path: signed/oculante.exe
+          archive: false
+          overwrite: true
       - name: Installer
         if: runner.os == 'Windows'
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          & $iscc /Qp "/DAppVersion=$version-test" "/DNumericVersion=$($version.Split('-')[0])" "/DExe=$PWD\target\release\oculante.exe" "/O$PWD\dist" res\windows\oculante.iss
+          & $iscc /Qp "/DAppVersion=$version-test" "/DNumericVersion=$($version.Split('-')[0])" "/DExe=$PWD\signed\oculante.exe" "/O$PWD\dist" res\windows\oculante.iss
           if ($LASTEXITCODE) { exit 1 }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
+        id: setup
         if: runner.os == 'Windows'
         with:
-          name: oculante-windows-setup
           path: dist/oculante_setup.exe
+          archive: false
+      - uses: signpath/github-action-submit-signing-request@v2
+        if: runner.os == 'Windows'
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 4171ac00-07c8-466d-b3e5-92a37e3eb2f9
+          project-slug: oculante
+          signing-policy-slug: test-signing
+          github-artifact-id: ${{ steps.setup.outputs.artifact-id }}
+          output-artifact-directory: signed
+          skip-decompress: true
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          path: signed/oculante_setup.exe
+          archive: false
+          overwrite: true
