@@ -91,8 +91,7 @@ pub fn info_ui(
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
-                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex_color(state.sampled_color.map(|c| c as u8)));
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
                 info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
                     "{:.0},{:.0}",

@@ -21,7 +21,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 let (rect, resp) =
                                     ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
 
-                                let egui_color = Color32::from_rgba_premultiplied(
+                                let egui_color = Color32::from_rgba_unmultiplied(
                                     color[0], color[1], color[2], color[3],
                                 );
 
@@ -54,15 +54,15 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                         });
                                     }
                                     if ui.ctx().input(|r| r.pointer.primary_clicked()) {
-                                        ui.ctx().copy_text(egui_color.to_hex());
+                                        ui.ctx().copy_text(hex_color(*color));
                                         state.send_message_info(&format!(
                                             "Copied color: {}",
-                                            egui_color.to_hex()
+                                            hex_color(*color)
                                         ));
                                     }
                                 }
                                 resp.on_hover_ui(|ui| {
-                                    ui.label(format!("HEX: {}", egui_color.to_hex()));
+                                    ui.label(format!("HEX: {}", hex_color(*color)));
                                     ui.label(format!(
                                         "RGBA: {}",
                                         disp_col([
