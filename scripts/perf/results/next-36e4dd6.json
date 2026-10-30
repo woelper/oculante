@@ -1,0 +1,672 @@
+{
+ "meta": {
+  "label": "next-36e4dd6",
+  "date": "2026-10-04T20:25:33",
+  "binary_size_mb": 42.979792,
+  "runs": 3,
+  "idle_seconds": 10,
+  "image_set": 1,
+  "cpu": "12th Gen Intel(R) Core(TM) i7-12700T",
+  "cores": 20,
+  "rendering": "software (llvmpipe), textures are part of the process memory",
+  "failures": []
+ },
+ "metrics": {
+  "empty.time_to_window_s": {
+   "median": 0.16799664497375488,
+   "values": [
+    0.173858642578125,
+    0.15302515029907227,
+    0.16799664497375488
+   ]
+  },
+  "empty.rss_mb": {
+   "median": 208.8828125,
+   "values": [
+    208.859375,
+    208.98828125,
+    208.8828125
+   ]
+  },
+  "empty.pss_mb": {
+   "median": 170.025390625,
+   "values": [
+    169.919921875,
+    170.025390625,
+    170.0283203125
+   ]
+  },
+  "empty.peak_rss_mb": {
+   "median": 208.8828125,
+   "values": [
+    208.859375,
+    208.98828125,
+    208.8828125
+   ]
+  },
+  "empty.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "empty.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_2mp.jpg.time_to_window_s": {
+   "median": 0.16531062126159668,
+   "values": [
+    0.16531062126159668,
+    0.17966318130493164,
+    0.15480327606201172
+   ]
+  },
+  "open.rgb8_2mp.jpg.time_to_image_s": {
+   "median": 0.3062617778778076,
+   "values": [
+    0.3062617778778076,
+    0.32262372970581055,
+    0.2900097370147705
+   ]
+  },
+  "open.rgb8_2mp.jpg.rss_mb": {
+   "median": 255.76953125,
+   "values": [
+    255.76953125,
+    255.57421875,
+    256.33203125
+   ]
+  },
+  "open.rgb8_2mp.jpg.pss_mb": {
+   "median": 216.9287109375,
+   "values": [
+    216.9287109375,
+    216.6064453125,
+    217.3740234375
+   ]
+  },
+  "open.rgb8_2mp.jpg.peak_rss_mb": {
+   "median": 255.76953125,
+   "values": [
+    255.76953125,
+    255.57421875,
+    256.33203125
+   ]
+  },
+  "open.rgb8_2mp.jpg.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_2mp.jpg.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_24mp.jpg.time_to_window_s": {
+   "median": 0.1570420265197754,
+   "values": [
+    0.15626883506774902,
+    0.1570420265197754,
+    0.15766263008117676
+   ]
+  },
+  "open.rgb8_24mp.jpg.time_to_image_s": {
+   "median": 0.569502592086792,
+   "values": [
+    0.5655777454376221,
+    0.5772781372070312,
+    0.569502592086792
+   ]
+  },
+  "open.rgb8_24mp.jpg.rss_mb": {
+   "median": 485.5546875,
+   "values": [
+    485.5546875,
+    485.5234375,
+    485.7578125
+   ]
+  },
+  "open.rgb8_24mp.jpg.pss_mb": {
+   "median": 446.5771484375,
+   "values": [
+    446.5400390625,
+    446.5771484375,
+    446.6953125
+   ]
+  },
+  "open.rgb8_24mp.jpg.peak_rss_mb": {
+   "median": 553.1171875,
+   "values": [
+    553.1171875,
+    552.75390625,
+    553.25
+   ]
+  },
+  "open.rgb8_24mp.jpg.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_24mp.jpg.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgba8_24mp.png.time_to_window_s": {
+   "median": 0.15464997291564941,
+   "values": [
+    0.1525869369506836,
+    0.159104585647583,
+    0.15464997291564941
+   ]
+  },
+  "open.rgba8_24mp.png.time_to_image_s": {
+   "median": 0.5525851249694824,
+   "values": [
+    0.5525851249694824,
+    0.5874865055084229,
+    0.5523734092712402
+   ]
+  },
+  "open.rgba8_24mp.png.rss_mb": {
+   "median": 536.33203125,
+   "values": [
+    536.33203125,
+    536.3671875,
+    535.58984375
+   ]
+  },
+  "open.rgba8_24mp.png.pss_mb": {
+   "median": 497.34765625,
+   "values": [
+    497.34765625,
+    497.400390625,
+    496.6396484375
+   ]
+  },
+  "open.rgba8_24mp.png.peak_rss_mb": {
+   "median": 618.5390625,
+   "values": [
+    619.3046875,
+    618.5390625,
+    618.3515625
+   ]
+  },
+  "open.rgba8_24mp.png.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgba8_24mp.png.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.gray8_64mp.png.time_to_window_s": {
+   "median": 0.1551985740661621,
+   "values": [
+    0.1551985740661621,
+    0.15195488929748535,
+    0.16074347496032715
+   ]
+  },
+  "open.gray8_64mp.png.time_to_image_s": {
+   "median": 1.201894998550415,
+   "values": [
+    1.2084851264953613,
+    1.201894998550415,
+    1.1938340663909912
+   ]
+  },
+  "open.gray8_64mp.png.rss_mb": {
+   "median": 455.83203125,
+   "values": [
+    455.98046875,
+    455.83203125,
+    455.5078125
+   ]
+  },
+  "open.gray8_64mp.png.pss_mb": {
+   "median": 416.806640625,
+   "values": [
+    417.0126953125,
+    416.806640625,
+    416.4619140625
+   ]
+  },
+  "open.gray8_64mp.png.peak_rss_mb": {
+   "median": 656.328125,
+   "values": [
+    656.234375,
+    656.62890625,
+    656.328125
+   ]
+  },
+  "open.gray8_64mp.png.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.gray8_64mp.png.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.gray16_16mp.png.time_to_window_s": {
+   "median": 0.30599021911621094,
+   "values": [
+    0.30599021911621094,
+    0.2934877872467041,
+    0.3109908103942871
+   ]
+  },
+  "open.gray16_16mp.png.time_to_image_s": {
+   "median": 0.46169042587280273,
+   "values": [
+    0.46169042587280273,
+    0.46031665802001953,
+    0.47139644622802734
+   ]
+  },
+  "open.gray16_16mp.png.rss_mb": {
+   "median": 337.171875,
+   "values": [
+    337.7578125,
+    337.171875,
+    336.8359375
+   ]
+  },
+  "open.gray16_16mp.png.pss_mb": {
+   "median": 298.1904296875,
+   "values": [
+    298.771484375,
+    298.1904296875,
+    297.9130859375
+   ]
+  },
+  "open.gray16_16mp.png.peak_rss_mb": {
+   "median": 337.171875,
+   "values": [
+    337.7578125,
+    337.171875,
+    336.8359375
+   ]
+  },
+  "open.gray16_16mp.png.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.gray16_16mp.png.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.float_12mp.hdr.time_to_window_s": {
+   "median": 0.16359901428222656,
+   "values": [
+    0.16359901428222656,
+    0.20189404487609863,
+    0.1621699333190918
+   ]
+  },
+  "open.float_12mp.hdr.time_to_image_s": {
+   "median": 0.5701005458831787,
+   "values": [
+    0.5482962131500244,
+    0.7029285430908203,
+    0.5701005458831787
+   ]
+  },
+  "open.float_12mp.hdr.rss_mb": {
+   "median": 365.15234375,
+   "values": [
+    365.15234375,
+    365.13671875,
+    365.55078125
+   ]
+  },
+  "open.float_12mp.hdr.pss_mb": {
+   "median": 326.228515625,
+   "values": [
+    326.228515625,
+    326.181640625,
+    326.626953125
+   ]
+  },
+  "open.float_12mp.hdr.peak_rss_mb": {
+   "median": 509.23046875,
+   "values": [
+    509.23046875,
+    504.6796875,
+    510.98828125
+   ]
+  },
+  "open.float_12mp.hdr.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.float_12mp.hdr.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_144mp.jpg.time_to_window_s": {
+   "median": 0.1629009246826172,
+   "values": [
+    0.15919947624206543,
+    0.1629009246826172,
+    0.16623926162719727
+   ]
+  },
+  "open.rgb8_144mp.jpg.time_to_image_s": {
+   "median": 2.282712697982788,
+   "values": [
+    2.277712821960449,
+    2.282712697982788,
+    2.336223602294922
+   ]
+  },
+  "open.rgb8_144mp.jpg.rss_mb": {
+   "median": 1810.3125,
+   "values": [
+    1810.3125,
+    1809.5859375,
+    1810.6015625
+   ]
+  },
+  "open.rgb8_144mp.jpg.pss_mb": {
+   "median": 1771.2890625,
+   "values": [
+    1771.2890625,
+    1770.501953125,
+    1771.5224609375
+   ]
+  },
+  "open.rgb8_144mp.jpg.peak_rss_mb": {
+   "median": 1890.91796875,
+   "values": [
+    1890.91796875,
+    1902.96484375,
+    1890.140625
+   ]
+  },
+  "open.rgb8_144mp.jpg.idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "open.rgb8_144mp.jpg.idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "panels.info_rss_mb": {
+   "median": 485.6171875,
+   "values": [
+    485.73046875,
+    485.6171875,
+    485.58984375
+   ]
+  },
+  "panels.info_idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "panels.info_idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "panels.edit_rss_mb": {
+   "median": 669.34765625,
+   "values": [
+    669.40625,
+    669.34765625,
+    669.3046875
+   ]
+  },
+  "panels.edit_idle_cpu_percent": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "panels.edit_idle_wakeups_per_s": {
+   "median": 0.0,
+   "values": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "animation.cpu_percent": {
+   "median": 1101.1434766315176,
+   "values": [
+    1115.390293563434,
+    1101.1434766315176,
+    1082.2318558137129
+   ]
+  },
+  "animation.shown_fps": {
+   "median": 19.798983688071242,
+   "values": [
+    19.799827696392317,
+    19.798983688071242,
+    19.798753344831855
+   ]
+  },
+  "animation.rss_mb": {
+   "median": 260.23046875,
+   "values": [
+    260.23046875,
+    259.3046875,
+    260.890625
+   ]
+  },
+  "animation.pss_mb": {
+   "median": 221.32421875,
+   "values": [
+    221.32421875,
+    220.3037109375,
+    221.9013671875
+   ]
+  },
+  "animation.peak_rss_mb": {
+   "median": 260.23046875,
+   "values": [
+    260.23046875,
+    259.3046875,
+    260.890625
+   ]
+  },
+  "switch.next_median_s": {
+   "median": 0.1759045124053955,
+   "values": [
+    0.1759045124053955,
+    0.17644667625427246,
+    0.17553353309631348
+   ]
+  },
+  "switch.next_max_s": {
+   "median": 0.20368480682373047,
+   "values": [
+    0.19269585609436035,
+    0.20368480682373047,
+    0.20885992050170898
+   ]
+  },
+  "switch.back_median_s": {
+   "median": 0.0764164924621582,
+   "values": [
+    0.07933163642883301,
+    0.0764164924621582,
+    0.07458305358886719
+   ]
+  },
+  "switch.rss_mb": {
+   "median": 729.49609375,
+   "values": [
+    729.484375,
+    729.65625,
+    729.49609375
+   ]
+  },
+  "switch.pss_mb": {
+   "median": 690.48046875,
+   "values": [
+    690.4541015625,
+    690.685546875,
+    690.48046875
+   ]
+  },
+  "switch.peak_rss_mb": {
+   "median": 794.70703125,
+   "values": [
+    794.6484375,
+    794.91015625,
+    794.70703125
+   ]
+  },
+  "channels.to_channel_median_s": {
+   "median": 0.021704673767089844,
+   "values": [
+    0.02195572853088379,
+    0.021704673767089844,
+    0.020962238311767578
+   ]
+  },
+  "channels.to_color_median_s": {
+   "median": 0.020899295806884766,
+   "values": [
+    0.020899295806884766,
+    0.02077770233154297,
+    0.021062135696411133
+   ]
+  },
+  "view.rgb8_24mp.jpg.pan_latency_median_s": {
+   "median": 0.008849024772644043,
+   "values": [
+    0.008849024772644043,
+    0.009499192237854004,
+    0.008083224296569824
+   ]
+  },
+  "view.rgb8_24mp.jpg.pan_latency_max_s": {
+   "median": 0.012210369110107422,
+   "values": [
+    0.01174020767211914,
+    0.012427806854248047,
+    0.012210369110107422
+   ]
+  },
+  "view.rgb8_24mp.jpg.pan_cpu_s": {
+   "median": 15.78,
+   "values": [
+    15.67,
+    15.94,
+    15.78
+   ]
+  },
+  "view.rgb8_24mp.jpg.zoom_cpu_s": {
+   "median": 15.079999999999998,
+   "values": [
+    15.419999999999998,
+    15.040000000000003,
+    15.079999999999998
+   ]
+  },
+  "view.rgb8_144mp.jpg.pan_latency_median_s": {
+   "median": 0.008188962936401367,
+   "values": [
+    0.008033156394958496,
+    0.008188962936401367,
+    0.00856924057006836
+   ]
+  },
+  "view.rgb8_144mp.jpg.pan_latency_max_s": {
+   "median": 0.011087417602539062,
+   "values": [
+    0.009850263595581055,
+    0.012305736541748047,
+    0.011087417602539062
+   ]
+  },
+  "view.rgb8_144mp.jpg.pan_cpu_s": {
+   "median": 15.479999999999997,
+   "values": [
+    15.64,
+    15.479999999999997,
+    15.250000000000004
+   ]
+  },
+  "view.rgb8_144mp.jpg.zoom_cpu_s": {
+   "median": 15.25,
+   "values": [
+    15.270000000000003,
+    15.25,
+    14.79
+   ]
+  }
+ }
+}

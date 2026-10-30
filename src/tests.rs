@@ -1,321 +1,1962 @@
-// use crate::image_loader::*;
-// use cmd_lib::run_cmd;
+use std::path::PathBuf;
+use std::time::Duration;
 
-// use crate::{
-//     image_editing::{process_pixels, ImageOperation, ScaleFilter},
-//     shortcuts::{keypresses_as_markdown, ShortcutExt, Shortcuts},
-// };
+use crate::image_loader::open_image;
+use crate::utils::Frame;
 
-// use super::*;
-// use std::{fs::File, io::Write, path::PathBuf, time::Instant};
+/// Helper: load an image and return the first frame, with timeout
+fn load_first_frame(path: &str) -> Frame {
+    let p = PathBuf::from(path);
+    assert!(p.exists(), "Test file not found: {path}");
+    let rx = open_image(&p, None, None).expect("open_image failed");
+    rx.recv_timeout(Duration::from_secs(30))
+        .expect("Timed out waiting for image")
+}
 
-// #[test]
-// fn ci_load() {
-//     open_image(
-//         &PathBuf::from("tests/frstvisuals-lmV1g1UbdhQ-unsplash.jpg"),
-//         None,
-//     )
-//     .unwrap();
-// }
+/// Helper: assert the frame contains an image with nonzero dimensions
+fn assert_valid_image(frame: &Frame) {
+    match frame {
+        Frame::Still(img)
+        | Frame::AnimationStart(img)
+        | Frame::Animation(img, _)
+        | Frame::EditResult(img)
+        | Frame::CompareResult(img, _) => {
+            assert!(
+                img.width() > 0 && img.height() > 0,
+                "Image has zero dimensions"
+            );
+        }
+        Frame::UpdateTexture
+        | Frame::UpdateTextureArea(_)
+        | Frame::AnimationEnd(_)
+        | Frame::Item { .. } => {
+            panic!("Expected an image frame, got {frame}")
+        }
+    }
+}
 
-// #[test]
-// /// This test needs a window system and user verification (it should show an image)
-// fn net() {
-//     std::env::set_var("RUST_LOG", "info");
-//     let _ = env_logger::try_init();
+// === Format loading tests ===
 
-//     info!("Spawn thread...");
-//     std::thread::spawn(|| {
-//         std::process::Command::new("cargo")
-//             .args(["run", "--", "-l", "11111"])
-//             .output()
-//             .unwrap();
-//     });
+#[test]
+fn ci_load_jpg() {
+    let frame = load_first_frame("res/tests/test.jpg");
+    assert_valid_image(&frame);
+}
 
-//     info!("Ran the app, sleeping");
+#[test]
+fn ci_load_png() {
+    let frame = load_first_frame("res/tests/test.png");
+    assert_valid_image(&frame);
+}
 
-//     std::thread::sleep(std::time::Duration::from_secs(5));
-//     info!("Running nc");
+#[test]
+fn ci_load_png_16bit() {
+    let frame = load_first_frame("res/tests/pngtest_16bit.png");
+    assert_valid_image(&frame);
+}
 
-//     run_cmd! (
-//         nc localhost 11111 < tests/test.jpg;
-//     )
-//     .unwrap();
-// }
+#[test]
+fn ci_load_png_gray() {
+    let frame = load_first_frame("res/tests/gray_8bpp.png");
+    assert_valid_image(&frame);
+}
 
-// #[test]
-// #[allow(unreachable_code)]
-// fn bench_load_large() {
-//     #[cfg(debug_assertions)]
-//     panic!("This test needs release mode to pass.");
-//     std::env::set_var("RUST_LOG", "info");
-//     let _ = env_logger::try_init();
-//     let iters = 5;
+#[test]
+fn ci_load_webp() {
+    let frame = load_first_frame("res/tests/mohsen-karimi.webp");
+    assert_valid_image(&frame);
+}
 
-//     info!("Benching JPEG with {iters} iterations...");
-//     let mut total = 0;
+/// Writes an animated GIF with the given frame delays in milliseconds. Without
+/// a repeat, the GIF has no loop block.
+fn write_gif(
+    path: &std::path::Path,
+    delays_ms: &[u32],
+    repeat: Option<image::codecs::gif::Repeat>,
+) {
+    use image::codecs::gif::GifEncoder;
+    use image::{Delay, Frame as ImageFrame, Rgba, RgbaImage};
+    let mut encoder = GifEncoder::new(std::fs::File::create(path).unwrap());
+    if let Some(repeat) = repeat {
+        encoder.set_repeat(repeat).unwrap();
+    }
+    for (i, delay) in delays_ms.iter().enumerate() {
+        let color = Rgba([(i * 80) as u8, 0, 0, 255]);
+        let buffer = RgbaImage::from_pixel(8, 8, color);
+        encoder
+            .encode_frame(ImageFrame::from_parts(
+                buffer,
+                0,
+                0,
+                Delay::from_numer_denom_ms(*delay, 1),
+            ))
+            .unwrap();
+    }
+}
 
-//     for _i in 0..iters {
-//         let start = Instant::now();
-//         open_image(
-//             &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
-//             None,
-//         )
-//         .unwrap();
-//         let elapsed = start.elapsed();
-//         let d = elapsed.as_millis();
-//         total += d;
-//         info!("Loaded jpg image in {}", d);
-//     }
-//     info!("{} ms mean", total / iters);
-//     let mut f = File::create("benches/load_large_jpg.bench").unwrap();
-//     f.write_fmt(format_args!("{}ms", total / iters)).unwrap();
+/// GIF delays go up to more than ten minutes. A frame of 100 seconds kept
+/// its delay instead of overflowing.
+#[test]
+fn ci_load_gif_long_delay() {
+    let path = std::env::temp_dir().join("oculante_test_long_delay.gif");
+    write_gif(
+        &path,
+        &[100, 100_000, 20],
+        Some(image::codecs::gif::Repeat::Infinite),
+    );
+    let receiver = open_image(&path, None, None).expect("open_image failed");
+    let delays: Vec<u32> = receiver
+        .iter()
+        .filter_map(|frame| match frame {
+            Frame::Animation(_, delay) => Some(delay),
+            _ => None,
+        })
+        .collect();
+    _ = std::fs::remove_file(&path);
+    assert_eq!(delays, vec![100, 100_000, 20]);
+}
 
-//     info!("Benching PNG with {iters} iterations...");
-//     let mut total = 0;
+/// How often the loader says an animation is to be played
+fn plays_of(path: &std::path::Path) -> Option<u32> {
+    let receiver = open_image(path, None, None).expect("open_image failed");
+    receiver
+        .iter()
+        .find_map(|frame| match frame {
+            Frame::AnimationEnd(plays) => Some(plays),
+            _ => None,
+        })
+        .expect("the animation has no end")
+}
 
-//     for _i in 0..iters {
-//         let start = Instant::now();
+/// A GIF without a loop block plays once, a loop count of n repeats it n more
+/// times, 0 is forever.
+#[test]
+fn ci_gif_play_count() {
+    use image::codecs::gif::Repeat;
+    let path = std::env::temp_dir().join("oculante_test_play_count.gif");
+    for (repeat, plays) in [
+        (None, Some(1)),
+        (Some(Repeat::Finite(2)), Some(3)),
+        (Some(Repeat::Infinite), None),
+    ] {
+        write_gif(&path, &[100, 100], repeat);
+        assert_eq!(plays_of(&path), plays, "for {repeat:?}");
+    }
+    _ = std::fs::remove_file(&path);
+}
 
-//         open_image(&PathBuf::from("tests/large.png"), None).unwrap();
-//         let elapsed = start.elapsed();
-//         let d = elapsed.as_millis();
-//         total += d;
-//         info!("Loaded png image in {}", d);
-//     }
-//     info!("{} ms mean", total / iters);
-//     let mut f = File::create("benches/load_large_png.bench").unwrap();
-//     f.write_fmt(format_args!("{}ms", total / iters)).unwrap();
-// }
+/// An APNG says how often it is played, 0 is forever
+#[test]
+fn ci_apng_play_count() {
+    let path = std::env::temp_dir().join("oculante_test_play_count.png");
+    for (num_plays, plays) in [(1, Some(1)), (3, Some(3)), (0, None)] {
+        let file = std::io::BufWriter::new(std::fs::File::create(&path).unwrap());
+        let mut encoder = png::Encoder::new(file, 2, 2);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_animated(2, num_plays).unwrap();
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(&[255; 16]).unwrap();
+        writer.write_image_data(&[0; 16]).unwrap();
+        writer.finish().unwrap();
+        assert_eq!(plays_of(&path), plays, "for num_plays {num_plays}");
+    }
+    _ = std::fs::remove_file(&path);
+}
 
-// #[test]
-// fn ci_bench_process_pxl() {
-//     std::env::set_var("RUST_LOG", "info");
-//     let _ = env_logger::try_init();
-//     let iters = 5;
-//     info!("Benching this with {iters} iterations...");
-//     let mut total = 0;
+/// An animated PNG of 4x4 pixels with 16 bit colors: a red frame, then a blue one
+fn write_apng_16bit(path: &std::path::Path) {
+    let file = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+    let mut encoder = png::Encoder::new(file, 4, 4);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Sixteen);
+    encoder.set_animated(2, 0).unwrap();
+    encoder.set_frame_delay(1, 10).unwrap();
+    let mut writer = encoder.write_header().unwrap();
+    let red = [0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff].repeat(16);
+    let blue = [0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff].repeat(16);
+    writer.write_image_data(&red).unwrap();
+    writer.write_image_data(&blue).unwrap();
+    writer.finish().unwrap();
+}
 
-//     let ops = vec![
-//         ImageOperation::Brightness(10),
-//         ImageOperation::Contrast(10),
-//         ImageOperation::Exposure(20),
-//         ImageOperation::Equalize((10, 100)),
-//         ImageOperation::Posterize(4),
-//         ImageOperation::Desaturate(20),
-//         ImageOperation::HSV((20, 0, 0)),
-//         // ImageOperation::Noise {amt: 50, mono: false},
-//     ];
+/// The image crate can not composite the frames of a 16 bit APNG. The default
+/// image is shown instead, with a warning, as the APNG specification recommends
+/// for animations that can not be played.
+#[test]
+fn ci_load_apng_16bit_shows_default_image() {
+    let path = std::env::temp_dir().join("oculante_test_apng_16bit.png");
+    write_apng_16bit(&path);
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    let receiver = open_image(&path, Some(message_sender), None).expect("open_image failed");
+    let frames: Vec<Frame> = receiver.iter().collect();
+    _ = std::fs::remove_file(&path);
+    assert_eq!(frames.len(), 1, "expected the default image only");
+    let Frame::Still(image) = &frames[0] else {
+        panic!("expected a still image, got {}", frames[0]);
+    };
+    assert_eq!(image.to_rgba8().get_pixel(0, 0).0, [255, 0, 0, 255]);
+    assert!(
+        messages
+            .try_iter()
+            .any(|m| matches!(m, crate::appstate::Message::Warning(_))),
+        "no warning that the animation can not be played"
+    );
+}
 
-//     for _i in 0..iters {
-//         let f = open_image(
-//             &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
-//             None,
-//         )
-//         .unwrap();
-//         let mut buffer = f.recv().unwrap().buffer;
-//         let start = Instant::now();
-//         process_pixels(&mut buffer, &ops);
-//         let elapsed = start.elapsed();
-//         let d = elapsed.as_millis();
-//         total += d;
-//         info!("Processed image in {} s", elapsed.as_secs_f32());
-//     }
-//     info!("{} ms mean", total / iters);
-//     info!("295");
-// }
+/// Pixel operations work on every layout they support, and refuse the others
+/// instead of crashing. 32 bit float RGBA crashed.
+#[test]
+fn ci_pixel_operations_on_every_layout() {
+    use crate::image_editing::{ImageOperation, process_pixels};
+    use image::{DynamicImage, Rgba32FImage, RgbaImage};
+    let ops = vec![ImageOperation::Invert];
+    let base = RgbaImage::from_pixel(3, 2, image::Rgba([10, 20, 30, 255]));
+    let layouts = [
+        DynamicImage::ImageLuma8(DynamicImage::ImageRgba8(base.clone()).to_luma8()),
+        DynamicImage::ImageLumaA8(DynamicImage::ImageRgba8(base.clone()).to_luma_alpha8()),
+        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(base.clone()).to_rgb8()),
+        DynamicImage::ImageRgba8(base.clone()),
+        DynamicImage::ImageRgb32F(DynamicImage::ImageRgba8(base.clone()).to_rgb32f()),
+        DynamicImage::ImageRgba32F(Rgba32FImage::from(DynamicImage::ImageRgba8(base.clone()))),
+    ];
+    for mut image in layouts {
+        let color = image.color();
+        process_pixels(&mut image, &ops).unwrap_or_else(|e| panic!("{color:?}: {e}"));
+        // every pixel, including the last one, was inverted
+        let last = image.to_rgba8().get_pixel(2, 1).0;
+        assert!(last[0] > 200, "{color:?} was not inverted: {last:?}");
+    }
+    let mut sixteen = DynamicImage::ImageRgba16(DynamicImage::ImageRgba8(base).to_rgba16());
+    assert!(process_pixels(&mut sixteen, &ops).is_err());
+}
 
-// #[test]
-// fn bench_process_bright() {
-//     std::env::set_var("RUST_LOG", "info");
-//     let _ = env_logger::try_init();
-//     let iters = 5;
-//     info!("Benching this with {iters} iterations...");
-//     let mut total = 0;
+/// Every encoder saves every layout an image can have, and the file opens
+/// again with the same size. Lossless formats keep the pixels.
+#[test]
+fn ci_save_every_layout_with_every_encoder() {
+    use crate::file_encoder::{CompressionLevel, FileEncoder};
+    use image::{DynamicImage, GenericImageView, RgbaImage};
+    let base = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 50) as u8, (y * 80) as u8, 90, 255])
+    }));
+    let layouts = [
+        base.to_luma8().into(),
+        base.to_luma_alpha8().into(),
+        base.to_rgb8().into(),
+        base.clone(),
+        base.to_luma16().into(),
+        base.to_rgba16().into(),
+        base.to_rgb32f().into(),
+        DynamicImage::ImageRgba32F(base.to_rgba32f()),
+    ];
+    let encoders = [
+        FileEncoder::Png {
+            compressionlevel: CompressionLevel::Default,
+        },
+        FileEncoder::Jpg { quality: 90 },
+        FileEncoder::Bmp,
+        FileEncoder::WebP,
+        FileEncoder::Avif,
+    ];
+    let dir = std::env::temp_dir().join("oculante_test_save");
+    _ = std::fs::create_dir_all(&dir);
+    let mut failures = vec![];
+    for encoder in &encoders {
+        for image in &layouts {
+            let path = dir.join(format!("{:?}.{}", image.color(), encoder.ext()));
+            let result = std::panic::catch_unwind(|| encoder.save(image, &path));
+            let saved = match result {
+                Ok(Ok(())) => open_image(&path, None, None).and_then(|receiver| {
+                    receiver
+                        .recv_timeout(Duration::from_secs(30))?
+                        .get_image()
+                        .ok_or(anyhow::anyhow!("no image"))
+                }),
+                Ok(Err(e)) => {
+                    failures.push(format!("{encoder} {:?}: {e}", image.color()));
+                    continue;
+                }
+                Err(_) => {
+                    failures.push(format!("{encoder} {:?}: panicked", image.color()));
+                    continue;
+                }
+            };
+            match saved {
+                Ok(saved) if saved.dimensions() != (5, 3) => failures.push(format!(
+                    "{encoder} {:?}: size {:?}",
+                    image.color(),
+                    saved.dimensions()
+                )),
+                Ok(saved) => {
+                    let lossless = matches!(
+                        encoder,
+                        FileEncoder::Png { .. } | FileEncoder::Bmp | FileEncoder::WebP
+                    );
+                    if lossless && saved.to_rgb8() != image.to_rgb8() {
+                        failures.push(format!("{encoder} {:?}: pixels differ", image.color()));
+                    }
+                }
+                Err(e) => failures.push(format!(
+                    "{encoder} {:?}: can not open the file: {e}",
+                    image.color()
+                )),
+            }
+        }
+    }
+    _ = std::fs::remove_dir_all(&dir);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
 
-//     let ops = vec![ImageOperation::Brightness(10)];
+/// Edits saved for an image or a folder are found again, older files are
+/// upgraded. They were written and never read since the move to egui.
+#[test]
+fn ci_saved_edits_are_found() {
+    use crate::image_editing::{
+        EditState, ImageOperation, ImgOpItem, LegacyEditState, saved_edits,
+    };
+    let dir = std::env::temp_dir().join("oculante_test_saved_edits");
+    _ = std::fs::remove_dir_all(&dir);
+    for sub in ["own", "folder", "legacy", "broken", "none"] {
+        std::fs::create_dir_all(dir.join(sub)).unwrap();
+    }
+    let edits = EditState {
+        pixel_op_stack: vec![ImgOpItem::new(ImageOperation::Invert)],
+        ..Default::default()
+    };
+    let json = serde_json::to_string(&edits).unwrap();
+    std::fs::write(dir.join("own/a.oculante"), &json).unwrap();
+    std::fs::write(dir.join("folder/.oculante"), &json).unwrap();
+    let legacy = LegacyEditState {
+        painting: false,
+        non_destructive_painting: false,
+        paint_strokes: vec![],
+        paint_fade: false,
+        pixel_op_stack: vec![ImageOperation::Invert],
+        image_op_stack: vec![],
+        export_extension: "png".into(),
+    };
+    std::fs::write(
+        dir.join("legacy/a.oculante"),
+        serde_json::to_string(&legacy).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(dir.join("broken/a.oculante"), "not json").unwrap();
 
-//     for _i in 0..iters {
-//         let f = open_image(
-//             &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
-//             None,
-//         )
-//         .unwrap();
-//         let mut buffer = f.recv().unwrap().buffer;
-//         let start = Instant::now();
-//         process_pixels(&mut buffer, &ops);
-//         let elapsed = start.elapsed();
-//         let d = elapsed.as_millis();
-//         total += d;
-//         info!("Processed image in {} s", elapsed.as_secs_f32());
-//     }
-//     info!("{} ms mean", total / iters);
-//     info!("24 simd");
-// }
+    let found = |sub: &str| saved_edits(&dir.join(sub).join("a.png"));
+    let (own, message) = found("own").unwrap().unwrap();
+    assert_eq!(own.pixel_op_stack.len(), 1);
+    assert!(message.contains("this image"));
+    let (folder, message) = found("folder").unwrap().unwrap();
+    assert_eq!(folder.pixel_op_stack.len(), 1);
+    assert!(message.contains("Directory"));
+    let (upgraded, _) = found("legacy").unwrap().unwrap();
+    assert_eq!(upgraded.pixel_op_stack.len(), 1);
+    // and saved in the current format
+    let rewritten = std::fs::read_to_string(dir.join("legacy/a.oculante")).unwrap();
+    assert!(serde_json::from_str::<EditState>(&rewritten).is_ok());
+    assert!(found("broken").unwrap().is_err());
+    assert!(found("none").is_none());
+    _ = std::fs::remove_dir_all(&dir);
+}
 
-// #[test]
-// fn dump_shortcuts() {
-//     use std::io::prelude::*;
-//     let mut shortcuts_file = File::create("shortcuts.txt").unwrap();
+/// EXIF data with only an orientation tag, as TIFF data the way JPEG files hold it
+pub(crate) fn exif_with_orientation(orientation: u16) -> Vec<u8> {
+    let mut exif = vec![b'I', b'I', 42, 0, 8, 0, 0, 0, 1, 0];
+    // tag 0x0112, type SHORT, one value
+    exif.extend_from_slice(&[0x12, 0x01, 3, 0, 1, 0, 0, 0]);
+    exif.extend_from_slice(&orientation.to_le_bytes());
+    exif.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+    exif
+}
 
-//     let shortcuts = Shortcuts::default_keys();
-//     let mut ordered_shortcuts = shortcuts.iter().collect::<Vec<_>>();
-//     ordered_shortcuts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+/// A JPEG of 4x2 pixels with a red pixel at the top left and the given EXIF
+/// orientation
+pub(crate) fn write_jpeg_with_orientation(path: &std::path::Path, orientation: u16) {
+    let image = image::RgbImage::from_fn(4, 2, |x, y| {
+        if (x, y) == (0, 0) {
+            image::Rgb([255, 0, 0])
+        } else {
+            image::Rgb([0, 0, 255])
+        }
+    });
+    image.save(path).unwrap();
+    crate::utils::fix_exif(path, Some(exif_with_orientation(orientation).into())).unwrap();
+}
 
-//     for (k, v) in ordered_shortcuts {
-//         writeln!(shortcuts_file, "{} = {:?}\n", keypresses_as_markdown(&v), k).unwrap();
-//     }
-// }
+/// TIFF data with these fields, and pixels when there are some
+fn exif_with(fields: &[exif::Field], pixels: Option<&[u8]>) -> Vec<u8> {
+    let strips = pixels.map(|pixels| [pixels]);
+    let mut writer = exif::experimental::Writer::new();
+    fields.iter().for_each(|field| writer.push_field(field));
+    if let Some(strips) = &strips {
+        writer.set_strips(strips, exif::In::PRIMARY);
+    }
+    let mut buf = std::io::Cursor::new(Vec::new());
+    writer.write(&mut buf, true).unwrap();
+    buf.into_inner()
+}
 
-// #[test]
-// /// Generate / update flathub meta
-// fn flathub() {
-//     use chrono::offset::Utc;
-//     use chrono::DateTime;
-//     use std::time::SystemTime;
-//     use xmltree::Element;
-//     use xmltree::{EmitterConfig, XMLNode};
+/// What a camera writes, and what is about the file and not the photo
+fn camera_fields() -> Vec<exif::Field> {
+    use exif::{Field, In, Tag, Value};
+    let field = |tag, value| Field {
+        tag,
+        ifd_num: In::PRIMARY,
+        value,
+    };
+    vec![
+        field(Tag::Make, Value::Ascii(vec![b"Oculante".to_vec()])),
+        field(Tag::Orientation, Value::Short(vec![6])),
+        field(Tag::ImageWidth, Value::Long(vec![400])),
+        field(
+            Tag::DateTimeOriginal,
+            Value::Ascii(vec![b"2026:10:28 12:00:00".to_vec()]),
+        ),
+        field(Tag::MakerNote, Value::Undefined(vec![7; 1000], 0)),
+    ]
+}
 
-//     let kokai_result = std::process::Command::new("kokai")
-//         .args(&["release", "--ref", "HEAD"])
-//         .output()
-//         .unwrap()
-//         .stdout;
-//     let release_notes = String::from_utf8_lossy(&kokai_result).to_string();
-//     let release_notes: String = release_notes
-//         .lines()
-//         .into_iter()
-//         .filter(|l| !l.contains("# HEAD"))
-//         .map(|l| format!("{l}\n"))
-//         .collect();
+/// EXIF is read for the info panel, and kept when a copy is saved in another
+/// format, also now that it is taken from the file at the time of saving
+#[test]
+fn ci_exif_is_read_and_kept_when_saving() {
+    use crate::file_encoder::{CompressionLevel, FileEncoder};
+    use crate::utils::{ExtendedImageInfo, fix_exif, raw_exif};
+    let dir = std::env::temp_dir().join("oculante_test_exif");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.jpg");
+    write_jpeg_with_orientation(&source, 6);
+    fix_exif(&source, Some(exif_with(&camera_fields(), None).into())).unwrap();
 
-//     let metafile = "res/flathub/io.github.woelper.Oculante.metainfo.xml";
-//     let s = std::fs::read_to_string(metafile).unwrap();
-//     let mut doc = Element::parse(s.as_bytes()).unwrap();
-//     let releases = doc.get_mut_child("releases").unwrap();
-//     // check if this version is already present, we don't want duplicates
-//     for c in &releases.children {
-//         if c.as_element().unwrap().attributes.get("version").unwrap() == env!("CARGO_PKG_VERSION") {
-//             panic!("This release already exists!");
-//         }
-//     }
-//     let mut new_release = Element::new("release");
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&source).unwrap();
+    assert!(
+        // orientation 6, as the EXIF reader describes it
+        info.exif
+            .get("Orientation")
+            .is_some_and(|o| o.contains("row 0 at right")),
+        "{:?}",
+        info.exif
+    );
 
-//     new_release
-//         .attributes
-//         .insert("version".into(), env!("CARGO_PKG_VERSION").into());
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    let copy = dir.join("copy.png");
+    let image = image::open(&source).unwrap();
+    FileEncoder::Png {
+        compressionlevel: CompressionLevel::Default,
+    }
+    .save(&image, &copy)
+    .unwrap();
+    fix_exif(&copy, Some(exif.clone())).unwrap();
+    assert_eq!(raw_exif(&copy), Some(exif));
 
-//     let datetime: DateTime<Utc> = SystemTime::now().into();
-//     let date = format!("{}", datetime.format("%Y-%m-%d"));
-//     new_release.attributes.insert("date".into(), date);
-//     let mut url = Element::new("url");
-//     url.attributes.insert("type".into(), "details".into());
-//     url.children.insert(
-//         0,
-//         XMLNode::Text(format!(
-//             "https://github.com/woelper/oculante/releases/tag/{}",
-//             env!("CARGO_PKG_VERSION")
-//         )),
-//     );
-//     let mut description = Element::new("description");
-//     let mut lines = release_notes.lines().into_iter();
-//     loop {
-//         if let Some(l) = lines.next() {
-//             if l.starts_with("###") {
-//                 let mut paragraph = Element::new("p");
-//                 paragraph.children.insert(
-//                     0,
-//                     XMLNode::Text(
-//                         l.replace("### ", "")
-//                             .replace(":sparkles:", "")
-//                             .replace(":beetle:", "")
-//                             .replace(":green_apple:", "")
-//                             .trim()
-//                             .into(),
-//                     ),
-//                 );
-//                 description.children.insert(0, XMLNode::Element(paragraph));
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&copy).unwrap();
+    assert!(info.exif.contains_key("Make"), "{:?}", info.exif);
+    assert!(
+        info.exif.contains_key("DateTimeOriginal"),
+        "{:?}",
+        info.exif
+    );
+    // the pixels are saved upright, other viewers would turn them again
+    assert!(!info.exif.contains_key("Orientation"), "{:?}", info.exif);
+    assert!(!info.exif.contains_key("MakerNote"), "{:?}", info.exif);
+    _ = std::fs::remove_dir_all(&dir);
+}
 
-//                 let mut list = Element::new("ul");
+/// A TIFF file is its own EXIF block, pixels and all. Saving a copy as a JPEG
+/// panicked when that was more than 64 KB, as a PNG it was as big as the file.
+#[test]
+fn ci_exif_of_a_tiff_is_small_when_saving() {
+    use crate::utils::{ExtendedImageInfo, fix_exif, raw_exif};
+    let dir = std::env::temp_dir().join("oculante_test_exif_tiff");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.tif");
+    std::fs::write(&source, exif_with(&camera_fields(), Some(&[1; 400_000]))).unwrap();
 
-//                 // skip next empty line
-//                 _ = lines.next();
-//                 while let Some(commit) = lines.next() {
-//                     dbg!(commit);
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    assert!(exif.len() < 1000, "{} bytes", exif.len());
+    let copy = dir.join("copy.jpg");
+    image::RgbImage::new(4, 2).save(&copy).unwrap();
+    fix_exif(&copy, Some(exif)).unwrap();
+    let mut info = ExtendedImageInfo::default();
+    info.with_exif(&copy).unwrap();
+    assert!(info.exif.contains_key("Make"), "{:?}", info.exif);
+    assert!(!info.exif.contains_key("ImageWidth"), "{:?}", info.exif);
 
-//                     if commit.starts_with("*") {
-//                         let mut item = Element::new("li");
-//                         item.children
-//                             .insert(0, XMLNode::Text(commit.replace("* ", "")));
-//                         list.children.insert(0, XMLNode::Element(item));
-//                     } else {
-//                         break;
-//                     }
-//                 }
-//                 description.children.insert(1, XMLNode::Element(list));
-//             }
-//         } else {
-//             break;
-//         }
-//     }
+    // more than fits into a JPEG: saved without it, and not a panic
+    let comment = exif::Field {
+        tag: exif::Tag::UserComment,
+        ifd_num: exif::In::PRIMARY,
+        value: exif::Value::Undefined(vec![b'a'; 70_000], 0),
+    };
+    std::fs::write(&source, exif_with(&[comment], None)).unwrap();
+    let exif = raw_exif(&source).expect("no EXIF in the source");
+    fix_exif(&copy, Some(exif)).unwrap();
+    assert!(image::open(&copy).is_ok());
+    _ = std::fs::remove_dir_all(&dir);
+}
 
-//     new_release
-//         .children
-//         .insert(0, XMLNode::Element(description));
-//     new_release.children.insert(0, XMLNode::Element(url));
-//     releases.children.insert(0, XMLNode::Element(new_release));
-//     let config = EmitterConfig::new()
-//         .autopad_comments(true)
-//         .perform_indent(true);
+/// The parallel reorientation gives the same pixels as the image crate, for
+/// every orientation and layout
+/// The numbers of the info panel for an edit are those of the edited pixels, with the
+/// EXIF read from the file before: it is not read again for every change
+#[test]
+fn ci_info_for_an_edit_keeps_what_was_read_of_the_file() {
+    use crate::utils::send_extended_info;
+    use image::{DynamicImage, Rgb, RgbImage};
+    use std::sync::Arc;
+    let dir = std::env::temp_dir().join("oculante_test_info_edit");
+    _ = std::fs::create_dir_all(&dir);
+    let source = dir.join("photo.jpg");
+    write_jpeg_with_orientation(&source, 6);
+    let channel = std::sync::mpsc::channel();
+    let plain = Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+        4,
+        4,
+        Rgb([200, 10, 10]),
+    )));
+    send_extended_info(plain, Some(source.clone()), None, (3, 0), &channel);
+    let (version, first) = channel.1.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(version, (3, 0));
+    assert!(!first.exif.is_empty(), "no EXIF was read");
+    // brighter, and the file is gone
+    std::fs::remove_file(&source).unwrap();
+    let edited = Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+        4,
+        4,
+        Rgb([250, 60, 60]),
+    )));
+    send_extended_info(edited, Some(source), Some(&first), (3, 7), &channel);
+    let (version, info) = channel.1.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(version, (3, 7));
+    assert_eq!(info.exif, first.exif);
+    let red = |info: &crate::utils::ExtendedImageInfo, level: i32| {
+        info.red_histogram
+            .iter()
+            .find(|(v, _)| *v == level)
+            .map_or(0, |(_, n)| *n)
+    };
+    assert_eq!((red(&first, 200), red(&first, 250)), (16, 0));
+    assert_eq!((red(&info, 200), red(&info, 250)), (0, 16));
+}
 
-//     // doc.write_with_config(File::create("result.xml").unwrap(), config)
-//     //     .unwrap();
-//     doc.write_with_config(File::create(metafile).unwrap(), config)
-//         .unwrap();
-// }
+#[test]
+fn ci_reorient_like_the_image_crate() {
+    use crate::image_loader::reorient;
+    use image::{DynamicImage, RgbaImage, metadata::Orientation};
+    let base = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 40) as u8, (y * 70) as u8, (x * y * 9) as u8, 200])
+    }));
+    let layouts = [
+        DynamicImage::ImageLuma8(base.to_luma8()),
+        DynamicImage::ImageRgb8(base.to_rgb8()),
+        base.clone(),
+        DynamicImage::ImageLumaA16(base.to_luma_alpha16()),
+        DynamicImage::ImageRgba32F(base.to_rgba32f()),
+    ];
+    for exif in 1..=8 {
+        let orientation = Orientation::from_exif(exif).unwrap();
+        for layout in &layouts {
+            let mut expected = layout.clone();
+            expected.apply_orientation(orientation);
+            let mut ours = layout.clone();
+            reorient(&mut ours, orientation);
+            assert_eq!(ours, expected, "{orientation:?} {:?}", layout.color());
+        }
+    }
+}
 
-// #[test]
-// fn ci_bench_process_all() {
-//     std::env::set_var("RUST_LOG", "info");
-//     let _ = env_logger::try_init();
-//     let iters = 5;
-//     info!("Multi-ops: benching this with {iters} iterations...");
-//     let mut total = 0;
+/// A photo with an EXIF orientation comes out turned, through the decoder the
+/// app uses. None of the test images had an orientation.
+#[test]
+fn ci_exif_orientation_is_applied() {
+    use crate::image_loader::rotate_dynimage;
+    let dir = std::env::temp_dir().join("oculante_test_orientation");
+    _ = std::fs::create_dir_all(&dir);
+    for (orientation, size, red_at) in [
+        (1, (4, 2), (0, 0)),
+        (6, (2, 4), (1, 0)),
+        (8, (2, 4), (0, 3)),
+    ] {
+        let path = dir.join(format!("turned_{orientation}.jpg"));
+        write_jpeg_with_orientation(&path, orientation);
+        let mut image = load_first_frame(path.to_str().unwrap())
+            .get_image()
+            .unwrap();
+        rotate_dynimage(&mut image, &path).unwrap();
+        let rgb = image.to_rgb8();
+        assert_eq!(rgb.dimensions(), size, "orientation {orientation}");
+        let red = rgb.get_pixel(red_at.0, red_at.1).0;
+        assert!(
+            red[0] > 180 && red[2] < 100,
+            "orientation {orientation}: {red:?} at {red_at:?}"
+        );
+    }
+    _ = std::fs::remove_dir_all(&dir);
+}
 
-//     // let blur = ImageOperation::Blur(10);
+/// The mean difference of two images of the same size, per channel
+fn mean_difference(a: &image::RgbImage, b: &image::RgbImage) -> f64 {
+    assert_eq!(a.dimensions(), b.dimensions());
+    let sum: u64 = a
+        .as_raw()
+        .iter()
+        .zip(b.as_raw())
+        .map(|(x, y)| x.abs_diff(*y) as u64)
+        .sum();
+    sum as f64 / a.as_raw().len() as f64
+}
 
-//     for _i in 0..iters {
-//         let ops = vec![
-//             ImageOperation::Brightness(10),
-//             ImageOperation::ChromaticAberration(5),
-//             // ImageOperation::Blur(5),
-//             ImageOperation::Desaturate(100),
-//             ImageOperation::Resize {
-//                 dimensions: (300, 200),
-//                 aspect: true,
-//                 filter: ScaleFilter::Hamming,
-//             },
-//             // ImageOperation::
-//         ];
-//         let f = open_image(
-//             &PathBuf::from("tests/mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg"),
-//             None,
-//         )
-//         .unwrap();
-//         let mut buffer = f.recv().unwrap().buffer;
-//         let start = Instant::now();
-//         process_pixels(&mut buffer, &ops);
+/// Lossless rotations and flips of a JPEG whose size is not a multiple of its
+/// blocks: the result is the turned image, without strips of the old one at an
+/// edge. Blocks that can not be moved are trimmed, a few pixels at most.
+#[cfg(feature = "turbo")]
+#[test]
+fn ci_lossless_jpeg_transforms() {
+    use crate::image_editing::lossless_tx;
+    use image::GenericImageView;
+    use turbojpeg::{Transform, TransformOp};
+    let dir = std::env::temp_dir().join("oculante_test_lossless");
+    _ = std::fs::create_dir_all(&dir);
+    // 1000x750 in blocks of 16: 8 and 14 pixels are left over
+    let original = image::open("res/tests/moss.jpg").unwrap();
+    for (op, expected) in [
+        (TransformOp::Rot90, original.rotate90()),
+        (TransformOp::Rot180, original.rotate180()),
+        (TransformOp::Rot270, original.rotate270()),
+        (TransformOp::Hflip, original.fliph()),
+        (TransformOp::Vflip, original.flipv()),
+    ] {
+        let path = dir.join(format!("{op:?}.jpg"));
+        std::fs::copy("res/tests/moss.jpg", &path).unwrap();
+        lossless_tx(&path, Transform::op(op)).unwrap();
+        let turned = image::open(&path).unwrap();
+        let (w, h) = turned.dimensions();
+        assert!(
+            expected.width() - w < 16 && expected.height() - h < 16,
+            "{op:?}: {w}x{h} from {:?}",
+            expected.dimensions()
+        );
+        // trimmed blocks were at the start of the turned image when the edge moved
+        // to the left or the top
+        let x = expected.width() - w;
+        let y = expected.height() - h;
+        let best = [(0, 0), (x, 0), (0, y), (x, y)]
+            .into_iter()
+            .map(|(x, y)| {
+                mean_difference(&turned.to_rgb8(), &expected.crop_imm(x, y, w, h).to_rgb8())
+            })
+            .fold(f64::MAX, f64::min);
+        assert!(
+            best < 1.5,
+            "{op:?} differs from the turned image by {best:.2} on average"
+        );
+    }
 
-//         for op in ops {
-//             info!("IMG {:?}", op);
-//             op.process_image(&mut buffer).unwrap();
-//         }
+    // a crop that does not start on a block keeps to the image
+    let path = dir.join("crop.jpg");
+    std::fs::copy("res/tests/moss.jpg", &path).unwrap();
+    let mut crop = Transform::default();
+    crop.crop = Some(turbojpeg::TransformCrop {
+        x: 13,
+        y: 21,
+        width: Some(300),
+        height: Some(200),
+    });
+    lossless_tx(&path, crop).unwrap();
+    let cropped = image::open(&path).unwrap();
+    assert_eq!(cropped.dimensions(), (300, 200));
+    _ = std::fs::remove_dir_all(&dir);
+}
 
-//         let elapsed = start.elapsed();
-//         let d = elapsed.as_millis();
-//         total += d;
-//         info!("Processed image in {} s", elapsed.as_secs_f32());
-//         info!("simd 1.467s");
-//     }
-//     info!("{} ms mean", total / iters);
-// }
+/// All frames the loader sends for a file, and the warnings
+fn load_all(path: &std::path::Path) -> anyhow::Result<(Vec<Frame>, Vec<String>)> {
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    let receiver = open_image(path, Some(message_sender), None)?;
+    let mut frames = vec![];
+    while let Ok(frame) = receiver.recv_timeout(Duration::from_secs(60)) {
+        frames.push(frame);
+    }
+    let warnings = messages
+        .try_iter()
+        .filter_map(|m| match m {
+            crate::appstate::Message::Warning(w) => Some(w),
+            _ => None,
+        })
+        .collect();
+    Ok((frames, warnings))
+}
+
+/// AVIF images of 10 and 12 bits stay 16 bit, and show the same picture as the
+/// one of 8 bits. They were cut to 8 bits before.
+#[cfg(feature = "avif_native")]
+#[test]
+fn ci_avif_bit_depths() {
+    let load = |bits: u8| {
+        let name = format!("res/tests/red-at-12-oclock-with-color-profile-{bits}bpc.avif");
+        let (frames, _) = load_all(std::path::Path::new(&name)).unwrap();
+        frames.first().and_then(|f| f.get_image()).unwrap()
+    };
+    let eight = load(8);
+    assert_eq!(eight.color(), image::ColorType::Rgb8);
+    for bits in [10, 12] {
+        let image = load(bits);
+        assert_eq!(image.color(), image::ColorType::Rgb16, "{bits} bit");
+        let difference = mean_difference(&eight.to_rgb8(), &image.to_rgb8());
+        assert!(
+            difference < 1.0,
+            "{bits} bit differs by {difference} from 8 bit"
+        );
+    }
+}
+
+/// The last box of an AVIF file may have the size 0, it then runs to the end of
+/// the file. Lightroom writes its AVIFs like that, and none of them opened.
+#[cfg(feature = "avif_native")]
+#[test]
+fn ci_avif_whose_last_box_runs_to_the_end() {
+    let original = "res/tests/red-at-12-oclock-with-color-profile-8bpc.avif";
+    let mut data = std::fs::read(original).unwrap();
+    let mdat = data.windows(4).position(|w| w == b"mdat").unwrap() - 4;
+    let size = u32::from_be_bytes(data[mdat..mdat + 4].try_into().unwrap()) as usize;
+    assert_eq!(mdat + size, data.len(), "the mdat is the last box");
+    data[mdat..mdat + 4].copy_from_slice(&0u32.to_be_bytes());
+    let path = std::env::temp_dir().join("oculante_test_mdat_to_end.avif");
+    std::fs::write(&path, data).unwrap();
+
+    let load = |path: &std::path::Path| {
+        let (frames, _) = load_all(path).unwrap();
+        frames.first().and_then(|f| f.get_image()).unwrap()
+    };
+    let image = load(&path);
+    std::fs::remove_file(&path).unwrap();
+    assert!(image.as_bytes() == load(std::path::Path::new(original)).as_bytes());
+}
+
+/// The image library refuses images that need more than 512 MiB unless told
+/// otherwise, which showed as "Memory limit exceeded" for photos of 200
+/// megapixels (#782). This one needs 537 MB. A QOI file of one colour is
+/// written by hand, it is a header, the colour and runs of 62 pixels.
+#[test]
+fn ci_images_above_512_mib_load() {
+    let (width, height) = (11586u32, 11586u32);
+    let mut qoi = b"qoif".to_vec();
+    qoi.extend(width.to_be_bytes());
+    qoi.extend(height.to_be_bytes());
+    qoi.extend([4, 0, 0xff, 30, 60, 90, 255]);
+    let mut left = width as u64 * height as u64 - 1;
+    while left > 0 {
+        let run = left.min(62);
+        qoi.push(0xc0 | (run - 1) as u8);
+        left -= run;
+    }
+    qoi.extend([0, 0, 0, 0, 0, 0, 0, 1]);
+    let path = std::env::temp_dir().join("oculante_test_large.qoi");
+    std::fs::write(&path, qoi).unwrap();
+
+    let (frames, _) = load_all(&path).unwrap();
+    std::fs::remove_file(&path).unwrap();
+    let Some(Frame::Still(image)) = frames.first() else {
+        panic!("no image")
+    };
+    assert_eq!((image.width(), image.height()), (width, height));
+    assert_eq!(image.as_bytes()[..4], [30, 60, 90, 255]);
+}
+
+/// libjpeg-turbo fails on what libjpeg only warns about, such as a missing end
+/// of the file. The image library shows those, and when both fail the error
+/// says why each of them did.
+#[cfg(feature = "turbo")]
+#[test]
+fn ci_jpeg_that_libjpeg_turbo_refuses() {
+    let dir = std::env::temp_dir().join("oculante_test_jpeg_fallback");
+    _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let jpeg = std::fs::read("res/tests/moss.jpg").unwrap();
+    let truncated = dir.join("truncated.jpg");
+    std::fs::write(&truncated, &jpeg[..jpeg.len() * 9 / 10]).unwrap();
+    let (frames, _) = load_all(&truncated).unwrap();
+    let Some(Frame::Still(image)) = frames.first() else {
+        panic!("the truncated JPEG did not load")
+    };
+    assert_eq!((image.width(), image.height()), (1000, 750));
+
+    let broken = dir.join("broken.jpg");
+    std::fs::write(&broken, b"\xff\xd8\xff\xe0 no JPEG after all").unwrap();
+    let error = load_all(&broken).unwrap_err().to_string();
+    assert!(error.contains("libjpeg-turbo:"), "{error}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A Krita file is a zip with the picture in it as mergedimage.png. No test file
+/// covered it.
+#[test]
+fn ci_load_krita_and_openraster() {
+    use std::io::Write;
+    let rgba = image::RgbaImage::from_fn(7, 5, |x, y| {
+        image::Rgba([(x * 30) as u8, (y * 40) as u8, 90, 255])
+    });
+    let mut png = std::io::Cursor::new(vec![]);
+    image::DynamicImage::ImageRgba8(rgba.clone())
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    for (extension, mimetype) in [("kra", "application/x-krita"), ("ora", "image/openraster")] {
+        let path = std::env::temp_dir().join(format!("oculante_test_merged.{extension}"));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("mimetype", stored).unwrap();
+        zip.write_all(mimetype.as_bytes()).unwrap();
+        let deflated = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("mergedimage.png", deflated).unwrap();
+        zip.write_all(png.get_ref()).unwrap();
+        zip.finish().unwrap();
+
+        let (frames, warnings) = load_all(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let image = frames.first().and_then(|f| f.get_image()).unwrap();
+        assert_eq!(image.to_rgba8(), rgba, "{extension}");
+        assert!(warnings.is_empty(), "{extension}: {warnings:?}");
+    }
+}
+
+/// The size a file name gives, like 600x300 in "600x300_float.exr"
+fn size_in_name(name: &str) -> Option<(u32, u32)> {
+    name.split(|c: char| !c.is_ascii_alphanumeric())
+        .find_map(|part| {
+            let (w, h) = part.split_once('x')?;
+            Some((w.parse().ok()?, h.parse().ok()?))
+        })
+}
+
+/// Every file in res/tests loads, with the size its name gives, and the
+/// animated ones as animations. About 30 of them were loaded by no test.
+#[test]
+fn ci_load_every_test_file() {
+    // not supported, or not an image
+    let mut expected_errors = vec!["mp4_ex-signature.gif"];
+    if cfg!(not(any(feature = "heif", feature = "heif_native"))) {
+        expected_errors.push("orange.heic");
+    }
+    let animated = [
+        "APNG_throbber.png",
+        "Animated_PNG_example_bouncing_beach_ball.png",
+        "3d2.png",
+    ];
+    let mut paths: Vec<_> = std::fs::read_dir("res/tests")
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_file())
+        .collect();
+    paths.sort();
+    let mut failures = vec![];
+    for path in paths {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let frames = match load_all(&path) {
+            Ok((frames, _)) => frames,
+            Err(e) => {
+                if !expected_errors.contains(&name.as_str()) {
+                    failures.push(format!("{name}: {e}"));
+                }
+                continue;
+            }
+        };
+        let images: Vec<_> = frames.iter().filter_map(|f| f.get_image()).collect();
+        let Some(first) = images.first() else {
+            if !expected_errors.contains(&name.as_str()) {
+                failures.push(format!("{name}: no image"));
+            }
+            continue;
+        };
+        if expected_errors.contains(&name.as_str()) {
+            failures.push(format!("{name}: loads now, update the test"));
+        }
+        if first.width() == 0 || first.height() == 0 {
+            failures.push(format!("{name}: empty"));
+        }
+        if let Some(size) = size_in_name(&name)
+            && (first.width(), first.height()) != size
+        {
+            failures.push(format!("{name}: {}x{}", first.width(), first.height()));
+        }
+        if animated.contains(&name.as_str()) {
+            let ended = frames.iter().any(|f| matches!(f, Frame::AnimationEnd(_)));
+            if images.len() < 2 || !ended {
+                failures.push(format!(
+                    "{name}: {} frames, end sent: {ended}",
+                    images.len()
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// Formats without a test file are written here and loaded, with the right
+/// size, a pixel that is right, and no warning about the extension
+#[test]
+fn ci_load_generated_formats() {
+    use image::{DynamicImage, GrayImage, ImageBuffer, Luma, RgbaImage};
+    let dir = std::env::temp_dir().join("oculante_test_formats");
+    _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let rgba = DynamicImage::ImageRgba8(RgbaImage::from_fn(5, 3, |x, y| {
+        image::Rgba([(x * 50) as u8, (y * 80) as u8, 90, 255])
+    }));
+    // the pixel at 4,2
+    let corner = [200, 160, 90];
+    let gray16 = DynamicImage::ImageLuma16(ImageBuffer::from_fn(5, 3, |x, y| {
+        Luma([(x * 10000 + y * 500) as u16])
+    }));
+    let written = [
+        ("a.bmp", rgba.to_rgb8().into()),
+        ("a.ico", rgba.clone()),
+        ("a.tga", rgba.clone()),
+        ("a.qoi", rgba.clone()),
+        ("a.ppm", rgba.to_rgb8().into()),
+        ("a.ff", rgba.to_rgba16().into()),
+        ("a.jpeg", rgba.to_rgb8().into()),
+        ("a.tif", rgba.to_rgb8().into()),
+        ("rgba.tiff", rgba.clone()),
+        (
+            "gray.tif",
+            DynamicImage::ImageLuma8(GrayImage::from_fn(5, 3, |x, _| Luma([(x * 50) as u8]))),
+        ),
+        ("gray16.tif", gray16),
+        ("float.hdr", rgba.to_rgb32f().into()),
+    ];
+    let mut failures = vec![];
+    for (name, image) in written {
+        let path = dir.join(name);
+        image.save(&path).unwrap();
+        let (frames, warnings) = match load_all(&path) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                failures.push(format!("{name}: {e}"));
+                continue;
+            }
+        };
+        let Some(loaded) = frames.first().and_then(|f| f.get_image()) else {
+            failures.push(format!("{name}: no image"));
+            continue;
+        };
+        if (loaded.width(), loaded.height()) != (5, 3) {
+            failures.push(format!("{name}: {}x{}", loaded.width(), loaded.height()));
+        }
+        if !warnings.is_empty() {
+            failures.push(format!("{name}: {warnings:?}"));
+        }
+        let pixel = loaded.to_rgb8().get_pixel(4, 2).0;
+        let lossless =
+            !name.ends_with(".jpeg") && !name.ends_with(".hdr") && !name.starts_with("gray");
+        if lossless && pixel != corner {
+            failures.push(format!("{name}: {pixel:?} at 4,2"));
+        }
+    }
+
+    // A 16 bit TIFF with a single value has its level, it came out black
+    let flat = DynamicImage::ImageLuma16(ImageBuffer::from_pixel(4, 4, Luma([30000u16])));
+    let path = dir.join("flat.tif");
+    flat.save(&path).unwrap();
+    let level = load_all(&path).unwrap().0[0]
+        .get_image()
+        .unwrap()
+        .to_luma8()
+        .get_pixel(0, 0)
+        .0[0];
+    if level.abs_diff(117) > 1 {
+        failures.push(format!("flat.tif: level {level}"));
+    }
+
+    // formats the image crate can not write: written by hand
+    let by_hand: [(&str, &[u8]); 3] = [
+        (
+            "a.xbm",
+            b"#define a_width 5\n#define a_height 3\nstatic unsigned char a_bits[] = { 0x01, 0x02, 0x04 };\n",
+        ),
+        (
+            "a.xpm",
+            b"/* XPM */\nstatic char *a[] = {\n\"5 3 2 1\",\n\"r c #FF0000\",\n\"b c #0000FF\",\n\"rrbbb\",\n\"bbbbb\",\n\"rrrrr\"\n};\n",
+        ),
+        // type 0, no extended header, 5x3, one byte per row
+        ("a.wbmp", &[0, 0, 5, 3, 0b1000_0000, 0b0100_0000, 0b0010_0000]),
+    ];
+    for (name, bytes) in by_hand {
+        let path = dir.join(name);
+        std::fs::write(&path, bytes).unwrap();
+        match load_all(&path).map(|(frames, _)| frames.first().and_then(|f| f.get_image())) {
+            Ok(Some(image)) if (image.width(), image.height()) == (5, 3) => {}
+            Ok(Some(image)) => {
+                failures.push(format!("{name}: {}x{}", image.width(), image.height()))
+            }
+            Ok(None) => failures.push(format!("{name}: no image")),
+            Err(e) => failures.push(format!("{name}: {e}")),
+        }
+    }
+    _ = std::fs::remove_dir_all(&dir);
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// An empty settings file gives the defaults
+#[test]
+fn ci_settings_defaults_from_an_empty_file() {
+    use crate::settings::{PersistentSettings, VolatileSettings};
+    let persistent: PersistentSettings = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(&persistent).unwrap(),
+        serde_json::to_value(PersistentSettings::default()).unwrap()
+    );
+    let volatile: VolatileSettings = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        serde_json::to_value(&volatile).unwrap(),
+        serde_json::to_value(VolatileSettings::default()).unwrap()
+    );
+}
+
+/// Settings saved by 0.9.6 are read, the values that were set are kept. They
+/// could not be read at all: the shortcuts were saved in another format, and
+/// the app started with the defaults and overwrote them.
+#[test]
+fn ci_settings_of_0_9_6_are_read() {
+    use crate::settings::{PersistentSettings, VolatileSettings};
+    use crate::shortcuts::{InputEvent, default_shortcuts};
+    let text = std::fs::read_to_string("res/tests/settings-0.9.6/config.json").unwrap();
+    let persistent: PersistentSettings = serde_json::from_str(&text).unwrap();
+    assert!(persistent.info_enabled, "a value that was set");
+    assert!(
+        persistent.trackpad_pans,
+        "one that is newer has its default"
+    );
+    assert_eq!(persistent.cache_memory, crate::cache::CacheMemory::Auto);
+    assert_eq!(persistent.stamps, crate::annotate::Stamp::TILES);
+    // the file has the default shortcuts of 0.9.6, which are the ones of now
+    assert_eq!(persistent.shortcuts.len(), 36);
+    let defaults = default_shortcuts();
+    for (event, shortcut) in &persistent.shortcuts {
+        assert_eq!(Some(shortcut), defaults.get(event), "{event:?}");
+    }
+    // changed ones are kept, one that can not be read is left out
+    let changed = serde_json::from_str::<PersistentSettings>(
+        r#"{"shortcuts": {"ZoomIn": ["LControl", "Key2"], "Quit": ["Banana"]}}"#,
+    )
+    .unwrap()
+    .shortcuts;
+    assert_eq!(changed.len(), 1);
+    let zoom_in = &changed[&InputEvent::ZoomIn];
+    assert_eq!(
+        zoom_in.keys,
+        defaults[&InputEvent::ZoomDouble].keys,
+        "the key 2"
+    );
+    assert_eq!(
+        zoom_in.modifiers,
+        defaults[&InputEvent::Copy].modifiers,
+        "with ctrl"
+    );
+
+    let text = std::fs::read_to_string("res/tests/settings-0.9.6/config_volatile.json").unwrap();
+    let volatile: VolatileSettings = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        volatile.recent_images.front(),
+        Some(&PathBuf::from("/photos/test.png"))
+    );
+    // the formats of 0.9.6 as they were saved, and AVIF, which came later
+    assert_eq!(
+        volatile.encoding_options,
+        crate::file_encoder::FileEncoder::all()
+    );
+}
+
+/// The default shortcuts survive saving, and no two of them are the same keys
+#[test]
+fn ci_default_shortcuts() {
+    use crate::shortcuts::{Shortcuts, default_shortcuts};
+    let shortcuts = default_shortcuts();
+    let saved = serde_json::to_string(&shortcuts).unwrap();
+    assert_eq!(
+        serde_json::from_str::<Shortcuts>(&saved).unwrap(),
+        shortcuts
+    );
+    let mut seen = std::collections::HashMap::new();
+    for (event, shortcut) in &shortcuts {
+        let keys = serde_json::to_string(shortcut).unwrap();
+        if let Some(other) = seen.insert(keys, event) {
+            panic!("{event:?} and {other:?} have the same keys");
+        }
+    }
+}
+
+/// Since egui 0.36 Shift, Ctrl and Alt are held keys as well. A shortcut assigned with
+/// them had them among its keys and never fired. Reading the settings drops them.
+#[test]
+fn ci_modifiers_are_no_keys_of_a_shortcut() {
+    use crate::shortcuts::{
+        InputEvent, Shortcut, default_shortcuts, deserialize_shortcuts, is_modifier_key,
+    };
+    use egui::{Key, Modifiers};
+    use std::collections::BTreeSet;
+    let assigned = Shortcut {
+        keys: BTreeSet::from([Key::ShiftLeft, Key::ArrowRight, Key::ControlRight]),
+        modifiers: Modifiers::SHIFT | Modifiers::CTRL,
+    };
+    let only_a_modifier = Shortcut {
+        keys: BTreeSet::from([Key::AltLeft]),
+        modifiers: Modifiers::ALT,
+    };
+    let saved = serde_json::json!({"NextImage": assigned, "Quit": only_a_modifier});
+    let shortcuts = deserialize_shortcuts(saved).unwrap();
+    assert_eq!(
+        shortcuts[&InputEvent::NextImage],
+        Shortcut {
+            keys: BTreeSet::from([Key::ArrowRight]),
+            modifiers: Modifiers::SHIFT | Modifiers::CTRL,
+        }
+    );
+    // no shortcut is left, so Quit keeps its default
+    assert!(!shortcuts.contains_key(&InputEvent::Quit));
+    assert!(
+        default_shortcuts()
+            .values()
+            .all(|s| !s.keys.iter().any(is_modifier_key))
+    );
+}
+
+/// Formats that came after the settings were saved can be picked when saving, the
+/// saved ones keep their options
+#[test]
+fn ci_saved_formats_get_the_new_ones() {
+    use crate::file_encoder::FileEncoder;
+    use crate::settings::VolatileSettings;
+    let volatile: VolatileSettings =
+        serde_json::from_str(r#"{"encoding_options": [{"Jpg": {"quality": 90}}, "Bmp"]}"#).unwrap();
+    assert_eq!(
+        volatile.encoding_options[0],
+        FileEncoder::Jpg { quality: 90 }
+    );
+    assert_eq!(
+        volatile
+            .encoding_options
+            .iter()
+            .map(FileEncoder::ext)
+            .collect::<Vec<_>>(),
+        ["jpg", "bmp", "webp", "png", "avif"]
+    );
+    assert_eq!(
+        FileEncoder::matching_variant(&PathBuf::from("a.avif"), &volatile.encoding_options),
+        FileEncoder::Avif
+    );
+}
+
+/// The warnings the loader sends while opening a file
+fn warnings_for(path: &str) -> Vec<String> {
+    let (message_sender, messages) = std::sync::mpsc::channel();
+    if let Ok(receiver) = open_image(&PathBuf::from(path), Some(message_sender), None) {
+        _ = receiver.recv_timeout(Duration::from_secs(30));
+    }
+    messages
+        .try_iter()
+        .filter_map(|m| match m {
+            crate::appstate::Message::Warning(w) => Some(w),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A HEIC file is a HEIF file. Every one of them was reported as having the
+/// wrong extension.
+#[cfg(any(feature = "heif", feature = "heif_native"))]
+#[test]
+fn ci_heic_has_the_right_extension() {
+    assert_eq!(warnings_for("res/tests/orange.heic"), Vec::<String>::new());
+    // a file that really has the wrong extension is still reported
+    assert_eq!(warnings_for("res/tests/mp4_ex-signature.gif").len(), 1);
+}
+
+#[test]
+fn ci_load_misnamed_mp4_as_gif() {
+    // This file is actually an MP4 with a .gif extension.
+    // It should fail gracefully (not panic).
+    let p = PathBuf::from("res/tests/mp4_ex-signature.gif");
+    assert!(p.exists());
+    let result = open_image(&p, None, None);
+    // Either open_image returns an error, or the frame it sends is an error.
+    // The point is it doesn't panic.
+    if let Ok(rx) = result {
+        // If it sends something, that's fine too — format detection may reclassify it
+        let _ = rx.recv_timeout(Duration::from_secs(5));
+    }
+}
+
+#[test]
+fn ci_load_exr() {
+    let frame = load_first_frame("res/tests/test.exr");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_exr_float() {
+    let frame = load_first_frame("res/tests/512x512_float.exr");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_psd() {
+    let frame = load_first_frame("res/tests/test.psd");
+    assert_valid_image(&frame);
+}
+
+/// Camera RAW files from raw.pixls.us, too big for the repository: run
+/// scripts/raw-samples.sh first. Each shows the largest preview the camera put
+/// into it, the right way round, or is developed when there is no big one.
+/// quickraw alone read none of the Canon, Pentax and newer Fujifilm files, and the
+/// detection took the NEF for an ARW and the PEF for a TIFF.
+#[cfg(feature = "rawler")]
+#[test]
+#[ignore = "needs the files of scripts/raw-samples.sh"]
+fn raw_samples() {
+    let samples = [
+        ("Nikon-D850-14bit-compressed.NEF", 8256, 5504),
+        ("DSC_0750.NEF", 6048, 4024),
+        ("B13A0729.CR2", 6720, 4480),
+        ("Canon_EOS_R5_CRAW_ISO_100_nocrop_nodual.CR3", 8192, 5464),
+        ("Canon_EOS_R6_RAW_ISO_100_nocrop_nodual.CR3", 5472, 3648),
+        ("_DSC0009.ARW", 1616, 1080),
+        ("AFXT2720.RAF", 4416, 2944),
+        ("_T012010.RW2", 1920, 1440),
+        ("R0000357.DNG", 6000, 4000),
+        // rawler finds no preview, quickraw does
+        ("Olympus_EM1mk2_Standard_20MP.ORF", 3200, 2400),
+        // developed, the preview is 720x480
+        ("IMGP8550.PEF", 7360, 4912),
+        // the thumbnail is full size, and turned upright
+        ("IMG_1361.DNG", 3024, 4032),
+    ];
+    let mut failures = vec![];
+    for (name, width, height) in samples {
+        let path = std::path::Path::new("target/raw-samples").join(name);
+        assert!(
+            path.exists(),
+            "{} is missing, run scripts/raw-samples.sh",
+            path.display()
+        );
+        let (frames, warnings) = match load_all(&path) {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                failures.push(format!("{name}: {e:#}"));
+                continue;
+            }
+        };
+        let Some(image) = frames.first().and_then(|f| f.get_image()) else {
+            failures.push(format!("{name}: no image"));
+            continue;
+        };
+        if (image.width(), image.height()) != (width, height) {
+            failures.push(format!(
+                "{name}: {}x{}, expected {width}x{height}",
+                image.width(),
+                image.height()
+            ));
+        }
+        if !warnings.is_empty() {
+            failures.push(format!("{name}: {warnings:?}"));
+        }
+        // a picture, not one colour
+        let luma = image.thumbnail(64, 64).to_luma8();
+        let mean = luma.iter().map(|&v| v as f64).sum::<f64>() / luma.len() as f64;
+        let deviation = (luma.iter().map(|&v| (v as f64 - mean).powi(2)).sum::<f64>()
+            / luma.len() as f64)
+            .sqrt();
+        if deviation < 10. {
+            failures.push(format!("{name}: flat, deviation {deviation:.1}"));
+        }
+        // what a saved copy gets, it has to fit into a JPEG
+        let exif = crate::utils::raw_exif(&path);
+        eprintln!("{name}: EXIF {:?} bytes", exif.as_ref().map(|e| e.len()));
+        if exif.as_ref().is_some_and(|e| e.len() > 65527) {
+            failures.push(format!("{name}: EXIF too big for a JPEG"));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+#[test]
+fn ci_load_svg() {
+    let frame = load_first_frame("res/tests/johnny_automatic_lobster.svg");
+    assert_valid_image(&frame);
+    // 165x282 in the file, drawn at twice that size by default
+    let img = frame.get_image().unwrap();
+    assert_eq!((img.width(), img.height()), (330, 564));
+}
+
+#[test]
+fn ci_load_jxl() {
+    let frame = load_first_frame("res/tests/test.jxl");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_dds() {
+    let frame = load_first_frame("res/tests/test.dds");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_ktx2_r8g8b8a8() {
+    let frame = load_first_frame("res/tests/test_R8G8B8A8_SRGB.ktx2");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_ktx2_r16g16b16a16() {
+    let frame = load_first_frame("res/tests/test_R16G16B16A16_SFLOAT.ktx2");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_avif() {
+    let frame = load_first_frame("res/tests/red-at-12-oclock-with-color-profile-8bpc.avif");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_large_jpg() {
+    let frame = load_first_frame("res/tests/large_image.jpg");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_no_extension() {
+    // File with no extension — format detected from content
+    let frame = load_first_frame("res/tests/pngtest_16bit_no_ext");
+    assert_valid_image(&frame);
+}
+
+#[test]
+fn ci_load_unicode_path() {
+    let frame = load_first_frame("res/tests/AR-اختبار.png");
+    assert_valid_image(&frame);
+}
+
+#[cfg(feature = "j2k")]
+#[test]
+fn ci_load_jp2() {
+    let frame = load_first_frame("res/tests/test.jp2");
+    assert_valid_image(&frame);
+}
+
+/// HEIC without libheif. The mean color also checks that the decoder reads the
+/// range and the matrix from the video stream: this photo has no colr box, and
+/// a decoder that ignores the stream gets about 173, 139, 107.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_load_heic_native() {
+    let frame = load_first_frame("res/tests/orange.heic");
+    assert_valid_image(&frame);
+    let img = frame.get_image().unwrap();
+    // The file stores 4000x3000 and a rotation, which the decoder applies
+    assert_eq!((img.width(), img.height()), (3000, 4000));
+    // What libheif gets for this file
+    assert_mean_rgb(&img, [162.0, 134.0, 104.0], 2.0);
+}
+
+/// Camera HIF is 4:2:2 (Canon, Sony), and 4:4:4 exists too. heic-rs 0.1.4 failed on
+/// both as soon as there was a photo in them (tbraun96/heic-rs#10 and #12). Made
+/// from moss.jpg with heif-enc.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_load_heic_422_and_444() {
+    // with what libheif gets for them
+    for (path, expected) in [
+        ("res/tests/moss_422.heic", [82.9, 83.8, 45.3]),
+        ("res/tests/moss_444.heic", [82.9, 83.8, 45.2]),
+    ] {
+        let frame = load_first_frame(path);
+        assert_valid_image(&frame);
+        let img = frame.get_image().unwrap();
+        assert_eq!((img.width(), img.height()), (1000, 701), "{path}");
+        assert_mean_rgb(&img, expected, 1.0);
+    }
+}
+
+#[cfg(feature = "heif_native")]
+fn assert_mean_rgb(img: &image::DynamicImage, expected: [f64; 3], tolerance: f64) {
+    let rgb = img.to_rgb8();
+    let pixels = (rgb.width() * rgb.height()) as f64;
+    let mut sum = [0f64; 3];
+    for p in rgb.pixels() {
+        for (total, channel) in sum.iter_mut().zip(p.0) {
+            *total += channel as f64;
+        }
+    }
+    for (mean, expected) in sum.iter().map(|s| s / pixels).zip(expected) {
+        assert!(
+            (mean - expected).abs() < tolerance,
+            "mean color {mean:.1} is not near {expected}"
+        );
+    }
+}
+
+/// One image of a file that holds several
+fn load_item(path: &std::path::Path, item: usize) -> image::DynamicImage {
+    let receiver = crate::image_loader::open_image_item(path, item, None, None).unwrap();
+    let frame = receiver.recv_timeout(Duration::from_secs(60)).unwrap();
+    frame.get_image().unwrap()
+}
+
+/// The pages of a TIFF are counted and each can be shown, also when its strips
+/// are decoded in parallel, each thread at the right page
+#[test]
+fn ci_tiff_pages() {
+    use crate::image_loader::image_count;
+    use tiff::encoder::{TiffEncoder, colortype::RGB8};
+    let path = std::env::temp_dir().join("oculante_test_pages.tif");
+    let pages = [
+        ((8, 4), [200, 0, 0]),
+        ((5, 9), [0, 200, 0]),
+        ((64, 600), [0, 0, 200]),
+    ];
+    let mut encoder = TiffEncoder::new(std::fs::File::create(&path).unwrap()).unwrap();
+    for ((width, height), color) in pages {
+        let pixels = color.repeat((width * height) as usize);
+        let mut image = encoder.new_image::<RGB8>(width, height).unwrap();
+        image.rows_per_strip(16).unwrap();
+        image.write_data(&pixels).unwrap();
+    }
+    drop(encoder);
+    let mut decoder = tiff::decoder::Decoder::new(std::fs::File::open(&path).unwrap()).unwrap();
+    decoder.seek_to_image(2).unwrap();
+    assert!(
+        decoder.strip_count().unwrap() > 1,
+        "the last page has one strip"
+    );
+
+    assert_eq!(image_count(&path), 3);
+    for (page, ((width, height), color)) in pages.into_iter().enumerate() {
+        let image = load_item(&path, page);
+        assert_eq!(
+            (image.width(), image.height()),
+            (width, height),
+            "page {page}"
+        );
+        assert!(
+            image.to_rgb8().pixels().all(|p| p.0 == color),
+            "page {page}"
+        );
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// The images of a HEIF file, without its thumbnails and alpha planes. The file is
+/// made by libheif's heif-enc from three flat images, the third with half alpha.
+#[cfg(feature = "heif_native")]
+#[test]
+fn ci_heic_images() {
+    let path = std::path::Path::new("res/tests/three_images.heic");
+    assert_eq!(crate::image_loader::image_count(path), 3);
+    for (item, size, color) in [
+        (0, (64, 48), [220, 30, 30, 255]),
+        (1, (64, 48), [30, 200, 40, 255]),
+        (2, (32, 80), [40, 60, 230, 128]),
+    ] {
+        let image = load_item(path, item).to_rgba8();
+        assert_eq!(image.dimensions(), size, "item {item}");
+        // HEVC is lossy, the colours come back a few values off
+        let close = |p: &image::Rgba<u8>| p.0.iter().zip(color).all(|(a, b)| a.abs_diff(b) <= 8);
+        assert!(
+            image.pixels().all(close),
+            "item {item}: {:?}",
+            image.get_pixel(0, 0)
+        );
+    }
+}
+
+/// The faces of a cube map
+#[test]
+fn ci_ktx2_cube_faces() {
+    use crate::ktx2_loader::tests::ktx2_file;
+    let level: Vec<u8> = (0..6u8)
+        .flat_map(|face| [face * 40, 0, 0, 255].repeat(4))
+        .collect();
+    let path = std::env::temp_dir().join("oculante_test_cube.ktx2");
+    std::fs::write(
+        &path,
+        ktx2_file(ktx2::Format::R8G8B8A8_UNORM, (2, 2, 0), 0, 6, false, &level),
+    )
+    .unwrap();
+    assert_eq!(crate::image_loader::image_count(&path), 6);
+    for face in 0..6 {
+        let image = load_item(&path, face as usize).to_rgba8();
+        assert!(
+            image.pixels().all(|p| p.0 == [face * 40, 0, 0, 255]),
+            "face {face}"
+        );
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// The frames of a DICOM file: three of 2x2 pixels, the bright pixel moves
+#[test]
+fn ci_dicom_frames() {
+    use dicom_core::{DataElement, PrimitiveValue, Tag, VR};
+    use dicom_object::{FileMetaTableBuilder, InMemDicomObject};
+    let mut object = InMemDicomObject::new_empty();
+    let text = |group, element, vr, value: &str| {
+        DataElement::new(Tag(group, element), vr, PrimitiveValue::from(value))
+    };
+    let number = |group, element, value: u16| {
+        DataElement::new(Tag(group, element), VR::US, PrimitiveValue::from(value))
+    };
+    // secondary capture, made up instance
+    object.put(text(0x0008, 0x0016, VR::UI, "1.2.840.10008.5.1.4.1.1.7"));
+    object.put(text(0x0008, 0x0018, VR::UI, "1.2.3.4.5"));
+    object.put(number(0x0028, 0x0002, 1));
+    object.put(text(0x0028, 0x0004, VR::CS, "MONOCHROME2"));
+    object.put(text(0x0028, 0x0008, VR::IS, "3"));
+    object.put(number(0x0028, 0x0010, 2));
+    object.put(number(0x0028, 0x0011, 2));
+    object.put(number(0x0028, 0x0100, 8));
+    object.put(number(0x0028, 0x0101, 8));
+    object.put(number(0x0028, 0x0102, 7));
+    object.put(number(0x0028, 0x0103, 0));
+    let pixels = [[255, 0, 0, 0], [0, 255, 0, 0], [0, 0, 255, 0]].concat();
+    object.put(DataElement::new(
+        Tag(0x7FE0, 0x0010),
+        VR::OB,
+        PrimitiveValue::from(pixels),
+    ));
+    let file = object
+        .with_meta(FileMetaTableBuilder::new().transfer_syntax("1.2.840.10008.1.2.1"))
+        .unwrap();
+    let path = std::env::temp_dir().join("oculante_test_frames.dcm");
+    file.write_to_file(&path).unwrap();
+
+    assert_eq!(crate::image_loader::image_count(&path), 3);
+    for frame in 0..3 {
+        let image = load_item(&path, frame).to_luma8();
+        let brightest = image
+            .pixels()
+            .enumerate()
+            .max_by_key(|(_, p)| p.0[0])
+            .unwrap()
+            .0;
+        assert_eq!(brightest, frame, "frame {frame}: {:?}", image.as_raw());
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// A DICOM file that is only the data set, without preamble, `DICM` and file
+/// meta header, so its format is not detected. In palette colours, which
+/// dicom-pixeldata gives as gray indices.
+#[test]
+fn ci_dicom_without_meta_header_in_palette_colour() {
+    use dicom_core::{DataElement, PrimitiveValue, Tag, VR};
+    use dicom_object::InMemDicomObject;
+    let mut object = InMemDicomObject::new_empty();
+    let text = |group, element, vr, value: &str| {
+        DataElement::new(Tag(group, element), vr, PrimitiveValue::from(value))
+    };
+    let number = |group, element, value: u16| {
+        DataElement::new(Tag(group, element), VR::US, PrimitiveValue::from(value))
+    };
+    let words = |group, element, value: Vec<u16>| {
+        DataElement::new(
+            Tag(group, element),
+            VR::OW,
+            PrimitiveValue::U16(value.into()),
+        )
+    };
+    object.put(text(0x0008, 0x0016, VR::UI, "1.2.840.10008.5.1.4.1.1.7"));
+    object.put(text(0x0008, 0x0018, VR::UI, "1.2.3.4.5"));
+    object.put(number(0x0028, 0x0002, 1));
+    object.put(text(0x0028, 0x0004, VR::CS, "PALETTE COLOR"));
+    object.put(number(0x0028, 0x0010, 2));
+    object.put(number(0x0028, 0x0011, 2));
+    object.put(number(0x0028, 0x0100, 8));
+    object.put(number(0x0028, 0x0101, 8));
+    object.put(number(0x0028, 0x0102, 7));
+    object.put(number(0x0028, 0x0103, 0));
+    // three entries of 16 bit from index 10: red, green, blue
+    for (descriptor, data, entries) in [
+        (0x1101, 0x1201, vec![0xFFFF, 0, 0]),
+        (0x1102, 0x1202, vec![0, 0xFFFF, 0]),
+        (0x1103, 0x1203, vec![0, 0, 0xFFFF]),
+    ] {
+        object.put(DataElement::new(
+            Tag(0x0028, descriptor),
+            VR::US,
+            PrimitiveValue::from([3u16, 10, 16]),
+        ));
+        object.put(words(0x0028, data, entries));
+    }
+    // below the first index, the three entries, past the last
+    object.put(DataElement::new(
+        Tag(0x7FE0, 0x0010),
+        VR::OB,
+        PrimitiveValue::from(vec![0u8, 11, 12, 200]),
+    ));
+    let path = std::env::temp_dir().join("oculante_test_no_meta.dcm");
+    let implicit_le = dicom_transfer_syntax_registry::entries::IMPLICIT_VR_LITTLE_ENDIAN.erased();
+    object
+        .write_dataset_with_ts(std::fs::File::create(&path).unwrap(), &implicit_le)
+        .unwrap();
+
+    let image = load_item(&path, 0).to_rgb8();
+    let colours: Vec<[u8; 3]> = image.pixels().map(|p| p.0).collect();
+    assert_eq!(
+        colours,
+        [[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 0, 255]]
+    );
+    std::fs::remove_file(&path).unwrap();
+}
+
+/// JPEG 2000 in DICOM, the same MR image as the RLE one, both lossless
+#[cfg(feature = "j2k")]
+#[test]
+fn ci_dicom_jpeg2000() {
+    let jpeg2000 = load_item(
+        std::path::Path::new("res/tests/dicom/MR_small_jp2klossless.dcm"),
+        0,
+    );
+    let rle = load_item(std::path::Path::new("res/tests/dicom/MR_small_RLE.dcm"), 0);
+    assert_eq!((jpeg2000.width(), jpeg2000.height()), (64, 64));
+    assert_eq!(jpeg2000.as_bytes(), rle.as_bytes());
+}
+
+/// Without a window position (Wayland) fullscreen keeps the image at the same fraction
+/// of the canvas, the area the panels leave for it
+#[test]
+fn ci_fullscreen_keeps_the_image_in_proportion() {
+    use crate::appstate::ImageGeometry;
+    use egui::{Rect, pos2, vec2};
+    use nalgebra::Vector2;
+
+    // 200 x 100 at twice the size, its centre at (300, 250): a fifth across a
+    // canvas that starts right of a panel 100 wide, half way down
+    let mut geometry = ImageGeometry {
+        scale: 2.0,
+        offset: Vector2::new(100., 150.),
+        dimensions: (200, 100),
+    };
+    let windowed = Rect::from_min_size(pos2(100., 0.), vec2(1000., 500.));
+    let fullscreen = Rect::from_min_size(pos2(100., 0.), vec2(2000., 1100.));
+    let fraction = crate::utils::keep_in_proportion(&mut geometry, windowed, fullscreen);
+    assert_eq!(fraction, Vector2::new(0.2, 0.5));
+    // the centre at (100 + 400, 550)
+    assert_eq!(geometry.offset, Vector2::new(300., 450.));
+    assert_eq!(geometry.scale, 2.0, "the zoom stays");
+
+    // and back
+    crate::utils::keep_in_proportion(&mut geometry, fullscreen, windowed);
+    assert_eq!(geometry.offset, Vector2::new(100., 150.));
+
+    // a centred image stays centred
+    let mut geometry = ImageGeometry {
+        scale: 1.0,
+        offset: Vector2::new(500., 200.),
+        dimensions: (200, 100),
+    };
+    crate::utils::keep_in_proportion(&mut geometry, windowed, fullscreen);
+    assert_eq!(geometry.offset, Vector2::new(1000., 500.));
+}
+
+/// Arguments become paths: plain ones as they are, `file://` URIs decoded. CI runs
+/// this on Windows too.
+#[test]
+fn ci_file_uri_args_become_paths() {
+    use crate::utils::path_from_arg;
+    // `Exec=oculante %U` makes file managers pass URIs
+    assert_eq!(path_from_arg("/tmp/a b.png"), PathBuf::from("/tmp/a b.png"));
+    assert_eq!(path_from_arg("rel/a.png"), PathBuf::from("rel/a.png"));
+    // Explorer passes plain paths, with spaces and umlauts, also on a network share
+    for plain in [
+        r"C:\Users\Jö Doe\a b.png",
+        r"\\server\share\a.png",
+        r"C:\a#%20.png",
+    ] {
+        assert_eq!(path_from_arg(plain), PathBuf::from(plain));
+    }
+    #[cfg(unix)]
+    {
+        assert_eq!(
+            path_from_arg("file:///tmp/a%20b%23.png"),
+            PathBuf::from("/tmp/a b#.png")
+        );
+        assert_eq!(
+            path_from_arg("file://localhost/tmp/a.png"),
+            PathBuf::from("/tmp/a.png")
+        );
+        assert_eq!(
+            path_from_arg("file:///tmp/%C3%BCber.jpg"),
+            PathBuf::from("/tmp/über.jpg")
+        );
+    }
+    #[cfg(windows)]
+    {
+        assert_eq!(
+            path_from_arg("file:///C:/Users/a%20b.png"),
+            PathBuf::from(r"C:\Users\a b.png")
+        );
+        assert_eq!(
+            path_from_arg("file:///C:/Users/J%C3%B6/a.png"),
+            PathBuf::from(r"C:\Users\Jö\a.png")
+        );
+    }
+}
+
+/// egui loads the thumbnails of the file browser from their URI. On Windows it took
+/// `file://C:\...` for a path on the network, each one showed a red triangle (#813).
+/// An image in a folder with a space and an umlaut, as user names have them, and its
+/// thumbnail where the file browser keeps it. CI runs this on Windows too.
+#[test]
+fn ci_thumbnails_load_from_their_uri() {
+    let folder = std::env::temp_dir().join("oculante test ü");
+    std::fs::create_dir_all(&folder).unwrap();
+    let source = folder.join("thumbnail uri.png");
+    image::RgbaImage::new(4, 3).save(&source).unwrap();
+    let cached = crate::thumbnails::get_cached_path(&source);
+    std::fs::create_dir_all(cached.parent().unwrap()).unwrap();
+    crate::thumbnails::from_existing(&cached, &image::open(&source).unwrap()).unwrap();
+    let ctx = egui::Context::default();
+    egui_extras::install_image_loaders(&ctx);
+    for (path, size) in [(&source, [4, 3]), (&cached, [120, 90])] {
+        let uri = crate::ui::file_uri(path);
+        let start = std::time::Instant::now();
+        loop {
+            match ctx.try_load_image(&uri, egui::SizeHint::default()) {
+                Ok(egui::load::ImagePoll::Ready { image }) => {
+                    assert_eq!(image.size, size, "{uri}");
+                    break;
+                }
+                Ok(egui::load::ImagePoll::Pending { .. }) => {
+                    assert!(
+                        start.elapsed() < Duration::from_secs(10),
+                        "{uri} never loaded"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(e) => panic!("{uri} did not load: {e}"),
+            }
+        }
+    }
+    _ = std::fs::remove_file(&cached);
+}
+
+/// The desktop entries must hand the file to the app, or double clicking an
+/// image starts an empty viewer.
+#[test]
+fn desktop_entries_pass_files() {
+    for entry in [
+        "res/oculante.desktop",
+        "res/flathub/io.github.woelper.Oculante.desktop",
+    ] {
+        let text = std::fs::read_to_string(entry).unwrap();
+        let exec = text
+            .lines()
+            .find_map(|l| l.strip_prefix("Exec="))
+            .unwrap_or_else(|| panic!("{entry} has no Exec line"));
+        assert!(
+            ["%f", "%F", "%u", "%U"].iter().any(|c| exec.contains(c)),
+            "{entry}: Exec={exec} does not pass the file"
+        );
+        assert!(text.contains("MimeType="), "{entry} claims no file types");
+    }
+}
+
+/// The Windows installer puts Oculante into "Open with" and the default apps for
+/// every format it reads. A format added to the app needs its three lines there.
+#[test]
+fn ci_the_windows_installer_registers_every_format() {
+    use std::collections::BTreeSet;
+    let script = std::fs::read_to_string("res/windows/oculante.iss").unwrap();
+    let registered = |prefix: &str, suffix: &str| -> BTreeSet<String> {
+        script
+            .lines()
+            .filter_map(|l| l.strip_prefix(prefix)?.split_once(suffix))
+            .map(|(ext, _)| ext.to_string())
+            .collect()
+    };
+    let open_with = registered(
+        r#"Root: HKA; Subkey: "Software\Classes\."#,
+        r#"\OpenWithProgids""#,
+    );
+    let supported = registered(
+        r#"Root: HKA; Subkey: "Software\Classes\Applications\oculante.exe\SupportedTypes"; ValueType: string; ValueName: "."#,
+        r#"""#,
+    );
+    let default_apps = registered(
+        r#"Root: HKA; Subkey: "Software\Oculante\Capabilities\FileAssociations"; ValueType: string; ValueName: "."#,
+        r#"""#,
+    );
+    let formats: BTreeSet<String> = crate::utils::SUPPORTED_EXTENSIONS
+        .iter()
+        .map(|e| e.to_string())
+        .collect();
+    for (what, list) in [
+        ("Open with", &open_with),
+        ("SupportedTypes", &supported),
+        ("FileAssociations", &default_apps),
+    ] {
+        let missing: Vec<_> = formats.difference(list).collect();
+        let extra: Vec<_> = list.difference(&formats).collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "res/windows/oculante.iss, {what}: missing {missing:?}, not read by the app {extra:?}"
+        );
+    }
+}
+
+/// Run one frame of the confirmation modal with the given key pressed.
+/// Returns whether it accepted, and whether it is still open.
+fn modal_frame(ctx: &egui::Context, key: Option<egui::Key>) -> (bool, bool) {
+    use crate::ui::Modal;
+    let mut input = egui::RawInput::default();
+    if let Some(key) = key {
+        input.events.push(egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    let was_open = crate::ui::is_popup_open(ctx, egui::Id::new("test"));
+    let mut accepted = false;
+    let mut leaked = false;
+    let mut output = ctx.run_ui(input, |ui| {
+        Modal::new("test", ui.ctx()).show("Sure?", |_| accepted = true);
+        leaked = key.is_some_and(|k| ui.input(|i| i.key_pressed(k)));
+    });
+    output.textures_delta.clear();
+    // while open, a shortcut read after the modal must not see the key
+    assert!(!(was_open && leaked), "{key:?} reached the shortcuts");
+    let open = crate::ui::is_popup_open(ctx, egui::Id::new("test"));
+    (accepted, open)
+}
+
+#[test]
+fn confirmation_modal_keys() {
+    let ctx = egui::Context::default();
+    crate::ui::Modal::new("test", &ctx).open();
+    assert_eq!(modal_frame(&ctx, None), (false, true), "stays open");
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Escape)), (false, false));
+
+    crate::ui::Modal::new("test", &ctx).open();
+    _ = modal_frame(&ctx, None);
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Enter)), (true, false));
+
+    // closed, Enter does nothing
+    assert_eq!(modal_frame(&ctx, Some(egui::Key::Enter)), (false, false));
+}
+
+/// The color at 12 o'clock of the ring of the ColorSpin test image. Its profile
+/// turns blue into red, so red is there only when the profile is used.
+fn color_at_twelve(path: &std::path::Path, color_management: bool) -> image::Rgb<u8> {
+    let settings = crate::settings::DecoderSettings {
+        color_management,
+        ..Default::default()
+    };
+    let receiver = crate::image_loader::open_image_item(path, 0, None, Some(settings)).unwrap();
+    let frame = receiver.recv_timeout(Duration::from_secs(30)).unwrap();
+    *frame.get_image().unwrap().to_rgb8().get_pixel(400, 92)
+}
+
+fn write_with_profile(encoder: impl image::ImageEncoder, image: &image::DynamicImage, icc: &[u8]) {
+    let mut encoder = encoder;
+    encoder.set_icc_profile(icc.to_vec()).unwrap();
+    image.write_with_encoder(encoder).unwrap();
+}
+
+/// Images with a color profile come in sRGB, in all formats that carry one, in 8
+/// and 16 bits and with alpha. With color management off they come as stored.
+#[test]
+fn ci_color_profiles_are_converted_to_srgb() {
+    use image::ImageDecoder;
+    let tests = std::path::Path::new("res/tests");
+    let mut files: Vec<PathBuf> = [
+        "red-at-12-oclock-with-color-profile.jpg",
+        "red-at-12-oclock-with-color-profile.png",
+        "red-at-12-oclock-with-color-profile.heic",
+        "red-at-12-oclock-with-color-profile-8bpc.avif",
+        "red-at-12-oclock-with-color-profile-10bpc.avif",
+        "red-at-12-oclock-with-color-profile-12bpc.avif",
+        "red-at-12-oclock-with-color-profile-lossy.avif",
+    ]
+    .iter()
+    .map(|name| tests.join(name))
+    .collect();
+
+    // the others written with the same profile
+    let source =
+        std::fs::File::open(tests.join("red-at-12-oclock-with-color-profile.png")).unwrap();
+    let mut decoder = image::codecs::png::PngDecoder::new(std::io::BufReader::new(source)).unwrap();
+    let icc = decoder.icc_profile().unwrap().unwrap();
+    let rgb = image::DynamicImage::from_decoder(decoder).unwrap();
+    let rgb16 = image::DynamicImage::ImageRgb16(rgb.to_rgb16());
+    let rgba = image::DynamicImage::ImageRgba8(rgb.to_rgba8());
+    let mut file = |name: &str| {
+        let path = std::env::temp_dir().join(format!("oculante_test_profile_{name}"));
+        files.push(path.clone());
+        std::fs::File::create(path).unwrap()
+    };
+    use image::codecs::{png::PngEncoder, tiff::TiffEncoder, webp::WebPEncoder};
+    write_with_profile(PngEncoder::new(file("16bit.png")), &rgb16, &icc);
+    write_with_profile(PngEncoder::new(file("rgba.png")), &rgba, &icc);
+    write_with_profile(TiffEncoder::new(file("8bit.tif")), &rgb, &icc);
+    write_with_profile(TiffEncoder::new(file("16bit.tif")), &rgb16, &icc);
+    write_with_profile(WebPEncoder::new_lossless(file("rgba.webp")), &rgba, &icc);
+
+    // the AVIFs store a slightly different blue, it becomes (255, 0, 98), as with
+    // littleCMS
+    let red = |c: image::Rgb<u8>| c[0] > 200 && c[1] < 60 && c[2] < 128;
+    let blue = |c: image::Rgb<u8>| c[0] < 60 && c[1] < 128 && c[2] > 200;
+    for path in &files {
+        let managed = color_at_twelve(path, true);
+        let stored = color_at_twelve(path, false);
+        assert!(
+            red(managed),
+            "{}: {managed:?} at 12 o'clock, not red",
+            path.display()
+        );
+        assert!(
+            blue(stored),
+            "{}: {stored:?} as stored, not blue",
+            path.display()
+        );
+    }
+    for path in files
+        .iter()
+        .filter(|path| path.starts_with(std::env::temp_dir()))
+    {
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// sRGB profiles, also the small ones of images from the web, change nothing, so
+/// those images are not converted. Display P3 is.
+#[test]
+fn ci_srgb_profiles_are_left_alone() {
+    use crate::color_profile::{ToSrgb, icc_profile, name};
+    use moxcms::ColorProfile;
+    for file in [
+        "mohsen-karimi-f_2B1vBMaQQ-unsplash.jpg",
+        "mohsen-karimi.webp",
+        "AR-اختبار.png",
+        "141x121-target.png",
+    ] {
+        let path = std::path::Path::new("res/tests").join(file);
+        let extension = path.extension().unwrap().to_str().unwrap();
+        let icc = icc_profile(&path, extension).unwrap_or_else(|| panic!("{file} has a profile"));
+        assert!(
+            ToSrgb::new(&icc).is_none(),
+            "{file} ({}) is converted",
+            name(&icc)
+        );
+    }
+    let srgb = ColorProfile::new_srgb().encode().unwrap();
+    assert!(ToSrgb::new(&srgb).is_none());
+    let p3 = ColorProfile::new_display_p3().encode().unwrap();
+    assert!(ToSrgb::new(&p3).is_some());
+    assert_eq!(name(&p3), "Display P3");
+}
