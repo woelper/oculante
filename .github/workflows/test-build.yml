@@ -53,6 +53,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: runner.os == 'Windows'
         with:
+          # overwrite looks for the name, archive: false uploads under the file's name
+          name: oculante.exe
           path: signed/oculante.exe
           archive: false
           overwrite: true
@@ -83,6 +85,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: runner.os == 'Windows'
         with:
+          # overwrite looks for the name, archive: false uploads under the file's name
+          name: oculante_setup.exe
           path: signed/oculante_setup.exe
           archive: false
           overwrite: true
