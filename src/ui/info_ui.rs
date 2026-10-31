@@ -328,6 +328,8 @@ fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
     let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);
     egui::ScrollArea::vertical()
         .id_salt("sequence")
+        // dragged with the mouse too, like the panel around it (#824)
+        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
         // as wide as the panel, the scroll bar at its edge
         .auto_shrink([false, true])
         .min_scrolled_height(height)
