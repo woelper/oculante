@@ -224,7 +224,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
             {
                 ui.add_space(4.);
-                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
+                if crate::ui::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
                     image_changed = true;
                 }
                 ui.add_space(4.);
@@ -584,7 +584,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
             let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
             match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
                 Some(annotations) => {
-                    let copy = crate::annotate::canvas_ui(
+                    let copy = crate::ui::annotate::canvas_ui(
                         ctx,
                         annotations,
                         &mut state.edit_state.annotate,
@@ -600,7 +600,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 }
                 None => state.edit_state.annotate.stop(),
             }
-            let annotations = crate::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
+            let annotations = crate::ui::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
 
             // Do the processing
             //

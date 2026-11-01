@@ -3,7 +3,8 @@ use std::fmt;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use crate::annotate::{AnnotateUi, Annotation};
+use crate::annotate::Annotation;
+use crate::ui::annotate::AnnotateUi;
 use crate::icons::*;
 use crate::paint::{PaintStroke, Pixels, StrokeDrawing, channels};
 use crate::settings::VolatileSettings;

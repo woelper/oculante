@@ -13,6 +13,7 @@ mod top_bar;
 pub use top_bar::*;
 mod edit_ui;
 pub use edit_ui::edit_ui;
+pub(crate) mod annotate;
 mod colors;
 pub use colors::*;
 mod theme;
@@ -487,7 +488,7 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
     ui.styled_collapsing("Measure", |ui| {
         ui.vertical_centered_justified(|ui| {
             dark_panel(ui, |ui| {
-                crate::annotate::select_button(ui, true);
+                annotate::select_button(ui, true);
                 ui.allocate_space(vec2(ui.available_width(), 0.));
                 // draw a line using egui with the mouse
 

@@ -1,0 +1,140 @@
+//! Working with annotations: the tools panel, the annotation cards, drawing, selecting, and editing them on the image. See `crate::annotate` for what they are.
+
+mod canvas;
+mod panel;
+mod style;
+#[cfg(test)]
+mod tests;
+mod tools;
+mod typing;
+
+pub(crate) use canvas::canvas_ui;
+pub(crate) use panel::{panel_ui, select_button};
+use style::Style;
+use tools::{Icon, Tool, paint_icon};
+use typing::text_ui;
+
+use std::ops::RangeInclusive;
+
+use egui::{Color32, CursorIcon, Id, Key, Pos2, Stroke, Ui, pos2};
+use tiny_skia::Point;
+
+use crate::appstate::ImageGeometry;
+use crate::image_editing::{ImageOperation, ImgOpItem, canvas_rect};
+use crate::ui::{
+    CARD, OVER_IMAGE_EDGE, Opacity, RED, TRANSPARENT, ToColor32, WHITE, YELLOW, accent_color,
+    opacity, selection_colors, state_color,
+};
+
+use crate::annotate::*;
+
+/// The annotations drawn onto the image. Text still being typed is excluded since the text box shows it.
+pub fn visible(stack: &[ImgOpItem], state: &AnnotateUi) -> Vec<Annotation> {
+    stack
+        .iter()
+        .filter(|op| op.active)
+        .find_map(|op| match &op.operation {
+            ImageOperation::Annotate(annotations) => Some(annotations),
+            _ => None,
+        })
+        .map(|annotations| {
+            annotations
+                .iter()
+                .enumerate()
+                .filter(|(i, a)| state.typing != Some(*i) && !a.hidden)
+                .map(|(_, a)| a.clone())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[derive(Debug, Clone)]
+enum Drag {
+    Draw { index: usize, from: [f32; 2] },
+    Move {
+        from: [f32; 2],
+        starts: Vec<[i32; 2]>,
+    },
+    Select { from: [f32; 2], before: Vec<usize> },
+}
+
+/// What the mouse and the keys do with annotations
+#[derive(Debug, Clone, Default)]
+pub struct AnnotateUi {
+    /// The tool a drag over the image uses. `None` moves the image instead.
+    pub tool: Option<Tool>,
+    /// Whether the tools panel is unfolded. Annotating needs it open.
+    open: bool,
+    style: Style,
+    /// The card under the mouse in the panel.
+    pointed_card: Option<usize>,
+    /// A dropdown or colour picker was open at the start of the frame, so Esc closes it.
+    popup_open: bool,
+    /// Indices of the selected annotations.
+    pub selected: Vec<usize>,
+    drag: Option<Drag>,
+    /// The text annotation being typed into.
+    typing: Option<usize>,
+    /// The text box takes keyboard input.
+    focus_text: bool,
+    /// The image's size as loaded.
+    original: (u32, u32),
+    /// The annotations as they appear in the edited image.
+    pub layer: AnnotationLayer,
+    /// Set when the mouse and keys belong to annotations this frame.
+    pub grab: bool,
+}
+
+impl AnnotateUi {
+    /// Runs before the panel and canvas. Sets the image size and the line widths scaled to it.
+    pub fn prepare(&mut self, original: (u32, u32)) {
+        self.original = original;
+        self.style.fit(original);
+    }
+
+    /// Clears the annotations, selection and any drag or typing in progress, for a new image.
+    pub fn new_image(&mut self) {
+        self.layer.reset();
+        self.selected.clear();
+        self.drag = None;
+        self.typing = None;
+    }
+
+    /// Drops the current tool and clears everything `new_image` clears.
+    pub fn stop(&mut self) {
+        self.tool = None;
+        self.new_image();
+    }
+
+    fn start_typing(&mut self, index: usize) {
+        self.typing = Some(index);
+        self.focus_text = true;
+        self.selected = vec![index];
+        self.drag = None;
+    }
+
+    fn finish_typing(&mut self, annotations: &mut Vec<Annotation>) {
+        if let Some(i) = self.typing.take()
+            && let Some(a) = annotations.get_mut(i)
+        {
+            if a.is_empty() {
+                self.remove(annotations, vec![i]);
+            } else {
+                a.reanchor(self.original);
+            }
+        }
+    }
+
+    fn remove(&mut self, annotations: &mut Vec<Annotation>, mut indices: Vec<usize>) {
+        indices.sort_unstable();
+        indices.dedup();
+        for i in indices.into_iter().rev() {
+            if i < annotations.len() {
+                annotations.remove(i);
+            }
+        }
+        self.selected.clear();
+        self.typing = None;
+        self.drag = None;
+    }
+}
