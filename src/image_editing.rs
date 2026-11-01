@@ -959,11 +959,11 @@ impl ImageOperation {
                     ];
 
                     // make a black background covering the image area
-                    painter.rect_filled(Rect::EVERYTHING, 0., opacity(BLACK, Opacity::Light));
+                    painter.rect_filled(Rect::EVERYTHING, 0., opacity(BLACK, Opacity::Faint));
 
                     let shape = PathShape::convex_polygon(
                         pts,
-                        opacity(WHITE, Opacity::Subtle),
+                        opacity(WHITE, Opacity::Faint),
                         Stroke::new(1., YELLOW),
                     );
                     handle_painter.add(shape);
