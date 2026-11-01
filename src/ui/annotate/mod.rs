@@ -1,7 +1,10 @@
 //! Working with annotations: the tools panel, the annotation cards, drawing, selecting, and editing them on the image. See `crate::annotate` for what they are.
 
 mod canvas;
+mod history;
+mod menu;
 mod panel;
+mod selection_box;
 mod style;
 #[cfg(test)]
 mod tests;
@@ -10,6 +13,9 @@ mod typing;
 
 pub(crate) use canvas::canvas_ui;
 pub(crate) use panel::{panel_ui, select_button};
+use history::History;
+use menu::menu_ui;
+use selection_box::*;
 use style::Style;
 use tools::{Icon, Tool, paint_icon};
 use typing::text_ui;
@@ -22,8 +28,8 @@ use tiny_skia::Point;
 use crate::appstate::ImageGeometry;
 use crate::image_editing::{ImageOperation, ImgOpItem, canvas_rect};
 use crate::ui::{
-    CARD, OVER_IMAGE_EDGE, Opacity, RED, TRANSPARENT, ToColor32, WHITE, YELLOW, accent_color,
-    opacity, selection_colors, state_color,
+    BLACK, BUTTON, CARD, OVER_IMAGE_EDGE, Opacity, PANEL, RED, TEXT, TRANSPARENT, ToColor32,
+    WHITE, YELLOW, accent_color, fade, opacity, selection_colors, state_color,
 };
 
 use crate::annotate::*;
@@ -56,6 +62,24 @@ enum Drag {
         starts: Vec<[i32; 2]>,
     },
     Select { from: [f32; 2], before: Vec<usize> },
+    /// Resizing the selection by the handle at `side`. `shape` is its box, lines
+    /// not counted. `before` holds the selected annotations as they were.
+    Resize {
+        side: [i8; 2],
+        from: [f32; 2],
+        shape: [f32; 4],
+        before: Vec<(usize, Annotation)>,
+    },
+    /// Turning the selection around `pivot`, which stays put. `from` is the mouse's
+    /// starting angle, `base` the angle shown at the start.
+    Rotate {
+        pivot: [f32; 2],
+        from: f32,
+        base: f32,
+        before: Vec<(usize, Annotation)>,
+    },
+    /// A button above the box was pressed, it acts when released over it
+    Button(Action),
 }
 
 /// What the mouse and the keys do with annotations
@@ -83,6 +107,13 @@ pub struct AnnotateUi {
     pub layer: AnnotationLayer,
     /// Set when the mouse and keys belong to annotations this frame.
     pub grab: bool,
+    /// The corner of the box around what is selected that shows the button to turn
+    rotate_corner: Option<[i8; 2]>,
+    /// What of the box the mouse is over, since when, for its tooltip
+    hovered: Option<(Target, f64)>,
+    /// Where on the screen the menu of a right-click on what is selected is open
+    menu: Option<Pos2>,
+    history: History,
 }
 
 impl AnnotateUi {
@@ -92,18 +123,26 @@ impl AnnotateUi {
         self.style.fit(original);
     }
 
-    /// Clears the annotations, selection and any drag or typing in progress, for a new image.
+    /// Clears the annotations, selection, any drag or typing in progress and the undo history,
+    /// for a new image.
     pub fn new_image(&mut self) {
+        self.forget_drawn();
+        self.history.clear();
+    }
+
+    /// Drops the current tool and clears what `new_image` clears, but keeps the undo history:
+    /// switched on again, earlier changes can still be undone.
+    pub fn stop(&mut self) {
+        self.tool = None;
+        self.forget_drawn();
+    }
+
+    /// Clears the annotations, selection and any drag or typing in progress.
+    fn forget_drawn(&mut self) {
         self.layer.reset();
         self.selected.clear();
         self.drag = None;
         self.typing = None;
-    }
-
-    /// Drops the current tool and clears everything `new_image` clears.
-    pub fn stop(&mut self) {
-        self.tool = None;
-        self.new_image();
     }
 
     fn start_typing(&mut self, index: usize) {
@@ -128,11 +167,19 @@ impl AnnotateUi {
     fn remove(&mut self, annotations: &mut Vec<Annotation>, mut indices: Vec<usize>) {
         indices.sort_unstable();
         indices.dedup();
+        let mut gone: Vec<u32> = indices
+            .iter()
+            .filter_map(|i| match annotations.get(*i)?.shape {
+                Shape::Counter(number) => Some(number),
+                _ => None,
+            })
+            .collect();
         for i in indices.into_iter().rev() {
             if i < annotations.len() {
                 annotations.remove(i);
             }
         }
+        renumber(annotations, &mut gone);
         self.selected.clear();
         self.typing = None;
         self.drag = None;

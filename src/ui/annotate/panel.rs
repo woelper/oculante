@@ -89,17 +89,17 @@ pub fn panel_ui(
                 match state.tool {
                     Some(Tool::Select) => {
                         ui.small(
-                            "Click to select, Shift+click selects more, drag a box around \
-                             what to select. Drag what you point at to move it, double click \
-                             a text to change it. Del removes what is selected, Esc stops \
-                             annotating.",
+                            "Click to select, Shift+click to add more, or drag a box around several items. \
+                             Drag an item to move it, and double-click a text to edit it. Drag a handle to \
+                             resize, holding Shift to keep proportions. Use the buttons to turn or flip. \
+                             Del deletes, Ctrl+Z undoes, Ctrl+Shift+Z redoes, Esc stops annotating.",
                         );
                     }
                     Some(_) => {
                         ui.small(
-                            "Drag what you point at to move it, Shift+click selects more, \
-                             double click a text to change it. Del removes what is selected, \
-                             Esc goes back to selecting.",
+                            "Drag to move, Shift+click to add to the selection, and double-click a text to \
+                             edit it. Drag a handle to resize, or use the buttons to turn or flip. \
+                             Del deletes, Ctrl+Z undoes, Ctrl+Shift+Z redoes, Esc goes back to selecting.",
                         );
                     }
                     None => {}
@@ -167,6 +167,8 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
     let count = annotations.len();
     let mut swap = None;
     let mut remove = None;
+    // the spotlights dim together, a changed shade is that of all of them
+    let mut shade = None;
     for i in (0..count).rev() {
         let selected = state.selected.contains(&i);
         let response = card(ui, selected, |ui| {
@@ -245,6 +247,9 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
                 && options_ui(ui, a, i)
             {
                 state.style.remember(a);
+                if a.is_spotlight() {
+                    shade = Some(a.color);
+                }
             }
         });
         if response.hovered() {
@@ -262,6 +267,11 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
             *s = other(*s);
         }
         state.typing = state.typing.map(other);
+    }
+    if let Some(color) = shade {
+        for a in annotations.iter_mut().filter(|a| a.is_spotlight()) {
+            a.color = color;
+        }
     }
     if let Some(i) = remove {
         state.remove(annotations, vec![i]);
@@ -287,12 +297,13 @@ fn annotations_or_new(stack: &mut Vec<ImgOpItem>) -> (&mut Vec<Annotation>, bool
 }
 
 /// The names in the list, numbered for each kind
-fn names(annotations: &[Annotation]) -> Vec<String> {
+pub(super) fn names(annotations: &[Annotation]) -> Vec<String> {
     let mut counts = std::collections::HashMap::new();
     annotations
         .iter()
         .map(|a| match &a.shape {
-            Shape::Text(_) => a.label(),
+            // a counter has its number already
+            Shape::Text(_) | Shape::Counter(_) => a.label(),
             _ => {
                 let label = a.label();
                 let n = counts.entry(label.clone()).or_insert(0);
@@ -364,6 +375,19 @@ fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
             );
             font_ui(ui, &mut a.font, id);
         }
+        Shape::Counter(number) => {
+            // the next one gets its number when it is placed
+            if id != usize::MAX {
+                slider_row(ui, format!("{} Number", crate::icons::LIST), number, 1..=99);
+            }
+            slider_row(
+                ui,
+                format!("{PENCIL_SIMPLE_LINE} Size"),
+                &mut a.width,
+                8..=1000,
+            );
+            color_row(ui, format!("{PALETTE} Number color"), &mut a.number_color);
+        }
         Shape::Stamp(stamp) => {
             // the tiles pick the next one
             if id != usize::MAX {
@@ -411,12 +435,51 @@ fn options_ui(ui: &mut Ui, a: &mut Annotation, id: usize) -> bool {
             }
             return *a != before;
         }
+        Shape::Spotlight { oval, .. } => {
+            ui.horizontal(|ui| {
+                let shapes = [(false, Icon::Frame, "Box"), (true, Icon::Circle, "Oval")];
+                for (round, icon, name) in shapes {
+                    if icon_button(ui, *oval == round, icon)
+                        .on_hover_text(name)
+                        .clicked()
+                    {
+                        *oval = round;
+                    }
+                }
+            });
+            if !*oval {
+                slider_row(
+                    ui,
+                    format!("{ARROWS_OUT_SIMPLE} Radius"),
+                    &mut a.radius,
+                    0..=200,
+                );
+            }
+            // how much the shade covers, its alpha in percent
+            let percent = (a.color[3] as u32 * 100 + 127) / 255;
+            let mut dim = percent;
+            slider_row(ui, format!("{PALETTE} Dim"), &mut dim, 0..=100);
+            if dim != percent {
+                a.color[3] = ((dim * 255 + 50) / 100).min(255) as u8;
+            }
+            color_row(ui, format!("{PALETTE} Shade"), &mut a.color);
+            return *a != before;
+        }
     }
     ui.separator();
     slider_row(ui, format!("{ARROWS_OUT} Outline"), &mut a.outline, 0..=40);
     color_row(ui, format!("{PALETTE} Color"), &mut a.color);
     ui.add_enabled_ui(a.outline > 0, |ui| {
         color_row(ui, format!("{PALETTE} Outline color"), &mut a.outline_color);
+    });
+    slider_row(ui, format!("{ARROWS_OUT} Shadow"), &mut a.shadow, 0..=100);
+    ui.add_enabled_ui(a.shadow > 0, |ui| {
+        slider_row(
+            ui,
+            format!("{ARROWS_OUT} Shadow size"),
+            &mut a.shadow_size,
+            0..=100,
+        );
     });
     *a != before
 }

@@ -13,11 +13,15 @@ pub fn canvas_ui(
     pointer_over_ui: bool,
 ) -> bool {
     forget_what_is_gone(annotations, state);
+    undo_and_redo(ctx, annotations, state);
     let Some(tool) = state.tool else {
         state.finish_typing(annotations);
         state.selected.clear();
         state.drag = None;
         state.grab = false;
+        state.rotate_corner = None;
+        state.hovered = None;
+        state.menu = None;
         return false;
     };
     state.grab = true;
@@ -25,27 +29,53 @@ pub fn canvas_ui(
     let copy = state.typing.is_none() && keys(ctx, annotations, state, mapping, tool);
 
     let canvas = Canvas::new(ctx, mapping, geo, tool, pointer_over_ui);
+    let selection = selection_box(&canvas, annotations, state);
+    let mut dragged = Dragged::default();
     if let Some(pos) = canvas.pointer {
         let p = canvas.to_result(pos);
-        if canvas.pressed && !pointer_over_ui {
-            press(&canvas, annotations, state, p, typed);
+        // a click besides the menu only closes it
+        let closes_menu = canvas.pressed && !pointer_over_ui && state.menu.take().is_some();
+        if canvas.pressed && !pointer_over_ui && !closes_menu {
+            press(&canvas, annotations, state, selection.as_ref(), pos, p, typed);
         }
+        right_click(&canvas, annotations, state, selection.as_ref(), pos, p, typed);
         if canvas.down || canvas.released {
-            drag(&canvas, annotations, state, p);
+            dragged = drag(&canvas, annotations, state, p);
         }
-        if !pointer_over_ui {
-            point(&canvas, annotations, state, p);
-        }
+        point(&canvas, annotations, state, selection.as_ref(), &dragged, pos, p);
     }
     if canvas.down {
         canvas.show_select_box(state);
     }
     if canvas.released {
-        release(&canvas, annotations, state);
+        release(&canvas, annotations, state, selection.as_ref());
         double_click(&canvas, annotations, state);
     }
-    show_selection(&canvas, annotations, state);
+    let target = selection.and_then(|s| s.target);
+    show_selection(&canvas, annotations, state, target, &dragged);
+    if state.selected.is_empty() || state.typing.is_some() {
+        state.menu = None;
+    }
+    if let Some(at) = state.menu {
+        menu_ui(ctx, annotations, state, mapping, at);
+    }
+    show_tooltip(&canvas, state, dragged.angle);
     copy
+}
+
+/// The selection's box at the start of the frame, and what the mouse is over.
+struct Selection {
+    bounds: Bounds,
+    handles: Handles,
+    target: Option<Target>,
+}
+
+/// What a drag changed this frame: the new angle, and the handle it resizes by.
+/// The handle flips to the opposite side once the drag passes it.
+#[derive(Default)]
+struct Dragged {
+    angle: Option<String>,
+    side: Option<[i8; 2]>,
 }
 
 /// What the canvas works with in a frame: where the image is on the screen, the mouse, and the
@@ -60,6 +90,7 @@ struct Canvas<'a> {
     pressed: bool,
     down: bool,
     released: bool,
+    right_pressed: bool,
     /// On the second release
     double: bool,
     shift: bool,
@@ -68,6 +99,8 @@ struct Canvas<'a> {
     /// The mouse may be this far off a line on the screen and still hit it, in pixels of the
     /// edited image
     slack: f32,
+    /// The part of the screen that shows the image
+    view: egui::Rect,
 }
 
 impl<'a> Canvas<'a> {
@@ -78,11 +111,12 @@ impl<'a> Canvas<'a> {
         tool: Tool,
         pointer_over_ui: bool,
     ) -> Self {
-        let (pressed, down, released, double, shift) = ctx.input(|i| {
+        let (pressed, down, released, right_pressed, double, shift) = ctx.input(|i| {
             (
                 i.pointer.primary_pressed(),
                 i.pointer.primary_down(),
                 i.pointer.primary_released(),
+                i.pointer.secondary_pressed(),
                 i.pointer
                     .button_double_clicked(egui::PointerButton::Primary),
                 i.modifiers.shift,
@@ -104,10 +138,12 @@ impl<'a> Canvas<'a> {
             pressed,
             down,
             released,
+            right_pressed,
             double,
             shift,
             pointer: ctx.input(|i| i.pointer.hover_pos()),
             slack: 6. / geo.scale.max(0.01),
+            view: canvas_rect(ctx),
         }
     }
 
@@ -127,41 +163,51 @@ impl<'a> Canvas<'a> {
         )
     }
 
-    /// The annotation in front at `p` in the edited image
+    /// The annotation in front at `p` in the edited image. A spotlight only when nothing else
+    /// is there: what it shows can still be clicked.
     fn hit(&self, annotations: &[Annotation], p: [f32; 2]) -> Option<usize> {
-        (0..annotations.len()).rev().find(|i| {
-            !annotations[*i].hidden && hits(&annotations[*i], self.mapping, p, self.slack)
-        })
+        let find = |spotlight: bool| {
+            (0..annotations.len()).rev().find(|i| {
+                let a = &annotations[*i];
+                !a.hidden && a.is_spotlight() == spotlight && hits(a, self.mapping, p, self.slack)
+            })
+        };
+        find(false).or_else(|| find(true))
     }
 
-    /// A thin line around it, for what the mouse points at, a stronger one for what is selected
-    fn show(&self, a: &Annotation, strong: bool) {
-        let t = a.transform(self.mapping);
-        let on_screen = (scale_of(t) * self.geo.scale).max(0.001);
-        let width = if strong { 1.5 } else { 1. };
-        for line in outline(a, 3. / on_screen, on_screen) {
-            let points: Vec<Pos2> = line
-                .into_iter()
-                .map(|p| {
-                    let mut p = Point::from_xy(p[0], p[1]);
-                    t.map_point(&mut p);
-                    self.to_screen(p)
-                })
-                .collect();
-            self.painter.add(egui::Shape::closed_line(
-                points.clone(),
-                Stroke::new(width + 2., OVER_IMAGE_EDGE),
-            ));
-            let yellow = Stroke::new(width, YELLOW);
-            if strong {
-                // what is selected is dashed, what is pointed at is not
-                let mut points = points;
-                points.push(points[0]);
-                self.painter
-                    .extend(egui::Shape::dashed_line(&points, yellow, 6., 4.));
-            } else {
-                self.painter.add(egui::Shape::closed_line(points, yellow));
-            }
+    /// The box around what is drawn of the shown ones of `indices`, a little around it, on the
+    /// screen
+    fn screen_box(
+        &self,
+        annotations: &[Annotation],
+        indices: &[usize],
+    ) -> Option<(Bounds, egui::Rect)> {
+        let bounds = selection_bounds(annotations, indices, self.mapping)?;
+        let d = bounds.drawn;
+        let rect = egui::Rect::from_min_max(
+            self.to_screen(Point::from_xy(d[0], d[1])),
+            self.to_screen(Point::from_xy(d[2], d[3])),
+        )
+        .expand(FRAME_GAP);
+        Some((bounds, rect))
+    }
+
+    /// The box around what is selected, not while it is typed or drawn
+    fn selected_box(
+        &self,
+        annotations: &[Annotation],
+        state: &AnnotateUi,
+    ) -> Option<(Bounds, egui::Rect)> {
+        if state.typing.is_some() || matches!(state.drag, Some(Drag::Draw { .. })) {
+            return None;
+        }
+        self.screen_box(annotations, &state.selected)
+    }
+
+    /// A thin box around the one the mouse points at, or whose card it is over
+    fn show_pointed(&self, annotations: &[Annotation], i: usize) {
+        if let Some((_, rect)) = self.screen_box(annotations, &[i]) {
+            frame_line(&self.painter, rect, 1.);
         }
     }
 
@@ -203,8 +249,32 @@ fn forget_what_is_gone(annotations: &[Annotation], state: &mut AnnotateUi) {
     }
 }
 
-/// Delete removes what is selected, Esc lets go of it and then of the tool, the arrows move it.
-/// Returns whether the image should be copied.
+/// What changed, here or on the cards, can be undone once it is done. Ctrl+Z (Cmd+Z on a Mac)
+/// undoes, with Shift or Ctrl+Y it redoes, while a tool is picked; a box to type in has its own.
+fn undo_and_redo(ctx: &egui::Context, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
+    let busy = state.drag.is_some()
+        || state.typing.is_some()
+        || ctx.input(|i| i.pointer.any_down());
+    state.history.record(annotations, busy);
+    if state.tool.is_none() || busy || ctx.egui_wants_keyboard_input() {
+        return;
+    }
+    let (undo, redo) = ctx.input(|i| {
+        let z = i.modifiers.command && i.key_pressed(Key::Z);
+        let y = i.modifiers.command && i.key_pressed(Key::Y);
+        (z && !i.modifiers.shift, (z && i.modifiers.shift) || y)
+    });
+    if (undo || redo) && state.history.step(annotations, undo) {
+        state.selected.retain(|i| *i < annotations.len());
+        state.drag = None;
+        state.typing = None;
+        state.menu = None;
+    }
+}
+
+/// Delete removes what is selected, Esc closes the menu, stops a drag, lets go of what is
+/// selected and then of the tool, the arrows move it. Returns whether the image should be
+/// copied.
 fn keys(
     ctx: &egui::Context,
     annotations: &mut Vec<Annotation>,
@@ -213,7 +283,7 @@ fn keys(
     tool: Tool,
 ) -> bool {
     let original = mapping.original;
-    let (delete, escape, shift) = ctx.input(|i| {
+    let (delete, mut escape, shift) = ctx.input(|i| {
         (
             i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
             // that only closes a list
@@ -222,17 +292,39 @@ fn keys(
         )
     });
     let copy = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
+    // that only closes the menu, what is selected stays
+    if escape && state.menu.take().is_some() {
+        escape = false;
+    }
     if delete && !state.selected.is_empty() {
         let selected = state.selected.clone();
         state.remove(annotations, selected);
     }
     if escape {
-        if state.selected.is_empty() {
-            // from drawing back to selecting, then no more annotating
-            state.tool = (tool != Tool::Select).then_some(Tool::Select);
+        match state.drag.take() {
+            // a drag stops, what it changed is as it was
+            Some(Drag::Move { starts, .. }) => {
+                for (i, start) in state.selected.iter().zip(starts) {
+                    annotations[*i].set_start(start, original);
+                }
+            }
+            Some(Drag::Resize { before, .. } | Drag::Rotate { before, .. }) => {
+                for (i, a) in before {
+                    if let Some(slot) = annotations.get_mut(i) {
+                        *slot = a;
+                    }
+                }
+            }
+            Some(Drag::Draw { index, .. }) => state.remove(annotations, vec![index]),
+            Some(Drag::Select { before, .. }) => state.selected = before,
+            Some(Drag::Button(_)) | None => {
+                if state.selected.is_empty() {
+                    // from drawing back to selecting, then no more annotating
+                    state.tool = (tool != Tool::Select).then_some(Tool::Select);
+                }
+                state.selected.clear();
+            }
         }
-        state.selected.clear();
-        state.drag = None;
     }
     let step = if shift { 10. } else { 1. };
     let nudge = ctx.input(|i| {
@@ -273,12 +365,64 @@ fn keys(
     copy
 }
 
-/// A press on the image at `p`: it ends the typing, selects, starts a move, a box that selects,
-/// a text or a drawing
+/// The box around what is selected as the frame begins: which corner shows the button to turn,
+/// what of it the mouse is over, and since when, for its tooltip
+fn selection_box(
+    canvas: &Canvas,
+    annotations: &[Annotation],
+    state: &mut AnnotateUi,
+) -> Option<Selection> {
+    let Some((bounds, rect)) = canvas.selected_box(annotations, state) else {
+        state.rotate_corner = None;
+        state.hovered = None;
+        return None;
+    };
+    let pointer = canvas.pointer.filter(|_| !canvas.pointer_over_ui);
+    if state.drag.is_none() {
+        state.rotate_corner = rotate_corner(rect, state.rotate_corner, pointer);
+    }
+    let idle = matches!(state.drag, None | Some(Drag::Button(_)));
+    let handles = Handles::new(rect, state.rotate_corner.filter(|_| idle), canvas.view);
+    let target = pointer.and_then(|pos| handles.target(pos));
+    let now = canvas.ctx.input(|i| i.time);
+    state.hovered = match (state.hovered, target.filter(|_| state.drag.is_none())) {
+        (Some((was, since)), Some(t)) if was == t => Some((t, since)),
+        (_, Some(t)) => Some((t, now)),
+        _ => None,
+    };
+    Some(Selection {
+        bounds,
+        handles,
+        target,
+    })
+}
+
+/// A move of what is selected, from `o` in the image as it was loaded
+fn start_move(
+    annotations: &[Annotation],
+    state: &mut AnnotateUi,
+    o: [f32; 2],
+    original: (u32, u32),
+) {
+    state.drag = Some(Drag::Move {
+        from: o,
+        starts: state
+            .selected
+            .iter()
+            .map(|i| annotations[*i].start(original))
+            .collect(),
+    });
+}
+
+/// A press on the image at `pos`, `p` in the edited image: it ends the typing, grabs a handle or
+/// a button of the box around what is selected, selects, starts a move, a box that selects, a
+/// text or a drawing
 fn press(
     canvas: &Canvas,
     annotations: &mut Vec<Annotation>,
     state: &mut AnnotateUi,
+    selection: Option<&Selection>,
+    pos: Pos2,
     p: [f32; 2],
     typed: bool,
 ) {
@@ -289,8 +433,48 @@ fn press(
         state.finish_typing(annotations);
         return;
     }
+    if let Some(selection) = selection
+        && let Some(target) = selection.target
+    {
+        let before: Vec<(usize, Annotation)> = state
+            .selected
+            .iter()
+            .filter(|i| !annotations[**i].hidden)
+            .map(|&i| (i, annotations[i].clone()))
+            .collect();
+        let shape = selection.bounds.shape;
+        state.drag = Some(match target {
+            Target::Button(action) => Drag::Button(action),
+            Target::Handle(side) => Drag::Resize {
+                side,
+                from: p,
+                shape,
+                before,
+            },
+            Target::Rotate(_) => {
+                let pivot = middle_of(shape);
+                // one is shown at its angle, several by how much they turn
+                let base = match before.as_slice() {
+                    [(_, a)] => shown_angle(a, mapping),
+                    _ => 0.,
+                };
+                Drag::Rotate {
+                    pivot,
+                    from: angle_of(p, pivot),
+                    base,
+                    before,
+                }
+            }
+        });
+        return;
+    }
     let under = canvas.hit(annotations, p);
     let text_under = under.filter(|i| is_text(&annotations[*i]));
+    // anywhere in the box around what is selected it is moved, Shift selects more with a box as
+    // besides it
+    let inside = tool == Tool::Select
+        && !canvas.shift
+        && selection.is_some_and(|s| s.handles.rect.contains(pos));
     match under {
         // the text tool changes the text it clicks
         Some(i) if tool == Tool::Text && text_under.is_some() => state.start_typing(i),
@@ -306,15 +490,9 @@ fn press(
             if !state.selected.contains(&i) {
                 state.selected = vec![i];
             }
-            state.drag = Some(Drag::Move {
-                from: o,
-                starts: state
-                    .selected
-                    .iter()
-                    .map(|i| annotations[*i].start(original))
-                    .collect(),
-            });
+            start_move(annotations, state, o, original);
         }
+        None if inside => start_move(annotations, state, o, original),
         // a box selects what is in it
         None if tool == Tool::Select => {
             let before = if canvas.shift {
@@ -336,7 +514,10 @@ fn press(
         None => {
             if let Some(mut a) = state.style.new_annotation(tool) {
                 a.offset = round(o);
-                if matches!(a.shape, Shape::Stamp(_)) {
+                if let Shape::Counter(number) = &mut a.shape {
+                    *number = next_counter(annotations);
+                }
+                if matches!(a.shape, Shape::Stamp(_) | Shape::Counter(_)) {
                     a.stand_upright(mapping);
                     a.centre_at(o, original);
                 }
@@ -349,16 +530,58 @@ fn press(
     }
 }
 
+/// A right-click on what is selected, or in its box, opens its menu; on another one it selects
+/// that first, besides everything it closes the menu
+fn right_click(
+    canvas: &Canvas,
+    annotations: &[Annotation],
+    state: &mut AnnotateUi,
+    selection: Option<&Selection>,
+    pos: Pos2,
+    p: [f32; 2],
+    typed: bool,
+) {
+    if !canvas.right_pressed
+        || canvas.pointer_over_ui
+        || state.drag.is_some()
+        || state.typing.is_some()
+        || typed
+    {
+        return;
+    }
+    let in_box = selection.is_some_and(|s| s.handles.rect.contains(pos));
+    state.menu = match canvas.hit(annotations, p) {
+        _ if in_box => Some(pos),
+        Some(i) => {
+            if !state.selected.contains(&i) {
+                state.selected = vec![i];
+            }
+            Some(pos)
+        }
+        None => None,
+    };
+}
+
 /// The mouse at `p` while a drag goes on: what is drawn grows, what is moved follows, the box
-/// selects what is in it
-fn drag(canvas: &Canvas, annotations: &mut [Annotation], state: &mut AnnotateUi, p: [f32; 2]) {
+/// selects what is in it, what is resized or turned follows the handle
+fn drag(
+    canvas: &Canvas,
+    annotations: &mut [Annotation],
+    state: &mut AnnotateUi,
+    p: [f32; 2],
+) -> Dragged {
     let (mapping, original) = (canvas.mapping, canvas.mapping.original);
     let o = mapping.to_original(p);
+    let mut dragged = Dragged::default();
     match &state.drag {
         Some(Drag::Draw { index, from }) => {
             if let Some(a) = annotations.get_mut(*index) {
                 let mut d = [o[0] - from[0], o[1] - from[1]];
-                if canvas.shift && matches!(a.shape, Shape::Rect(_) | Shape::Ellipse(_)) {
+                let squared = matches!(
+                    a.shape,
+                    Shape::Rect(_) | Shape::Ellipse(_) | Shape::Spotlight { .. }
+                );
+                if canvas.shift && squared {
                     // as wide as high
                     let side = d[0].abs().max(d[1].abs());
                     d = [side.copysign(d[0]), side.copysign(d[1])];
@@ -367,7 +590,10 @@ fn drag(canvas: &Canvas, annotations: &mut [Annotation], state: &mut AnnotateUi,
                 let size = round([d[0].abs(), d[1].abs()]);
                 match &mut a.shape {
                     Shape::Arrow(to) => *to = round(d),
-                    Shape::Rect(s) | Shape::Ellipse(s) | Shape::Redact { size: s, .. } => {
+                    Shape::Rect(s)
+                    | Shape::Ellipse(s)
+                    | Shape::Redact { size: s, .. }
+                    | Shape::Spotlight { size: s, .. } => {
                         *s = size;
                         a.set_start(round(corner), original);
                     }
@@ -379,10 +605,14 @@ fn drag(canvas: &Canvas, annotations: &mut [Annotation], state: &mut AnnotateUi,
                     }
                     // a square from where the drag started, a click places one as large as
                     // the last
-                    Shape::Stamp(_) => {
+                    Shape::Stamp(_) | Shape::Counter(_) => {
                         let side = d[0].abs().max(d[1].abs());
                         let centre = if side * canvas.geo.scale < 4. {
-                            a.width = state.style.stamp_size;
+                            a.width = if matches!(a.shape, Shape::Counter(_)) {
+                                state.style.counter_size
+                            } else {
+                                state.style.stamp_size
+                            };
                             *from
                         } else {
                             a.width = side.round() as u32;
@@ -410,31 +640,114 @@ fn drag(canvas: &Canvas, annotations: &mut [Annotation], state: &mut AnnotateUi,
             }
             state.selected = selected;
         }
-        None => {}
+        Some(Drag::Resize {
+            side,
+            from,
+            shape,
+            before,
+        }) => {
+            let by = [p[0] - from[0], p[1] - from[1]];
+            let (scale, fixed) = stretch(*side, *shape, by, canvas.shift);
+            for (i, a) in before {
+                if let Some(slot) = annotations.get_mut(*i) {
+                    *slot = resized(a, mapping, fixed, scale);
+                }
+            }
+            let indices: Vec<usize> = before.iter().map(|(i, _)| *i).collect();
+            keep_in_place(annotations, &indices, mapping, *side, fixed, scale);
+            let mirrored = |axis: usize| {
+                if scale[axis] < 0. {
+                    -side[axis]
+                } else {
+                    side[axis]
+                }
+            };
+            dragged.side = Some([mirrored(0), mirrored(1)]);
+        }
+        Some(Drag::Rotate {
+            pivot,
+            from,
+            base,
+            before,
+        }) => {
+            let mut shown = wrap(base + angle_of(p, *pivot) - from);
+            if canvas.shift {
+                shown = wrap((shown / 15.).round() * 15.);
+            }
+            let turn = wrap(shown - base).round() as i32;
+            for (i, a) in before {
+                if let Some(slot) = annotations.get_mut(*i) {
+                    *slot = rotated(a, mapping, *pivot, turn);
+                }
+            }
+            let shown = wrap(base + turn as f32).round() as i32;
+            dragged.angle = Some(if canvas.shift {
+                format!("{shown}° (snapped)")
+            } else {
+                format!("{shown}°")
+            });
+        }
+        Some(Drag::Button(_)) | None => {}
     }
+    dragged
 }
 
-/// The cursor for what a click at `p` would do, and a thin line around what it would select
-fn point(canvas: &Canvas, annotations: &[Annotation], state: &AnnotateUi, p: [f32; 2]) {
+/// The cursor for what is dragged, or for what a click at `pos` would do, and a thin box around
+/// what it would select
+fn point(
+    canvas: &Canvas,
+    annotations: &[Annotation],
+    state: &AnnotateUi,
+    selection: Option<&Selection>,
+    dragged: &Dragged,
+    pos: Pos2,
+    p: [f32; 2],
+) {
+    // the handles and buttons of the box go before what is below them, a drag goes on over the
+    // panels too
+    let box_cursor = match &state.drag {
+        Some(Drag::Resize { side, .. }) => Some(resize_cursor(dragged.side.unwrap_or(*side))),
+        Some(Drag::Rotate { .. }) => Some(CursorIcon::Grabbing),
+        Some(Drag::Button(_)) => Some(CursorIcon::PointingHand),
+        None => selection.and_then(|s| s.target).map(Target::cursor),
+        _ => None,
+    };
+    if let Some(cursor) = box_cursor {
+        canvas.ctx.set_cursor_icon(cursor);
+        return;
+    }
+    if canvas.pointer_over_ui {
+        return;
+    }
     let tool = canvas.tool;
     let pointed = canvas.hit(annotations, p).filter(|_| state.drag.is_none());
+    let inside = tool == Tool::Select
+        && !canvas.shift
+        && state.drag.is_none()
+        && selection.is_some_and(|s| s.handles.rect.contains(pos));
     canvas.ctx.set_cursor_icon(match pointed {
         Some(i) if tool == Tool::Text && is_text(&annotations[i]) => CursorIcon::Text,
         Some(_) => CursorIcon::Move,
         None if matches!(state.drag, Some(Drag::Move { .. })) => CursorIcon::Move,
+        None if inside => CursorIcon::Move,
         None if tool == Tool::Select => CursorIcon::Default,
         None if tool == Tool::Text => CursorIcon::Text,
         None => CursorIcon::Crosshair,
     });
     if let Some(i) = pointed.filter(|i| !state.selected.contains(i)) {
-        canvas.show(&annotations[i], false);
+        canvas.show_pointed(annotations, i);
     }
 }
 
-/// The end of a drag: what was drawn empty is removed, what was drawn or moved keeps to the
-/// nearest anchor
-fn release(canvas: &Canvas, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
-    let original = canvas.mapping.original;
+/// The end of a drag: what was drawn empty is removed, what was drawn, moved, resized or turned
+/// keeps to the nearest anchor, a button acts when let go over it
+fn release(
+    canvas: &Canvas,
+    annotations: &mut Vec<Annotation>,
+    state: &mut AnnotateUi,
+    selection: Option<&Selection>,
+) {
+    let (mapping, original) = (canvas.mapping, canvas.mapping.original);
     let Some(drag) = state.drag.take() else {
         return;
     };
@@ -444,14 +757,39 @@ fn release(canvas: &Canvas, annotations: &mut Vec<Annotation>, state: &mut Annot
                 state.remove(annotations, vec![index]);
             } else if let Some(a) = annotations.get_mut(index) {
                 a.reanchor(original);
-                if matches!(a.shape, Shape::Stamp(_)) {
-                    state.style.stamp_size = a.width;
+                match a.shape {
+                    Shape::Stamp(_) => state.style.stamp_size = a.width,
+                    Shape::Counter(_) => state.style.counter_size = a.width,
+                    _ => {}
                 }
             }
         }
         Drag::Move { .. } => {
             for &i in &state.selected {
                 annotations[i].reanchor(original);
+            }
+        }
+        Drag::Resize { before, .. } | Drag::Rotate { before, .. } => {
+            for (i, _) in &before {
+                if let Some(a) = annotations.get_mut(*i) {
+                    a.reanchor(original);
+                }
+            }
+            // new stamps and counters are as large as one made larger
+            if let [(i, _)] = before.as_slice()
+                && let Some(a) = annotations.get(*i)
+            {
+                match a.shape {
+                    Shape::Stamp(_) => state.style.stamp_size = a.width,
+                    Shape::Counter(_) => state.style.counter_size = a.width,
+                    _ => {}
+                }
+            }
+        }
+        Drag::Button(action) => {
+            if selection.and_then(|s| s.target) == Some(Target::Button(action)) {
+                let selected = state.selected.clone();
+                act(annotations, &selected, mapping, action);
             }
         }
         Drag::Select { .. } => {}
@@ -472,21 +810,48 @@ fn double_click(canvas: &Canvas, annotations: &[Annotation], state: &mut Annotat
     }
 }
 
-/// The lines around what is selected, not while it is typed or drawn, and around the one of the
-/// card the mouse is over in the panel
-fn show_selection(canvas: &Canvas, annotations: &[Annotation], state: &AnnotateUi) {
-    let drawn = match state.drag {
-        Some(Drag::Draw { index, .. }) => Some(index),
-        _ => None,
-    };
-    for &i in &state.selected {
-        if state.typing != Some(i) && drawn != Some(i) && !annotations[i].hidden {
-            canvas.show(&annotations[i], true);
-        }
+/// The selection box after this frame, with its handles, and a thin box around the card under the mouse. 
+/// `target` is what the mouse was over at the frame's start.
+fn show_selection(
+    canvas: &Canvas,
+    annotations: &[Annotation],
+    state: &AnnotateUi,
+    target: Option<Target>,
+    dragged: &Dragged,
+) {
+    if let Some((_, rect)) = canvas.selected_box(annotations, state) {
+        let idle = matches!(state.drag, None | Some(Drag::Button(_)));
+        let handles = Handles::new(rect, state.rotate_corner.filter(|_| idle), canvas.view);
+        let hot = match &state.drag {
+            Some(Drag::Resize { side, .. }) => Some(Target::Handle(dragged.side.unwrap_or(*side))),
+            Some(Drag::Button(action)) => Some(Target::Button(*action)),
+            None => target,
+            _ => None,
+        };
+        handles.paint(canvas.ctx, &canvas.painter, hot, idle);
     }
     if let Some(i) = state.pointed_card.filter(|i| !state.selected.contains(i))
-        && let Some(a) = annotations.get(i).filter(|a| !a.hidden)
+        && annotations.get(i).is_some_and(|a| !a.hidden)
     {
-        canvas.show(a, false);
+        canvas.show_pointed(annotations, i);
+    }
+}
+
+/// The angle while what is selected is turned, or what a handle or a button does once the mouse rests on it
+fn show_tooltip(canvas: &Canvas, state: &AnnotateUi, angle: Option<String>) {
+    let Some(pos) = canvas.pointer else {
+        return;
+    };
+    if let Some(angle) = angle {
+        tooltip(canvas.ctx, pos, &angle);
+    } else if let Some((target, since)) = state.hovered {
+        let waited = canvas.ctx.input(|i| i.time) - since;
+        if waited >= TOOLTIP_DELAY {
+            tooltip(canvas.ctx, pos, target.hint());
+        } else {
+            canvas
+                .ctx
+                .request_repaint_after(std::time::Duration::from_secs_f64(TOOLTIP_DELAY - waited));
+        }
     }
 }

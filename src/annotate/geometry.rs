@@ -130,6 +130,16 @@ impl Mapping {
         }
         [p.x, p.y]
     }
+
+    /// How the edits turn, mirror and stretch the image as it was loaded, without moving it
+    pub(crate) fn linear(&self) -> Transform {
+        let t = self.transform(Transform::identity(), Point::zero());
+        Transform::from_row(t.sx, t.ky, t.kx, t.sy, 0., 0.)
+    }
+}
+
+pub(crate) fn mirrors(t: Transform) -> bool {
+    t.sx * t.sy - t.kx * t.ky < 0.
 }
 
 /// How much larger a transform makes things
@@ -181,187 +191,6 @@ pub(crate) fn in_box(annotations: &[Annotation], mapping: &Mapping, a: [f32; 2],
                 })
         })
         .collect()
-}
-
-/// The lines that show an annotation is pointed at or selected, in its own
-/// coordinates, each closed: `gap` around its lines, its arrow, its text or the
-/// area it hides. `resolution` is how large it is on the screen.
-pub(crate) fn outline(a: &Annotation, gap: f32, resolution: f32) -> Vec<Vec<[f32; 2]>> {
-    let w = a.line_width();
-    // around the outline it may have
-    let o = a.outline_width();
-    let mut stroke = tiny_skia::Stroke {
-        width: w + (o + gap) * 2.,
-        line_cap: LineCap::Round,
-        line_join: LineJoin::Round,
-        ..Default::default()
-    };
-    // of an area, only the line outside of it
-    let mut area = false;
-    let path = match &a.shape {
-        Shape::Arrow(to) => {
-            let Some([tip, left, right]) = arrow_head_corners(*to, w) else {
-                return vec![];
-            };
-            // the arrow as one area: along the line on one side, around the head
-            // and back on the other side
-            let length = tip.x.hypot(tip.y);
-            let (nx, ny) = (-tip.y / length * w / 2., tip.x / length * w / 2.);
-            let (bx, by) = ((left.x + right.x) / 2., (left.y + right.y) / 2.);
-            let mut arrow = PathBuilder::new();
-            arrow.move_to(nx, ny);
-            arrow.line_to(bx + nx, by + ny);
-            arrow.line_to(left.x, left.y);
-            arrow.line_to(tip.x, tip.y);
-            arrow.line_to(right.x, right.y);
-            arrow.line_to(bx - nx, by - ny);
-            arrow.line_to(-nx, -ny);
-            // around the round end where it starts
-            let (backx, backy) = (-tip.x / length * w / 2., -tip.y / length * w / 2.);
-            for i in 1..8 {
-                let (sin, cos) = (i as f32 / 8. * std::f32::consts::PI).sin_cos();
-                arrow.line_to(-nx * cos + backx * sin, -ny * cos + backy * sin);
-            }
-            arrow.close();
-            stroke.width = (o + gap) * 2.;
-            area = true;
-            arrow.finish()
-        }
-        Shape::Rect(size) => {
-            if a.corner_radius() <= 0. {
-                stroke.line_join = LineJoin::Miter;
-            }
-            frame_path(*size, a.corner_radius())
-        }
-        Shape::Ellipse(size) => tiny_skia::Rect::from_xywh(0., 0., size[0] as f32, size[1] as f32)
-            .and_then(PathBuilder::from_oval),
-        Shape::Pen(points) => match points.as_slice() {
-            // a dot
-            [only] => {
-                area = true;
-                let mut dot = PathBuilder::new();
-                dot.move_to(only[0] as f32, only[1] as f32);
-                dot.line_to(only[0] as f32, only[1] as f32 + 0.01);
-                dot.finish()
-            }
-            points => polyline(points),
-        },
-        Shape::Text(_) | Shape::Redact { .. } | Shape::Stamp(_) => {
-            let Some(b) = a.bounds() else { return vec![] };
-            let by = gap + o;
-            let (l, t, r, b) = (b[0] - by, b[1] - by, b[2] + by, b[3] + by);
-            return vec![vec![[l, t], [r, t], [r, b], [l, b]]];
-        }
-    };
-    let Some(around) = path.and_then(|path| path.stroke(&stroke, resolution)) else {
-        return vec![];
-    };
-    let mut lines = contours(&around);
-    // where it turns, a stroke also goes over itself, inside of what it draws
-    for line in &mut lines {
-        line.retain(|p| !touches(a, Point::from_xy(p[0], p[1]), gap * 0.5));
-        without_sharp_turns(line);
-    }
-    lines.retain(|line| line.len() > 2);
-    if area {
-        // the widest one
-        let extent = |line: &Vec<[f32; 2]>| {
-            let (min, max) = line
-                .iter()
-                .fold(([f32::MAX; 2], [f32::MIN; 2]), |(min, max), p| {
-                    (
-                        [min[0].min(p[0]), min[1].min(p[1])],
-                        [max[0].max(p[0]), max[1].max(p[1])],
-                    )
-                });
-            (max[0] - min[0]) * (max[1] - min[1])
-        };
-        lines.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
-        lines.truncate(1);
-    }
-    lines
-}
-
-/// Takes out the points of a closed line where it turns back, a line drawn through
-/// them would end in a long spike there
-fn without_sharp_turns(line: &mut Vec<[f32; 2]>) {
-    let mut i = 0;
-    let mut kept = 0;
-    // until it went once around without taking any out
-    while line.len() > 2 && kept < line.len() {
-        let n = line.len();
-        let (before, at, after) = (line[(i + n - 1) % n], line[i % n], line[(i + 1) % n]);
-        let (ax, ay) = (at[0] - before[0], at[1] - before[1]);
-        let (bx, by) = (after[0] - at[0], after[1] - at[1]);
-        let (a, b) = (ax.hypot(ay), bx.hypot(by));
-        // twice the same point, or turned by more than about 100°
-        if a < 0.001 || (b >= 0.001 && ax * bx + ay * by < -0.2 * a * b) {
-            line.remove(i % n);
-            kept = 0;
-            // the one before may turn sharply now
-            i = (i + n - 2) % (n - 1);
-        } else {
-            i = (i + 1) % n;
-            kept += 1;
-        }
-    }
-}
-
-/// The lines a path is made of, its curves in short straight pieces
-fn contours(path: &Path) -> Vec<Vec<[f32; 2]>> {
-    let mut lines = vec![];
-    let mut line: Vec<[f32; 2]> = vec![];
-    let mut last = Point::zero();
-    for segment in path.segments() {
-        match segment {
-            tiny_skia::PathSegment::MoveTo(p) => {
-                if line.len() > 1 {
-                    lines.push(std::mem::take(&mut line));
-                }
-                line = vec![[p.x, p.y]];
-                last = p;
-            }
-            tiny_skia::PathSegment::LineTo(p) => {
-                line.push([p.x, p.y]);
-                last = p;
-            }
-            tiny_skia::PathSegment::QuadTo(c, p) => {
-                for i in 1..=8 {
-                    let (t, u) = (i as f32 / 8., 1. - i as f32 / 8.);
-                    line.push([
-                        u * u * last.x + 2. * u * t * c.x + t * t * p.x,
-                        u * u * last.y + 2. * u * t * c.y + t * t * p.y,
-                    ]);
-                }
-                last = p;
-            }
-            tiny_skia::PathSegment::CubicTo(c1, c2, p) => {
-                for i in 1..=8 {
-                    let (t, u) = (i as f32 / 8., 1. - i as f32 / 8.);
-                    line.push([
-                        u * u * u * last.x
-                            + 3. * u * u * t * c1.x
-                            + 3. * u * t * t * c2.x
-                            + t * t * t * p.x,
-                        u * u * u * last.y
-                            + 3. * u * u * t * c1.y
-                            + 3. * u * t * t * c2.y
-                            + t * t * t * p.y,
-                    ]);
-                }
-                last = p;
-            }
-            tiny_skia::PathSegment::Close => {
-                if line.len() > 1 {
-                    lines.push(std::mem::take(&mut line));
-                }
-            }
-        }
-    }
-    if line.len() > 1 {
-        lines.push(line);
-    }
-    lines
 }
 
 /// Whether a point of the edited image is on an annotation, `slack` pixels around
@@ -421,22 +250,9 @@ pub(super) fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
     match &a.shape {
         Shape::Arrow(to) => match arrow_head_corners(*to, a.line_width()) {
             None => to_line([0, 0], *to) <= near,
-            Some([tip, left, right]) => {
-                // the line ends below the head, as it is drawn
-                let length = tip.x.hypot(tip.y);
-                let into = 1. - arrow_head(a.line_width(), length).0 * 0.5 / length;
-                let end = Point::from_xy(tip.x * into, tip.y * into);
-                let sides = [(tip, left), (left, right), (right, tip)];
-                // on the same side of all sides of the head is inside it
-                let turns = sides
-                    .map(|(p0, p1)| (p1.x - p0.x) * (q.y - p0.y) - (p1.y - p0.y) * (q.x - p0.x));
-                segment_distance(q, Point::zero(), end) <= near
-                    || turns.iter().all(|t| *t >= 0.)
-                    || turns.iter().all(|t| *t <= 0.)
-                    || sides
-                        .iter()
-                        .any(|(p0, p1)| segment_distance(q, *p0, *p1) <= slack)
-            }
+            Some([tip, left, right]) => [(Point::zero(), tip), (left, tip), (right, tip)]
+                .iter()
+                .any(|(p0, p1)| segment_distance(q, *p0, *p1) <= near),
         },
         Shape::Rect(size) => {
             let (w, h) = (size[0] as f32, size[1] as f32);
@@ -467,5 +283,19 @@ pub(super) fn touches(a: &Annotation, q: Point, slack: f32) -> bool {
         Shape::Text(_) | Shape::Redact { .. } | Shape::Stamp(_) => a.bounds().is_some_and(|b| {
             q.x >= b[0] - slack && q.y >= b[1] - slack && q.x <= b[2] + slack && q.y <= b[3] + slack
         }),
+        Shape::Counter(_) => {
+            let r = a.width as f32 / 2.;
+            (q.x - r).hypot(q.y - r) <= r + slack
+        }
+        Shape::Spotlight { size, oval } => {
+            let (rx, ry) = (size[0] as f32 / 2., size[1] as f32 / 2.);
+            let (dx, dy) = (q.x - rx, q.y - ry);
+            if *oval {
+                let inside = (dx / rx.max(0.5)).powi(2) + (dy / ry.max(0.5)).powi(2) <= 1.;
+                inside || ellipse_distance(rx, ry, dx, dy) <= slack
+            } else {
+                dx.abs() <= rx + slack && dy.abs() <= ry + slack
+            }
+        }
     }
 }

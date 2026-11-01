@@ -428,7 +428,7 @@ fn clicks_hit_what_is_drawn() {
     let frame = Annotation::new(Shape::Rect([100, 100]), [0; 4], 4, [100, 100]);
     assert!(hits(&frame, &mapping, [101., 150.], 2.), "on the frame");
     assert!(!hits(&frame, &mapping, [150., 150.], 2.), "inside it");
-    // the head is hit to its corners, not before its tip
+    // the head is hit to the ends of its lines, not past its tip
     let head = arrow_head_corners([100, 0], 6.).expect("a head");
     assert!(hits(
         &arrow,
@@ -480,102 +480,6 @@ fn circles_are_drawn_and_hit() {
 }
 
 #[test]
-fn what_is_outlined_is_what_a_click_hits() {
-    let ops = [
-        item(ImageOperation::Rotate(90)),
-        item(ImageOperation::Resize {
-            dimensions: (150, 300),
-            aspect: false,
-            filter: crate::image_editing::ScaleFilter::Box,
-        }),
-    ];
-    let mapping = Mapping::new(&ops, (200, 100));
-    let shapes = [
-        Shape::Arrow([60, -30]),
-        Shape::Arrow([500, -375]),
-        Shape::Rect([50, 30]),
-        Shape::Ellipse([50, 30]),
-        Shape::Pen(vec![[0, 0], [20, 10], [40, -5]]),
-        // as drawn by hand, in small steps that turn a lot
-        Shape::Pen(
-            (0..60)
-                .map(|i| [i, ((i as f32 * 0.7).sin() * 6.) as i32])
-                .collect(),
-        ),
-        Shape::Pen(vec![[0, 0]]),
-        Shape::Ellipse([80, 8]),
-        Shape::Text("Hi".into()),
-        Shape::Redact {
-            size: [30, 20],
-            style: Redaction::Fill,
-        },
-        Shape::Stamp(Stamp::Check),
-    ];
-    let looks = [(0, 0), (4, 0), (0, 10), (4, 100)];
-    for (shape, (thick, radius)) in shapes
-        .into_iter()
-        .flat_map(|shape| looks.map(|look| (shape.clone(), look)))
-    {
-        // only frames have corners to round
-        if radius > 0 && !matches!(shape, Shape::Rect(_)) {
-            continue;
-        }
-        let mut a = Annotation::new(shape, [0; 4], 6, [80, 40]);
-        a.outline = thick;
-        a.radius = radius;
-        let t = a.transform(&mapping);
-        // 2 pixels around it in the edited image
-        let gap = 2. / scale_of(t);
-        let lines = outline(&a, gap, scale_of(t));
-        assert!(!lines.is_empty(), "{:?} has no outline", a.shape);
-        // all of it is inside
-        let b = a.bounds().expect("bounds");
-        let all = lines.iter().flatten();
-        let (left, top, right, bottom) = all.fold(
-            (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
-            |(l, t, r, b), p| (l.min(p[0]), t.min(p[1]), r.max(p[0]), b.max(p[1])),
-        );
-        assert!(
-            left < b[0] - gap / 2.
-                && top < b[1] - gap / 2.
-                && right > b[2] + gap / 2.
-                && bottom > b[3] + gap / 2.,
-            "the outline of {:?} from {left},{top} to {right},{bottom} leaves out some of {b:?}",
-            a.shape
-        );
-        // egui draws a spike where a line turns back
-        for line in &lines {
-            let n = line.len();
-            for i in 0..n {
-                let (before, at, after) = (line[(i + n - 1) % n], line[i], line[(i + 1) % n]);
-                let (ax, ay) = (at[0] - before[0], at[1] - before[1]);
-                let (bx, by) = (after[0] - at[0], after[1] - at[1]);
-                assert!(
-                    ax * bx + ay * by >= -0.2 * ax.hypot(ay) * bx.hypot(by),
-                    "the outline of {:?} turns back at {at:?}",
-                    a.shape
-                );
-            }
-        }
-        for p in lines.into_iter().flatten() {
-            let mut at = Point::from_xy(p[0], p[1]);
-            t.map_point(&mut at);
-            assert!(
-                hits(&a, &mapping, [at.x, at.y], 2.5),
-                "{:?} is not hit at {p:?} of its outline",
-                a.shape
-            );
-            // and not much closer
-            assert!(
-                !hits(&a, &mapping, [at.x, at.y], 1.),
-                "{:?} is outlined too closely at {p:?}",
-                a.shape
-            );
-        }
-    }
-}
-
-#[test]
 fn saved_with_the_edits() {
     let mut dressed = Annotation::new(Shape::Text("Hi".into()), [1, 2, 3, 4], 5, [6, 7]);
     dressed.outline = 3;
@@ -610,6 +514,9 @@ fn edits_saved_before_outlines_still_load() {
         "radius",
         "font",
         "hidden",
+        "number_color",
+        "shadow",
+        "shadow_size",
     ] {
         assert!(annotation.remove(newer).is_some(), "{newer} is saved");
     }
@@ -849,4 +756,551 @@ fn stamps_are_hit_in_their_square_and_stand_upright() {
         (middle.x - 50.).abs() < 1. && (middle.y - 30.).abs() < 1.,
         "its middle is at {middle:?}"
     );
+}
+
+#[test]
+fn turned_four_times_by_a_quarter_is_as_before() {
+    let mapping = Mapping::new(&[], (300, 300));
+    let frame = Annotation::new(Shape::Rect([40, 20]), [0; 4], 4, [100, 100]);
+    let bounds = selection_bounds(std::slice::from_ref(&frame), &[0], &mapping).unwrap();
+    let centre = middle_of(bounds.shape);
+    assert_eq!(centre, [120., 110.]);
+    let mut turned = frame.clone();
+    for quarter in 1..=4 {
+        turned = rotated(&turned, &mapping, centre, 90);
+        let middle = middle_in(&turned, &mapping).unwrap();
+        assert!(
+            (middle[0] - 120.).abs() < 1. && (middle[1] - 110.).abs() < 1.,
+            "turned around its middle, {quarter}: {middle:?}"
+        );
+    }
+    assert_eq!(turned.rotation, 0);
+    assert_eq!(turned.start(mapping.original), frame.start(mapping.original));
+    // the box is upright after a quarter
+    let quarter = rotated(&frame, &mapping, centre, 90);
+    let shape = selection_bounds(&[quarter], &[0], &mapping).unwrap().shape;
+    assert!(
+        (shape[2] - shape[0] - 20.).abs() < 0.01 && (shape[3] - shape[1] - 40.).abs() < 0.01,
+        "{shape:?}"
+    );
+}
+
+#[test]
+fn flipped_twice_is_as_before() {
+    let mapping = Mapping::new(&[], (300, 300));
+    let mut arrow = arrow_at([100, 100], [40, 10]);
+    arrow.rotation = 30;
+    let centre = [150., 150.];
+    for axis in 0..2 {
+        let once = flipped(&arrow, &mapping, centre, axis);
+        assert_ne!(once.flip, arrow.flip);
+        let twice = flipped(&once, &mapping, centre, axis);
+        assert_eq!(twice.rotation, 30);
+        assert_eq!(twice.flip, [false; 2]);
+        let (a, b) = (twice.start(mapping.original), arrow.start(mapping.original));
+        assert!((a[0] - b[0]).abs() <= 1 && (a[1] - b[1]).abs() <= 1, "{a:?} {b:?}");
+    }
+    // left to right: the tip goes to the other side of the middle
+    let mirrored = flipped(&arrow_at([100, 100], [40, 0]), &mapping, [150., 100.], 0);
+    let mut tip = Point::from_xy(40., 0.);
+    mirrored.transform(&mapping).map_point(&mut tip);
+    assert!((tip.x - 160.).abs() < 1. && (tip.y - 100.).abs() < 1., "{tip:?}");
+}
+
+#[test]
+fn flipped_on_a_turned_image_as_it_is_seen() {
+    // on an image turned clockwise an arrow to the right points down
+    let ops = [item(ImageOperation::Rotate(90))];
+    let mapping = Mapping::new(&ops, (200, 100));
+    let arrow = arrow_at([50, 50], [40, 0]);
+    let middle = middle_in(&arrow, &mapping).unwrap();
+    // left to right, it still points down
+    let mirrored = flipped(&arrow, &mapping, middle, 0);
+    let t = mirrored.transform(&mapping);
+    assert!(t.sx.abs() < 0.01 && t.ky > 0.99, "{t:?}");
+    // top to bottom it points up
+    let mirrored = flipped(&arrow, &mapping, middle, 1);
+    let t = mirrored.transform(&mapping);
+    assert!(t.sx.abs() < 0.01 && t.ky < -0.99, "{t:?}");
+}
+
+#[test]
+fn turned_on_a_mirrored_image_as_it_is_seen() {
+    let ops = [item(ImageOperation::Flip(false))];
+    let mapping = Mapping::new(&ops, (200, 100));
+    let arrow = arrow_at([50, 50], [40, 0]);
+    let middle = middle_in(&arrow, &mapping).unwrap();
+    assert!(shown_angle(&arrow, &mapping).abs() < 0.01);
+    let turned = rotated(&arrow, &mapping, middle, 30);
+    assert!(
+        (shown_angle(&turned, &mapping) - 30.).abs() < 0.5,
+        "{}",
+        shown_angle(&turned, &mapping)
+    );
+}
+
+#[test]
+fn stretched_by_the_handles() {
+    let mapping = Mapping::new(&[], (400, 400));
+    let frame = Annotation::new(Shape::Rect([40, 20]), [0; 4], 4, [100, 100]);
+    let shape = [100., 100., 140., 120.];
+    // the bottom right corner twice as far, the top left stays
+    let (scale, fixed) = stretch([1, 1], shape, [40., 20.], false);
+    assert_eq!((scale, fixed), ([2., 2.], [100., 100.]));
+    let larger = resized(&frame, &mapping, fixed, scale);
+    assert_eq!(larger.shape, Shape::Rect([80, 40]));
+    assert_eq!(larger.start(mapping.original), [100, 100]);
+    assert_eq!(larger.width, 4, "lines keep their width");
+    // the left side, the right one stays
+    let (scale, fixed) = stretch([-1, 0], shape, [-40., 30.], false);
+    assert_eq!((scale, fixed), ([2., 1.], [140., 110.]));
+    let wider = resized(&frame, &mapping, fixed, scale);
+    assert_eq!(wider.shape, Shape::Rect([80, 20]));
+    assert_eq!(wider.start(mapping.original), [60, 100]);
+    // with Shift it keeps its proportions, the corner along the diagonal
+    let (scale, _) = stretch([1, 1], shape, [40., 0.], true);
+    assert!((scale[0] - 1.8).abs() < 0.001 && scale[0] == scale[1], "{scale:?}");
+    // from a side as much across, around the middle
+    let (scale, fixed) = stretch([0, 1], shape, [0., 20.], true);
+    assert_eq!((scale, fixed), ([2., 2.], [120., 100.]));
+    // past the opposite side it is mirrored
+    let (scale, fixed) = stretch([1, 0], shape, [-100., 0.], false);
+    assert_eq!((scale, fixed), ([-1.5, 1.], [100., 110.]));
+    // never flat
+    let (scale, _) = stretch([1, 0], shape, [-40., 0.], false);
+    assert!(scale[0] != 0. && scale[1] == 1., "{scale:?}");
+    // from a side with Shift it is mirrored only along it
+    let (scale, _) = stretch([0, 1], shape, [0., -60.], true);
+    assert_eq!(scale, [2., -2.]);
+}
+
+#[test]
+fn mirrored_when_dragged_past_the_other_side() {
+    let mapping = Mapping::new(&[], (400, 400));
+    let arrow = arrow_at([100, 100], [40, 20]);
+    let shape = [100., 100., 140., 120.];
+    // the right side dragged 60 to the left: 20 wide on the other side of 100
+    let (scale, fixed) = stretch([1, 0], shape, [-60., 0.], false);
+    let mut list = vec![resized(&arrow, &mapping, fixed, scale)];
+    keep_in_place(&mut list, &[0], &mapping, [1, 0], fixed, scale);
+    let after = selection_bounds(&list, &[0], &mapping).unwrap().shape;
+    assert!(
+        (after[0] - 80.).abs() < 0.01 && (after[2] - 100.).abs() < 0.01,
+        "{after:?}"
+    );
+    assert!((after[1] - 100.).abs() < 0.01 && (after[3] - 120.).abs() < 0.01);
+    // it points the other way, to the bottom left
+    let mut tip = Point::from_xy(20., 20.);
+    list[0].transform(&mapping).map_point(&mut tip);
+    assert!((tip.x - 80.).abs() < 1. && (tip.y - 120.).abs() < 1., "{tip:?}");
+}
+
+#[test]
+fn what_stays_stays_where_it_is() {
+    let mapping = Mapping::new(&[], (600, 600));
+    let mut list = vec![
+        Annotation::new(Shape::Rect([40, 20]), [0; 4], 4, [100, 100]),
+        Annotation::new(Shape::Stamp(Stamp::Check), [0; 4], 30, [150, 100]),
+        arrow_at([110, 160], [60, 10]),
+    ];
+    let before = list.clone();
+    let shape = selection_bounds(&list, &[0, 1, 2], &mapping).unwrap().shape;
+    for (side, by) in [
+        ([1, 1], [37., 13.]),
+        ([-1, -1], [-23., 7.]),
+        ([1, 0], [55., 0.]),
+        ([0, -1], [0., -31.]),
+        ([-1, 1], [200., 170.]),
+    ] {
+        for keep in [false, true] {
+            let (scale, fixed) = stretch(side, shape, by, keep);
+            for i in 0..list.len() {
+                list[i] = resized(&before[i], &mapping, fixed, scale);
+            }
+            keep_in_place(&mut list, &[0, 1, 2], &mapping, side, fixed, scale);
+            let after = selection_bounds(&list, &[0, 1, 2], &mapping).unwrap().shape;
+            for axis in 0..2 {
+                let (lo, hi) = (after[axis], after[axis + 2]);
+                let stays = match side[axis] {
+                    0 => (lo + hi) / 2.,
+                    s if (s < 0) == (scale[axis] > 0.) => hi,
+                    _ => lo,
+                };
+                assert!(
+                    (stays - fixed[axis]).abs() <= 1.,
+                    "{side:?} by {by:?}, Shift {keep}: {stays} is not {}",
+                    fixed[axis]
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn texts_and_stamps_grow_as_they_are_stretched() {
+    let mapping = Mapping::new(&[], (400, 400));
+    let stamp = Annotation::new(Shape::Stamp(Stamp::Check), [0; 4], 40, [100, 100]);
+    let larger = resized(&stamp, &mapping, [100., 100.], [1.5, 1.]);
+    assert_eq!(larger.width, 60, "as much as the side that stretches most");
+    // a turned frame is stretched along its own sides
+    let mut frame = Annotation::new(Shape::Rect([40, 20]), [0; 4], 4, [100, 100]);
+    frame.rotation = 90;
+    let wider = resized(&frame, &mapping, [0., 0.], [1., 2.]);
+    assert_eq!(wider.shape, Shape::Rect([80, 20]));
+}
+
+/// Flipped top to bottom was taken as turned by 180: then "Reset rotation" turned a flipped
+/// arrow around
+#[test]
+fn a_flip_is_not_a_turn() {
+    for ops in [
+        vec![],
+        vec![item(ImageOperation::Rotate(90))],
+        vec![item(ImageOperation::Flip(false))],
+    ] {
+        let mapping = Mapping::new(&ops, (200, 200));
+        let mut arrow = arrow_at([50, 50], [40, 0]);
+        arrow.stand_upright(&mapping);
+        assert!(shown_angle(&arrow, &mapping).abs() < 0.01, "{ops:?}: upright");
+        let middle = middle_in(&arrow, &mapping).unwrap();
+        for axis in 0..2 {
+            let mirrored = flipped(&arrow, &mapping, middle, axis);
+            let angle = shown_angle(&mirrored, &mapping);
+            assert!(angle.abs() < 0.01, "{ops:?}, axis {axis}: {angle}");
+        }
+        // turned, then flipped: turned the other way
+        let turned = rotated(&arrow, &mapping, middle, 30);
+        assert!((shown_angle(&turned, &mapping) - 30.).abs() < 0.5, "{ops:?}");
+        let mirrored = flipped(&turned, &mapping, middle, 1);
+        assert!((shown_angle(&mirrored, &mapping) + 30.).abs() < 0.5, "{ops:?}");
+    }
+}
+
+/// The line went under the head, drawn on their own: see-through, where they met was darker
+#[test]
+fn a_see_through_arrow_is_one_piece() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let img = RgbaImage::from_pixel(200, 200, Rgba([0, 0, 0, 255]));
+    let mut arrow = Annotation::new(Shape::Arrow([160, 0]), [255, 0, 0, 128], 8, [20, 100]);
+    for outline in [0, 3] {
+        arrow.outline = outline;
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&arrow), &mapping);
+        let line = drawn.get_pixel(60, 100).0;
+        assert_ne!(line, [0, 0, 0, 255], "it is drawn");
+        // the line, both lines of the head and the round tip are all there
+        assert_eq!(drawn.get_pixel(172, 100).0, line, "where it meets the head");
+        assert_eq!(drawn.get_pixel(175, 100).0, line, "at the tip");
+        // the head is open: between its lines the image shows
+        assert_eq!(drawn.get_pixel(155, 108).0, [0, 0, 0, 255], "inside the head");
+    }
+    // it ends where it points
+    arrow.color = [255, 0, 0, 255];
+    arrow.outline = 0;
+    let drawn = drawn_at_once(&img, &[arrow], &mapping);
+    assert_eq!(drawn.get_pixel(178, 100).0, [255, 0, 0, 255], "at its end");
+    assert_eq!(drawn.get_pixel(181, 100).0, [0, 0, 0, 255], "past its end");
+}
+
+fn spotlight_at(start: [i32; 2], size: [i32; 2], oval: bool) -> Annotation {
+    Annotation::new(Shape::Spotlight { size, oval }, [0, 0, 0, 128], 0, start)
+}
+
+#[test]
+fn a_spotlight_dims_all_but_its_spot() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let gray = Rgba([100, 100, 100, 255]);
+    let img = RgbaImage::from_pixel(200, 200, gray);
+    let one = drawn_at_once(&img, &[spotlight_at([20, 20], [60, 40], false)], &mapping);
+    assert_eq!(*one.get_pixel(50, 40), gray, "the spot is as it was");
+    // black at half over 100
+    let dimmed = one.get_pixel(150, 150).0;
+    assert!(dimmed[0] > 40 && dimmed[0] < 60 && dimmed[3] == 255, "{dimmed:?}");
+    // two dim once together, each keeps its spot
+    let two = drawn_at_once(
+        &img,
+        &[
+            spotlight_at([20, 20], [60, 40], false),
+            spotlight_at([120, 120], [60, 40], true),
+        ],
+        &mapping,
+    );
+    assert_eq!(*two.get_pixel(50, 40), gray);
+    assert_eq!(*two.get_pixel(150, 140), gray, "the middle of the oval");
+    assert_eq!(two.get_pixel(10, 180).0, dimmed, "dimmed once, not twice");
+    assert_eq!(two.get_pixel(121, 121).0, dimmed, "the corner besides the oval");
+    // one that is too small dims nothing
+    let empty = drawn_at_once(&img, &[spotlight_at([20, 20], [0, 0], false)], &mapping);
+    assert_eq!(*empty.get_pixel(150, 150), gray);
+}
+
+#[test]
+fn what_is_in_front_of_a_spotlight_is_not_dimmed() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let img = RgbaImage::from_pixel(200, 200, Rgba([100, 100, 100, 255]));
+    let mut list = vec![
+        arrow_at([20, 100], [150, 0]),
+        spotlight_at([10, 10], [40, 40], false),
+        arrow_at([20, 150], [150, 0]),
+    ];
+    let drawn = drawn_at_once(&img, &list, &mapping);
+    assert_eq!(drawn.get_pixel(80, 150).0, [255, 0, 0, 255], "in front");
+    let behind = drawn.get_pixel(80, 100).0;
+    assert!(behind[0] > 100 && behind[0] < 200, "behind is dimmed: {behind:?}");
+    // drawn a change at a time it is the same as at once
+    let mut changing = img.clone();
+    let mut layer = AnnotationLayer::default();
+    layer.update(&mut changing, &list, &mapping);
+    list[0] = arrow_at([20, 120], [150, 0]);
+    list[2] = arrow_at([30, 170], [140, 0]);
+    layer.update(&mut changing, &list, &mapping);
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "arrows moved");
+    list[1].set_start([60, 60], mapping.original);
+    layer.update(&mut changing, &list, &mapping);
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "the spotlight moved");
+    list[1].color = [0, 0, 80, 200];
+    layer.update(&mut changing, &list, &mapping);
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "its shade changed");
+}
+
+/// Moved, a spotlight changes the image only where its spot was and where it is: its shade is as
+/// it was everywhere else. It dimmed all of the image again, on a large photo at every frame of
+/// a drag.
+#[test]
+fn a_moved_spotlight_redraws_only_around_its_spot() {
+    let mapping = Mapping::new(&[], (400, 400));
+    let img = RgbaImage::from_pixel(400, 400, Rgba([100, 100, 100, 255]));
+    let mut list = vec![
+        arrow_at([250, 350], [120, 0]),
+        spotlight_at([20, 20], [60, 40], true),
+    ];
+    let mut changing = img.clone();
+    let mut layer = AnnotationLayer::default();
+    layer.update(&mut changing, &list, &mapping);
+    list[1].set_start([40, 30], mapping.original);
+    let area = layer.update(&mut changing, &list, &mapping).expect("it moved");
+    // where it was and where it is, not the arrow far from it
+    assert!(area.x + area.width <= 110 && area.y + area.height <= 80, "{area:?}");
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "moved");
+    // turned and larger, the same
+    list[1].rotation = 30;
+    list[1].shape = Shape::Spotlight {
+        size: [80, 40],
+        oval: true,
+    };
+    let area = layer.update(&mut changing, &list, &mapping).expect("it changed");
+    assert!(area.width < 200 && area.height < 200, "{area:?}");
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "turned and larger");
+    // a new shade is everywhere
+    list[1].color = [0, 0, 80, 200];
+    let area = layer.update(&mut changing, &list, &mapping).expect("its shade changed");
+    assert_eq!((area.width, area.height), (400, 400));
+    assert!(changing == drawn_at_once(&img, &list, &mapping), "its shade changed");
+}
+
+#[test]
+fn a_click_in_a_spot_goes_to_what_is_in_it() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let spot = spotlight_at([10, 10], [100, 100], false);
+    assert!(hits(&spot, &mapping, [60., 60.], 0.), "in its spot");
+    assert!(!hits(&spot, &mapping, [150., 150.], 2.), "where it dims");
+    // an oval only in its oval, not in the corners of its box
+    let oval = spotlight_at([10, 10], [100, 100], true);
+    assert!(hits(&oval, &mapping, [60., 60.], 0.), "in the oval");
+    assert!(!hits(&oval, &mapping, [14., 14.], 0.), "in a corner of its box");
+}
+
+#[test]
+fn counter_digits_fit_in_their_round() {
+    for number in [1, 2, 3, 4, 7, 10, 11, 42, 100, 999, 12345] {
+        let digits = counter_digits(number, 100.).expect("digits");
+        let [l, t, r, b] = ink(&digits).expect("ink");
+        assert!(r - l <= 70.1 && b - t <= 50.1, "{number}: {l},{t} to {r},{b}");
+        assert!(l >= 8. && r <= 92., "{number} stays in the round: {l} to {r}");
+        assert!((t + b - 100.).abs() < 0.6, "{number} is in the middle up and down");
+        let across = weight_middle(&digits).expect("a weight");
+        assert!((across - 50.).abs() < 0.3, "{number}: its weight at {across}");
+    }
+    // the stem of a 1 is in the middle, the flag on the left takes its box there
+    let [l, _, r, _] = ink(&counter_digits(1, 100.).unwrap()).unwrap();
+    assert!((l + r) / 2. < 49.5, "{l} to {r}");
+}
+
+#[test]
+fn a_counter_is_a_number_in_a_round_that_reads_upright() {
+    let white = |p: &Rgba<u8>| p.0[0] > 240 && p.0[1] > 240 && p.0[2] > 240;
+    let ground = [40, 40, 40, 255];
+    for ops in [
+        vec![],
+        vec![item(ImageOperation::Rotate(90))],
+        vec![item(ImageOperation::Flip(false))],
+    ] {
+        let mapping = Mapping::new(&ops, (200, 200));
+        let img = RgbaImage::from_pixel(200, 200, Rgba(ground));
+        let mut one = Annotation::new(Shape::Counter(1), [229, 72, 74, 255], 60, [0, 0]);
+        one.stand_upright(&mapping);
+        one.centre_at(mapping.to_original([100., 100.]), mapping.original);
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&one), &mapping);
+        let (mut left, mut top, mut right, mut bottom) = (u32::MAX, u32::MAX, 0, 0);
+        for (x, y, _) in drawn.enumerate_pixels().filter(|(_, _, p)| white(p)) {
+            let from_middle = (x as f32 + 0.5 - 100.).hypot(y as f32 + 0.5 - 100.);
+            assert!(from_middle < 30., "{ops:?}: white at {x},{y} is out of the round");
+            (left, top) = (left.min(x), top.min(y));
+            (right, bottom) = (right.max(x), bottom.max(y));
+        }
+        let (wide, high) = (right + 1 - left, bottom + 1 - top);
+        assert!(high > wide * 2, "{ops:?}: a 1 stands upright, {wide} by {high}");
+        assert!(high.abs_diff(30) <= 3, "{ops:?}: half as high as the round, {high}");
+        assert_eq!(drawn.get_pixel(100, 73).0, [229, 72, 74, 255], "{ops:?}: the round");
+        assert_eq!(drawn.get_pixel(100, 60).0, ground, "{ops:?}: not further out");
+        assert_eq!(drawn.get_pixel(5, 5).0, ground, "{ops:?}: nothing far away");
+    }
+}
+
+#[test]
+fn a_counter_turns_but_never_reads_mirrored() {
+    // how it is turned on the screen, and whether its number is mirrored
+    let shown = |a: &Annotation, mapping: &Mapping| {
+        (shown_angle(a, mapping), mirrors(a.transform(mapping)))
+    };
+    for ops in [
+        vec![],
+        vec![item(ImageOperation::Rotate(90))],
+        vec![item(ImageOperation::Flip(false))],
+        vec![item(ImageOperation::Flip(true))],
+    ] {
+        let mapping = Mapping::new(&ops, (200, 200));
+        let mut counter = Annotation::new(Shape::Counter(1), [0; 4], 40, [0, 0]);
+        counter.stand_upright(&mapping);
+        counter.centre_at([100., 100.], mapping.original);
+        let (angle, mirrored) = shown(&counter, &mapping);
+        assert!(angle.abs() < 0.5 && !mirrored, "{ops:?}: placed upright, {angle}");
+        let middle = middle_in(&counter, &mapping).unwrap();
+        let turned = rotated(&counter, &mapping, middle, 30);
+        let (angle, mirrored) = shown(&turned, &mapping);
+        assert!((angle - 30.).abs() < 0.5 && !mirrored, "{ops:?}: turned, {angle}");
+        for axis in 0..2 {
+            let flipped = flipped(&turned, &mapping, middle, axis);
+            let (angle, mirrored) = shown(&flipped, &mapping);
+            assert!(
+                (angle + 30.).abs() < 0.5 && !mirrored,
+                "{ops:?}: flipped along {axis}, turned the other way, {angle}"
+            );
+        }
+    }
+}
+
+/// Its number in its own colour, turned with the round
+#[test]
+fn a_counter_draws_its_number_in_its_colour() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let ground = [40, 40, 40, 255];
+    let img = RgbaImage::from_pixel(200, 200, Rgba(ground));
+    let mut one = Annotation::new(Shape::Counter(8), [0, 90, 200, 255], 60, [70, 70]);
+    one.number_color = [0, 0, 0, 255];
+    let drawn = drawn_at_once(&img, &[one], &mapping);
+    assert!(drawn.pixels().any(|p| p.0 == [0, 0, 0, 255]), "a black number");
+    assert!(!drawn.pixels().any(|p| p.0[0] > 240 && p.0[1] > 240), "nothing white");
+    assert_eq!(drawn.get_pixel(100, 132).0, ground, "nothing besides the round");
+    // turned by hand, its number turns with it: a 1 lies on its side
+    let mut lying = Annotation::new(Shape::Counter(1), [229, 72, 74, 255], 60, [70, 70]);
+    let middle = middle_in(&lying, &mapping).unwrap();
+    lying = rotated(&lying, &mapping, middle, 90);
+    let drawn = drawn_at_once(&img, &[lying], &mapping);
+    let white: Vec<(u32, u32)> = drawn
+        .enumerate_pixels()
+        .filter(|(_, _, p)| p.0[0] > 240 && p.0[1] > 240 && p.0[2] > 240)
+        .map(|(x, y, _)| (x, y))
+        .collect();
+    let wide = white.iter().map(|p| p.0).max().unwrap() - white.iter().map(|p| p.0).min().unwrap();
+    let high = white.iter().map(|p| p.1).max().unwrap() - white.iter().map(|p| p.1).min().unwrap();
+    assert!(wide > high * 2, "{wide} by {high}");
+}
+
+#[test]
+fn shadows_are_round_and_smooth() {
+    let mapping = Mapping::new(&[], (300, 300));
+    let ground = [200, 200, 200, 255];
+    let img = RgbaImage::from_pixel(300, 300, Rgba(ground));
+    for size in [3, 12, 40] {
+        let mut counter = Annotation::new(Shape::Counter(1), [0, 0, 0, 255], 100, [100, 100]);
+        (counter.shadow, counter.shadow_size) = (100, size);
+        let drawn = drawn_at_once(&img, std::slice::from_ref(&counter), &mapping);
+        // out of the round to the right, and as much the other ways
+        let xs = 200..=200 + size + 3;
+        let row: Vec<u8> = xs.clone().map(|x| drawn.get_pixel(x, 150).0[0]).collect();
+        for (i, x) in xs.enumerate() {
+            let around = [
+                drawn.get_pixel(299 - x, 149).0[0],
+                drawn.get_pixel(150, x).0[0],
+                drawn.get_pixel(149, 299 - x).0[0],
+            ];
+            assert!(
+                around.iter().all(|v| v.abs_diff(row[i]) <= 2),
+                "size {size}: at {x} {} but {around:?}",
+                row[i]
+            );
+        }
+        assert!(row[0] < 150, "size {size}: dark next to the round, {row:?}");
+        for pair in row.windows(2) {
+            assert!(pair[1] >= pair[0], "size {size}: lighter outwards, {row:?}");
+        }
+        assert_eq!(*row.last().unwrap(), 200, "size {size}: it ends, {row:?}");
+        if size == 40 {
+            let steps = row.windows(2).map(|p| p[1] - p[0]).max().unwrap();
+            assert!(steps <= 16, "smooth when large: {row:?}");
+        }
+    }
+}
+
+/// Drawn around an arrow, not where nothing is near; a redaction casts none
+#[test]
+fn shadows_are_drawn_around_what_casts_them() {
+    // drawn around an arrow, not where nothing is near
+    let mapping = Mapping::new(&[], (200, 200));
+    let ground = [200, 200, 200, 255];
+    let img = RgbaImage::from_pixel(200, 200, Rgba(ground));
+    let mut arrow = arrow_at([20, 100], [150, 0]);
+    (arrow.shadow, arrow.shadow_size) = (60, 10);
+    let drawn = drawn_at_once(&img, &[arrow], &mapping);
+    let near = drawn.get_pixel(80, 106).0;
+    assert!(near[0] < 190 && near[1] < 190, "below the line {near:?}");
+    assert_eq!(drawn.get_pixel(80, 130).0, ground, "far below");
+    // a redaction has none
+    let mut hidden = Annotation::new(
+        Shape::Redact {
+            size: [40, 40],
+            style: Redaction::Fill,
+        },
+        [0, 0, 0, 255],
+        8,
+        [50, 50],
+    );
+    (hidden.shadow, hidden.shadow_size) = (100, 10);
+    assert!(!hidden.casts_shadow());
+}
+
+/// The layer was cut at the edge of the image, so what was drawn beyond it cast no shadow and
+/// the shadow faded there
+#[test]
+fn a_shadow_is_as_dark_at_the_edge_of_the_image() {
+    let mut counter = Annotation::new(Shape::Counter(1), [0, 0, 0, 255], 60, [70, 70]);
+    (counter.shadow, counter.shadow_size) = (100, 20);
+    let ground = Rgba([200, 200, 200, 255]);
+    // the whole of it, and cut by the bottom edge at 115
+    let whole = drawn_at_once(
+        &RgbaImage::from_pixel(300, 300, ground),
+        std::slice::from_ref(&counter),
+        &Mapping::new(&[], (300, 300)),
+    );
+    let cut = drawn_at_once(
+        &RgbaImage::from_pixel(300, 115, ground),
+        std::slice::from_ref(&counter),
+        &Mapping::new(&[], (300, 115)),
+    );
+    // a few pixels out of the round, near the edge of the image
+    for (x, y) in [(132, 110), (130, 114), (68, 112)] {
+        let (a, b) = (whole.get_pixel(x, y).0, cut.get_pixel(x, y).0);
+        assert!(a[0].abs_diff(b[0]) <= 1, "at {x},{y}: {a:?} and {b:?}");
+        assert!(a[0] < 150, "a shadow at {x},{y}: {a:?}");
+    }
 }

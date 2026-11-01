@@ -230,6 +230,12 @@ pub fn selection_colors(ui: &Ui) -> (Color32, Color32) {
     selected_colors(accent_color(ui.ctx()), ui.visuals().dark_mode)
 }
 
+/// `t` of the way from `from` to `to`, from 0 to 1: a colour that changes over a moment, as a
+/// handle under the mouse turns red
+pub fn fade(from: Color32, to: Color32, t: f32) -> Color32 {
+    from.lerp_to_gamma(to, t)
+}
+
 /// The gray furthest in brightness from `value` so that it stands out on that colour.
 pub fn contrast_gray(value: u8) -> Color32 {
     Color32::from_gray(255 - value)

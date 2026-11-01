@@ -12,18 +12,22 @@ pub enum Tool {
     Text,
     Pen,
     Redact,
+    Spotlight,
+    Counter,
     Stamp(Stamp),
 }
 
 impl Tool {
     /// Those that draw, a tile each
-    pub(super) const ALL: [Tool; 6] = [
+    pub(super) const ALL: [Tool; 8] = [
         Tool::Arrow,
         Tool::Frame,
         Tool::Circle,
         Tool::Text,
         Tool::Pen,
         Tool::Redact,
+        Tool::Spotlight,
+        Tool::Counter,
     ];
 
     pub(super) fn name(self) -> &'static str {
@@ -35,6 +39,8 @@ impl Tool {
             Tool::Text => "Text",
             Tool::Pen => "Pen",
             Tool::Redact => "Redact",
+            Tool::Spotlight => "Spotlight",
+            Tool::Counter => "Counter",
             Tool::Stamp(stamp) => stamp.name(),
         }
     }
@@ -48,6 +54,8 @@ impl Tool {
             Tool::Text => "Click where the text goes, click a text to change it",
             Tool::Pen => "Draw freely",
             Tool::Redact => "Drag over what nobody should see",
+            Tool::Spotlight => "Drag over what to show, the rest is dimmed, with Shift a square",
+            Tool::Counter => "Click where the next number goes or drag how large",
             Tool::Stamp(_) => {
                 "Click where it goes or drag how large, right-click for another symbol"
             }
@@ -63,6 +71,8 @@ impl Tool {
             Tool::Text => Icon::Text,
             Tool::Pen => Icon::Pen,
             Tool::Redact => Icon::Pixelate,
+            Tool::Spotlight => Icon::Spotlight,
+            Tool::Counter => Icon::Counter,
             Tool::Stamp(stamp) => Icon::Stamp(stamp),
         }
     }
@@ -79,6 +89,8 @@ pub(super) enum Icon {
     Pen,
     Pixelate,
     Fill,
+    Spotlight,
+    Counter,
     Stamp(Stamp),
 }
 
@@ -100,12 +112,14 @@ pub(super) fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, 
             );
         }
         Icon::Arrow => {
-            painter.line_segment([at(2.5, 13.5), at(10., 6.)], stroke);
-            painter.add(egui::Shape::convex_polygon(
-                vec![at(13.5, 2.5), at(11.4, 8.9), at(7.1, 4.6)],
-                color,
-                Stroke::NONE,
+            painter.line_segment([at(2.5, 13.5), at(13., 3.)], stroke);
+            painter.add(egui::Shape::line(
+                vec![at(7., 3.), at(13., 3.), at(13., 9.)],
+                stroke,
             ));
+            for end in [at(2.5, 13.5), at(7., 3.), at(13., 3.), at(13., 9.)] {
+                painter.circle_filled(end, stroke.width / 2., color);
+            }
         }
         Icon::Frame => {
             painter.rect_stroke(square, 1., stroke, egui::StrokeKind::Middle);
@@ -150,6 +164,16 @@ pub(super) fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, 
         }
         Icon::Fill => {
             painter.rect_filled(square, 1., color);
+        }
+        Icon::Counter => {
+            painter.circle_stroke(at(8., 8.), 5.8 * scale, stroke);
+            let thin = Stroke::new(1.4 * scale, color);
+            painter.line_segment([at(8.6, 5.), at(8.6, 11.)], thin);
+            painter.line_segment([at(8.6, 5.), at(6.8, 6.5)], thin);
+        }
+        Icon::Spotlight => {
+            painter.rect_filled(square, 1., opacity(color, Opacity::Light));
+            painter.circle_filled(at(8., 8.), 3.4 * scale, color);
         }
         Icon::Stamp(stamp) => {
             painter.text(

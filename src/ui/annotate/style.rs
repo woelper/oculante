@@ -19,6 +19,17 @@ pub struct Style {
     font: Font,
     blocks: u32,
     redact_color: [u8; 4],
+    /// Of all new ones but redactions and spotlights, off at first: how dark at the edge and
+    /// how far out, as wide as a line is twice once an image tells
+    shadow: u32,
+    shadow_size: u32,
+    /// Of new counters: their size when they are clicked, not dragged, and of their number
+    pub(super) counter_size: u32,
+    number_color: [u8; 4],
+    /// Of new spotlights
+    shade: [u8; 4],
+    spot_oval: bool,
+    spot_radius: u32,
 }
 
 impl Default for Style {
@@ -35,6 +46,14 @@ impl Default for Style {
             font: Font::default(),
             blocks: 0,
             redact_color: [0, 0, 0, 255],
+            // the rest of the image at a quarter of how bright it was
+            shade: opacity(BLACK, Opacity::Strong).to_srgba_unmultiplied(),
+            spot_oval: false,
+            spot_radius: 0,
+            counter_size: 0,
+            number_color: white(),
+            shadow: 0,
+            shadow_size: 0,
         }
     }
 }
@@ -47,6 +66,8 @@ impl Style {
             self.text_size = self.width * 6;
             self.stamp_size = self.width * 8;
             self.blocks = (self.width * 3).max(8);
+            self.counter_size = self.width * 7;
+            self.shadow_size = self.width * 2;
         }
     }
 
@@ -59,6 +80,17 @@ impl Style {
             Tool::Pen => (Shape::Pen(vec![[0, 0]]), self.color, self.width),
             Tool::Text => (Shape::Text(String::new()), self.color, self.text_size),
             Tool::Stamp(stamp) => (Shape::Stamp(stamp), self.color, self.stamp_size),
+            // numbered when it is placed
+            Tool::Counter => (Shape::Counter(1), self.color, self.counter_size),
+            Tool::Spotlight => {
+                let shape = Shape::Spotlight {
+                    size: [0, 0],
+                    oval: self.spot_oval,
+                };
+                let mut a = Annotation::new(shape, self.shade, 0, [0, 0]);
+                a.radius = self.spot_radius;
+                return Some(a);
+            }
             Tool::Redact => {
                 let style = self.redaction;
                 let shape = Shape::Redact {
@@ -76,21 +108,30 @@ impl Style {
         let mut a = Annotation::new(shape, color, width, [0, 0]);
         a.outline = self.outline;
         a.outline_color = self.outline_color;
+        a.shadow = self.shadow;
+        a.shadow_size = self.shadow_size;
         match tool {
             Tool::Frame => a.radius = self.radius,
             Tool::Text => a.font = self.font.clone(),
+            Tool::Counter => a.number_color = self.number_color,
             _ => {}
         }
         Some(a)
     }
 
-    /// The next annotations look like this one
+    /// The next annotations look like the previous
     pub(super) fn remember(&mut self, a: &Annotation) {
         match &a.shape {
             Shape::Redact { style, .. } => {
                 self.redaction = *style;
                 self.blocks = a.width;
                 self.redact_color = a.color;
+                return;
+            }
+            Shape::Spotlight { oval, .. } => {
+                self.shade = a.color;
+                self.spot_oval = *oval;
+                self.spot_radius = a.radius;
                 return;
             }
             Shape::Text(_) => {
@@ -103,9 +144,16 @@ impl Style {
             }
             Shape::Arrow(_) | Shape::Ellipse(_) | Shape::Pen(_) => self.width = a.width,
             Shape::Stamp(_) => self.stamp_size = a.width,
+            // its color is that of the others
+            Shape::Counter(_) => {
+                self.counter_size = a.width;
+                self.number_color = a.number_color;
+            }
         }
         self.color = a.color;
         self.outline = a.outline;
         self.outline_color = a.outline_color;
+        self.shadow = a.shadow;
+        self.shadow_size = a.shadow_size;
     }
 }

@@ -3,14 +3,18 @@
 //! `geometry` places them, `text` lays out their text, and `render` draws them. Editing UI is in `crate::ui::annotate`.
 
 mod geometry;
+mod glyphs;
 mod render;
 #[cfg(test)]
 pub(crate) mod tests;
 mod text;
+mod transform;
 
 pub(crate) use geometry::*;
+use glyphs::*;
 pub(crate) use render::*;
 pub(crate) use text::*;
+pub(crate) use transform::*;
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -55,6 +59,15 @@ pub struct Annotation {
     /// Kept in the list, but not drawn
     #[serde(default)]
     pub hidden: bool,
+    /// Of the number of a counter
+    #[serde(default = "white")]
+    pub number_color: [u8; 4],
+    /// How dark its shadow is at its edge, in percent, 0 for none
+    #[serde(default)]
+    pub shadow: u32,
+    /// How far its shadow reaches out of what it draws, 0 for none
+    #[serde(default)]
+    pub shadow_size: u32,
 }
 
 pub(crate) fn white() -> [u8; 4] {
@@ -87,8 +100,15 @@ pub enum Shape {
     /// A line through these points, the first one is where it starts
     Pen(Vec<[i32; 2]>),
     Redact { size: [i32; 2], style: Redaction },
+    /// Dims the image outside a spotlight: an oval or a rounded box. The dim colour
+    /// is the shade, with the coverage as its alpha. All spotlights dim together, down
+    /// to the layer furthest back. Anything in front of that is not dimmed.
+    Spotlight { size: [i32; 2], oval: bool },
     /// A symbol of the icon font in a square as large as the annotation is wide
     Stamp(Stamp),
+    /// A number in a round as large as the annotation is wide, in its color. New ones count on
+    /// from the highest there is, and those after a removed one count on without a gap.
+    Counter(u32),
 }
 
 /// Stamp symbols, saved by name since the icon font may change.
@@ -226,6 +246,9 @@ impl Annotation {
             radius: 0,
             font: Font::default(),
             hidden: false,
+            number_color: white(),
+            shadow: 0,
+            shadow_size: 0,
         }
     }
 
@@ -270,12 +293,13 @@ impl Annotation {
         };
         match &self.shape {
             Shape::Arrow(to) => around(&[[0, 0], *to]),
-            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
-                around(&[[0, 0], *size])
-            }
+            Shape::Rect(size)
+            | Shape::Ellipse(size)
+            | Shape::Redact { size, .. }
+            | Shape::Spotlight { size, .. } => around(&[[0, 0], *size]),
             Shape::Pen(points) => around(points),
             Shape::Text(text) => text_layout(text, self).map(|l| l.bounds),
-            Shape::Stamp(_) => around(&[[0, 0], [self.width as i32; 2]]),
+            Shape::Stamp(_) | Shape::Counter(_) => around(&[[0, 0], [self.width as i32; 2]]),
         }
     }
 
@@ -286,12 +310,13 @@ impl Annotation {
         let outline = self.outline_width();
         match &self.shape {
             Shape::Arrow(to) => {
+                // the lines of the head reach out to the sides
                 let length = (to[0] as f32).hypot(to[1] as f32);
-                half.max(arrow_head(self.line_width(), length).1) + outline
+                arrow_head(self.line_width(), length).1 + half + outline
             }
             Shape::Rect(_) | Shape::Ellipse(_) | Shape::Pen(_) => half + outline,
-            Shape::Text(_) | Shape::Stamp(_) => outline,
-            Shape::Redact { .. } => 0.,
+            Shape::Text(_) | Shape::Stamp(_) | Shape::Counter(_) => outline,
+            Shape::Redact { .. } | Shape::Spotlight { .. } => 0.,
         }
     }
 
@@ -299,18 +324,18 @@ impl Annotation {
         self.width.max(1) as f32
     }
 
-    /// A redaction has none
+    /// A redaction and a spotlight have none
     fn outline_width(&self) -> f32 {
         match self.shape {
-            Shape::Redact { .. } => 0.,
+            Shape::Redact { .. } | Shape::Spotlight { .. } => 0.,
             _ => self.outline as f32,
         }
     }
 
-    /// Of a frame, at most half of its shorter side
+    /// Of a frame or a spotlight that is a box, at most half of its shorter side
     fn corner_radius(&self) -> f32 {
         match self.shape {
-            Shape::Rect(size) => (self.radius as f32)
+            Shape::Rect(size) | Shape::Spotlight { size, oval: false } => (self.radius as f32)
                 .min(size[0].abs() as f32 / 2.)
                 .min(size[1].abs() as f32 / 2.),
             _ => 0.,
@@ -321,12 +346,13 @@ impl Annotation {
     pub(crate) fn is_empty(&self) -> bool {
         match &self.shape {
             Shape::Arrow(to) => to[0].abs().max(to[1].abs()) < 2,
-            Shape::Rect(size) | Shape::Ellipse(size) | Shape::Redact { size, .. } => {
-                size[0] < 2 || size[1] < 2
-            }
+            Shape::Rect(size)
+            | Shape::Ellipse(size)
+            | Shape::Redact { size, .. }
+            | Shape::Spotlight { size, .. } => size[0] < 2 || size[1] < 2,
             Shape::Pen(points) => points.is_empty(),
             Shape::Text(text) => text.trim().is_empty(),
-            Shape::Stamp(_) => self.width < 2,
+            Shape::Stamp(_) | Shape::Counter(_) => self.width < 2,
         }
     }
 
@@ -372,6 +398,26 @@ impl Annotation {
         }
     }
 
+    pub(crate) fn is_spotlight(&self) -> bool {
+        matches!(self.shape, Shape::Spotlight { .. })
+    }
+
+    /// A redaction and a spotlight have none
+    pub(crate) fn casts_shadow(&self) -> bool {
+        self.shadow > 0
+            && self.shadow_size > 0
+            && !matches!(self.shape, Shape::Redact { .. } | Shape::Spotlight { .. })
+    }
+
+    /// How far its shadow reaches out of what it draws, in its own coordinates
+    fn shadow_reach(&self) -> f32 {
+        if self.casts_shadow() {
+            self.shadow_size as f32
+        } else {
+            0.
+        }
+    }
+
     /// Its name in the list of annotations
     pub(crate) fn label(&self) -> String {
         match &self.shape {
@@ -380,7 +426,9 @@ impl Annotation {
             Shape::Ellipse(_) => "Circle".into(),
             Shape::Pen(_) => "Pen".into(),
             Shape::Redact { .. } => "Redacted".into(),
+            Shape::Spotlight { .. } => "Spotlight".into(),
             Shape::Stamp(stamp) => stamp.name().into(),
+            Shape::Counter(number) => format!("Counter {number}"),
             Shape::Text(text) => {
                 let line = text.lines().next().unwrap_or_default();
                 let mut short: String = line.chars().take(16).collect();
@@ -389,6 +437,36 @@ impl Annotation {
                 }
                 format!("Text: {short}")
             }
+        }
+    }
+}
+
+/// One more than the highest counter there is, starts at 1
+pub(crate) fn next_counter(annotations: &[Annotation]) -> u32 {
+    annotations
+        .iter()
+        .filter_map(|a| match a.shape {
+            Shape::Counter(number) => Some(number),
+            _ => None,
+        })
+        .max()
+        .map_or(1, |n| n.saturating_add(1))
+}
+
+/// Renumbers the counters after a removed one so there are no gaps.
+/// Numbers still used by another counter are kept.
+pub(crate) fn renumber(annotations: &mut [Annotation], gone: &mut Vec<u32>) {
+    gone.sort_unstable();
+    gone.dedup();
+    gone.retain(|n| {
+        !annotations
+            .iter()
+            .any(|a| matches!(a.shape, Shape::Counter(m) if m == *n))
+    });
+    for a in annotations.iter_mut() {
+        if let Shape::Counter(n) = &mut a.shape {
+            let below = gone.iter().filter(|g| **g < *n).count() as u32;
+            *n -= below;
         }
     }
 }
