@@ -582,6 +582,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 state.edit_state.painting = false;
             }
             let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
+            let window_open = crate::ui::window_open(ctx, state);
             match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
                 Some(annotations) => {
                     let copy = crate::ui::annotate::canvas_ui(
@@ -591,6 +592,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                         &mapping,
                         &state.image_geometry,
                         state.pointer_over_ui,
+                        window_open,
                     );
                     // the keys go to the annotations, copying the image works still
                     if copy && let Some(img) = effective_image(state) {

@@ -32,6 +32,8 @@ pub struct OculanteApp {
     texture_dirty: bool,
     /// Only this part of the image needs to be uploaded again
     texture_area: Option<Rect>,
+    /// Frames that arrived late in a pass, for the start of the next one, in their order
+    held_frames: Vec<Frame>,
     /// Glow renderer for direct GL rendering (created on the first frame)
     renderer: Option<GlowRenderer>,
     /// Tiles covering the current image. One tile for images that fit in the
@@ -174,6 +176,7 @@ impl OculanteApp {
             first_frame: true,
             texture_dirty: false,
             texture_area: None,
+            held_frames: Vec::new(),
             renderer: None,
             image_tiles: Vec::new(),
             image_format: TexFormat::Rgba8,
@@ -325,8 +328,16 @@ impl OculanteApp {
 
     /// Upload only a part of the edit result, painting changes a little of it at a time
     fn upload_area_to_glow(&mut self, gl: &glow::Context, area: Rect) {
+        if self.renderer.is_some() && !self.update_area_on_gpu(gl, area) {
+            self.upload_image_to_glow(gl);
+        }
+    }
+
+    /// Uploads `area` of the edited image into the textures that hold it. False when they no
+    /// longer fit the image, while an animation plays, or without a renderer.
+    fn update_area_on_gpu(&self, gl: &glow::Context, area: Rect) -> bool {
         let Some(renderer) = &self.renderer else {
-            return;
+            return false;
         };
         let img = &self.state.edit_state.result_pixel_op;
         let (format, layout) = glow_renderer::texture_layout(img);
@@ -335,7 +346,7 @@ impl OculanteApp {
             linear_mag: self.state.persistent_settings.linear_mag_filter,
             mipmaps: self.state.persistent_settings.use_mipmaps,
         };
-        let uploaded = self.animation.is_none()
+        self.animation.is_none()
             && renderer.update_tiles_area(
                 gl,
                 &self.image_tiles,
@@ -345,9 +356,40 @@ impl OculanteApp {
                 format,
                 filter,
                 area,
-            );
-        if !uploaded {
-            self.upload_image_to_glow(gl);
+            )
+    }
+
+    /// Uploads the parts of the image that changed in this pass (annotations or a stroke being
+    /// painted) so they appear in the same frame as the overlay drawn over them, not one frame
+    /// later. Any other pending frame waits for the next pass. A new image or size is laid out
+    /// before it shows.
+    fn upload_changed_areas(&mut self, ctx: &egui::Context, frame: &eframe::Frame) {
+        let frames: Vec<Frame> = self.state.texture_channel.1.try_iter().collect();
+        if frames.is_empty() {
+            return;
+        }
+        let only_areas = frames
+            .iter()
+            .all(|f| matches!(f, Frame::UpdateTextureArea(_)));
+        if !only_areas || !self.held_frames.is_empty() {
+            self.held_frames.extend(frames);
+            return;
+        }
+        for f in frames {
+            self.process_frame(ctx, f);
+        }
+        // a whole new upload waits for the next pass, as before
+        if self.texture_dirty {
+            return;
+        }
+        let Some(gl) = frame.gl() else {
+            return;
+        };
+        if let Some(area) = self.texture_area.take()
+            && !self.update_area_on_gpu(gl, area)
+        {
+            // the textures no longer fit: the whole image, at the start of the next pass
+            self.texture_area = Some(area);
         }
     }
 
@@ -453,7 +495,8 @@ impl OculanteApp {
     }
 
     fn process_texture_channel(&mut self, ctx: &egui::Context) {
-        let frames: Vec<Frame> = self.state.texture_channel.1.try_iter().collect();
+        let mut frames = std::mem::take(&mut self.held_frames);
+        frames.extend(self.state.texture_channel.1.try_iter());
         for frame in frames {
             self.process_frame(ctx, frame);
         }
@@ -1430,6 +1473,12 @@ impl eframe::App for OculanteApp {
                             }
                         }
                     }
+
+                    // what Annotate draws over the image, in this layer below windows
+                    let overlay = std::mem::take(&mut self.state.edit_state.annotate.overlay);
+                    ui.painter()
+                        .with_clip_rect(crate::image_editing::canvas_rect(ui.ctx()))
+                        .extend(overlay);
                 }
                 // over the image and below windows, like the top bar it goes in zen mode
                 if !self.state.persistent_settings.zen_mode {
@@ -1458,6 +1507,8 @@ impl eframe::App for OculanteApp {
         if self.state.new_image_loaded {
             self.state.new_image_loaded = false;
         }
+
+        self.upload_changed_areas(ctx, frame);
 
         // Save window geometry into volatile settings for persistence. The window opens
         // with the size inside its frame, Wayland tells no position. Minimized or in full

@@ -599,10 +599,8 @@ fn outlines_are_not_cut_off() {
         let mut everywhere = img.clone();
         draw(&mut everywhere, &a, t, whole);
         for (x, y, p) in everywhere.enumerate_pixels() {
-            let inside = x >= area.x
-                && y >= area.y
-                && x < area.x + area.width
-                && y < area.y + area.height;
+            let inside =
+                x >= area.x && y >= area.y && x < area.x + area.width && y < area.y + area.height;
             assert!(
                 inside || p.0 == [0, 0, 0, 255],
                 "{:?} draws at {x},{y}, out of {area:?}",
@@ -680,8 +678,7 @@ fn every_stamp_fills_the_middle_of_its_square() {
 fn stamps_are_drawn_in_their_square_with_their_outline() {
     let img = RgbaImage::from_pixel(100, 100, Rgba([255; 4]));
     let mapping = Mapping::new(&[], (100, 100));
-    let mut stamp =
-        Annotation::new(Shape::Stamp(Stamp::Warning), [255, 0, 0, 255], 60, [20, 20]);
+    let mut stamp = Annotation::new(Shape::Stamp(Stamp::Warning), [255, 0, 0, 255], 60, [20, 20]);
     let count = |drawn: &RgbaImage, color: [u8; 4], inside: [u32; 2]| {
         let mut count = [0, 0];
         for (x, y, p) in drawn.enumerate_pixels() {
@@ -775,7 +772,10 @@ fn turned_four_times_by_a_quarter_is_as_before() {
         );
     }
     assert_eq!(turned.rotation, 0);
-    assert_eq!(turned.start(mapping.original), frame.start(mapping.original));
+    assert_eq!(
+        turned.start(mapping.original),
+        frame.start(mapping.original)
+    );
     // the box is upright after a quarter
     let quarter = rotated(&frame, &mapping, centre, 90);
     let shape = selection_bounds(&[quarter], &[0], &mapping).unwrap().shape;
@@ -798,13 +798,19 @@ fn flipped_twice_is_as_before() {
         assert_eq!(twice.rotation, 30);
         assert_eq!(twice.flip, [false; 2]);
         let (a, b) = (twice.start(mapping.original), arrow.start(mapping.original));
-        assert!((a[0] - b[0]).abs() <= 1 && (a[1] - b[1]).abs() <= 1, "{a:?} {b:?}");
+        assert!(
+            (a[0] - b[0]).abs() <= 1 && (a[1] - b[1]).abs() <= 1,
+            "{a:?} {b:?}"
+        );
     }
     // left to right: the tip goes to the other side of the middle
     let mirrored = flipped(&arrow_at([100, 100], [40, 0]), &mapping, [150., 100.], 0);
     let mut tip = Point::from_xy(40., 0.);
     mirrored.transform(&mapping).map_point(&mut tip);
-    assert!((tip.x - 160.).abs() < 1. && (tip.y - 100.).abs() < 1., "{tip:?}");
+    assert!(
+        (tip.x - 160.).abs() < 1. && (tip.y - 100.).abs() < 1.,
+        "{tip:?}"
+    );
 }
 
 #[test]
@@ -859,7 +865,10 @@ fn stretched_by_the_handles() {
     assert_eq!(wider.start(mapping.original), [60, 100]);
     // with Shift it keeps its proportions, the corner along the diagonal
     let (scale, _) = stretch([1, 1], shape, [40., 0.], true);
-    assert!((scale[0] - 1.8).abs() < 0.001 && scale[0] == scale[1], "{scale:?}");
+    assert!(
+        (scale[0] - 1.8).abs() < 0.001 && scale[0] == scale[1],
+        "{scale:?}"
+    );
     // from a side as much across, around the middle
     let (scale, fixed) = stretch([0, 1], shape, [0., 20.], true);
     assert_eq!((scale, fixed), ([2., 2.], [120., 100.]));
@@ -892,7 +901,10 @@ fn mirrored_when_dragged_past_the_other_side() {
     // it points the other way, to the bottom left
     let mut tip = Point::from_xy(20., 20.);
     list[0].transform(&mapping).map_point(&mut tip);
-    assert!((tip.x - 80.).abs() < 1. && (tip.y - 120.).abs() < 1., "{tip:?}");
+    assert!(
+        (tip.x - 80.).abs() < 1. && (tip.y - 120.).abs() < 1.,
+        "{tip:?}"
+    );
 }
 
 #[test]
@@ -961,7 +973,10 @@ fn a_flip_is_not_a_turn() {
         let mapping = Mapping::new(&ops, (200, 200));
         let mut arrow = arrow_at([50, 50], [40, 0]);
         arrow.stand_upright(&mapping);
-        assert!(shown_angle(&arrow, &mapping).abs() < 0.01, "{ops:?}: upright");
+        assert!(
+            shown_angle(&arrow, &mapping).abs() < 0.01,
+            "{ops:?}: upright"
+        );
         let middle = middle_in(&arrow, &mapping).unwrap();
         for axis in 0..2 {
             let mirrored = flipped(&arrow, &mapping, middle, axis);
@@ -970,9 +985,15 @@ fn a_flip_is_not_a_turn() {
         }
         // turned, then flipped: turned the other way
         let turned = rotated(&arrow, &mapping, middle, 30);
-        assert!((shown_angle(&turned, &mapping) - 30.).abs() < 0.5, "{ops:?}");
+        assert!(
+            (shown_angle(&turned, &mapping) - 30.).abs() < 0.5,
+            "{ops:?}"
+        );
         let mirrored = flipped(&turned, &mapping, middle, 1);
-        assert!((shown_angle(&mirrored, &mapping) + 30.).abs() < 0.5, "{ops:?}");
+        assert!(
+            (shown_angle(&mirrored, &mapping) + 30.).abs() < 0.5,
+            "{ops:?}"
+        );
     }
 }
 
@@ -991,7 +1012,11 @@ fn a_see_through_arrow_is_one_piece() {
         assert_eq!(drawn.get_pixel(172, 100).0, line, "where it meets the head");
         assert_eq!(drawn.get_pixel(175, 100).0, line, "at the tip");
         // the head is open: between its lines the image shows
-        assert_eq!(drawn.get_pixel(155, 108).0, [0, 0, 0, 255], "inside the head");
+        assert_eq!(
+            drawn.get_pixel(155, 108).0,
+            [0, 0, 0, 255],
+            "inside the head"
+        );
     }
     // it ends where it points
     arrow.color = [255, 0, 0, 255];
@@ -1014,7 +1039,10 @@ fn a_spotlight_dims_all_but_its_spot() {
     assert_eq!(*one.get_pixel(50, 40), gray, "the spot is as it was");
     // black at half over 100
     let dimmed = one.get_pixel(150, 150).0;
-    assert!(dimmed[0] > 40 && dimmed[0] < 60 && dimmed[3] == 255, "{dimmed:?}");
+    assert!(
+        dimmed[0] > 40 && dimmed[0] < 60 && dimmed[3] == 255,
+        "{dimmed:?}"
+    );
     // two dim once together, each keeps its spot
     let two = drawn_at_once(
         &img,
@@ -1027,7 +1055,11 @@ fn a_spotlight_dims_all_but_its_spot() {
     assert_eq!(*two.get_pixel(50, 40), gray);
     assert_eq!(*two.get_pixel(150, 140), gray, "the middle of the oval");
     assert_eq!(two.get_pixel(10, 180).0, dimmed, "dimmed once, not twice");
-    assert_eq!(two.get_pixel(121, 121).0, dimmed, "the corner besides the oval");
+    assert_eq!(
+        two.get_pixel(121, 121).0,
+        dimmed,
+        "the corner besides the oval"
+    );
     // one that is too small dims nothing
     let empty = drawn_at_once(&img, &[spotlight_at([20, 20], [0, 0], false)], &mapping);
     assert_eq!(*empty.get_pixel(150, 150), gray);
@@ -1045,7 +1077,10 @@ fn what_is_in_front_of_a_spotlight_is_not_dimmed() {
     let drawn = drawn_at_once(&img, &list, &mapping);
     assert_eq!(drawn.get_pixel(80, 150).0, [255, 0, 0, 255], "in front");
     let behind = drawn.get_pixel(80, 100).0;
-    assert!(behind[0] > 100 && behind[0] < 200, "behind is dimmed: {behind:?}");
+    assert!(
+        behind[0] > 100 && behind[0] < 200,
+        "behind is dimmed: {behind:?}"
+    );
     // drawn a change at a time it is the same as at once
     let mut changing = img.clone();
     let mut layer = AnnotationLayer::default();
@@ -1053,13 +1088,22 @@ fn what_is_in_front_of_a_spotlight_is_not_dimmed() {
     list[0] = arrow_at([20, 120], [150, 0]);
     list[2] = arrow_at([30, 170], [140, 0]);
     layer.update(&mut changing, &list, &mapping);
-    assert!(changing == drawn_at_once(&img, &list, &mapping), "arrows moved");
+    assert!(
+        changing == drawn_at_once(&img, &list, &mapping),
+        "arrows moved"
+    );
     list[1].set_start([60, 60], mapping.original);
     layer.update(&mut changing, &list, &mapping);
-    assert!(changing == drawn_at_once(&img, &list, &mapping), "the spotlight moved");
+    assert!(
+        changing == drawn_at_once(&img, &list, &mapping),
+        "the spotlight moved"
+    );
     list[1].color = [0, 0, 80, 200];
     layer.update(&mut changing, &list, &mapping);
-    assert!(changing == drawn_at_once(&img, &list, &mapping), "its shade changed");
+    assert!(
+        changing == drawn_at_once(&img, &list, &mapping),
+        "its shade changed"
+    );
 }
 
 /// Moved, a spotlight changes the image only where its spot was and where it is: its shade is as
@@ -1077,9 +1121,14 @@ fn a_moved_spotlight_redraws_only_around_its_spot() {
     let mut layer = AnnotationLayer::default();
     layer.update(&mut changing, &list, &mapping);
     list[1].set_start([40, 30], mapping.original);
-    let area = layer.update(&mut changing, &list, &mapping).expect("it moved");
+    let area = layer
+        .update(&mut changing, &list, &mapping)
+        .expect("it moved");
     // where it was and where it is, not the arrow far from it
-    assert!(area.x + area.width <= 110 && area.y + area.height <= 80, "{area:?}");
+    assert!(
+        area.x + area.width <= 110 && area.y + area.height <= 80,
+        "{area:?}"
+    );
     assert!(changing == drawn_at_once(&img, &list, &mapping), "moved");
     // turned and larger, the same
     list[1].rotation = 30;
@@ -1087,14 +1136,56 @@ fn a_moved_spotlight_redraws_only_around_its_spot() {
         size: [80, 40],
         oval: true,
     };
-    let area = layer.update(&mut changing, &list, &mapping).expect("it changed");
+    let area = layer
+        .update(&mut changing, &list, &mapping)
+        .expect("it changed");
     assert!(area.width < 200 && area.height < 200, "{area:?}");
-    assert!(changing == drawn_at_once(&img, &list, &mapping), "turned and larger");
+    assert!(
+        changing == drawn_at_once(&img, &list, &mapping),
+        "turned and larger"
+    );
     // a new shade is everywhere
     list[1].color = [0, 0, 80, 200];
-    let area = layer.update(&mut changing, &list, &mapping).expect("its shade changed");
+    let area = layer
+        .update(&mut changing, &list, &mapping)
+        .expect("its shade changed");
     assert_eq!((area.width, area.height), (400, 400));
-    assert!(changing == drawn_at_once(&img, &list, &mapping), "its shade changed");
+    assert!(
+        changing == drawn_at_once(&img, &list, &mapping),
+        "its shade changed"
+    );
+}
+
+/// What did not change is not drawn again, not copied and not measured again either
+#[test]
+fn the_layer_draws_again_only_what_changed() {
+    let mapping = Mapping::new(&[], (200, 200));
+    let img = RgbaImage::from_pixel(200, 200, Rgba([100, 100, 100, 255]));
+    let mut list = vec![arrow_at([10, 10], [40, 0]), arrow_at([120, 150], [60, 0])];
+    let mut changing = img.clone();
+    let mut layer = AnnotationLayer::default();
+    assert!(layer.update(&mut changing, &list, &mapping).is_some());
+    assert_eq!(
+        layer.update(&mut changing, &list, &mapping),
+        None,
+        "nothing changed"
+    );
+    list[1].width = 9;
+    let area = layer
+        .update(&mut changing, &list, &mapping)
+        .expect("one changed");
+    assert!(
+        area.y > 100,
+        "around the one that changed, not the other: {area:?}"
+    );
+    assert!(changing == drawn_at_once(&img, &list, &mapping));
+    // the last one removed: only where it was
+    list.pop();
+    let area = layer
+        .update(&mut changing, &list, &mapping)
+        .expect("one removed");
+    assert!(area.y > 100, "where it was: {area:?}");
+    assert!(changing == drawn_at_once(&img, &list, &mapping));
 }
 
 #[test]
@@ -1106,7 +1197,10 @@ fn a_click_in_a_spot_goes_to_what_is_in_it() {
     // an oval only in its oval, not in the corners of its box
     let oval = spotlight_at([10, 10], [100, 100], true);
     assert!(hits(&oval, &mapping, [60., 60.], 0.), "in the oval");
-    assert!(!hits(&oval, &mapping, [14., 14.], 0.), "in a corner of its box");
+    assert!(
+        !hits(&oval, &mapping, [14., 14.], 0.),
+        "in a corner of its box"
+    );
 }
 
 #[test]
@@ -1114,11 +1208,23 @@ fn counter_digits_fit_in_their_round() {
     for number in [1, 2, 3, 4, 7, 10, 11, 42, 100, 999, 12345] {
         let digits = counter_digits(number, 100.).expect("digits");
         let [l, t, r, b] = ink(&digits).expect("ink");
-        assert!(r - l <= 70.1 && b - t <= 50.1, "{number}: {l},{t} to {r},{b}");
-        assert!(l >= 8. && r <= 92., "{number} stays in the round: {l} to {r}");
-        assert!((t + b - 100.).abs() < 0.6, "{number} is in the middle up and down");
+        assert!(
+            r - l <= 70.1 && b - t <= 50.1,
+            "{number}: {l},{t} to {r},{b}"
+        );
+        assert!(
+            l >= 8. && r <= 92.,
+            "{number} stays in the round: {l} to {r}"
+        );
+        assert!(
+            (t + b - 100.).abs() < 0.6,
+            "{number} is in the middle up and down"
+        );
         let across = weight_middle(&digits).expect("a weight");
-        assert!((across - 50.).abs() < 0.3, "{number}: its weight at {across}");
+        assert!(
+            (across - 50.).abs() < 0.3,
+            "{number}: its weight at {across}"
+        );
     }
     // the stem of a 1 is in the middle, the flag on the left takes its box there
     let [l, _, r, _] = ink(&counter_digits(1, 100.).unwrap()).unwrap();
@@ -1143,15 +1249,32 @@ fn a_counter_is_a_number_in_a_round_that_reads_upright() {
         let (mut left, mut top, mut right, mut bottom) = (u32::MAX, u32::MAX, 0, 0);
         for (x, y, _) in drawn.enumerate_pixels().filter(|(_, _, p)| white(p)) {
             let from_middle = (x as f32 + 0.5 - 100.).hypot(y as f32 + 0.5 - 100.);
-            assert!(from_middle < 30., "{ops:?}: white at {x},{y} is out of the round");
+            assert!(
+                from_middle < 30.,
+                "{ops:?}: white at {x},{y} is out of the round"
+            );
             (left, top) = (left.min(x), top.min(y));
             (right, bottom) = (right.max(x), bottom.max(y));
         }
         let (wide, high) = (right + 1 - left, bottom + 1 - top);
-        assert!(high > wide * 2, "{ops:?}: a 1 stands upright, {wide} by {high}");
-        assert!(high.abs_diff(30) <= 3, "{ops:?}: half as high as the round, {high}");
-        assert_eq!(drawn.get_pixel(100, 73).0, [229, 72, 74, 255], "{ops:?}: the round");
-        assert_eq!(drawn.get_pixel(100, 60).0, ground, "{ops:?}: not further out");
+        assert!(
+            high > wide * 2,
+            "{ops:?}: a 1 stands upright, {wide} by {high}"
+        );
+        assert!(
+            high.abs_diff(30) <= 3,
+            "{ops:?}: half as high as the round, {high}"
+        );
+        assert_eq!(
+            drawn.get_pixel(100, 73).0,
+            [229, 72, 74, 255],
+            "{ops:?}: the round"
+        );
+        assert_eq!(
+            drawn.get_pixel(100, 60).0,
+            ground,
+            "{ops:?}: not further out"
+        );
         assert_eq!(drawn.get_pixel(5, 5).0, ground, "{ops:?}: nothing far away");
     }
 }
@@ -1173,11 +1296,17 @@ fn a_counter_turns_but_never_reads_mirrored() {
         counter.stand_upright(&mapping);
         counter.centre_at([100., 100.], mapping.original);
         let (angle, mirrored) = shown(&counter, &mapping);
-        assert!(angle.abs() < 0.5 && !mirrored, "{ops:?}: placed upright, {angle}");
+        assert!(
+            angle.abs() < 0.5 && !mirrored,
+            "{ops:?}: placed upright, {angle}"
+        );
         let middle = middle_in(&counter, &mapping).unwrap();
         let turned = rotated(&counter, &mapping, middle, 30);
         let (angle, mirrored) = shown(&turned, &mapping);
-        assert!((angle - 30.).abs() < 0.5 && !mirrored, "{ops:?}: turned, {angle}");
+        assert!(
+            (angle - 30.).abs() < 0.5 && !mirrored,
+            "{ops:?}: turned, {angle}"
+        );
         for axis in 0..2 {
             let flipped = flipped(&turned, &mapping, middle, axis);
             let (angle, mirrored) = shown(&flipped, &mapping);
@@ -1198,9 +1327,19 @@ fn a_counter_draws_its_number_in_its_colour() {
     let mut one = Annotation::new(Shape::Counter(8), [0, 90, 200, 255], 60, [70, 70]);
     one.number_color = [0, 0, 0, 255];
     let drawn = drawn_at_once(&img, &[one], &mapping);
-    assert!(drawn.pixels().any(|p| p.0 == [0, 0, 0, 255]), "a black number");
-    assert!(!drawn.pixels().any(|p| p.0[0] > 240 && p.0[1] > 240), "nothing white");
-    assert_eq!(drawn.get_pixel(100, 132).0, ground, "nothing besides the round");
+    assert!(
+        drawn.pixels().any(|p| p.0 == [0, 0, 0, 255]),
+        "a black number"
+    );
+    assert!(
+        !drawn.pixels().any(|p| p.0[0] > 240 && p.0[1] > 240),
+        "nothing white"
+    );
+    assert_eq!(
+        drawn.get_pixel(100, 132).0,
+        ground,
+        "nothing besides the round"
+    );
     // turned by hand, its number turns with it: a 1 lies on its side
     let mut lying = Annotation::new(Shape::Counter(1), [229, 72, 74, 255], 60, [70, 70]);
     let middle = middle_in(&lying, &mapping).unwrap();

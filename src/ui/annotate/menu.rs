@@ -1,4 +1,4 @@
-//! Right click menu for selected annotatoins
+//! Right click menu for selected annotations
 
 use super::*;
 

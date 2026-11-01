@@ -214,11 +214,11 @@ impl Handles {
     pub(super) fn paint(
         &self,
         ctx: &egui::Context,
-        painter: &egui::Painter,
+        out: &mut Vec<egui::Shape>,
         hot: Option<Target>,
         idle: bool,
     ) {
-        frame_line(painter, self.rect, FRAME_WIDTH);
+        frame_line(out, self.rect, FRAME_WIDTH);
         let grow = |id: Id, on: bool| ctx.animate_bool_with_time(id, on, GROW_TIME);
         let mut handles: Vec<(f32, Pos2)> = self
             .handles
@@ -230,7 +230,7 @@ impl Handles {
             .collect();
         handles.sort_by(|a, b| a.0.total_cmp(&b.0));
         for (t, centre) in handles {
-            dot(painter, centre, HANDLE_RADIUS, t);
+            dot(out, centre, HANDLE_RADIUS, t);
         }
         if !idle {
             return;
@@ -240,44 +240,66 @@ impl Handles {
             .iter()
             .map(|(action, centre)| {
                 let on = hot == Some(Target::Button(*action));
-                (grow(Id::new(("annotation_button", *action)), on), *action, *centre)
+                (
+                    grow(Id::new(("annotation_button", *action)), on),
+                    *action,
+                    *centre,
+                )
             })
             .collect();
         buttons.sort_by(|a, b| a.0.total_cmp(&b.0));
         for (t, action, centre) in buttons {
-            paint_button(painter, centre, action, t);
+            paint_button(out, centre, action, t);
         }
         if let Some((corner, centre)) = self.rotate {
-            let t = grow(Id::new("annotation_rotate"), hot == Some(Target::Rotate(corner)));
+            let t = grow(
+                Id::new("annotation_rotate"),
+                hot == Some(Target::Rotate(corner)),
+            );
             let scale = 1. + GROW * t;
-            dot(painter, centre, ROTATE_RADIUS, t);
-            paint_turn(painter, centre, 4.2 * scale, false, symbol_color(t), 1.6 * scale);
+            dot(out, centre, ROTATE_RADIUS, t);
+            paint_turn(
+                out,
+                centre,
+                4.2 * scale,
+                false,
+                symbol_color(t),
+                1.6 * scale,
+            );
         }
     }
 }
 
-pub(super) fn frame_line(painter: &egui::Painter, rect: egui::Rect, width: f32) {
+pub(super) fn frame_line(out: &mut Vec<egui::Shape>, rect: egui::Rect, width: f32) {
     let corners = vec![
         rect.left_top(),
         rect.right_top(),
         rect.right_bottom(),
         rect.left_bottom(),
     ];
-    painter.add(egui::Shape::closed_line(
+    out.push(egui::Shape::closed_line(
         corners.clone(),
         Stroke::new(width + 2., OVER_IMAGE_EDGE),
     ));
-    painter.add(egui::Shape::closed_line(corners, Stroke::new(width, YELLOW)));
+    out.push(egui::Shape::closed_line(
+        corners,
+        Stroke::new(width, YELLOW),
+    ));
 }
 
 /// A handle or the round of a button, `t` from 0 to 1 as far as it grew under the mouse
-fn dot(painter: &egui::Painter, centre: Pos2, radius: f32, t: f32) {
-    painter.circle(
+fn dot(out: &mut Vec<egui::Shape>, centre: Pos2, radius: f32, t: f32) {
+    let radius = radius * (1. + GROW * t);
+    out.push(egui::Shape::circle_filled(
         centre,
-        radius * (1. + GROW * t),
+        radius,
         fade(YELLOW, RED, t),
+    ));
+    out.push(egui::Shape::circle_stroke(
+        centre,
+        radius,
         Stroke::new(1., OVER_IMAGE_EDGE),
-    );
+    ));
 }
 
 /// Dark on the round of a button, white once it is red
@@ -286,13 +308,13 @@ fn symbol_color(t: f32) -> Color32 {
 }
 
 /// Filled, in either order of its corners
-fn triangle(painter: &egui::Painter, mut corners: [Pos2; 3], color: Color32) {
+fn triangle(out: &mut Vec<egui::Shape>, mut corners: [Pos2; 3], color: Color32) {
     let (a, b) = (corners[1] - corners[0], corners[2] - corners[0]);
     // clockwise on the screen
     if a.x * b.y - a.y * b.x < 0. {
         corners.swap(1, 2);
     }
-    painter.add(egui::Shape::convex_polygon(
+    out.push(egui::Shape::convex_polygon(
         corners.to_vec(),
         color,
         Stroke::NONE,
@@ -301,7 +323,7 @@ fn triangle(painter: &egui::Painter, mut corners: [Pos2; 3], color: Color32) {
 
 /// A round arrow, open at the top, its head pointing the way it turns
 fn paint_turn(
-    painter: &egui::Painter,
+    out: &mut Vec<egui::Shape>,
     centre: Pos2,
     radius: f32,
     clockwise: bool,
@@ -320,17 +342,17 @@ fn paint_turn(
     let points = (0..=steps)
         .map(|i| centre + direction(start + (end - start) * i as f32 / steps as f32) * radius)
         .collect();
-    painter.add(egui::Shape::line(points, Stroke::new(width, color)));
+    out.push(egui::Shape::line(points, Stroke::new(width, color)));
     let tip = centre + direction(end) * radius;
     let along = direction(end + 90.);
-    let out = direction(end);
+    let outward = direction(end);
     let head = width * 1.8;
     triangle(
-        painter,
+        out,
         [
             tip + along * head * 0.9,
-            tip - along * head * 0.4 + out * head,
-            tip - along * head * 0.4 - out * head,
+            tip - along * head * 0.4 + outward * head,
+            tip - along * head * 0.4 - outward * head,
         ],
         color,
     );
@@ -338,7 +360,7 @@ fn paint_turn(
 
 /// A line with a head at both ends, along `along`
 fn paint_both_ways(
-    painter: &egui::Painter,
+    out: &mut Vec<egui::Shape>,
     centre: Pos2,
     along: egui::Vec2,
     half: f32,
@@ -349,29 +371,33 @@ fn paint_both_ways(
     let head = width * 2.;
     let wide = width * 1.7;
     let (a, b) = (centre - along * half, centre + along * half);
-    painter.line_segment(
+    out.push(egui::Shape::line_segment(
         [a + along * head * 0.8, b - along * head * 0.8],
         Stroke::new(width, color),
-    );
+    ));
     for (tip, back) in [(a, along), (b, -along)] {
         let base = tip + back * head;
-        triangle(painter, [tip, base + across * wide, base - across * wide], color);
+        triangle(
+            out,
+            [tip, base + across * wide, base - across * wide],
+            color,
+        );
     }
 }
 
 /// A button above the box with its symbol, grown by `t` from 0 to 1
-fn paint_button(painter: &egui::Painter, centre: Pos2, action: Action, t: f32) {
-    dot(painter, centre, BUTTON_RADIUS, t);
+fn paint_button(out: &mut Vec<egui::Shape>, centre: Pos2, action: Action, t: f32) {
+    dot(out, centre, BUTTON_RADIUS, t);
     let scale = 1. + GROW * t;
     let (color, width) = (symbol_color(t), 2. * scale);
     match action {
-        Action::TurnLeft => paint_turn(painter, centre, 6. * scale, false, color, width),
-        Action::TurnRight => paint_turn(painter, centre, 6. * scale, true, color, width),
+        Action::TurnLeft => paint_turn(out, centre, 6. * scale, false, color, width),
+        Action::TurnRight => paint_turn(out, centre, 6. * scale, true, color, width),
         Action::FlipHorizontally => {
-            paint_both_ways(painter, centre, egui::vec2(1., 0.), 7.5 * scale, color, width)
+            paint_both_ways(out, centre, egui::vec2(1., 0.), 7.5 * scale, color, width)
         }
         Action::FlipVertically => {
-            paint_both_ways(painter, centre, egui::vec2(0., 1.), 7.5 * scale, color, width)
+            paint_both_ways(out, centre, egui::vec2(0., 1.), 7.5 * scale, color, width)
         }
     }
 }

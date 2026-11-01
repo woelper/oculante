@@ -1,4 +1,4 @@
-//! Arrows, frames, circles, stamps, text, pen lines and hidden areas drawn over the edited image. 
+//! Arrows, frames, circles, stamps, text, pen lines and hidden areas drawn over the edited image.
 //! They are stored in pixels of the loaded image, so crops, resizes, rotations and flips carry them along.
 //! `geometry` places them, `text` lays out their text, and `render` draws them. Editing UI is in `crate::ui::annotate`.
 
@@ -99,11 +99,17 @@ pub enum Shape {
     Text(String),
     /// A line through these points, the first one is where it starts
     Pen(Vec<[i32; 2]>),
-    Redact { size: [i32; 2], style: Redaction },
+    Redact {
+        size: [i32; 2],
+        style: Redaction,
+    },
     /// Dims the image outside a spotlight: an oval or a rounded box. The dim colour
     /// is the shade, with the coverage as its alpha. All spotlights dim together, down
     /// to the layer furthest back. Anything in front of that is not dimmed.
-    Spotlight { size: [i32; 2], oval: bool },
+    Spotlight {
+        size: [i32; 2],
+        oval: bool,
+    },
     /// A symbol of the icon font in a square as large as the annotation is wide
     Stamp(Stamp),
     /// A number in a round as large as the annotation is wide, in its color. New ones count on

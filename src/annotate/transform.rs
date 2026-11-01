@@ -19,7 +19,12 @@ pub(crate) fn selection_bounds(
 ) -> Option<Bounds> {
     let around = |b: Option<[f32; 4]>, e: [f32; 4]| {
         Some(b.map_or(e, |b| {
-            [b[0].min(e[0]), b[1].min(e[1]), b[2].max(e[2]), b[3].max(e[3])]
+            [
+                b[0].min(e[0]),
+                b[1].min(e[1]),
+                b[2].max(e[2]),
+                b[3].max(e[3]),
+            ]
         }))
     };
     let (mut shape, mut drawn) = (None, None);
@@ -192,7 +197,10 @@ pub(crate) fn resized(
         }
         Shape::Text(_) | Shape::Stamp(_) | Shape::Counter(_) => {}
     }
-    if matches!(a.shape, Shape::Text(_) | Shape::Stamp(_) | Shape::Counter(_)) {
+    if matches!(
+        a.shape,
+        Shape::Text(_) | Shape::Stamp(_) | Shape::Counter(_)
+    ) {
         a.width = ((a.width as f32 * most).round() as u32).max(2);
     }
     let moved = [
@@ -240,7 +248,10 @@ pub(crate) fn keep_in_place(
     let at = middle_of(b);
     let from = mapping.to_original(at);
     let to = mapping.to_original([at[0] + off[0], at[1] + off[1]]);
-    let by = [(to[0] - from[0]).round() as i32, (to[1] - from[1]).round() as i32];
+    let by = [
+        (to[0] - from[0]).round() as i32,
+        (to[1] - from[1]).round() as i32,
+    ];
     if by == [0, 0] {
         return;
     }

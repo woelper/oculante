@@ -1,9 +1,11 @@
 //! Drawing, selecting and moving annotations on the image with the mouse, and the keys for them.
 
+use std::cell::RefCell;
+
 use super::*;
 
-/// Drawing, selecting and moving annotations with the mouse, and the keys for them.
-/// Returns whether the image should be copied.
+/// Drawing, selecting and moving annotations with the mouse, and the keys for them, unless a
+/// window is open over the image. Returns whether the image should be copied.
 pub fn canvas_ui(
     ctx: &egui::Context,
     annotations: &mut Vec<Annotation>,
@@ -11,9 +13,13 @@ pub fn canvas_ui(
     mapping: &Mapping,
     geo: &ImageGeometry,
     pointer_over_ui: bool,
+    window_open: bool,
 ) -> bool {
+    // a field that has the keys keeps them, as a window open over the image does: Backspace in
+    // the file manager does not remove what is selected
+    let keys_free = !window_open && !ctx.egui_wants_keyboard_input();
     forget_what_is_gone(annotations, state);
-    undo_and_redo(ctx, annotations, state);
+    undo_and_redo(ctx, annotations, state, keys_free);
     let Some(tool) = state.tool else {
         state.finish_typing(annotations);
         state.selected.clear();
@@ -22,27 +28,48 @@ pub fn canvas_ui(
         state.rotate_corner = None;
         state.hovered = None;
         state.menu = None;
+        state.overlay.clear();
         return false;
     };
     state.grab = true;
     let typed = text_ui(ctx, annotations, state, mapping, geo);
-    let copy = state.typing.is_none() && keys(ctx, annotations, state, mapping, tool);
+    let copy = keys_free && state.typing.is_none() && keys(ctx, annotations, state, mapping, tool);
 
     let canvas = Canvas::new(ctx, mapping, geo, tool, pointer_over_ui);
-    let selection = selection_box(&canvas, annotations, state);
+    let selection = lay_out_selection(&canvas, annotations, state);
     let mut dragged = Dragged::default();
-    if let Some(pos) = canvas.pointer {
-        let p = canvas.to_result(pos);
+    if let Some(mouse) = canvas.mouse {
         // a click besides the menu only closes it
         let closes_menu = canvas.pressed && !pointer_over_ui && state.menu.take().is_some();
         if canvas.pressed && !pointer_over_ui && !closes_menu {
-            press(&canvas, annotations, state, selection.as_ref(), pos, p, typed);
+            press(
+                &canvas,
+                annotations,
+                state,
+                selection.as_ref(),
+                mouse,
+                typed,
+            );
         }
-        right_click(&canvas, annotations, state, selection.as_ref(), pos, p, typed);
+        right_click(
+            &canvas,
+            annotations,
+            state,
+            selection.as_ref(),
+            mouse,
+            typed,
+        );
         if canvas.down || canvas.released {
-            dragged = drag(&canvas, annotations, state, p);
+            dragged = drag(&canvas, annotations, state, mouse.image);
         }
-        point(&canvas, annotations, state, selection.as_ref(), &dragged, pos, p);
+        point(
+            &canvas,
+            annotations,
+            state,
+            selection.as_ref(),
+            &dragged,
+            mouse,
+        );
     }
     if canvas.down {
         canvas.show_select_box(state);
@@ -60,6 +87,7 @@ pub fn canvas_ui(
         menu_ui(ctx, annotations, state, mapping, at);
     }
     show_tooltip(&canvas, state, dragged.angle);
+    state.overlay = canvas.shapes.take();
     copy
 }
 
@@ -68,6 +96,13 @@ struct Selection {
     bounds: Bounds,
     handles: Handles,
     target: Option<Target>,
+}
+
+/// Where the mouse is, on the screen and in the edited image
+#[derive(Clone, Copy)]
+struct Mouse {
+    screen: Pos2,
+    image: [f32; 2],
 }
 
 /// What a drag changed this frame: the new angle, and the handle it resizes by.
@@ -86,7 +121,8 @@ struct Canvas<'a> {
     geo: &'a ImageGeometry,
     tool: Tool,
     pointer_over_ui: bool,
-    painter: egui::Painter,
+    /// What is drawn over the image, see `AnnotateUi::overlay`
+    shapes: RefCell<Vec<egui::Shape>>,
     pressed: bool,
     down: bool,
     released: bool,
@@ -95,7 +131,7 @@ struct Canvas<'a> {
     double: bool,
     shift: bool,
     /// A drag goes on over the panels too
-    pointer: Option<Pos2>,
+    mouse: Option<Mouse>,
     /// The mouse may be this far off a line on the screen and still hit it, in pixels of the
     /// edited image
     slack: f32,
@@ -122,29 +158,28 @@ impl<'a> Canvas<'a> {
                 i.modifiers.shift,
             )
         });
-        let painter = ctx
-            .layer_painter(egui::LayerId::new(
-                egui::Order::Middle,
-                Id::new("annotation_overlay"),
-            ))
-            .with_clip_rect(canvas_rect(ctx));
-        Self {
+        let mut canvas = Self {
             ctx,
             mapping,
             geo,
             tool,
             pointer_over_ui,
-            painter,
+            shapes: RefCell::default(),
             pressed,
             down,
             released,
             right_pressed,
             double,
             shift,
-            pointer: ctx.input(|i| i.pointer.hover_pos()),
+            mouse: None,
             slack: 6. / geo.scale.max(0.01),
             view: canvas_rect(ctx),
-        }
+        };
+        canvas.mouse = ctx.input(|i| i.pointer.hover_pos()).map(|screen| Mouse {
+            screen,
+            image: canvas.to_result(screen),
+        });
+        canvas
     }
 
     /// A point on the screen in the edited image
@@ -207,24 +242,30 @@ impl<'a> Canvas<'a> {
     /// A thin box around the one the mouse points at, or whose card it is over
     fn show_pointed(&self, annotations: &[Annotation], i: usize) {
         if let Some((_, rect)) = self.screen_box(annotations, &[i]) {
-            frame_line(&self.painter, rect, 1.);
+            frame_line(&mut self.shapes.borrow_mut(), rect, 1.);
         }
     }
 
     /// The box that selects, while it is dragged
     fn show_select_box(&self, state: &AnnotateUi) {
         if let Some(Drag::Select { from, .. }) = &state.drag
-            && let Some(pos) = self.pointer
+            && let Some(mouse) = self.mouse
         {
             let accent = accent_color(self.ctx);
             let corner = self.to_screen(Point::from_xy(from[0], from[1]));
-            self.painter.rect(
-                egui::Rect::from_two_pos(corner, pos),
+            let rect = egui::Rect::from_two_pos(corner, mouse.screen);
+            let mut shapes = self.shapes.borrow_mut();
+            shapes.push(egui::Shape::rect_filled(
+                rect,
                 0.,
                 opacity(accent, Opacity::Faint),
+            ));
+            shapes.push(egui::Shape::rect_stroke(
+                rect,
+                0.,
                 Stroke::new(1., accent),
                 egui::StrokeKind::Inside,
-            );
+            ));
         }
     }
 }
@@ -250,13 +291,18 @@ fn forget_what_is_gone(annotations: &[Annotation], state: &mut AnnotateUi) {
 }
 
 /// What changed, here or on the cards, can be undone once it is done. Ctrl+Z (Cmd+Z on a Mac)
-/// undoes, with Shift or Ctrl+Y it redoes, while a tool is picked; a box to type in has its own.
-fn undo_and_redo(ctx: &egui::Context, annotations: &mut Vec<Annotation>, state: &mut AnnotateUi) {
-    let busy = state.drag.is_some()
-        || state.typing.is_some()
-        || ctx.input(|i| i.pointer.any_down());
+/// undoes, with Shift or Ctrl+Y it redoes, while a tool is picked and the keys are free; a box to
+/// type in has its own.
+fn undo_and_redo(
+    ctx: &egui::Context,
+    annotations: &mut Vec<Annotation>,
+    state: &mut AnnotateUi,
+    keys_free: bool,
+) {
+    let busy =
+        state.drag.is_some() || state.typing.is_some() || ctx.input(|i| i.pointer.any_down());
     state.history.record(annotations, busy);
-    if state.tool.is_none() || busy || ctx.egui_wants_keyboard_input() {
+    if state.tool.is_none() || busy || !keys_free {
         return;
     }
     let (undo, redo) = ctx.input(|i| {
@@ -367,7 +413,7 @@ fn keys(
 
 /// The box around what is selected as the frame begins: which corner shows the button to turn,
 /// what of it the mouse is over, and since when, for its tooltip
-fn selection_box(
+fn lay_out_selection(
     canvas: &Canvas,
     annotations: &[Annotation],
     state: &mut AnnotateUi,
@@ -377,7 +423,10 @@ fn selection_box(
         state.hovered = None;
         return None;
     };
-    let pointer = canvas.pointer.filter(|_| !canvas.pointer_over_ui);
+    let pointer = canvas
+        .mouse
+        .map(|mouse| mouse.screen)
+        .filter(|_| !canvas.pointer_over_ui);
     if state.drag.is_none() {
         state.rotate_corner = rotate_corner(rect, state.rotate_corner, pointer);
     }
@@ -414,18 +463,17 @@ fn start_move(
     });
 }
 
-/// A press on the image at `pos`, `p` in the edited image: it ends the typing, grabs a handle or
-/// a button of the box around what is selected, selects, starts a move, a box that selects, a
-/// text or a drawing
+/// A press on the image where the mouse is: it ends the typing, grabs a handle or a button of the
+/// box around what is selected, selects, starts a move, a box that selects, a text or a drawing
 fn press(
     canvas: &Canvas,
     annotations: &mut Vec<Annotation>,
     state: &mut AnnotateUi,
     selection: Option<&Selection>,
-    pos: Pos2,
-    p: [f32; 2],
+    mouse: Mouse,
     typed: bool,
 ) {
+    let (pos, p) = (mouse.screen, mouse.image);
     let (tool, mapping, original) = (canvas.tool, canvas.mapping, canvas.mapping.original);
     let o = mapping.to_original(p);
     if state.typing.is_some() || typed {
@@ -537,10 +585,10 @@ fn right_click(
     annotations: &[Annotation],
     state: &mut AnnotateUi,
     selection: Option<&Selection>,
-    pos: Pos2,
-    p: [f32; 2],
+    mouse: Mouse,
     typed: bool,
 ) {
+    let (pos, p) = (mouse.screen, mouse.image);
     if !canvas.right_pressed
         || canvas.pointer_over_ui
         || state.drag.is_some()
@@ -692,17 +740,17 @@ fn drag(
     dragged
 }
 
-/// The cursor for what is dragged, or for what a click at `pos` would do, and a thin box around
-/// what it would select
+/// The cursor for what is dragged, or for what a click where the mouse is would do, and a thin
+/// box around what it would select
 fn point(
     canvas: &Canvas,
     annotations: &[Annotation],
     state: &AnnotateUi,
     selection: Option<&Selection>,
     dragged: &Dragged,
-    pos: Pos2,
-    p: [f32; 2],
+    mouse: Mouse,
 ) {
+    let (pos, p) = (mouse.screen, mouse.image);
     // the handles and buttons of the box go before what is below them, a drag goes on over the
     // panels too
     let box_cursor = match &state.drag {
@@ -801,16 +849,16 @@ fn double_click(canvas: &Canvas, annotations: &[Annotation], state: &mut Annotat
     if canvas.double
         && !canvas.pointer_over_ui
         && state.typing.is_none()
-        && let Some(pos) = canvas.pointer
+        && let Some(mouse) = canvas.mouse
         && let Some(i) = canvas
-            .hit(annotations, canvas.to_result(pos))
+            .hit(annotations, mouse.image)
             .filter(|i| is_text(&annotations[*i]))
     {
         state.start_typing(i);
     }
 }
 
-/// The selection box after this frame, with its handles, and a thin box around the card under the mouse. 
+/// The selection box after this frame, with its handles, and a thin box around the card under the mouse.
 /// `target` is what the mouse was over at the frame's start.
 fn show_selection(
     canvas: &Canvas,
@@ -828,7 +876,7 @@ fn show_selection(
             None => target,
             _ => None,
         };
-        handles.paint(canvas.ctx, &canvas.painter, hot, idle);
+        handles.paint(canvas.ctx, &mut canvas.shapes.borrow_mut(), hot, idle);
     }
     if let Some(i) = state.pointed_card.filter(|i| !state.selected.contains(i))
         && annotations.get(i).is_some_and(|a| !a.hidden)
@@ -839,7 +887,7 @@ fn show_selection(
 
 /// The angle while what is selected is turned, or what a handle or a button does once the mouse rests on it
 fn show_tooltip(canvas: &Canvas, state: &AnnotateUi, angle: Option<String>) {
-    let Some(pos) = canvas.pointer else {
+    let Some(pos) = canvas.mouse.map(|mouse| mouse.screen) else {
         return;
     };
     if let Some(angle) = angle {

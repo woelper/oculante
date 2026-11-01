@@ -4,10 +4,10 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::annotate::Annotation;
-use crate::ui::annotate::AnnotateUi;
 use crate::icons::*;
 use crate::paint::{PaintStroke, Pixels, StrokeDrawing, channels};
 use crate::settings::VolatileSettings;
+use crate::ui::annotate::AnnotateUi;
 use crate::ui::{
     BLACK, EguiExt, Opacity, RED, ToColor32, WHITE, YELLOW, YELLOW_HOVER, contrast_gray, opacity,
     over_image,

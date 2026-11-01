@@ -103,7 +103,10 @@ fn reset_rotation_turns_back_what_was_turned_only() {
         assert_eq!(list[0].flip, turned.flip, "{ops:?}: still flipped");
         let was = middle_in(&turned, &mapping).unwrap();
         let now = middle_in(&list[0], &mapping).unwrap();
-        assert!((was[0] - now[0]).abs() <= 1. && (was[1] - now[1]).abs() <= 1., "{ops:?}");
+        assert!(
+            (was[0] - now[0]).abs() <= 1. && (was[1] - now[1]).abs() <= 1.,
+            "{ops:?}"
+        );
     }
 }
 
@@ -174,10 +177,16 @@ fn undo_lasts_while_annotations_are_switched_off() {
     // removed and added again: a new, empty list
     let mut list = vec![];
     state.history.record(&list, false);
-    assert!(state.history.step(&mut list, true), "the empty list is a step");
+    assert!(
+        state.history.step(&mut list, true),
+        "the empty list is a step"
+    );
     assert_eq!(list.len(), 1, "the arrow is back");
     state.new_image();
-    assert!(!state.history.step(&mut list, true), "a new image starts over");
+    assert!(
+        !state.history.step(&mut list, true),
+        "a new image starts over"
+    );
 }
 
 #[test]
@@ -186,7 +195,11 @@ fn counters_count_on_from_the_highest() {
     assert_eq!(next_counter(&[]), 1);
     assert_eq!(next_counter(&[arrow_at([0, 0], [5, 5])]), 1);
     let list = [counter(1), counter(5), arrow_at([0, 0], [5, 5]), counter(2)];
-    assert_eq!(next_counter(&list), 6, "one removed in between is not counted again");
+    assert_eq!(
+        next_counter(&list),
+        6,
+        "one removed in between is not counted again"
+    );
     assert_eq!(counter(3).label(), "Counter 3");
     assert_eq!(
         panel::names(&[counter(1), counter(2)]),
@@ -237,7 +250,10 @@ fn counters_look_as_they_are_set() {
     style.fit((600, 600));
     let next = style.new_annotation(Tool::Counter).unwrap();
     let arrow = style.new_annotation(Tool::Arrow).unwrap();
-    assert_eq!(next.color, arrow.color, "the color of the other annotations");
+    assert_eq!(
+        next.color, arrow.color,
+        "the color of the other annotations"
+    );
     assert_eq!(next.number_color, white());
     // a changed one: the next ones look like it, the others take its color
     let mut changed = next.clone();
@@ -246,7 +262,10 @@ fn counters_look_as_they_are_set() {
     style.remember(&changed);
     let next = style.new_annotation(Tool::Counter).unwrap();
     assert_eq!(next.number_color, [255, 220, 0, 255]);
-    assert_eq!(style.new_annotation(Tool::Arrow).unwrap().color, [0, 90, 200, 255]);
+    assert_eq!(
+        style.new_annotation(Tool::Arrow).unwrap().color,
+        [0, 90, 200, 255]
+    );
 }
 
 #[test]

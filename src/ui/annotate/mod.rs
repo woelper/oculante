@@ -12,9 +12,9 @@ mod tools;
 mod typing;
 
 pub(crate) use canvas::canvas_ui;
-pub(crate) use panel::{panel_ui, select_button};
 use history::History;
 use menu::menu_ui;
+pub(crate) use panel::{panel_ui, select_button};
 use selection_box::*;
 use style::Style;
 use tools::{Icon, Tool, paint_icon};
@@ -28,8 +28,8 @@ use tiny_skia::Point;
 use crate::appstate::ImageGeometry;
 use crate::image_editing::{ImageOperation, ImgOpItem, canvas_rect};
 use crate::ui::{
-    BLACK, BUTTON, CARD, OVER_IMAGE_EDGE, Opacity, PANEL, RED, TEXT, TRANSPARENT, ToColor32,
-    WHITE, YELLOW, accent_color, fade, opacity, selection_colors, state_color,
+    BLACK, BUTTON, CARD, OVER_IMAGE_EDGE, Opacity, PANEL, RED, TEXT, TRANSPARENT, ToColor32, WHITE,
+    YELLOW, accent_color, fade, opacity, selection_colors, state_color,
 };
 
 use crate::annotate::*;
@@ -56,12 +56,18 @@ pub fn visible(stack: &[ImgOpItem], state: &AnnotateUi) -> Vec<Annotation> {
 
 #[derive(Debug, Clone)]
 enum Drag {
-    Draw { index: usize, from: [f32; 2] },
+    Draw {
+        index: usize,
+        from: [f32; 2],
+    },
     Move {
         from: [f32; 2],
         starts: Vec<[i32; 2]>,
     },
-    Select { from: [f32; 2], before: Vec<usize> },
+    Select {
+        from: [f32; 2],
+        before: Vec<usize>,
+    },
     /// Resizing the selection by the handle at `side`. `shape` is its box, lines
     /// not counted. `before` holds the selected annotations as they were.
     Resize {
@@ -113,6 +119,11 @@ pub struct AnnotateUi {
     hovered: Option<(Target, f64)>,
     /// Where on the screen the menu of a right-click on what is selected is open
     menu: Option<Pos2>,
+    /// What is drawn over the image this frame: the box around what is selected, its handles and
+    /// buttons, the thin box of what the mouse points at, the box that selects. The central
+    /// panel paints it right after the image, in its own layer, so it is below windows such as
+    /// the file manager and the menus.
+    pub overlay: Vec<egui::Shape>,
     history: History,
 }
 

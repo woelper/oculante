@@ -96,7 +96,13 @@ pub(super) enum Icon {
 
 /// Draws an icon in the middle of `rect`, in lines as thick as those of the icon
 /// font, `scale` times as large
-pub(super) fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Color32, scale: f32) {
+pub(super) fn paint_icon(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    icon: Icon,
+    color: Color32,
+    scale: f32,
+) {
     // in a box of 16 by 16
     let at = |x: f32, y: f32| rect.center() + egui::vec2(x - 8., y - 8.) * scale;
     let stroke = Stroke::new(1.6 * scale, color);

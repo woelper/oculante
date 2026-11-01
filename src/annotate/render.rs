@@ -1,5 +1,7 @@
 //! Drawing annotations onto the edited image and keeping them drawn there as they change.
 
+use rayon::prelude::*;
+
 use super::*;
 
 /// Length along the arrow and half the width of its head: two lines back from the tip at
@@ -73,11 +75,7 @@ fn spot_area(a: &Annotation, t: Transform, size: (u32, u32)) -> Option<Rect> {
 }
 
 /// The pixels of the image a box touches, `smooth` further on all sides, none outside it
-fn in_pixels(
-    [left, top, right, bottom]: [f32; 4],
-    smooth: f32,
-    size: (u32, u32),
-) -> Option<Rect> {
+fn in_pixels([left, top, right, bottom]: [f32; 4], smooth: f32, size: (u32, u32)) -> Option<Rect> {
     let (left, top) = (
         (left - smooth).floor().max(0.),
         (top - smooth).floor().max(0.),
@@ -95,7 +93,12 @@ fn in_pixels(
 }
 
 /// Draws an annotation, which reaches no further than `area`
-pub(super) fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation, t: Transform, area: Rect) {
+pub(super) fn draw<P: Pixel<Subpixel = u8>>(
+    img: &mut Pixels<P>,
+    a: &Annotation,
+    t: Transform,
+    area: Rect,
+) {
     if let Shape::Redact { style, .. } = &a.shape {
         match style {
             Redaction::Pixelate => {
@@ -124,10 +127,7 @@ pub(super) fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation,
     let Some(mut layer) = Pixmap::new(area.width + 2 * margin, area.height + 2 * margin) else {
         return;
     };
-    let t = t.post_translate(
-        margin as f32 - area.x as f32,
-        margin as f32 - area.y as f32,
-    );
+    let t = t.post_translate(margin as f32 - area.x as f32, margin as f32 - area.y as f32);
     let paint = |[r, g, b, alpha]: [u8; 4]| {
         let mut paint = Paint::default();
         paint.set_color_rgba8(r, g, b, alpha);
@@ -224,12 +224,8 @@ pub(super) fn draw<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, a: &Annotation,
     }
     if margin > 0 {
         add_shadow(&mut layer, a.shadow, spread);
-        let inside = tiny_skia::IntRect::from_xywh(
-            margin as i32,
-            margin as i32,
-            area.width,
-            area.height,
-        );
+        let inside =
+            tiny_skia::IntRect::from_xywh(margin as i32, margin as i32, area.width, area.height);
         match inside.and_then(|inside| layer.clone_rect(inside)) {
             Some(inside) => layer = inside,
             None => return,
@@ -322,33 +318,39 @@ fn pixelate<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, area: Rect, block: u32
 fn blend<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, layer: &Pixmap, area: Rect) {
     let n = channels::<P>();
     let stride = img.width() as usize * n;
-    let row_length = area.width as usize * 4;
-    for (row, src) in layer.data().chunks_exact(row_length).enumerate() {
-        let start = (area.y as usize + row) * stride + area.x as usize * n;
-        let dst = &mut img.as_mut()[start..start + area.width as usize * n];
-        let (src, _) = src.as_chunks::<4>();
-        for (d, s) in dst.chunks_exact_mut(n).zip(src) {
-            match s[3] {
-                0 => {}
-                255 => d.copy_from_slice(&s[..n]),
-                alpha => {
-                    let sa = alpha as f32 / 255.;
-                    // what shows of the pixel below, all of it without alpha
-                    let below = d.get(3).map_or(1., |a| *a as f32 / 255.) * (1. - sa);
-                    let out = sa + below;
-                    for c in 0..3 {
-                        d[c] = ((s[c] as f32 + d[c] as f32 * below) / out).round() as u8;
-                    }
-                    if let Some(a) = d.get_mut(3) {
-                        *a = (out * 255.).round() as u8;
-                    }
+    let (left, right) = (area.x as usize * n, (area.x + area.width) as usize * n);
+    let rows = area.y as usize * stride..(area.y + area.height) as usize * stride;
+    img.as_mut()[rows]
+        .par_chunks_mut(stride)
+        .zip(layer.data().par_chunks(area.width as usize * 4))
+        .with_min_len(8)
+        .for_each(|(row, src)| blend_row(&mut row[left..right], src, n));
+}
+
+/// One row of a layer over one row of the image with `n` channels
+fn blend_row(dst: &mut [u8], src: &[u8], n: usize) {
+    let (src, _) = src.as_chunks::<4>();
+    for (d, s) in dst.chunks_exact_mut(n).zip(src) {
+        match s[3] {
+            0 => {}
+            255 => d.copy_from_slice(&s[..n]),
+            alpha => {
+                let sa = alpha as f32 / 255.;
+                // what shows of the pixel below, all of it without alpha
+                let below = d.get(3).map_or(1., |a| *a as f32 / 255.) * (1. - sa);
+                let out = sa + below;
+                for c in 0..3 {
+                    d[c] = ((s[c] as f32 + d[c] as f32 * below) / out).round() as u8;
+                }
+                if let Some(a) = d.get_mut(3) {
+                    *a = (out * 255.).round() as u8;
                 }
             }
         }
     }
 }
 
-/// Adds a soft black shadow around the layer's content. 
+/// Adds a soft black shadow around the layer's content.
 /// The shadow is `dark` percent opaque at the edges and fades to nothing over `spread` pixels.
 fn add_shadow(layer: &mut Pixmap, dark: u32, spread: f32) {
     let (w, h) = (layer.width() as usize, layer.height() as usize);
@@ -365,7 +367,13 @@ fn add_shadow(layer: &mut Pixmap, dark: u32, spread: f32) {
         box_blur(&mut alpha, w, h, radius);
     }
     let dark = dark.min(100) as f32 / 100.;
-    for (p, blurred) in layer.data_mut().as_chunks_mut::<4>().0.iter_mut().zip(alpha) {
+    for (p, blurred) in layer
+        .data_mut()
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(alpha)
+    {
         // half covered at an edge: as dark as it is set there
         let shade = dark * (blurred * 2.).clamp(0., 1.);
         let a = p[3] as f32 / 255.;
@@ -455,7 +463,7 @@ fn dim<P: Pixel<Subpixel = u8>>(
 }
 
 /// An annotation as the layer drew it
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 struct Drawn {
     a: Annotation,
     /// What it covers of the image, none when it is not in it
@@ -464,7 +472,19 @@ struct Drawn {
     spot: Option<Rect>,
 }
 
-/// The same spotlight and shade on a different image size, with its spot moved, turned or resized.
+impl Drawn {
+    fn new(a: &Annotation, mapping: &Mapping, size: (u32, u32)) -> Self {
+        let t = a.transform(mapping);
+        Self {
+            a: a.clone(),
+            area: area(a, t, size),
+            spot: spot_area(a, t, size),
+        }
+    }
+}
+
+/// The same spotlight and shade on an image of the same size, with its spot moved, turned or
+/// resized.
 fn only_the_spot_changed(was: &Drawn, is: &Drawn) -> bool {
     was.a.is_spotlight()
         && is.a.is_spotlight()
@@ -484,6 +504,8 @@ pub struct AnnotationLayer {
     /// The annotations as they are in the image, with the part each one drew on
     drawn: Vec<Drawn>,
     fonts: u32,
+    /// Of the image they were drawn on
+    size: (u32, u32),
 }
 
 impl AnnotationLayer {
@@ -507,37 +529,47 @@ impl AnnotationLayer {
         mapping: &Mapping,
     ) -> Option<Rect> {
         let size = img.dimensions();
-        let now: Vec<Drawn> = annotations
-            .iter()
-            .map(|a| {
-                let t = a.transform(mapping);
-                Drawn {
-                    a: a.clone(),
-                    area: area(a, t, size),
-                    spot: spot_area(a, t, size),
-                }
-            })
-            .collect();
         let fonts = FONTS_VERSION.load(Ordering::Relaxed);
-        let everything = fonts != self.fonts;
+        // with other fonts, or on an image of another size, all is drawn again. Edits that change
+        // the image under the annotations reset the layer.
+        let everything = fonts != self.fonts || size != self.size;
         let mut dirty: Option<Rect> = None;
-        for i in 0..self.drawn.len().max(now.len()) {
-            let (was, is) = (self.drawn.get(i), now.get(i));
-            if !everything && was == is {
-                continue;
-            }
-            let changed = match (was, is) {
-                // A spotlight whose spot moved, turned or resized keeps its shade. Only the spot's old and new positions differ.
-                (Some(was), Some(is)) if !everything && only_the_spot_changed(was, is) => {
-                    [was.spot, is.spot]
-                }
-                _ => [was.and_then(|d| d.area), is.and_then(|d| d.area)],
-            };
-            for area in changed.into_iter().flatten() {
+        let mut add = |area: Option<Rect>| {
+            if let Some(area) = area {
                 dirty = Some(dirty.map_or(area, |d| rect_union(d, area)));
             }
+        };
+        // what is as it was drawn keeps what the layer knows of it, without a copy; only what
+        // changed is copied and measured again
+        let mut before = std::mem::take(&mut self.drawn).into_iter();
+        let mut now = Vec::with_capacity(annotations.len());
+        for a in annotations {
+            match before.next() {
+                Some(was) if !everything && was.a == *a => now.push(was),
+                was => {
+                    let is = Drawn::new(a, mapping, size);
+                    match &was {
+                        // A spotlight whose spot moved, turned or resized keeps its shade.
+                        // Only the spot's old and new positions differ.
+                        Some(was) if !everything && only_the_spot_changed(was, &is) => {
+                            add(was.spot);
+                            add(is.spot);
+                        }
+                        _ => {
+                            add(was.as_ref().and_then(|d| d.area));
+                            add(is.area);
+                        }
+                    }
+                    now.push(is);
+                }
+            }
+        }
+        // no longer in the list
+        for was in before {
+            add(was.area);
         }
         self.fonts = fonts;
+        self.size = size;
         let Some(mut dirty) = dirty else {
             self.drawn = now;
             return None;
@@ -546,7 +578,11 @@ impl AnnotationLayer {
         // The spotlight shade covers the whole image, so it is drawn only where needed.
         loop {
             let mut grown = false;
-            for area in now.iter().filter(|d| !d.a.is_spotlight()).filter_map(|d| d.area) {
+            for area in now
+                .iter()
+                .filter(|d| !d.a.is_spotlight())
+                .filter_map(|d| d.area)
+            {
                 if overlap(area, dirty) && rect_union(area, dirty) != dirty {
                     dirty = rect_union(area, dirty);
                     grown = true;

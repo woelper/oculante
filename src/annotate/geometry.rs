@@ -170,7 +170,12 @@ pub(super) fn extent(a: &Annotation, t: Transform, grow: f32) -> Option<[f32; 4]
 /// corners in the edited image, with their lines not counted. The area is that of the bounding
 /// box of the points they cover. One with no height or no width is in or out along that side,
 /// depending on whether it lies within the box.
-pub(crate) fn in_box(annotations: &[Annotation], mapping: &Mapping, a: [f32; 2], b: [f32; 2]) -> Vec<usize> {
+pub(crate) fn in_box(
+    annotations: &[Annotation],
+    mapping: &Mapping,
+    a: [f32; 2],
+    b: [f32; 2],
+) -> Vec<usize> {
     let (left, top) = (a[0].min(b[0]), a[1].min(b[1]));
     let (right, bottom) = (a[0].max(b[0]), a[1].max(b[1]));
     // the part of lo..hi within from..to, 0 to 1; a flat one is in or out

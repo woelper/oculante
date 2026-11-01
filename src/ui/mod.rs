@@ -780,6 +780,24 @@ pub fn is_popup_open(ctx: &egui::Context, id: Id) -> bool {
     ctx.data(|d| d.get_temp::<bool>(id).unwrap_or(false))
 }
 
+/// The windows and questions that open over the image, besides the preferences: the file
+/// managers to open and to save an image, a palette and a LUT, and the questions before a file is
+/// deleted or overwritten
+const WINDOWS: [&str; 6] = [
+    "OPEN",
+    "SAVE",
+    "SAVEASE",
+    "LUT",
+    DELETE_MODAL_ID,
+    "overwrite",
+];
+
+/// Whether a window or a question is open over the image: keys meant for the image are left to
+/// it then
+pub fn window_open(ctx: &egui::Context, state: &OculanteState) -> bool {
+    state.settings_enabled || WINDOWS.iter().any(|id| is_popup_open(ctx, Id::new(*id)))
+}
+
 pub struct Modal {
     id: String,
     ctx: egui::Context,
