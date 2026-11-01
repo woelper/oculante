@@ -1084,7 +1084,7 @@ impl ImageOperation {
                             painter.rect_stroke(rect, 0.0, edge, StrokeKind::Middle);
                             painter.rect_stroke(rect, 0.0, line, StrokeKind::Middle);
 
-                            painter.rect_filled(rect, 0.0, opacity(WHITE, Opacity::Subtle));
+                            painter.rect_filled(rect, 0.0, opacity(WHITE, Opacity::Faint));
 
                             painter.text(
                                 rect.expand(14.).center_bottom(),
