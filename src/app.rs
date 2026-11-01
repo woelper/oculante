@@ -1313,7 +1313,7 @@ impl eframe::App for OculanteApp {
         // Render image in egui's CentralPanel (behind side panels, below UI)
         let bg = self.state.persistent_settings.background_color;
         egui::CentralPanel::default()
-            .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(bg[0], bg[1], bg[2])))
+            .frame(egui::Frame::NONE.fill(bg.to_color32()))
             .show(ui, |ui| {
                 if let Some(renderer) = &self.renderer
                     && !self.image_tiles.is_empty()
@@ -1355,12 +1355,8 @@ impl eframe::App for OculanteApp {
                                     egui::pos2(0.0, 0.0),
                                     egui::pos2(repeats_x, repeats_y),
                                 );
-                                ui.painter().image(
-                                    checker.id(),
-                                    img_rect,
-                                    checker_uv,
-                                    egui::Color32::WHITE,
-                                );
+                                ui.painter()
+                                    .image(checker.id(), img_rect, checker_uv, UNTINTED);
                             }
                         }
                     }
@@ -1410,7 +1406,7 @@ impl eframe::App for OculanteApp {
                         ui.painter().circle_stroke(
                             egui::pos2(self.state.cursor.x, self.state.cursor.y),
                             radius,
-                            egui::Stroke::new(1.5, egui::Color32::from_white_alpha(128)),
+                            egui::Stroke::new(1.5, opacity(WHITE, Opacity::Half)),
                         );
                     }
 
@@ -1428,7 +1424,7 @@ impl eframe::App for OculanteApp {
                                 ui.painter().rect_stroke(
                                     frame_rect,
                                     0.0,
-                                    egui::Stroke::new(1.0, egui::Color32::GRAY),
+                                    egui::Stroke::new(1.0, GRAY),
                                     egui::StrokeKind::Inside,
                                 );
                             }

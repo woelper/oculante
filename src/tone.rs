@@ -4,6 +4,10 @@
 
 use std::sync::Arc;
 
+use crate::ui::{
+    BLACK, FIELD, GRAY, Opacity, PURE_BLUE, PURE_GREEN, PURE_RED, WHITE, opacity, strong_text,
+    weak_text,
+};
 use egui::{Color32, Id, Pos2, Rect, Response, Sense, Shape, Stroke, Ui, pos2, vec2};
 use image::{DynamicImage, GenericImageView};
 use serde::{Deserialize, Serialize};
@@ -168,10 +172,10 @@ impl Histogram {
 /// The color a channel is drawn in
 fn channel_color(ui: &Ui, channel: usize) -> Color32 {
     match channel {
-        1 => Color32::from_rgb(235, 80, 80),
-        2 => Color32::from_rgb(80, 200, 90),
-        3 => Color32::from_rgb(90, 140, 245),
-        _ => ui.visuals().strong_text_color(),
+        1 => PURE_RED,
+        2 => PURE_GREEN,
+        3 => PURE_BLUE,
+        _ => strong_text(ui),
     }
 }
 
@@ -199,7 +203,7 @@ fn paint_histogram(ui: &Ui, rect: Rect, channel: usize) {
     let bins = &histogram.0[channel];
     // the ends are often full of clipped pixels, they would flatten the rest
     let tallest = bins[1..255].iter().copied().max().unwrap_or(0).max(1) as f32;
-    let color = channel_color(ui, channel).gamma_multiply(0.35);
+    let color = opacity(channel_color(ui, channel), Opacity::Light);
     let width = rect.width() / 256.;
     for (i, &count) in bins.iter().enumerate() {
         let height = (count as f32 / tallest).min(1.) * rect.height();
@@ -229,7 +233,7 @@ fn paint_handle(ui: &Ui, tip: Pos2, fill: Color32, active: bool) {
     ui.painter().add(Shape::convex_polygon(
         points,
         fill,
-        Stroke::new(1., ui.visuals().strong_text_color()),
+        Stroke::new(1., strong_text(ui)),
     ));
 }
 
@@ -297,13 +301,11 @@ pub fn levels_ui(ui: &mut Ui, levels: &mut [Levels; 4], item_id: u64) -> Respons
     let color = channel_color(ui, channel);
 
     let (histogram, _) = ui.allocate_exact_size(vec2(width, 80.), Sense::hover());
-    ui.painter()
-        .rect_filled(histogram, 2., ui.visuals().extreme_bg_color);
+    ui.painter().rect_filled(histogram, 2., FIELD.of(ui));
     paint_histogram(ui, histogram, channel);
 
     let midtone = level.black as f32 / 255.
         + level.midtone() * (level.white as f32 - level.black as f32) / 255.;
-    let gray = Color32::from_gray(128);
     if let Some((handle, v)) = handle_strip(
         ui,
         width,
@@ -312,7 +314,7 @@ pub fn levels_ui(ui: &mut Ui, levels: &mut [Levels; 4], item_id: u64) -> Respons
             midtone,
             level.white as f32 / 255.,
         ],
-        &[Color32::BLACK, gray, Color32::WHITE],
+        &[BLACK, GRAY, WHITE],
         Id::new(("levels_input", item_id)),
     ) {
         let value = (v * 255.).round() as u8;
@@ -354,13 +356,13 @@ pub fn levels_ui(ui: &mut Ui, levels: &mut [Levels; 4], item_id: u64) -> Respons
 
     ui.add_space(4.);
     let (bar, _) = ui.allocate_exact_size(vec2(width, 10.), Sense::hover());
-    let end = if channel == 0 { Color32::WHITE } else { color };
-    paint_gradient(ui, bar, Color32::BLACK, end);
+    let end = if channel == 0 { WHITE } else { color };
+    paint_gradient(ui, bar, BLACK, end);
     if let Some((handle, v)) = handle_strip(
         ui,
         width,
         &[level.out_black as f32 / 255., level.out_white as f32 / 255.],
-        &[Color32::BLACK, Color32::WHITE],
+        &[BLACK, WHITE],
         Id::new(("levels_output", item_id)),
     ) {
         let value = (v * 255.).round() as u8;
@@ -485,9 +487,9 @@ pub fn curves_ui(ui: &mut Ui, curves: &mut [Vec<(u8, u8)>; 4], item_id: u64) -> 
 
     // the graph
     let painter = ui.painter_at(rect.expand(6.));
-    painter.rect_filled(rect, 2., ui.visuals().extreme_bg_color);
+    painter.rect_filled(rect, 2., FIELD.of(ui));
     paint_histogram(ui, rect, channel);
-    let faint = Stroke::new(1., ui.visuals().weak_text_color().gamma_multiply(0.4));
+    let faint = Stroke::new(1., opacity(weak_text(ui), Opacity::Half));
     for i in 1..4 {
         let t = i as f32 / 4.;
         painter.line_segment([to_screen((t, 0.)), to_screen((t, 1.))], faint);
@@ -507,7 +509,7 @@ pub fn curves_ui(ui: &mut Ui, curves: &mut [Vec<(u8, u8)>; 4], item_id: u64) -> 
     // the other channels that are bent, faintly
     for (other, points) in curves.iter().enumerate() {
         if other != channel && *points != straight_curve() {
-            let stroke = Stroke::new(1., channel_color(ui, other).gamma_multiply(0.5));
+            let stroke = Stroke::new(1., opacity(channel_color(ui, other), Opacity::Half));
             painter.add(Shape::line(line(points), stroke));
         }
     }
@@ -518,11 +520,11 @@ pub fn curves_ui(ui: &mut Ui, curves: &mut [Vec<(u8, u8)>; 4], item_id: u64) -> 
     ));
     for (i, &(x, y)) in points.iter().enumerate() {
         let center = to_screen((x as f32 / 255., y as f32 / 255.));
-        let stroke = Stroke::new(1.5, ui.visuals().strong_text_color());
+        let stroke = Stroke::new(1.5, strong_text(ui));
         if selected == Some(i) {
-            painter.circle(center, 5., ui.visuals().strong_text_color(), stroke);
+            painter.circle(center, 5., strong_text(ui), stroke);
         } else {
-            painter.circle(center, 4., ui.visuals().extreme_bg_color, stroke);
+            painter.circle(center, 4., FIELD.of(ui), stroke);
         }
     }
 

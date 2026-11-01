@@ -20,6 +20,10 @@ use tiny_skia::{FillRule, LineCap, LineJoin, Paint, Path, PathBuilder, Pixmap, P
 use crate::appstate::ImageGeometry;
 use crate::image_editing::{ImageOperation, ImgOpItem, canvas_rect, cropped_range, perspective};
 use crate::paint::{Base, Pixels, channels, keep_base, restore};
+use crate::ui::{
+    CARD, OVER_IMAGE_EDGE, Opacity, RED, TRANSPARENT, ToColor32, WHITE, YELLOW, accent_color,
+    opacity, selection_colors, state_color,
+};
 use crate::utils::rect_union;
 
 /// One annotation. Its own coordinates start where it starts, in pixels of the
@@ -1236,7 +1240,7 @@ impl Tool {
 
     fn icon(self) -> Icon {
         match self {
-            Tool::Select => Icon::Pointer,
+            Tool::Select => Icon::Mouse,
             Tool::Arrow => Icon::Arrow,
             Tool::Frame => Icon::Frame,
             Tool::Circle => Icon::Circle,
@@ -1251,7 +1255,7 @@ impl Tool {
 /// What the button of a tool or of a way to hide shows
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Icon {
-    Pointer,
+    Mouse,
     Arrow,
     Frame,
     Circle,
@@ -1270,18 +1274,14 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
     let stroke = Stroke::new(1.6 * scale, color);
     let square = egui::Rect::from_min_max(at(2.5, 3.5), at(13.5, 12.5));
     match icon {
-        Icon::Pointer => {
-            let tip = [
-                (4., 1.5),
-                (4., 13.5),
-                (7., 10.6),
-                (9.2, 14.8),
-                (11.1, 13.9),
-                (9., 9.8),
-                (13., 9.6),
-            ];
-            let points = tip.into_iter().map(|(x, y)| at(x, y)).collect();
-            painter.add(egui::Shape::closed_line(points, stroke));
+        Icon::Mouse => {
+            painter.text(
+                at(8., 8.),
+                egui::Align2::CENTER_CENTER,
+                crate::icons::MOUSE,
+                egui::FontId::proportional(14. * scale),
+                color,
+            );
         }
         Icon::Arrow => {
             painter.line_segment([at(2.5, 13.5), at(10., 6.)], stroke);
@@ -1310,7 +1310,7 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
             painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
                 [at(2., 12.), at(5., 0.), at(10., 17.), at(14., 4.)],
                 false,
-                Color32::TRANSPARENT,
+                TRANSPARENT,
                 stroke,
             ));
         }
@@ -1321,7 +1321,7 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: Colo
                     let shade = if (row + column) % 2 == 0 {
                         color
                     } else {
-                        color.gamma_multiply(0.35)
+                        opacity(color, Opacity::Light)
                     };
                     let min = at(2. + column as f32 * 4., 2. + row as f32 * 4.);
                     painter.rect_filled(
@@ -1409,7 +1409,8 @@ impl Default for AnnotateUi {
         Self {
             tool: None,
             open: false,
-            color: [235, 40, 40, 255],
+            // the app's red, what is drawn is drawn in the bytes it has then
+            color: RED.to_srgba_unmultiplied(),
             width: 0,
             text_size: 0,
             stamp_size: 0,
@@ -1589,8 +1590,9 @@ pub fn panel_ui(
                         ui.horizontal(|ui| {
                             for &tool in row {
                                 let button = egui::Button::new("").min_size(egui::vec2(width, 40.));
-                                let response = lit(ui, state.tool == Some(tool), button);
-                                let color = ui.style().interact(&response).fg_stroke.color;
+                                let on = state.tool == Some(tool);
+                                let response = lit(ui, on, button);
+                                let color = lit_color(ui, on, &response);
                                 paint_icon(ui.painter(), response.rect, tool.icon(), color, 1.5);
                                 if response
                                     .on_hover_text(format!("{}\n{}", tool.name(), tool.hint()))
@@ -1606,8 +1608,9 @@ pub fn panel_ui(
                         for slot in stamps.iter_mut() {
                             let tool = Tool::Stamp(*slot);
                             let button = egui::Button::new("").min_size(egui::vec2(width, 40.));
-                            let response = lit(ui, state.tool == Some(tool), button);
-                            let color = ui.style().interact(&response).fg_stroke.color;
+                            let on = state.tool == Some(tool);
+                            let response = lit(ui, on, button);
+                            let color = lit_color(ui, on, &response);
                             paint_icon(ui.painter(), response.rect, tool.icon(), color, 1.5);
                             let response =
                                 response.on_hover_text(format!("{}\n{}", tool.name(), tool.hint()));
@@ -1674,35 +1677,25 @@ pub fn panel_ui(
 }
 
 /// As wide as the box of the tools, tinted while it is on
-fn select_button(ui: &mut Ui, on: bool) -> egui::Response {
-    let accent = crate::ui::accent_color(ui.ctx());
+pub(crate) fn select_button(ui: &mut Ui, on: bool) -> egui::Response {
+    let (selected_fill, selected_text) = selection_colors(ui);
     let mut text = egui::RichText::new(Tool::Select.name());
     if on {
-        text = text.color(accent);
+        text = text.color(selected_text);
     }
     let mut button = egui::Button::new(text).min_size(egui::vec2(0., 32.));
     if on {
-        button = button.fill(tint(ui));
+        button = button.fill(selected_fill);
     }
     // the text in the middle
     let response = ui.vertical_centered_justified(|ui| ui.add(button)).inner;
-    let color = if on {
-        accent
-    } else {
-        ui.style().interact(&response).fg_stroke.color
-    };
+    let color = lit_color(ui, on, &response);
     let icon = egui::Rect::from_center_size(
         egui::pos2(response.rect.left() + 22., response.rect.center().y),
         egui::vec2(16., 16.),
     );
-    paint_icon(ui.painter(), icon, Icon::Pointer, color, 1.2);
+    paint_icon(ui.painter(), icon, Icon::Mouse, color, 1.2);
     response
-}
-
-/// The color of the select button while it is on and of the cards of what is
-/// selected
-fn tint(ui: &Ui) -> Color32 {
-    card_fill(ui).lerp_to_gamma(crate::ui::accent_color(ui.ctx()), 0.2)
 }
 
 /// The card of what comes next while nothing is selected, then one for each
@@ -1779,7 +1772,7 @@ fn cards_ui(ui: &mut Ui, annotations: &mut Vec<Annotation>, state: &mut Annotate
                 ui.add_space(size / 2.);
                 let mut name = egui::RichText::new(&names[i]);
                 if selected {
-                    name = name.color(crate::ui::accent_color(ui.ctx()));
+                    name = name.color(selection_colors(ui).1);
                 } else if a.hidden {
                     name = name.weak();
                 }
@@ -1866,7 +1859,12 @@ fn names(annotations: &[Annotation]) -> Vec<String> {
 /// Tinted for what is selected
 fn card(ui: &mut Ui, tinted: bool, add_contents: impl FnOnce(&mut Ui)) -> egui::Response {
     egui::Frame::new()
-        .fill(if tinted { tint(ui) } else { card_fill(ui) })
+        // the select button while it is on has this as well
+        .fill(if tinted {
+            selection_colors(ui).0
+        } else {
+            card_fill(ui)
+        })
         .corner_radius(ui.visuals().widgets.active.corner_radius)
         .inner_margin(egui::Margin::same(6))
         .show(ui, |ui| {
@@ -1877,11 +1875,7 @@ fn card(ui: &mut Ui, tinted: bool, add_contents: impl FnOnce(&mut Ui)) -> egui::
 }
 
 fn card_fill(ui: &Ui) -> Color32 {
-    if ui.visuals().dark_mode {
-        Color32::from_gray(33)
-    } else {
-        Color32::from_gray(242)
-    }
+    CARD.of(ui)
 }
 
 /// What can be set for an annotation: what only its kind has, a line, then its
@@ -2112,17 +2106,24 @@ fn font_families() -> Families {
 
 fn icon_button(ui: &mut Ui, on: bool, icon: Icon) -> egui::Response {
     let response = lit(ui, on, egui::Button::new("").min_size(egui::vec2(28., 24.)));
-    let color = ui.style().interact(&response).fg_stroke.color;
+    let color = lit_color(ui, on, &response);
     paint_icon(ui.painter(), response.rect, icon, color, 1.);
     response
 }
 
+/// A button that is on has the colours of what is selected
 fn lit<'a>(ui: &mut Ui, on: bool, button: egui::Button<'a>) -> egui::Response {
-    ui.add(if on {
-        button.fill(crate::ui::accent_color(ui.ctx()))
+    let (fill, _) = selection_colors(ui);
+    ui.add(if on { button.fill(fill) } else { button })
+}
+
+/// What is drawn on a button of `lit`: the accent on the shade of it while it is on
+fn lit_color(ui: &Ui, on: bool, response: &egui::Response) -> Color32 {
+    if on {
+        selection_colors(ui).1
     } else {
-        button
-    })
+        state_color(ui, response)
+    }
 }
 
 /// Drawing, selecting and moving annotations with the mouse, and the keys for them.
@@ -2187,9 +2188,9 @@ pub fn canvas_ui(
                 .collect();
             painter.add(egui::Shape::closed_line(
                 points.clone(),
-                Stroke::new(width + 2., Color32::from_black_alpha(120)),
+                Stroke::new(width + 2., OVER_IMAGE_EDGE),
             ));
-            let yellow = Stroke::new(width, Color32::from_rgb(255, 200, 40));
+            let yellow = Stroke::new(width, YELLOW);
             if strong {
                 // what is selected is dashed, what is pointed at is not
                 let mut points = points;
@@ -2439,12 +2440,12 @@ pub fn canvas_ui(
         && let Some(Drag::Select { from, .. }) = &state.drag
         && let Some(pos) = pointer
     {
-        let accent = crate::ui::accent_color(ctx);
+        let accent = accent_color(ctx);
         let corner = to_screen(Point::from_xy(from[0], from[1]));
         painter.rect(
             egui::Rect::from_two_pos(corner, pos),
             0.,
-            accent.gamma_multiply(0.15),
+            opacity(accent, Opacity::Faint),
             Stroke::new(1., accent),
             egui::StrokeKind::Inside,
         );
@@ -2520,7 +2521,7 @@ fn text_ui(
     t.map_point(&mut start);
     let size = (a.width as f32 * scale_of(t) * geo.scale).max(4.);
     let [r, g, b, alpha] = a.color;
-    let color = Color32::from_rgba_unmultiplied(r, g, b, alpha.max(80));
+    let color = [r, g, b, alpha.max(80)].to_color32();
     // as the text will be, other fonts than Inter aside
     let family = if a.font.weight >= 600 {
         egui::FontFamily::Name("bold".into())
@@ -2562,7 +2563,7 @@ fn text_ui(
             ui.painter().rect_stroke(
                 response.rect.expand(3.),
                 2.,
-                Stroke::new(1., Color32::from_white_alpha(150)),
+                Stroke::new(1., opacity(WHITE, Opacity::Half)),
                 egui::StrokeKind::Outside,
             );
             let enter = response.has_focus()

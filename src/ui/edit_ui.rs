@@ -246,13 +246,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
                             }
 
-                    if ui
-                        .add(
-                            egui::Button::new("Stop painting")
-                                .fill(accent_color(ui.ctx())),
-                        )
-                        .clicked()
-                    {
+                    let (fill, text) = selection_colors(ui);
+                    let stop = RichText::new("Stop painting").color(text);
+                    if ui.add(egui::Button::new(stop).fill(fill)).clicked() {
                         state.edit_state.painting = false;
                     }
                 } else if ui.button("Paint mode").clicked() {
@@ -574,7 +570,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
         #[cfg(debug_assertions)]
         {
-            ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+            ui.colored_label(BLUE, "Debug info");
             ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
             ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
 
@@ -898,11 +894,7 @@ fn modifier_stack_ui(
 
     for (n, &i) in shown.iter().enumerate() {
         let operation = &mut stack[i];
-        let frame_color = if ui.style().visuals.dark_mode {
-            Color32::from_hex("#212121").unwrap()
-        } else {
-            Color32::from_hex("#F2F2F2").unwrap()
-        };
+        let frame_color = CARD.of(ui);
         egui::Frame::new()
             .fill(frame_color)
             .corner_radius(ui.style().visuals.widgets.active.corner_radius)

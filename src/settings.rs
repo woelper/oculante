@@ -96,9 +96,9 @@ impl Default for PersistentSettings {
     fn default() -> Self {
         PersistentSettings {
             ui_scale: 1.0,
-            accent_color: [255, 0, 75],
+            accent_color: crate::ui::DEFAULT_ACCENT,
             accent_color_is_custom: false,
-            background_color: [30, 30, 30],
+            background_color: crate::ui::DEFAULT_BACKGROUND,
             background_color_is_custom: false,
             vsync: true,
             force_redraw: false,

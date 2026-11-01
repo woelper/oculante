@@ -91,7 +91,7 @@ pub fn info_ui(
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                let hex = Color32::from_rgba_unmultiplied(state.sampled_color[0] as u8, state.sampled_color[1] as u8, state.sampled_color[2] as u8, state.sampled_color[3] as u8).to_hex();
+                let hex = state.sampled_color.map(|channel| channel as u8).to_color32().to_hex();
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
                 info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
@@ -208,7 +208,7 @@ pub fn info_ui(
                                 let item = state.current_item();
                                 if let Some(geo) = state.compare_list.get(path, item) {
                                     if state.image_geometry != geo
-                                        && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(Color32::YELLOW)).clicked() {
+                                        && ui.button(RichText::new(format!("{LOCATION_PIN} Update position")).color(YELLOW)).clicked() {
                                                 state.compare_list.insert(CompareItem::new(path, item, state.image_geometry));
                                         }
                                     } else if ui.button(format!("{PLUS} Add current image")).clicked() {
@@ -352,12 +352,11 @@ fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 texture.id(),
                                 rect,
                                 Rect::from_min_max(pos2(0., 0.), pos2(1., 1.)),
-                                Color32::WHITE,
+                                UNTINTED,
                             );
                         }
                         _ => {
-                            ui.painter()
-                                .rect_filled(rect, 4., ui.visuals().extreme_bg_color);
+                            ui.painter().rect_filled(rect, 4., FIELD.of(ui));
                         }
                     }
                     if item == sequence.current {
@@ -420,14 +419,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                         ui.scope(|ui| {
                             ui.style_mut().override_font_id =
                                 Some(FontId::new(14., FontFamily::Name("bold".into())));
-                            ui.colored_label(
-                                if ui.style().visuals.dark_mode {
-                                    Color32::from_gray(200)
-                                } else {
-                                    Color32::from_gray(20)
-                                },
-                                key,
-                            );
+                            ui.colored_label(TEXT.of(ui), key);
                         });
                         ui.label(val);
                         ui.separator();
@@ -443,14 +435,7 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                         ui.scope(|ui| {
                             ui.style_mut().override_font_id =
                                 Some(FontId::new(14., FontFamily::Name("bold".into())));
-                            ui.colored_label(
-                                if ui.style().visuals.dark_mode {
-                                    Color32::from_gray(200)
-                                } else {
-                                    Color32::from_gray(20)
-                                },
-                                key,
-                            );
+                            ui.colored_label(TEXT.of(ui), key);
                         });
                         ui.label(val);
                         ui.separator();
@@ -491,9 +476,9 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
                 HoverPosition::Elsewhere { .. } => None,
             })
             .show(ui, |plot_ui| {
-                plot_ui.line(line("red", &info.red_histogram, Color32::RED));
-                plot_ui.line(line("green", &info.green_histogram, Color32::GREEN));
-                plot_ui.line(line("blue", &info.blue_histogram, Color32::BLUE));
+                plot_ui.line(line("red", &info.red_histogram, PURE_RED));
+                plot_ui.line(line("green", &info.green_histogram, PURE_GREEN));
+                plot_ui.line(line("blue", &info.blue_histogram, PURE_BLUE));
             });
 
         // The areas below the lines. The plot's own fill does not add colors up, here
@@ -503,14 +488,10 @@ fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
             .transform
             .position_from_point(&PlotPoint::new(0.0, 0.0))
             .y;
-        const FILL: u8 = 70;
         for (histogram, color) in [
-            (&info.red_histogram, Color32::from_rgb_additive(FILL, 0, 0)),
-            (
-                &info.green_histogram,
-                Color32::from_rgb_additive(0, FILL, 0),
-            ),
-            (&info.blue_histogram, Color32::from_rgb_additive(0, 0, FILL)),
+            (&info.red_histogram, CHANNEL_FILL_RED),
+            (&info.green_histogram, CHANNEL_FILL_GREEN),
+            (&info.blue_histogram, CHANNEL_FILL_BLUE),
         ] {
             let mut mesh = Mesh::default();
             for (i, (k, v)) in histogram.iter().enumerate() {
@@ -568,8 +549,9 @@ fn zoom_preview(
     // How many screen pixels per source pixel
     let px_per_src = rect.width() / src_size;
 
-    // Fill background for out-of-bounds areas
-    ui.painter().rect_filled(rect, 0.0, Color32::from_gray(30));
+    // Fill background for out-of-bounds areas of the zoom preview, uses background colour
+    let background = state.persistent_settings.background_color.to_color32();
+    ui.painter().rect_filled(rect, 0.0, background);
 
     // Collect the part of each tile that overlaps the source region
     let mut quads = Vec::new();
@@ -639,7 +621,7 @@ fn zoom_preview(
     // Crosshair
     let center_x = rect.left() + radius * px_per_src;
     let center_y = rect.top() + radius * px_per_src;
-    let stroke = egui::Stroke::new(7.0, Color32::from_rgba_unmultiplied(128, 128, 128, 128));
+    let stroke = egui::Stroke::new(7.0, opacity(GRAY, Opacity::Half));
     ui.painter().line_segment(
         [
             egui::pos2(center_x + px_per_src / 2.0, rect.top()),
@@ -658,10 +640,9 @@ fn zoom_preview(
         egui::pos2(center_x, center_y),
         egui::vec2(px_per_src, px_per_src),
     );
-    ui.painter().rect_stroke(
-        center_rect,
-        0.0,
-        egui::Stroke::new(1.0, Color32::from_gray(40)),
-        egui::StrokeKind::Inside,
-    );
+    let (edge, line) = over_image(1.0);
+    for stroke in [edge, line] {
+        ui.painter()
+            .rect_stroke(center_rect, 0.0, stroke, egui::StrokeKind::Middle);
+    }
 }

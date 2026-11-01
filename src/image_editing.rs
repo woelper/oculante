@@ -7,15 +7,18 @@ use crate::annotate::{AnnotateUi, Annotation};
 use crate::icons::*;
 use crate::paint::{PaintStroke, Pixels, StrokeDrawing, channels};
 use crate::settings::VolatileSettings;
-use crate::ui::EguiExt;
+use crate::ui::{
+    BLACK, EguiExt, Opacity, RED, ToColor32, WHITE, YELLOW, YELLOW_HOVER, contrast_gray, opacity,
+    over_image,
+};
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
 #[cfg(not(feature = "file_open"))]
 use crate::{filebrowser, utils::SUPPORTED_EXTENSIONS};
 use anyhow::{Context as _, Result, bail};
 use egui::epaint::PathShape;
 use egui::{
-    self, Align2, Color32, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke, StrokeKind,
-    Ui, Vec2, lerp, vec2,
+    self, Align2, DragValue, FontId, Id, Pos2, Rect, Response, Sense, Stroke, StrokeKind, Ui, Vec2,
+    lerp, vec2,
 };
 use evalexpr::*;
 use fast_image_resize::{self as fr, ResizeOptions};
@@ -520,7 +523,7 @@ impl ImageOperation {
                 let check = build_operator_tree::<DefaultNumericTypes>(expr)
                     .and_then(|tree| PixelVariables::new().run(&tree, &mut Vector4::repeat(0.5)));
                 if let Err(e) = check {
-                    ui.colored_label(ui.visuals().error_fg_color, e.to_string());
+                    ui.colored_label(RED, e.to_string());
                 }
                 r
             }
@@ -708,9 +711,7 @@ impl ImageOperation {
                     for &color in pts.iter() {
                         let t = color.pos as f32 / u8::MAX as f32;
                         let x = lerp(gradient_rect.x_range(), t);
-                        let egui_color =
-                            // Color32::from_rgb(color.1[0], color.1[1], color.1[2]).additive();
-                            Color32::from_rgb(color.r(), color.g(), color.b());
+                        let egui_color = [color.r(), color.g(), color.b()].to_color32();
 
                         // if first point is shifted, so we clamp and insert first
                         if i == 0 && color.pos > 0 {
@@ -794,11 +795,7 @@ impl ImageOperation {
                             gradient_rect.bottom()..=(gradient_rect.top() + 25.),
                             Stroke::new(
                                 if is_hovered { 4. } else { 1. },
-                                Color32::from_rgb(
-                                    255 - gradient_stop.r(),
-                                    255 - gradient_stop.r(),
-                                    255 - gradient_stop.r(),
-                                ),
+                                contrast_gray(gradient_stop.r()),
                             ),
                         );
                     }
@@ -940,11 +937,7 @@ impl ImageOperation {
                             }
                         }
 
-                        let col = if d < maxdist {
-                            Color32::LIGHT_BLUE
-                        } else {
-                            Color32::GOLD
-                        };
+                        let col = if d < maxdist { YELLOW_HOVER } else { YELLOW };
 
                         // ui.painter().debug_text(
                         //     Pos2::new(pt.0, pt.1),
@@ -965,16 +958,12 @@ impl ImageOperation {
                     ];
 
                     // make a black background covering the image area
-                    painter.rect_filled(
-                        Rect::EVERYTHING,
-                        0.,
-                        Color32::from_rgba_premultiplied(0, 0, 0, 70),
-                    );
+                    painter.rect_filled(Rect::EVERYTHING, 0., opacity(BLACK, Opacity::Light));
 
                     let shape = PathShape::convex_polygon(
                         pts,
-                        Color32::from_rgba_unmultiplied(255, 255, 255, 10),
-                        Stroke::new(1., Color32::GOLD),
+                        opacity(WHITE, Opacity::Subtle),
+                        Stroke::new(1., YELLOW),
                     );
                     handle_painter.add(shape);
                     for (center, color) in handles {
@@ -1005,6 +994,14 @@ impl ImageOperation {
             Self::Measure { shapes } => {
                 // create a fake response to alter
                 let r = ui.allocate_response(Vec2::ZERO, Sense::click_and_drag());
+                // The info and edit panels both draw this. Drawing it twice makes the rectangle too strong, so each panel draws it once per pass.
+                let pass = ui.ctx().cumulative_pass_nr();
+                let drawn_in = Id::new("measure_drawn_in_pass").with(item_id);
+                let drawn: Option<u64> = ui.ctx().data(|data| data.get_temp(drawn_in));
+                ui.ctx().data_mut(|data| data.insert_temp(drawn_in, pass));
+                if drawn == Some(pass) {
+                    return r;
+                }
                 // Draw on the middle layer, above the image (CentralPanel), and keep it
                 // off the side panels
                 let painter = ui
@@ -1046,7 +1043,7 @@ impl ImageOperation {
                                     [Pos2::new(p[0].0, p[0].1), Pos2::new(p[1].0, p[1].1)],
                                     Stroke::new(
                                         *width as f32,
-                                        Color32::from_rgb(color[0], color[1], color[2]),
+                                        [color[0], color[1], color[2]].to_color32(),
                                     ),
                                 );
                             }
@@ -1081,19 +1078,12 @@ impl ImageOperation {
                                 Pos2::new(points[1].0 as f32, points[1].1 as f32),
                             );
 
-                            // as in 0.9.6, a thin white frame that leaves the image as it is
-                            painter.rect_stroke(
-                                rect,
-                                0.0,
-                                Stroke::new(*width as f32 / 2., Color32::WHITE),
-                                StrokeKind::Inside,
-                            );
+                            // A thin white frame, with a dark edge drawn over it for visibility on light images.
+                            let (edge, line) = over_image(*width as f32 / 2.);
+                            painter.rect_stroke(rect, 0.0, edge, StrokeKind::Middle);
+                            painter.rect_stroke(rect, 0.0, line, StrokeKind::Middle);
 
-                            painter.rect_filled(
-                                rect,
-                                0.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 14),
-                            );
+                            painter.rect_filled(rect, 0.0, opacity(WHITE, Opacity::Subtle));
 
                             painter.text(
                                 rect.expand(14.).center_bottom(),
@@ -1104,17 +1094,17 @@ impl ImageOperation {
                                     rect_orig.height() as i32
                                 ),
                                 FontId::proportional(14.),
-                                Color32::from_rgb(color[0], color[1], color[2]),
+                                [color[0], color[1], color[2]].to_color32(),
                             );
 
                             painter.line_segment(
                                 [rect.left_center(), rect.right_center()],
-                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
+                                Stroke::new(1., opacity(WHITE, Opacity::Subtle)),
                             );
 
                             painter.line_segment(
                                 [rect.center_top(), rect.center_bottom()],
-                                Stroke::new(1., Color32::from_rgba_unmultiplied(255, 255, 255, 10)),
+                                Stroke::new(1., opacity(WHITE, Opacity::Subtle)),
                             );
                         }
                     }
