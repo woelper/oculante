@@ -145,8 +145,6 @@ pub const CHANNEL_FILL_BLUE: Color32 = Color32::from_rgba_premultiplied(0, 0, 70
 // What is wrong, what is to be seen, what is to be known
 pub const RED: Color32 = hsl(0, 100, 65);
 pub const YELLOW: Color32 = hsl(48, 100, 50);
-/// A yellow handle while it is hovered or dragged
-pub const YELLOW_HOVER: Color32 = hsl(48, 100, 65);
 pub const BLUE: Color32 = hsl(202, 100, 61);
 
 /// The dark edge on both sides of a line over the image, see `over_image`

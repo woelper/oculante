@@ -9,7 +9,7 @@ use crate::paint::{PaintStroke, Pixels, StrokeDrawing, channels};
 use crate::settings::VolatileSettings;
 use crate::ui::annotate::AnnotateUi;
 use crate::ui::{
-    BLACK, EguiExt, Opacity, RED, ToColor32, WHITE, YELLOW, YELLOW_HOVER, contrast_gray, opacity,
+    BLACK, EguiExt, Opacity, RED, ToColor32, WHITE, YELLOW, contrast_gray, opacity,
     over_image,
 };
 use crate::{appstate::ImageGeometry, utils::pos_from_coord};
@@ -938,7 +938,7 @@ impl ImageOperation {
                             }
                         }
 
-                        let col = if d < maxdist { YELLOW_HOVER } else { YELLOW };
+                        let col = if d < maxdist { RED } else { YELLOW };
 
                         // ui.painter().debug_text(
                         //     Pos2::new(pt.0, pt.1),
