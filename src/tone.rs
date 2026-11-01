@@ -489,7 +489,7 @@ pub fn curves_ui(ui: &mut Ui, curves: &mut [Vec<(u8, u8)>; 4], item_id: u64) -> 
     let painter = ui.painter_at(rect.expand(6.));
     painter.rect_filled(rect, 2., FIELD.of(ui));
     paint_histogram(ui, rect, channel);
-    let faint = Stroke::new(1., opacity(weak_text(ui), Opacity::Half));
+    let faint = Stroke::new(1., opacity(weak_text(ui), Opacity::Light));
     for i in 1..4 {
         let t = i as f32 / 4.;
         painter.line_segment([to_screen((t, 0.)), to_screen((t, 1.))], faint);
