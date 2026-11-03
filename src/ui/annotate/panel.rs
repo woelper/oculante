@@ -86,24 +86,6 @@ pub fn panel_ui(
                         state.tool = (state.tool != Some(tool)).then_some(tool);
                     }
                 });
-                match state.tool {
-                    Some(Tool::Select) => {
-                        ui.small(
-                            "Click to select, Shift+click to add more, or drag a box around several items. \
-                             Drag an item to move it, and double-click a text to edit it. Drag a handle to \
-                             resize, holding Shift to keep proportions. Use the buttons to turn or flip. \
-                             Del deletes, Ctrl+Z undoes, Ctrl+Shift+Z redoes, Esc stops annotating.",
-                        );
-                    }
-                    Some(_) => {
-                        ui.small(
-                            "Drag to move, Shift+click to add to the selection, and double-click a text to \
-                             edit it. Drag a handle to resize, or use the buttons to turn or flip. \
-                             Del deletes, Ctrl+Z undoes, Ctrl+Shift+Z redoes, Esc goes back to selecting.",
-                        );
-                    }
-                    None => {}
-                }
             });
         toggled = header.header_response.clicked();
     });
