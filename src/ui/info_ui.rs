@@ -74,7 +74,7 @@ pub fn info_ui(
                 egui::Grid::new("info")
                     .num_columns(2)
                     .show(ui, |ui| {
-                    ui.label_i(format!("{ARROWS_OUT} Size",));
+                    ui.label_i(format!("{BOUNDING_BOX} Size",));
                     ui.label_right(
                         RichText::new(format!(
                             "{}x{}",
@@ -86,7 +86,7 @@ pub fn info_ui(
                     if let Some(path) = &state.current_path {
                         // make sure we truncate filenames
                         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                        ui.label_i(format!("{} File", IMAGE));
+                        ui.label_i(format!("{} File", FILE));
                         let path_label = egui::Label::new(
                             RichText::new(file_name)
                         ).truncate();
