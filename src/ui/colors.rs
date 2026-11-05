@@ -118,11 +118,6 @@ impl ToColor32 for [u8; 4] {
     }
 }
 
-/// The image's colour as RGBA bytes, with the colour channels already multiplied by alpha.
-pub fn from_premultiplied(bytes: [u8; 4]) -> Color32 {
-    Color32::from_rgba_premultiplied(bytes[0], bytes[1], bytes[2], bytes[3])
-}
-
 // The colours
 
 pub const WHITE: Color32 = hsl(0, 0, 100);
