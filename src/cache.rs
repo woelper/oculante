@@ -24,7 +24,7 @@ pub struct Cache {
 /// How much memory the cached images may take, a setting
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CacheMemory {
-    /// A sixteenth of the memory of the machine, at least 256 MB and at most 1 GB.
+    /// A sixteenth of the memory of the machine, 2 GB on 32 GB.
     /// A photo of 24 megapixels takes about 72 MB.
     #[default]
     Auto,
@@ -39,7 +39,9 @@ impl CacheMemory {
     pub fn bytes(self, total_memory: u64) -> usize {
         const MB: u64 = 1024 * 1024;
         (match self {
-            Self::Auto => (total_memory / 16).clamp(256 * MB, 1024 * MB),
+            // where the memory of the machine is unknown, sysinfo says 0
+            Self::Auto if total_memory == 0 => 256 * MB,
+            Self::Auto => total_memory / 16,
             Self::Percent(percent) => total_memory * percent as u64 / 100,
             Self::Megabytes(megabytes) => megabytes as u64 * MB,
         }) as usize
@@ -187,18 +189,23 @@ mod tests {
         assert!(cache.get(Path::new("b"), 0).is_some());
     }
 
-    /// The memory for the cache: by itself a sixteenth of the machine's, 256 MB to
-    /// 1 GB, or a percent of it or megabytes from the settings
+    /// The memory for the cache: by itself a sixteenth of the machine's, or a
+    /// percent of it or megabytes from the settings
     #[test]
     fn memory_for_the_cache() {
         const GB: u64 = 1 << 30;
         let auto = |total| CacheMemory::Auto.bytes(total) >> 20;
         assert_eq!(
-            (auto(2 * GB), auto(8 * GB), auto(64 * GB)),
-            (256, 512, 1024)
+            (auto(2 * GB), auto(8 * GB), auto(32 * GB), auto(64 * GB)),
+            (128, 512, 2048, 4096)
         );
-        let budget = Cache::new(10).byte_budget;
-        assert!((256 << 20..=1 << 30).contains(&budget), "{budget}");
+        // the memory of the machine unknown
+        assert_eq!(auto(0), 256);
+        let cache = Cache::new(10);
+        assert_eq!(
+            cache.byte_budget,
+            CacheMemory::Auto.bytes(cache.total_memory)
+        );
         assert_eq!(CacheMemory::Percent(25).bytes(16 * GB) as u64, 4 * GB);
         assert_eq!(CacheMemory::Megabytes(300).bytes(16 * GB), 300 << 20);
         // less of it, the oldest images go

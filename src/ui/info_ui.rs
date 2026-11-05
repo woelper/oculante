@@ -91,8 +91,7 @@ pub fn info_ui(
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col(state.sampled_color));
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} RGBA")), disp_col_norm(state.sampled_color, 255.));
 
-                let hex = state.sampled_color.map(|channel| channel as u8).to_color32().to_hex();
-                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex);
+                info_row(ui, |ui| ui.label_i(format!("{PALETTE} HEX")), hex_color(state.sampled_color.map(|c| c as u8)));
                 info_row(ui, |ui| ui.label_i(format!("{PALETTE} Color")), format!("{:?}", color_type));
                 info_row(ui, |ui| ui.label_i(format!("{MOVE} Pos")), format!(
                     "{:.0},{:.0}",
@@ -329,6 +328,8 @@ fn sequence_ui(ui: &mut Ui, state: &mut OculanteState) {
     let height = (row * sequence.count as f32 - ui.spacing().item_spacing.y).min(row * 4.5);
     egui::ScrollArea::vertical()
         .id_salt("sequence")
+        // dragged with the mouse too, like the panel around it (#824)
+        .scroll_source(egui::containers::scroll_area::ScrollSource::ALL)
         // as wide as the panel, the scroll bar at its edge
         .auto_shrink([false, true])
         .min_scrolled_height(height)

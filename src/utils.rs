@@ -871,6 +871,12 @@ pub fn disp_col(col: [f32; 4]) -> String {
     format!("{:.0},{:.0},{:.0},{:.0}", col[0], col[1], col[2], col[3])
 }
 
+/// The color as #rrggbbaa, as it is stored. Not through egui's Color32, which
+/// premultiplies: the color of a transparent pixel would be lost.
+pub fn hex_color(col: [u8; 4]) -> String {
+    format!("#{:02x}{:02x}{:02x}{:02x}", col[0], col[1], col[2], col[3])
+}
+
 /// Normalized RGB values (0-1)
 pub fn disp_col_norm(col: [f32; 4], divisor: f32) -> String {
     format!(

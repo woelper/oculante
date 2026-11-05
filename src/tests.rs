@@ -1965,3 +1965,13 @@ fn ci_srgb_profiles_are_left_alone() {
     assert!(ToSrgb::new(&p3).is_some());
     assert_eq!(name(&p3), "Display P3");
 }
+
+#[test]
+fn ci_hex_keeps_the_color_of_transparent_pixels() {
+    use crate::utils::hex_color;
+    // through egui's Color32 these were #00000000, #cc66330a and #c7643280
+    assert_eq!(hex_color([255, 0, 0, 0]), "#ff000000");
+    assert_eq!(hex_color([200, 100, 50, 10]), "#c864320a");
+    assert_eq!(hex_color([200, 100, 50, 128]), "#c8643280");
+    assert_eq!(hex_color([200, 100, 50, 255]), "#c86432ff");
+}

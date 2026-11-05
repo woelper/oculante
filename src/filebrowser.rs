@@ -779,6 +779,8 @@ fn list(
         .id_salt("file_list")
         .striped(true)
         .sense(Sense::click())
+        // dragged with the mouse too, like the thumbnails (#824)
+        .drag_to_scroll(egui::containers::scroll_area::DragScroll::Always)
         .auto_shrink([false, false])
         // never taller than the room left, the row to save goes below
         .min_scrolled_height(min_height)
