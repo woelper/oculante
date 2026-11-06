@@ -1,0 +1,19 @@
+NRRD0004
+# Complete NRRD file format specification at:
+# http://teem.sourceforge.net/nrrd/format.html
+type: unsigned short
+dimension: 2
+sizes: 3 9
+spacings: 1.0458000000000001 2
+kinds: domain domain
+encoding: ASCII
+
+1 2 3
+4 5 6
+7 8 9
+10 11 12
+13 14 15
+16 17 18
+19 20 21
+22 23 24
+25 26 27

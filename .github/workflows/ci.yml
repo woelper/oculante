@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+    paths-ignore: ["**.md"]
+  pull_request:
+    branches: ["master"]
+    paths-ignore: ["**.md"]
+  # every week, with the BSDs, which are too slow for every push
+  schedule:
+    - cron: "28 16 * * 6"
+  workflow_dispatch:
+
+# a new push makes the run of the one before it pointless
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # no debug info: faster builds and smaller caches
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+
+      # the tests that need no files from outside the repo
+      - name: Tests
+        run: cargo test ci_
+
+      - name: Check without default features
+        run: cargo check --no-default-features
+
+      # warnings show up here, they do not fail the run
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
+        continue-on-error: true
+
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+
+      # paths are different here: the thumbnails broke on Windows alone (#813)
+      - name: Tests
+        run: cargo test ci_
+
+      - name: Build
+        run: cargo build
+
+      - name: Installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          & $iscc /Qp /DAppVersion=0.0.0-ci "/DExe=$PWD\target\debug\oculante.exe" "/O$PWD\dist" res\windows\oculante.iss
+          if ($LASTEXITCODE) { exit 1 }
+
+      # installed for the user without asking, as winget does it, then removed again
+      - name: Install and uninstall
+        run: |
+          $setup = Start-Process dist\oculante_setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/LOG=install.log' -Wait -PassThru
+          if ($setup.ExitCode) { throw "the installer ended with $($setup.ExitCode)" }
+          $app = "$env:LOCALAPPDATA\Programs\Oculante"
+          $uninstall = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{39664534-07BE-474A-A843-D557C0D1A240}_is1'
+          if (-not (Test-Path "$app\oculante.exe")) { throw "oculante.exe is not in $app" }
+          if (-not (Test-Path $uninstall)) { throw "not in the installed apps" }
+          $values = @(
+            @('HKCU:\Software\Classes\.jpg\OpenWithProgids', 'Oculante.Image'),
+            @('HKCU:\Software\Classes\.cr3\OpenWithProgids', 'Oculante.Image'),
+            @('HKCU:\Software\Classes\Applications\oculante.exe\SupportedTypes', '.png'),
+            @('HKCU:\Software\Oculante\Capabilities\FileAssociations', '.heic'),
+            @('HKCU:\Software\RegisteredApplications', 'Oculante')
+          )
+          foreach ($v in $values) {
+            if ($null -eq (Get-ItemProperty -Path $v[0] -Name $v[1] -ErrorAction SilentlyContinue)) { throw "$($v[0]) has no $($v[1])" }
+          }
+          $open = (Get-ItemProperty 'HKCU:\Software\Classes\Oculante.Image\shell\open\command').'(default)'
+          if ($open -ne "`"$app\oculante.exe`" `"%1`"") { throw "Oculante.Image opens with $open" }
+
+          Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait
+          # the uninstaller hands over to a copy of itself, which removes its entry last
+          for ($i = 0; $i -lt 60 -and (Test-Path $uninstall); $i++) { Start-Sleep 1 }
+          if (Test-Path $uninstall) { throw "still in the installed apps after a minute" }
+          if (Test-Path "$app\oculante.exe") { throw "oculante.exe is still there" }
+          foreach ($v in $values) {
+            if ($null -ne (Get-ItemProperty -Path $v[0] -Name $v[1] -ErrorAction SilentlyContinue)) { throw "$($v[0]) still has $($v[1])" }
+          }
+          if (Test-Path 'HKCU:\Software\Classes\Oculante.Image') { throw "Oculante.Image is still there" }
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: installer-log
+          path: install.log
+
+  windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/setup-nasm@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build
+
+  armv7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: Check
+        run: cross check --target armv7-unknown-linux-gnueabihf --no-default-features
+
+  netbsd:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/netbsd-vm@v1.2.0
+        with:
+          usesh: true
+          copyback: false
+          prepare: |
+            /usr/sbin/pkg_add -u curl pkg-config cmake openssl fontconfig freetype2 gdk-pixbuf2 cairo pango nasm perl git python313 ninja
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          run: |
+            PATH=$HOME/.cargo/bin:$PATH
+            export PATH
+            mkdir -p $HOME/bin
+            printf '#!/bin/sh\nif [ "$1" = "--build" ] || [ "$1" = "--install" ] || [ "$1" = "-E" ]; then\n  exec /usr/pkg/bin/cmake "$@"\nelse\n  exec /usr/pkg/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"\nfi\n' > $HOME/bin/cmake
+            chmod +x $HOME/bin/cmake
+            export PATH=$HOME/bin:$PATH
+            cargo check --no-default-features
+
+  # in the ports with 0.9.6, built there without default features
+  freebsd:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          copyback: false
+          prepare: |
+            pkg install -y curl cmake nasm pkgconf
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          run: |
+            PATH=$HOME/.cargo/bin:$PATH
+            export PATH
+            cargo check
+            cargo check --no-default-features
