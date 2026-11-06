@@ -671,6 +671,64 @@ def test_sequence_of_tiff_pages(binary):
         assert "[" not in title().split("|")[-1], f"the title still counts pages: {title()!r}"
 
 
+def test_lists_scroll_by_dragging(binary):
+    """The list of the file browser and the list of the images in a file move when
+    dragged with the mouse, as the thumbnails and the panels do. They only did on a
+    touchscreen (#824)."""
+    folder = folder_of("drag_list_images", [])
+    first = os.path.join(folder, "file00.png")
+    subprocess.run(["convert", "-size", "20x20", "xc:white", first], check=True)
+    for number in range(1, 40):
+        shutil.copy(first, os.path.join(folder, f"file{number:02}.png"))
+    volatile = {"last_open_directory": folder, "browser_list": True}
+    with App(binary, "drag_file_list", [], volatile=volatile) as app:
+        app.wait_window()
+        app.settle(2.0)
+        app.key("ctrl+o")
+        app.settle(2.0)
+        # the pointer away from the rows, a row under it is highlighted
+        app.move(1350, 880)
+        app.settle(0.8)
+        before = app.shot("file_list")
+        app.drag(300, 450, 300, 200, steps=20)
+        app.move(1350, 880)
+        app.settle(1.0)
+        after = app.shot("file_list_dragged")
+        rows = (150, 130, 700, 300)
+        assert changed_pixels_in(before, after, rows) > 500, "the file list did not move when dragged"
+        assert LOADED not in app.log(), "the drag opened a file"
+
+    folder = folder_of("drag_sequence_images", [])
+    colors = [(220, 40, 40), (40, 180, 60), (50, 70, 220), (220, 200, 40), (200, 40, 200), (40, 200, 200), (240, 130, 30), (120, 60, 20)]
+    pages = []
+    for number, color in enumerate(colors):
+        pages.append(os.path.join(folder, f"{number}.png"))
+        subprocess.run(["convert", "-size", "300x200", f"xc:rgb{color}", pages[-1]], check=True)
+    path = os.path.join(folder, "pages.tif")
+    subprocess.run(["convert", *pages, "-type", "TrueColor", "-depth", "8", path], check=True)
+    with App(binary, "drag_sequence", [path], settings={"info_enabled": True}) as app:
+        app.wait_window()
+        app.move(0.6, 0.6)
+        assert app.wait_for_log(LOADED), "the first page never loaded"
+        app.settle(1.5)
+        # open the list, then scroll the panel down to it
+        app.click(60, 549)
+        app.settle(1.0)
+        app.scroll_down(120, 150, 6)
+        app.settle(2.5)
+        panel = (0, 40, 250, 560)
+        shot = app.shot("sequence_list")
+        assert count_color(shot, panel, colors[1]) > 200, "no picture of the second page in the list"
+        assert count_color(shot, panel, colors[-1], 20) == 0, "the last page is in view before the drag"
+        x, y = color_center(shot, panel, colors[1])
+        app.drag(x, y, x, y - 150, steps=20)
+        app.move(0.6, 0.6)
+        app.settle(1.5)
+        shot = app.shot("sequence_list_dragged")
+        assert count_color(shot, panel, colors[-1], 20) > 200, "the list of pages did not move when dragged"
+        title = app.x("xdotool", "getwindowname", app.win).stdout.strip()
+        assert title.endswith("[1/8]"), f"the drag showed another page: {title!r}"
+
 def test_chainload_option_is_accepted(binary):
     """0.9.6 took -c, it relaunched itself with it on macOS. The option was gone and
     the app refused to start when it was given."""
@@ -2468,6 +2526,7 @@ TESTS = [
     test_overwrite_only_where_the_format_is_written,
     test_file_browser_list_and_sort,
     test_sequence_of_tiff_pages,
+    test_lists_scroll_by_dragging,
     test_chainload_option_is_accepted,
     test_delete,
     test_lossless_rotation_keys_and_quit,

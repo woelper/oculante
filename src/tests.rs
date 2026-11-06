@@ -845,10 +845,15 @@ fn ci_load_every_test_file() {
         "Animated_PNG_example_bouncing_beach_ball.png",
         "3d2.png",
     ];
+    // ignore hidden files, macOS puts a .DS_Store in a folder opened with Finder
+    let hidden = |p: &std::path::Path| {
+        p.file_name()
+            .is_some_and(|n| n.as_encoded_bytes().starts_with(b"."))
+    };
     let mut paths: Vec<_> = std::fs::read_dir("res/tests")
         .unwrap()
         .map(|e| e.unwrap().path())
-        .filter(|p| p.is_file())
+        .filter(|p| p.is_file() && !hidden(p))
         .collect();
     paths.sort();
     let mut failures = vec![];
@@ -1959,4 +1964,14 @@ fn ci_srgb_profiles_are_left_alone() {
     let p3 = ColorProfile::new_display_p3().encode().unwrap();
     assert!(ToSrgb::new(&p3).is_some());
     assert_eq!(name(&p3), "Display P3");
+}
+
+#[test]
+fn ci_hex_keeps_the_color_of_transparent_pixels() {
+    use crate::utils::hex_color;
+    // through egui's Color32 these were #00000000, #cc66330a and #c7643280
+    assert_eq!(hex_color([255, 0, 0, 0]), "#ff000000");
+    assert_eq!(hex_color([200, 100, 50, 10]), "#c864320a");
+    assert_eq!(hex_color([200, 100, 50, 128]), "#c8643280");
+    assert_eq!(hex_color([200, 100, 50, 255]), "#c86432ff");
 }
