@@ -38,7 +38,7 @@ jobs:
         run: rustup update
 
       - name: Install cargo bundle
-        run: cargo install cargo-bundle
+        run: cargo install cargo-bundle --locked
 
       - name: Build the bundle
         run: ${{ matrix.build }}
