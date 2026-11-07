@@ -1018,8 +1018,8 @@ def test_paint_on_transparency(binary):
 
 # where the filter search shows Annotate, the only filter that matches "annot"
 ANNOTATE_BUTTON = (790, 108, 210, 18)
-# the line around what is selected or pointed at
-OUTLINE = (255, 200, 40)
+# the box around what is selected, with its handles
+OUTLINE = (255, 204, 0)
 # the header of the Annotations in the edit panel of moss.jpg, and the button to
 # select and the tiles of the tools below it once it is open, scrolled to the top
 ANNOTATIONS_HEADER = (890, 90)
@@ -1028,8 +1028,8 @@ ANNOTATE_TOOLS = {
     name: (815 + 80 * (i % 3), 173 + 46 * (i // 3))
     for i, name in enumerate(("arrow", "frame", "circle", "text", "pen", "redact"))
 }
-# the row of stamps below the tools
-ANNOTATE_STAMPS = [(815 + 80 * i, 265) for i in range(3)]
+# the row of stamps below the tools, under the spotlight and the counter
+ANNOTATE_STAMPS = [(815 + 76 * i, 310) for i in range(3)]
 
 
 def test_annotate(binary):
@@ -1081,11 +1081,11 @@ def test_annotate(binary):
         arrow = app.shot("arrow")
         changed = changed_pixels_in(before, arrow, (240, 240, 220, 170))
         assert changed > 1000, f"the arrow changed only {changed} pixels"
-        # the outline of what is selected, only once it is drawn
-        arrow_box = (240, 240, 220, 170)
+        # the box around what is selected, only once it is drawn
+        arrow_box = (220, 190, 260, 240)
         yellow = [count_color(shot, arrow_box, OUTLINE, 30) for shot in (before, drawing, arrow)]
-        assert yellow[1] - yellow[0] < 20, f"an outline while drawing: {yellow}"
-        assert yellow[2] - yellow[0] > 100, f"no outline around the arrow that was drawn: {yellow}"
+        assert yellow[1] - yellow[0] < 20, f"a box while drawing: {yellow}"
+        assert yellow[2] - yellow[0] > 100, f"no box around the arrow that was drawn: {yellow}"
         assert changed_pixels_in(before, arrow, (600, 420, 150, 90)) == 0, "the drag moved the image"
         since = len(app.log())
         app.key("Right")
@@ -1097,14 +1097,15 @@ def test_annotate(binary):
         app.move(350, 325)
         app.settle(0.8)
         pointed = app.shot("pointed_at")
-        changed = changed_pixels_in(unselected, pointed, (240, 240, 220, 170))
+        changed = changed_pixels_in(unselected, pointed, arrow_box)
         assert changed > 200, f"pointing at the arrow outlines only {changed} pixels"
         # what is pointed at moves, with any tool
         app.drag(350, 325, 350, 425, steps=10)
         app.move(40, 560)
         app.settle(1.0)
         moved = app.shot("moved")
-        assert changed_pixels_in(before, moved, (240, 240, 220, 60)) == 0, "the arrow left a trace"
+        # above the buttons over the box of the moved arrow
+        assert changed_pixels_in(before, moved, (240, 240, 220, 45)) == 0, "the arrow left a trace"
         assert changed_pixels_in(arrow, moved, (240, 400, 220, 110)) > 1000, "the arrow did not move there"
         # it is selected now
         app.key("Delete")
@@ -1121,9 +1122,9 @@ def test_annotate(binary):
         circle = app.shot("circle")
         changed = changed_pixels_in(gone, circle, (470, 90, 140, 100))
         assert changed > 500, f"the circle changed only {changed} pixels"
-        # the pen moves the circle by its line, it draws nothing
+        # the pen moves the circle by its line, away from the handles of its box, it draws nothing
         app.click(*ANNOTATE_TOOLS["pen"])
-        app.drag(480, 140, 480, 300, steps=10)
+        app.drag(498, 168, 498, 328, steps=10)
         app.move(40, 560)
         app.settle(1.0)
         circle_moved = app.shot("circle_moved")
@@ -1655,7 +1656,7 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         before = app.shot("before")
         # the outline of the next frame, on its card below the tools
-        app.drag(876, 482, 894, 482, steps=6)
+        app.drag(877, 461, 895, 461, steps=6)
         app.drag(480, 100, 600, 180, steps=10)
         app.move(40, 560)
         app.settle(1.0)
@@ -1669,25 +1670,27 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         circle = app.shot("circle")
         overlap = (500, 120, 100, 60)
-        app.click(803, 386)  # "Send backward" on the card of the circle
+        app.click(803, 366)  # "Send backward" on the card of the circle
         app.move(40, 560)
         app.settle(1.0)
         behind = app.shot("behind")
         changed = changed_pixels_in(circle, behind, overlap)
         assert changed > 100, f"sending the circle backward changed only {changed} pixels"
         # the frame, now first, hides and comes back
-        corner = (470, 90, 25, 25)
-        app.click(822, 386)
+        # its left side, besides the box of the selected circle
+        corner = (466, 112, 12, 50)
+        app.click(822, 366)
         app.move(40, 560)
         app.settle(1.0)
         hidden = app.shot("frame_hidden")
         assert changed_pixels_in(before, hidden, corner) == 0, "the hidden frame is drawn"
-        app.click(822, 386)
+        assert changed_pixels_in(before, behind, corner) > 200, "no frame where it is hidden"
+        app.click(822, 366)
         app.move(40, 560)
         app.settle(1.0)
         assert changed_pixels_in(behind, app.shot("frame_shown"), frame_box) == 0, "the frame did not come back"
         # the circle goes by its card, below and right of the frame it was alone
-        app.click(842, 434)
+        app.click(842, 414)
         app.move(40, 560)
         app.settle(1.0)
         removed = app.shot("circle_removed")
@@ -1704,10 +1707,10 @@ def test_annotation_cards(binary):
         app.settle(1.0)
         text_box = (170, 270, 90, 90)
         text = app.shot("text")
-        app.click(980, 470)  # its font
+        app.click(890, 450)  # its font
         app.settle(0.8)
         listed = app.shot("list")
-        assert changed_pixels_in(text, listed, (790, 203, 230, 200)) > 1000, "no list of fonts"
+        assert changed_pixels_in(text, listed, (710, 230, 290, 200)) > 1000, "no list of fonts"
         app.key("Escape")
         app.move(40, 560)
         app.settle(1.0)
@@ -1739,7 +1742,7 @@ def test_annotation_select(binary):
     of what is selected, a click besides everything drops the selection, and the cards
     of what is selected are tinted. Esc then stops annotating, as folding the
     Annotations does, and opening them again selects as long as there are any."""
-    tint = (77, 26, 41)
+    tint = (61, 10, 25)
     frames = [(190, 90, 120, 90), (390, 90, 120, 90)]
     circle_box = (240, 290, 170, 120)
     panel = (775, 40, 240, 560)
@@ -1844,10 +1847,10 @@ def test_annotation_select(binary):
         assert changed > 500, f"the circle changed only {changed} pixels, it should stay"
 
 def test_annotation_stamps(binary):
-    """The third row of the tools has three stamps, check, cross and warning at first.
+    """The fourth row of the tools has three stamps, check, cross and warning at first.
     A click puts one on the image, a drag makes it as large as the drag. A right-click
     on a tile picks another symbol for it, which the settings keep."""
-    red = (235, 40, 40)
+    red = (255, 77, 77)
     tile = lambda i: (ANNOTATE_STAMPS[i][0] - 30, ANNOTATE_STAMPS[i][1] - 15, 60, 30)
     clicked_box = (240, 140, 120, 120)
     dragged_box = (400, 250, 161, 161)
@@ -1869,7 +1872,7 @@ def test_annotation_stamps(binary):
         app.x("xdotool", "mousemove", str(ANNOTATE_STAMPS[1][0]), str(ANNOTATE_STAMPS[1][1]), "click", "3")
         app.settle(1.0)
         app.shot("menu")
-        app.click(944, 373)  # "Error"
+        app.click(940, 111)  # "Error", in the menu that opens upward
         app.move(40, 560)
         app.settle(1.0)
         picked = app.shot("picked")
