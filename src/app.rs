@@ -1010,6 +1010,9 @@ impl eframe::App for OculanteApp {
 
         state.toasts.show(ctx);
 
+        // Interactions affect a floating window first rather than what's under it, escape for example
+        state.window_was_open = crate::ui::window_open(ctx, state);
+
         if let Some(id) = state.filebrowser_id.take() {
             crate::ui::open_popup(ctx, Id::new(&id));
         }

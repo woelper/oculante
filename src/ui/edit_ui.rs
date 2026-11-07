@@ -582,7 +582,8 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 state.edit_state.painting = false;
             }
             let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
-            let window_open = crate::ui::window_open(ctx, state);
+            // Escape to close the file manager does not deselect what is selected
+            let window_open = state.window_was_open || crate::ui::window_open(ctx, state);
             match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
                 Some(annotations) => {
                     let copy = crate::ui::annotate::canvas_ui(

@@ -54,7 +54,12 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 ui,
             );
 
-            if !popup_was_open && ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
+            if !popup_was_open
+                && ui.ctx().input_mut(|r| {
+                    let modifiers = r.modifiers;
+                    r.consume_key(modifiers, Key::Escape)
+                })
+            {
                 crate::ui::close_popup(ctx, popup_id);
             }
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
