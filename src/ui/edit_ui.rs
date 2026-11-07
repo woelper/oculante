@@ -215,20 +215,12 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     );
                 });
 
-            // the annotations have their own part, also when saved edits brought some
-            if state.persistent_settings.experimental_features
-                || state
-                    .edit_state
-                    .image_op_stack
-                    .iter()
-                    .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
-            {
-                ui.add_space(4.);
-                if crate::ui::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
-                    image_changed = true;
-                }
-                ui.add_space(4.);
+            // the annotations have their own part
+            ui.add_space(4.);
+            if crate::ui::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
+                image_changed = true;
             }
+            ui.add_space(4.);
 
 
             ui.vertical_centered_justified(|ui| {
