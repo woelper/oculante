@@ -155,12 +155,14 @@ pub fn over_image(width: f32) -> (Stroke, Stroke) {
 }
 
 /// Windows and the panels at the sides
-pub const PANEL: ThemedColor = ThemedColor::new(hsl(0, 0, 10), hsl(0, 0, 90));
+pub const PANEL: ThemedColor = ThemedColor::new(hsl(0, 0, 10), hsl(0, 0, 100));
 /// What is sunk into a panel: its sections, the list of files, text fields and scroll bars
-pub const FIELD: ThemedColor = ThemedColor::new(hsl(0, 0, 5), hsl(0, 0, 85));
+pub const FIELD: ThemedColor = ThemedColor::new(hsl(0, 0, 5), hsl(0, 0, 86));
 /// A card on a panel, one for each edit and annotation
-pub const CARD: ThemedColor = ThemedColor::new(hsl(0, 0, 13), hsl(0, 0, 95));
-pub const BUTTON: ThemedColor = ThemedColor::new(hsl(0, 0, 15), WHITE);
+pub const CARD: ThemedColor = ThemedColor::new(hsl(0, 0, 13), hsl(0, 0, 93));
+pub const BUTTON: ThemedColor = ThemedColor::new(hsl(0, 0, 15), hsl(0, 0, 95));
+pub const BUTTON_HOVER: ThemedColor = ThemedColor::new(hsl(0, 0, 20), hsl(0, 0, 92));
+pub const BUTTON_PRESSED: ThemedColor = ThemedColor::new(hsl(0, 0, 20), hsl(0, 0, 92));
 pub const TEXT: ThemedColor = ThemedColor::new(hsl(0, 0, 80), hsl(0, 0, 20));
 
 // The colours the person can pick start as these. They are kept as bytes in the settings and
@@ -296,9 +298,12 @@ pub(super) fn egui_follows_us(ctx: &Context, style: &mut Style, accent: Color32)
     v.widgets.noninteractive.fg_stroke.color = TEXT.in_theme(dark);
     v.widgets.inactive.fg_stroke.color = TEXT.in_theme(dark);
     v.widgets.inactive.weak_bg_fill = BUTTON.in_theme(dark);
+    v.widgets.hovered.weak_bg_fill = BUTTON_HOVER.in_theme(dark);
+    v.widgets.active.weak_bg_fill = BUTTON_PRESSED.in_theme(dark);
     if !dark {
         v.widgets.inactive.bg_fill = BUTTON.in_theme(dark);
-        v.widgets.hovered.bg_fill = opacity(WHITE, Opacity::Strong);
+        v.widgets.hovered.bg_fill = BUTTON_HOVER.in_theme(dark);
+        v.widgets.active.bg_fill = BUTTON_PRESSED.in_theme(dark);
     }
     // No stroke on buttons
     v.widgets.hovered.bg_stroke = Stroke::NONE;

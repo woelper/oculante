@@ -71,7 +71,7 @@ jobs:
     #   if: matrix.os == 'ubuntu-latest'
 
     - name: Install cargo bundle
-      run: cargo install cargo-bundle
+      run: cargo install cargo-bundle --locked
       if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
 
     - name: Install cargo deb
