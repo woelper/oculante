@@ -13,6 +13,9 @@ mod top_bar;
 pub use top_bar::*;
 mod edit_ui;
 pub use edit_ui::edit_ui;
+pub(crate) mod annotate;
+mod colors;
+pub use colors::*;
 mod theme;
 pub use theme::*;
 #[cfg_attr(feature = "file_open", allow(dead_code))]
@@ -44,7 +47,7 @@ use crate::{
         Channel, GradientStop, ImageOperation, ImgOpItem, MeasureShape, ScaleFilter, process_pixels,
     },
     paint::PaintStroke,
-    settings::{ColorTheme, PersistentSettings, VolatileSettings, set_system_theme},
+    settings::{ColorTheme, VolatileSettings, set_system_theme},
     shortcuts::{key_pressed, lookup},
     thumbnails::{self, THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails},
 };
@@ -160,6 +163,10 @@ impl EguiExt for Ui {
         });
 
         if self.is_rect_visible(rect) {
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "a checkbox is drawn in every visual state it has"
+            )]
             let visuals = self.style().interact(&response);
             let (small_icon_rect, big_icon_rect) = self.spacing().icon_rectangles(rect);
             self.painter().add(epaint::RectShape::new(
@@ -167,7 +174,7 @@ impl EguiExt for Ui {
                 visuals.corner_radius,
                 if *checked {
                     // a dark shade of the accent, as behind what is selected
-                    self.style().visuals.selection.bg_fill
+                    selection_colors(self).0
                 } else {
                     visuals.weak_bg_fill
                 },
@@ -215,9 +222,7 @@ impl EguiExt for Ui {
             ui.add(egui::Label::new(
                 RichText::new(icon).color(accent_color(ui.ctx())),
             ));
-            ui.label(
-                RichText::new(description).color(ui.style().visuals.noninteractive().text_color()),
-            );
+            ui.label(RichText::new(description).color(TEXT.of(ui)));
         })
         .response
     }
@@ -483,6 +488,7 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
     ui.styled_collapsing("Measure", |ui| {
         ui.vertical_centered_justified(|ui| {
             dark_panel(ui, |ui| {
+                annotate::select_button(ui, true);
                 ui.allocate_space(vec2(ui.available_width(), 0.));
                 // draw a line using egui with the mouse
 
@@ -583,16 +589,14 @@ fn measure_ui(ui: &mut Ui, state: &mut OculanteState) {
 // TODO redo as impl UI
 pub fn tooltip(r: Response, tooltip: &str, hotkey: &str, _ui: &mut Ui) -> Response {
     r.on_hover_ui(|ui| {
-        let accent = accent_color(ui.ctx());
-        let avg = (accent.r() as i32 + accent.g() as i32 + accent.b() as i32) / 3;
-        let contrast_color: u8 = if avg > 128 { 0 } else { 255 };
+        let (background, text) = selection_colors(ui);
         ui.horizontal(|ui| {
             ui.label(tooltip);
             ui.label(
                 RichText::new(hotkey)
                     .monospace()
-                    .color(Color32::from_gray(contrast_color))
-                    .background_color(accent),
+                    .color(text)
+                    .background_color(background),
             );
         });
     })
@@ -715,14 +719,11 @@ pub(crate) fn caret_icon(ui: &mut egui::Ui, openness: f32, response: &egui::Resp
     let glyph_center = galley.mesh_bounds.center().to_vec2();
     let pos = response.rect.center() - emath::Rot2::from_angle(angle) * glyph_center;
     ui.painter()
-        .add(TextShape::new(pos, galley, Color32::RED).with_angle(angle));
+        .add(TextShape::new(pos, galley, color).with_angle(angle));
 }
 
 fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
-    let panel_bg_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(25),
-        false => Color32::from_gray(230),
-    };
+    let panel_bg_color = PANEL.of(ui);
 
     egui::Frame::new()
         .fill(panel_bg_color)
@@ -734,10 +735,7 @@ fn light_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
 }
 
 pub(crate) fn dark_panel<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) {
-    let panel_bg_color = match ui.style().visuals.dark_mode {
-        true => Color32::from_gray(13),
-        false => Color32::from_gray(217),
-    };
+    let panel_bg_color = FIELD.of(ui);
 
     egui::Frame::new()
         .fill(panel_bg_color)
@@ -780,6 +778,24 @@ pub fn close_popup(ctx: &egui::Context, id: Id) {
 
 pub fn is_popup_open(ctx: &egui::Context, id: Id) -> bool {
     ctx.data(|d| d.get_temp::<bool>(id).unwrap_or(false))
+}
+
+/// The windows and questions that open over the image, besides the preferences: the file
+/// managers to open and to save an image, a palette and a LUT, and the questions before a file is
+/// deleted or overwritten
+const WINDOWS: [&str; 6] = [
+    "OPEN",
+    "SAVE",
+    "SAVEASE",
+    "LUT",
+    DELETE_MODAL_ID,
+    "overwrite",
+];
+
+/// Whether a window or a question is open over the image: keys meant for the image are left to
+/// it then
+pub fn window_open(ctx: &egui::Context, state: &OculanteState) -> bool {
+    state.settings_enabled || WINDOWS.iter().any(|id| is_popup_open(ctx, Id::new(*id)))
 }
 
 pub struct Modal {
@@ -829,23 +845,17 @@ impl Modal {
             ui.set_min_height(MODAL_MIN_HEIGHT);
             ui.vertical_centered_justified(|ui| {
                 ui.add_space(10.);
-                ui.label(
-                    RichText::new(WARNING_CIRCLE)
-                        .size(100.)
-                        .color(ui.style().visuals.warn_fg_color),
-                );
+                ui.label(RichText::new(WARNING_CIRCLE).size(100.).color(YELLOW));
                 ui.add_space(20.);
                 ui.vertical_centered(|ui| {
                     ui.add(Label::new(warning_text).wrap().halign(Align::Center));
                 });
                 ui.add_space(20.);
                 ui.scope(|ui| {
-                    let warn_color = Color32::from_rgb(255, 77, 77);
-                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = warn_color;
-                    ui.style_mut().visuals.widgets.inactive.fg_stroke =
-                        Stroke::new(1., Color32::WHITE);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = RED;
+                    ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., WHITE);
                     ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
-                        warn_color.linear_multiply(0.8);
+                        opacity(RED, Opacity::Strong);
                     if ui.styled_button("Yes").clicked() {
                         ui.scope(add_contents);
                         self.close();

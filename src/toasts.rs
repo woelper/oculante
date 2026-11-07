@@ -1,10 +1,11 @@
 use egui::{
-    Align2, Area, Color32, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense,
-    Stroke, Style, TextStyle, Ui, Vec2, pos2, vec2,
+    Align2, Area, Context, CornerRadius, FontId, Frame, Id, Margin, Order, Rect, Sense, Stroke,
+    Style, TextStyle, Ui, Vec2, pos2, vec2,
 };
 use std::time::Duration;
 
 use crate::icons;
+use crate::ui::{BLUE, Opacity, PANEL, RED, TEXT, YELLOW, opacity, selection_colors};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Anchor {
@@ -225,22 +226,23 @@ fn ease_out_cubic(t: f32) -> f32 {
 /// Draws a single toast card and returns whether its close button was clicked this frame.
 fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
     let accent = crate::ui::accent_color(ui.ctx());
-    let bg = style.visuals.window_fill();
-    let fg = style.visuals.text_color();
+    let selected_fill = selection_colors(ui).0;
+    let dark = style.visuals.dark_mode;
+    let (bg, fg) = (PANEL.in_theme(dark), TEXT.in_theme(dark));
 
     let mut close_clicked = false;
 
     let icon_colour = match toast.level {
-        ToastLevel::Info => Color32::from_rgb(57, 181, 255),
+        ToastLevel::Info => BLUE,
         ToastLevel::Success => accent,
-        ToastLevel::Warning => Color32::from_rgb(255, 204, 0),
-        ToastLevel::Error => Color32::from_rgb(255, 77, 77),
+        ToastLevel::Warning => YELLOW,
+        ToastLevel::Error => RED,
     };
 
     Frame::new()
         .fill(bg)
         .corner_radius(CornerRadius::same(8))
-        .stroke(Stroke::new(1.0, accent.gamma_multiply(0.5)))
+        .stroke(Stroke::new(1.0, selected_fill))
         .shadow(style.visuals.window_shadow)
         .inner_margin(Margin::symmetric(12, 10))
         .show(ui, |ui| {
@@ -284,15 +286,22 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                 Sense::click(),
             );
             if close.hovered() {
-                ui.painter()
-                    .rect_filled(close_box, CornerRadius::same(4), fg.gamma_multiply(0.08));
+                ui.painter().rect_filled(
+                    close_box,
+                    CornerRadius::same(4),
+                    opacity(fg, Opacity::Faint),
+                );
             }
             ui.painter().text(
                 close_box.center(),
                 Align2::CENTER_CENTER,
                 icons::X,
                 FontId::new(CLOSE_SIZE, font.family.clone()),
-                fg.gamma_multiply(if close.hovered() { 1.0 } else { 0.6 }),
+                if close.hovered() {
+                    fg
+                } else {
+                    opacity(fg, Opacity::Half)
+                },
             );
             close_clicked = close.clicked();
 
@@ -303,8 +312,7 @@ fn draw_toast(ui: &mut Ui, toast: &Toast, style: &Style) -> bool {
                 let frac = (remaining / total).clamp(0.0, 1.0);
                 let (rect, _) =
                     ui.allocate_exact_size(vec2(ui.available_width(), 3.0), Sense::hover());
-                ui.painter()
-                    .rect_filled(rect, 1.5, accent.gamma_multiply(0.25));
+                ui.painter().rect_filled(rect, 1.5, selected_fill);
                 let filled =
                     Rect::from_min_size(rect.min, vec2(rect.width() * frac, rect.height()));
                 ui.painter().rect_filled(filled, 1.5, accent);

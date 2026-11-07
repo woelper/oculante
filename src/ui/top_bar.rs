@@ -61,16 +61,16 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
                 ui.spacing_mut().icon_width = 0.;
 
                 let color = if ui.style().visuals.dark_mode {
-                    Color32::WHITE
+                    WHITE
                 } else {
-                    Color32::BLACK
+                    BLACK
                 };
                 ui.style_mut().visuals.widgets.inactive.fg_stroke = Stroke::new(1., color);
 
                 if !ui.style().visuals.dark_mode {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::WHITE);
-                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::BLACK;
-                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill = Color32::BLACK;
+                    ui.style_mut().visuals.override_text_color = Some(WHITE);
+                    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = BLACK;
+                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill = BLACK;
                 }
 
                 egui::ComboBox::from_id_salt("channels")
@@ -283,14 +283,14 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
             ));
             let pos = ctx.content_rect().center_bottom() + vec2(-30., -60.);
             if ctx.has_requested_repaint() {
-                painter.circle(pos, 6., Color32::RED, Stroke::NONE);
+                painter.circle(pos, 6., RED, Stroke::NONE);
             }
             painter.text(
                 pos + vec2(12., 0.),
                 Align2::LEFT_CENTER,
                 format!("{:.0} fps  pass {}", fps, ctx.cumulative_pass_nr()),
                 FontId::proportional(11.),
-                Color32::RED,
+                RED,
             );
         }
     });
@@ -310,7 +310,7 @@ pub fn channel_notice(ui: &Ui, state: &OculanteState) {
             ColorChannel::Rgba.hotkey(&state.persistent_settings.shortcuts)
         ),
         FontId::proportional(13.),
-        ui.style().visuals.text_color(),
+        TEXT.of(ui),
         1000.,
     );
     job.halign = Align::Center;
@@ -319,9 +319,9 @@ pub fn channel_notice(ui: &Ui, state: &OculanteState) {
     ui.painter().rect_filled(
         galley.rect.translate(pos.to_vec2()).expand(8.),
         ui.get_rounding(BUTTON_HEIGHT_SMALL),
-        ui.style().visuals.extreme_bg_color.gamma_multiply(0.7),
+        opacity(FIELD.of(ui), Opacity::Strong),
     );
-    ui.painter().galley(pos, galley, Color32::RED);
+    ui.painter().galley(pos, galley, TEXT.of(ui));
 }
 
 pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
@@ -423,12 +423,12 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                             .unwrap_or_default();
 
                         let res = ui.horizontal(|ui| {
-                            let accent = accent_color(ui.ctx());
+                            let (background, text) = selection_colors(ui);
                             let (_, icon_rect) = ui.allocate_space(Vec2::splat(24.));
                             ui.painter().rect(
                                 icon_rect,
                                 4.0,
-                                accent.gamma_multiply(0.1),
+                                background,
                                 Stroke::NONE,
                                 StrokeKind::Inside,
                             );
@@ -437,7 +437,7 @@ pub fn draw_hamburger_menu(ui: &mut Ui, state: &mut OculanteState) {
                                 Align2::CENTER_CENTER,
                                 &ext,
                                 FontId::proportional(9.),
-                                accent.gamma_multiply(0.8),
+                                text,
                             );
                             ui.add(
                                 egui::Button::new(RichText::new(&filename))

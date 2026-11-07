@@ -215,20 +215,12 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     );
                 });
 
-            // the annotations have their own part, also when saved edits brought some
-            if state.persistent_settings.experimental_features
-                || state
-                    .edit_state
-                    .image_op_stack
-                    .iter()
-                    .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
-            {
-                ui.add_space(4.);
-                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
-                    image_changed = true;
-                }
-                ui.add_space(4.);
+            // the annotations have their own part
+            ui.add_space(4.);
+            if crate::ui::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
+                image_changed = true;
             }
+            ui.add_space(4.);
 
 
             ui.vertical_centered_justified(|ui| {
@@ -246,13 +238,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
                             }
 
-                    if ui
-                        .add(
-                            egui::Button::new("Stop painting")
-                                .fill(accent_color(ui.ctx())),
-                        )
-                        .clicked()
-                    {
+                    let (fill, text) = selection_colors(ui);
+                    let stop = RichText::new("Stop painting").color(text);
+                    if ui.add(egui::Button::new(stop).fill(fill)).clicked() {
                         state.edit_state.painting = false;
                     }
                 } else if ui.button("Paint mode").clicked() {
@@ -574,7 +562,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
         #[cfg(debug_assertions)]
         {
-            ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+            ui.colored_label(BLUE, "Debug info");
             ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
             ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
 
@@ -586,15 +574,18 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 state.edit_state.painting = false;
             }
             let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
+            // Escape to close the file manager does not deselect what is selected
+            let window_open = state.window_was_open || crate::ui::window_open(ctx, state);
             match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
                 Some(annotations) => {
-                    let copy = crate::annotate::canvas_ui(
+                    let copy = crate::ui::annotate::canvas_ui(
                         ctx,
                         annotations,
                         &mut state.edit_state.annotate,
                         &mapping,
                         &state.image_geometry,
                         state.pointer_over_ui,
+                        window_open,
                     );
                     // the keys go to the annotations, copying the image works still
                     if copy && let Some(img) = effective_image(state) {
@@ -604,7 +595,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 }
                 None => state.edit_state.annotate.stop(),
             }
-            let annotations = crate::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
+            let annotations = crate::ui::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
 
             // Do the processing
             //
@@ -898,11 +889,7 @@ fn modifier_stack_ui(
 
     for (n, &i) in shown.iter().enumerate() {
         let operation = &mut stack[i];
-        let frame_color = if ui.style().visuals.dark_mode {
-            Color32::from_hex("#212121").unwrap()
-        } else {
-            Color32::from_hex("#F2F2F2").unwrap()
-        };
+        let frame_color = CARD.of(ui);
         egui::Frame::new()
             .fill(frame_color)
             .corner_radius(ui.style().visuals.widgets.active.corner_radius)

@@ -5,7 +5,10 @@ use crate::file_encoder::FileEncoder;
 use crate::file_sort::{FileInfo, FileSort, SortBy};
 use crate::settings::VolatileSettings;
 use crate::thumbnails::{THUMB_CAPTION_HEIGHT, THUMB_SIZE, Thumbnails};
-use crate::ui::{BUTTON_HEIGHT_LARGE, EguiExt, paint_thumbnail, render_file_icon};
+use crate::ui::{
+    BUTTON, BUTTON_HEIGHT_LARGE, EguiExt, FIELD, TEXT, TRANSPARENT, paint_thumbnail,
+    render_file_icon,
+};
 
 use egui::{self, *};
 use egui_extras::{Column, TableBuilder};
@@ -51,7 +54,12 @@ pub fn browse_modal<F: FnMut(&PathBuf)>(
                 ui,
             );
 
-            if !popup_was_open && ui.ctx().input(|r| r.key_pressed(Key::Escape)) {
+            if !popup_was_open
+                && ui.ctx().input_mut(|r| {
+                    let modifiers = r.modifiers;
+                    r.consume_key(modifiers, Key::Escape)
+                })
+            {
                 crate::ui::close_popup(ctx, popup_id);
             }
             ctx.data_mut(|w| w.insert_temp(Id::new("FBPATH"), path));
@@ -455,12 +463,12 @@ pub fn browse<F: FnMut(&PathBuf)>(
                     }
 
                     ui.vertical_centered_justified(|ui| {
-                        let col = ui.style().visuals.widgets.inactive.weak_bg_fill;
+                        let col = BUTTON.of(ui);
                         if ui
                             .add(
                                 egui::Button::new(RichText::new(PLUS).color(col))
                                     .corner_radius(ui.get_rounding(BUTTON_HEIGHT_LARGE))
-                                    .fill(Color32::TRANSPARENT)
+                                    .fill(TRANSPARENT)
                                     .frame(true)
                                     .stroke(Stroke::new(2., col))
                                     .min_size(vec2(140., BUTTON_HEIGHT_LARGE)),
@@ -474,10 +482,7 @@ pub fn browse<F: FnMut(&PathBuf)>(
             );
 
             ui.vertical(|ui| {
-                let panel_bg_color = match ui.style().visuals.dark_mode {
-                    true => Color32::from_gray(13),
-                    false => Color32::from_gray(217),
-                };
+                let panel_bg_color = FIELD.of(ui);
 
                 let r = ui.available_rect_before_wrap();
 
@@ -843,7 +848,7 @@ fn small_file_icon(ui: &mut Ui, entry: &FileInfo, size: Vec2, thumbnails: &mut T
             Align2::CENTER_CENTER,
             FOLDERFILL,
             FontId::proportional(size.y * 0.9),
-            ui.style().visuals.text_color(),
+            TEXT.of(ui),
         );
         return;
     }

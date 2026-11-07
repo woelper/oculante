@@ -21,9 +21,8 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 let (rect, resp) =
                                     ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
 
-                                let egui_color = Color32::from_rgba_unmultiplied(
-                                    color[0], color[1], color[2], color[3],
-                                );
+                                // straight colours of the image, not premultiplied
+                                let egui_color = (*color).to_color32();
 
                                 let sampled_color = [
                                     state.sampled_color[0] as u8,
