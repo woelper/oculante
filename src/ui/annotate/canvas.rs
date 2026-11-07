@@ -319,8 +319,8 @@ fn undo_and_redo(
 }
 
 /// Delete removes what is selected, Esc closes the menu, stops a drag, lets go of what is
-/// selected and then of the tool, the arrows move it. Returns whether the image should be
-/// copied.
+/// selected and then of the tool, Ctrl+A (Cmd+A on a Mac) selects everything shown, the arrows
+/// move what is selected. Returns whether the image should be copied.
 fn keys(
     ctx: &egui::Context,
     annotations: &mut Vec<Annotation>,
@@ -329,12 +329,13 @@ fn keys(
     tool: Tool,
 ) -> bool {
     let original = mapping.original;
-    let (delete, mut escape, shift) = ctx.input(|i| {
+    let (delete, mut escape, shift, select_all) = ctx.input(|i| {
         (
             i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
             // that only closes a list
             i.key_pressed(Key::Escape) && !std::mem::take(&mut state.popup_open),
             i.modifiers.shift,
+            i.modifiers.command && i.key_pressed(Key::A),
         )
     });
     let copy = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
@@ -371,6 +372,9 @@ fn keys(
                 state.selected.clear();
             }
         }
+    }
+    if select_all && state.drag.is_none() {
+        state.select_all(annotations);
     }
     let step = if shift { 10. } else { 1. };
     let nudge = ctx.input(|i| {

@@ -156,6 +156,13 @@ impl AnnotateUi {
         self.typing = None;
     }
 
+    /// Selects every annotation that is shown, hidden ones are ignored.
+    fn select_all(&mut self, annotations: &[Annotation]) {
+        self.selected = (0..annotations.len())
+            .filter(|&i| !annotations[i].hidden)
+            .collect();
+    }
+
     fn start_typing(&mut self, index: usize) {
         self.typing = Some(index);
         self.focus_text = true;

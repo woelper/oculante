@@ -10,6 +10,26 @@ fn hidden_ones_are_not_drawn() {
     assert_eq!(visible(&stack, &AnnotateUi::default()), vec![shown]);
 }
 
+/// Ctrl+A selects what is shown, as a box over all of it would
+#[test]
+fn select_all_leaves_out_hidden_ones() {
+    let mut hidden = arrow_at([1, 1], [50, 50]);
+    hidden.hidden = true;
+    let list = vec![
+        arrow_at([5, 5], [60, 60]),
+        hidden,
+        arrow_at([9, 9], [70, 70]),
+    ];
+    let mut state = AnnotateUi {
+        selected: vec![1],
+        ..Default::default()
+    };
+    state.select_all(&list);
+    assert_eq!(state.selected, vec![0, 2]);
+    state.select_all(&[]);
+    assert!(state.selected.is_empty(), "nothing to select");
+}
+
 #[test]
 fn new_ones_look_like_the_one_changed_last() {
     let mut style = Style::default();

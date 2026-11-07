@@ -47,7 +47,12 @@ impl Tool {
 
     pub(super) fn hint(self) -> &'static str {
         match self {
-            Tool::Select => "Click what to change, drag a box over what to select",
+            Tool::Select if cfg!(target_os = "macos") => {
+                "Click what to change, drag a box over what to select, Cmd+A selects everything"
+            }
+            Tool::Select => {
+                "Click what to change, drag a box over what to select, Ctrl+A selects everything"
+            }
             Tool::Arrow => "Drag from where the arrow starts to what it points at",
             Tool::Frame => "Drag a frame around something, with Shift a square",
             Tool::Circle => "Drag a circle around something, with Shift a round one",
