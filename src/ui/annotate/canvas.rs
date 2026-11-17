@@ -360,8 +360,9 @@ pub(super) fn take_key(
 /// selected on its card.
 
 /// These keys are taken from the input, so they do interfere with the regular shortcuts.
-/// The arrows only while something is selected or dragged, otherwise they go to the next image as
-/// usual. Delete is always taken so that a press meant for an annotation never prompts to delete the file. All other
+/// The arrows are always taken so they don't switch images. With Shift they're only taken while
+/// something is selected or dragged, otherwise they pan the view.
+/// Delete is always taken so that a press meant for an annotation never prompts to delete the file. All other
 /// keys, Ctrl+C (Cmd+C) to copy the image among them, are left untouched by annotations
 fn keys(
     ctx: &egui::Context,
@@ -380,17 +381,17 @@ fn keys(
         let select_all = take_key(i, Key::A, |m| m.command);
         let step = if shift { 10. } else { 1. };
         let mut nudge = [0., 0.];
-        if arrows_used {
-            for (key, by) in [
-                (Key::ArrowLeft, [-step, 0.]),
-                (Key::ArrowRight, [step, 0.]),
-                (Key::ArrowUp, [0., -step]),
-                (Key::ArrowDown, [0., step]),
-            ] {
-                // with Shift they move further, other modifiers are for the app
-                if take_key(i, key, |m| !m.command && !m.ctrl && !m.alt) {
-                    nudge = [nudge[0] + by[0], nudge[1] + by[1]];
-                }
+        for (key, by) in [
+            (Key::ArrowLeft, [-step, 0.]),
+            (Key::ArrowRight, [step, 0.]),
+            (Key::ArrowUp, [0., -step]),
+            (Key::ArrowDown, [0., step]),
+        ] {
+            // with Shift they move what's selected further, or pan the view if nothing is selected
+            let ours =
+                |m: &egui::Modifiers| !m.command && !m.ctrl && !m.alt && (arrows_used || !m.shift);
+            if take_key(i, key, ours) && arrows_used {
+                nudge = [nudge[0] + by[0], nudge[1] + by[1]];
             }
         }
         (delete, escape, select_all, nudge)

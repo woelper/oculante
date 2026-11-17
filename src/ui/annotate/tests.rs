@@ -398,10 +398,10 @@ fn hidden_ones_are_not_moved_by_the_keys() {
         selected: vec![0],
         ..Default::default()
     };
-    // with only a hidden one selected the arrows are the app's
+    // with only a hidden annotation selected the arrows move nothing and don't switch images
     let left = canvas_frame(&ctx, &mut list, &mut state, &[(Key::ArrowRight, NONE)]);
     assert_eq!(list[0], hidden, "not moved");
-    assert_eq!(left, vec![Key::ArrowRight], "to the next image");
+    assert!(left.is_empty(), "not to the next image");
     // with a shown one selected as well, only that one moves
     state.selected = vec![0, 1];
     let left = canvas_frame(&ctx, &mut list, &mut state, &[(Key::ArrowRight, NONE)]);
@@ -445,18 +445,25 @@ fn the_annotations_take_only_their_keys() {
         ..Default::default()
     };
     let command = egui::Modifiers::COMMAND;
-    // the app's: zoom, fullscreen, info, the next image while nothing is selected
-    for key in [
-        Key::Num1,
-        Key::F,
-        Key::I,
-        Key::ArrowRight,
-        Key::ArrowLeft,
-        Key::Equals,
-    ] {
+    // the app's: zoom, fullscreen, info
+    for key in [Key::Num1, Key::F, Key::I, Key::Equals] {
         let left = canvas_frame(&ctx, &mut list, &mut state, &[(key, NONE)]);
         assert_eq!(left, vec![key], "{key:?} reaches the app");
     }
+    // the arrows don't switch images, even with nothing selected, but Shift still pans
+    for key in [
+        Key::ArrowLeft,
+        Key::ArrowRight,
+        Key::ArrowUp,
+        Key::ArrowDown,
+    ] {
+        let left = canvas_frame(&ctx, &mut list, &mut state, &[(key, NONE)]);
+        assert!(left.is_empty(), "{key:?} is taken");
+        let shift = egui::Modifiers::SHIFT;
+        let left = canvas_frame(&ctx, &mut list, &mut state, &[(key, shift)]);
+        assert_eq!(left, vec![key], "Shift+{key:?} reaches the app");
+    }
+    assert_eq!(list[0].start((200, 200)), [10, 50], "nothing moved");
     for key in [Key::O, Key::V] {
         let left = canvas_frame(&ctx, &mut list, &mut state, &[(key, command)]);
         assert_eq!(left, vec![key], "Ctrl+{key:?} reaches the app");
