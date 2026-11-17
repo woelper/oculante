@@ -263,8 +263,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState) {
                     state.filebrowser_last_dir,
                     Some(&path_override),
                 );
-                ui.ctx()
-                    .data_mut(|w| w.insert_temp(Id::new(crate::filebrowser::START_PATH_ID), path_override));
+                ui.ctx().data_mut(|w| {
+                    w.insert_temp(Id::new(crate::filebrowser::START_PATH_ID), path_override)
+                });
 
                 crate::ui::open_popup(ui.ctx(), Id::new(window_id::OPEN));
             }
