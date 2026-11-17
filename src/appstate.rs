@@ -93,6 +93,9 @@ pub struct OculanteState {
     /// The image shown is a frame of an animation that has more than one
     pub animated: bool,
     pub settings_enabled: bool,
+    /// Interactions affect a floating window first rather than what's under it, escape for example
+    /// closes the window before any actions happen to contents below the window.
+    pub window_was_open: bool,
     pub image_metadata: Option<ExtendedImageInfo>,
     pub tiling: usize,
     pub mouse_grab: bool,
@@ -244,6 +247,7 @@ impl Default for OculanteState {
             animated: false,
             current_path: Default::default(),
             settings_enabled: Default::default(),
+            window_was_open: false,
             image_metadata: Default::default(),
             tiling: 1,
             mouse_grab: Default::default(),

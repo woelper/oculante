@@ -31,12 +31,8 @@ pub fn settings_ui(ctx: &Context, state: &mut OculanteState) {
             });
         });
         ui.add(
-            egui::Label::new(
-                RichText::new(description)
-                    .small()
-                    .color(ui.style().visuals.weak_text_color()),
-            )
-            .selectable(false),
+            egui::Label::new(RichText::new(description).small().color(weak_text(ui)))
+                .selectable(false),
         );
         ui.add_space(14.);
     }

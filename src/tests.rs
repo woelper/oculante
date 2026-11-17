@@ -845,10 +845,15 @@ fn ci_load_every_test_file() {
         "Animated_PNG_example_bouncing_beach_ball.png",
         "3d2.png",
     ];
+    // ignore hidden files, macOS puts a .DS_Store in a folder opened with Finder
+    let hidden = |p: &std::path::Path| {
+        p.file_name()
+            .is_some_and(|n| n.as_encoded_bytes().starts_with(b"."))
+    };
     let mut paths: Vec<_> = std::fs::read_dir("res/tests")
         .unwrap()
         .map(|e| e.unwrap().path())
-        .filter(|p| p.is_file())
+        .filter(|p| p.is_file() && !hidden(p))
         .collect();
     paths.sort();
     let mut failures = vec![];
