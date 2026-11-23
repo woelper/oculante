@@ -1,0 +1,29 @@
+# Colours of the interface are made in src/ui/colors.rs and nowhere else. That file allows these,
+# a widget that has to be drawn in the colours of its state says why where it does it.
+disallowed-methods = [
+    { path = "egui::Color32::from_rgb", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::from_rgb_additive", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::from_rgba_premultiplied", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::from_rgba_unmultiplied", reason = "colours are made in src/ui/colors.rs, bytes of the person or the image are shown with to_color32()" },
+    { path = "egui::Color32::from_gray", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::from_black_alpha", reason = "colours are made in src/ui/colors.rs, use opacity(BLACK, ..)" },
+    { path = "egui::Color32::from_white_alpha", reason = "colours are made in src/ui/colors.rs, use opacity(WHITE, ..)" },
+    { path = "egui::Color32::from_additive_luminance", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::from_hex", reason = "colours are made in src/ui/colors.rs, ask it by name" },
+    { path = "egui::Color32::gamma_multiply", reason = "use opacity() of src/ui/colors.rs" },
+    { path = "egui::Color32::gamma_multiply_u8", reason = "use opacity() of src/ui/colors.rs" },
+    { path = "egui::Color32::linear_multiply", reason = "use opacity() of src/ui/colors.rs" },
+    { path = "egui::Color32::lerp_to_gamma", reason = "colours are mixed in src/ui/colors.rs" },
+    { path = "egui::Color32::to_opaque", reason = "colours are made in src/ui/colors.rs" },
+    { path = "egui::Color32::additive", reason = "colours are made in src/ui/colors.rs" },
+    { path = "egui::Visuals::text_color", reason = "TEXT.of(ui) in src/ui/colors.rs" },
+    { path = "egui::Visuals::weak_text_color", reason = "weak_text(ui) in src/ui/colors.rs" },
+    { path = "egui::Visuals::strong_text_color", reason = "strong_text(ui) in src/ui/colors.rs" },
+    { path = "egui::Visuals::window_fill", reason = "PANEL.of(ui) in src/ui/colors.rs" },
+    { path = "egui::Style::interact", reason = "a widget drawn in the colours of its state says so with #[expect]" },
+]
+disallowed-types = [
+    { path = "egui::Rgba", reason = "colours are made in src/ui/colors.rs" },
+    { path = "egui::ecolor::Hsva", reason = "colours are made in src/ui/colors.rs" },
+    { path = "egui::ecolor::HsvaGamma", reason = "colours are made in src/ui/colors.rs" },
+]

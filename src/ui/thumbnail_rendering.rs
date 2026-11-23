@@ -1,5 +1,5 @@
 use super::*;
-use notan::egui::*;
+use egui::*;
 
 /// Helper function to paint an image - directly from egui as it is private to it
 fn paint_texture_load_result(
@@ -22,18 +22,67 @@ fn paint_texture_load_result(
         }
         Err(_) => {
             let font_id = TextStyle::Body.resolve(ui.style());
+            ui.painter()
+                .text(rect.center(), Align2::CENTER_CENTER, "⚠", font_id, RED);
+        }
+    }
+}
+
+/// The URI egui loads a file from. On Windows egui 0.36 takes `file://C:\x` for a path
+/// on the network, 0.31 of 0.9.6 did not: `file:///C:\x` is `C:\x`.
+pub fn file_uri(path: &Path) -> String {
+    if cfg!(windows) {
+        format!("file:///{}", path.display())
+    } else {
+        format!("file://{}", path.display())
+    }
+}
+
+/// The thumbnail of a file in `rect`, or its extension while there is none
+pub fn paint_thumbnail(
+    ui: &Ui,
+    path: &Path,
+    thumbnails: &mut Thumbnails,
+    rect: Rect,
+    rounding: CornerRadius,
+    font_size: f32,
+) {
+    match thumbnails.get(path) {
+        Ok(tp) => {
+            let image = egui::Image::new(file_uri(&tp))
+                .corner_radius(rounding)
+                .show_loading_spinner(true);
+
+            let load_result = image.load_for_size(ui.ctx(), rect.size());
+
+            paint_texture_load_result(ui, &load_result, rect, None, image.image_options());
+            if load_result.is_err() {
+                // If an image could not be loaded, reload. This is usually because the image
+                // is being written while loading.
+                ui.ctx().forget_image(&file_uri(&tp));
+            }
+        }
+        Err(_) => {
+            ui.painter().rect_filled(rect, rounding, FIELD.of(ui));
             ui.painter().text(
                 rect.center(),
                 Align2::CENTER_CENTER,
-                "⚠",
-                font_id,
-                ui.visuals().error_fg_color,
+                path.extension()
+                    .map(|e| e.to_string_lossy().to_string().to_uppercase())
+                    .unwrap_or_default(),
+                FontId::proportional(font_size),
+                TEXT.of(ui),
             );
         }
     }
 }
 
-pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnails) -> Response {
+pub fn render_file_icon(
+    icon_path: &Path,
+    is_dir: bool,
+    ui: &mut Ui,
+    thumbnails: &mut Thumbnails,
+) -> Response {
     let zoom = 1.;
 
     let size = Vec2::new(
@@ -48,98 +97,49 @@ pub fn render_file_icon(icon_path: &Path, ui: &mut Ui, thumbnails: &mut Thumbnai
     image_rect.min = image_rect.min.round();
     image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
 
-    if icon_path.is_dir() {
+    let text_color = TEXT.of(ui);
+    if is_dir {
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
             FOLDERFILL,
             FontId::proportional(85.),
-            ui.style().visuals.text_color(),
+            text_color,
         );
     } else {
-        match thumbnails.get(icon_path) {
-            Ok(tp) => {
-                let image = egui::Image::new(format!("file://{}", tp.display()))
-                    .corner_radius(rounding)
-                    .show_loading_spinner(true);
-
-                let load_result = image.load_for_size(ui.ctx(), image_rect.size());
-
-                paint_texture_load_result(
-                    ui,
-                    &load_result,
-                    image_rect,
-                    None,
-                    image.image_options(),
-                );
-                if load_result.is_err() {
-                    // If an image could not be loaded, reload. This is usually because the image
-                    // is being written while loading.
-                    ui.ctx().forget_image(&format!("file://{}", tp.display()));
-                }
-            }
-            Err(_) => {
-                // warn!("{e}");
-                ui.painter()
-                    .rect_filled(image_rect, rounding, Color32::from_gray(80).to_opaque());
-                ui.painter().text(
-                    image_rect.center(),
-                    Align2::CENTER_CENTER,
-                    icon_path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_string().to_uppercase())
-                        .unwrap_or_default(),
-                    FontId::proportional(25.),
-                    Color32::WHITE,
-                );
-            }
-        }
+        paint_thumbnail(ui, icon_path, thumbnails, image_rect, rounding, 25.);
     }
 
-    let text = icon_path
+    let name = icon_path
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_default();
-
-    let mut job = LayoutJob::simple(
-        text.clone(),
-        FontId::proportional(13.),
-        ui.style().visuals.text_color(),
-        THUMB_SIZE[0] as f32 * 10.,
-    );
+    let width = THUMB_SIZE[0] as f32;
+    let mut job = LayoutJob::simple(name, FontId::proportional(13.), text_color, width);
     job.halign = Align::Center;
 
     // the generic hover effect, a rect over everything
     if response.hovered() {
         ui.painter()
-            .rect_filled(image_rect, rounding, Color32::from_white_alpha(5));
+            .rect_filled(image_rect, rounding, opacity(WHITE, Opacity::Light));
 
-        let text_pos = image_rect.expand(6.).center_bottom();
-
-        let mut job = LayoutJob::simple(
-            text,
-            FontId::proportional(13.),
-            ui.style().visuals.text_color(),
-            THUMB_SIZE[0] as f32,
-        );
-        job.halign = Align::Center;
+        // the whole name, over what is under it
         let galley = ui.painter().layout_job(job);
         let painter = ui
             .ctx()
             .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
             .with_clip_rect(ui.clip_rect());
 
-        let c = ui.style().visuals.extreme_bg_color;
         let mut right_bottom = image_rect.right_bottom();
         right_bottom.y += galley.rect.height() + 14.;
         let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom).expand(1.);
-        painter.rect_filled(r, rounding, c);
-        painter.galley(text_pos, galley, Color32::RED);
+        painter.rect_filled(r, rounding, FIELD.of(ui));
+        painter.galley(image_rect.expand(6.).center_bottom(), galley, text_color);
     } else {
-        job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
+        job.wrap = TextWrapping::truncate_at_width(width);
         let galley = ui.painter().layout_job(job);
         ui.painter()
-            .galley(image_rect.expand(6.).center_bottom(), galley, Color32::RED);
+            .galley(image_rect.expand(6.).center_bottom(), galley, text_color);
     }
     response
 }

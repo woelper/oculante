@@ -1,0 +1,32 @@
+{
+  "favourite_images": [],
+  "recent_images": [
+    "/photos/test.png"
+  ],
+  "window_geometry": [
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "last_open_directory": "",
+  "folder_bookmarks": [],
+  "encoding_options": [
+    {
+      "Jpg": {
+        "quality": 75
+      }
+    },
+    "WebP",
+    {
+      "Png": {
+        "compressionlevel": "Default"
+      }
+    },
+    "Bmp"
+  ]
+}

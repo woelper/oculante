@@ -100,7 +100,9 @@
 				<string>Viewer</string>
 				<key>LSItemContentTypes</key>
 				<array>
-					<string>public.images</string>
+					<string>public.image</string>
+					<string>public.heic</string>
+					<string>public.heif</string>
 				</array>
 			</dict>
 			<dict>

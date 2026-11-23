@@ -7,7 +7,7 @@ Info.plist
 PKGBUILD
 paint/target
 shortcuts.txt
-perf.*
+perf.data*
 flamegraph.svg
 .notes
 TODO
