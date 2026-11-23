@@ -224,7 +224,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     .any(|op| matches!(op.operation, ImageOperation::Annotate(_)))
             {
                 ui.add_space(4.);
-                if crate::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
+                if crate::ui::annotate::panel_ui(ui, &mut state.edit_state.image_op_stack, &mut state.edit_state.annotate, &mut state.persistent_settings.stamps) {
                     image_changed = true;
                 }
                 ui.add_space(4.);
@@ -246,13 +246,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 // state.sampled_color = [p[0] as f32, p[1] as f32, p[2] as f32, p[3] as f32];
                             }
 
-                    if ui
-                        .add(
-                            egui::Button::new("Stop painting")
-                                .fill(accent_color(ui.ctx())),
-                        )
-                        .clicked()
-                    {
+                    let (fill, text) = selection_colors(ui);
+                    let stop = RichText::new("Stop painting").color(text);
+                    if ui.add(egui::Button::new(stop).fill(fill)).clicked() {
                         state.edit_state.painting = false;
                     }
                 } else if ui.button("Paint mode").clicked() {
@@ -514,12 +510,12 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 #[cfg(not(feature = "file_open"))]
                 if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
-                        crate::ui::open_popup(ui.ctx(), Id::new("SAVE"));
+                        crate::ui::open_popup(ui.ctx(), Id::new(window_id::SAVE));
                     }
 
                     let encoding_options = state.volatile_settings.encoding_options.clone();
 
-                    if crate::ui::is_popup_open(ctx, Id::new("SAVE")) {
+                    if crate::ui::is_popup_open(ctx, Id::new(window_id::SAVE)) {
                         let msg_sender = state.message_channel.0.clone();
                         let keys = &state.volatile_settings.encoding_options.iter().map(|e|e.ext()).collect::<Vec<_>>();
                         let key_slice = keys.iter().map(|k|k.as_str()).collect::<Vec<_>>();
@@ -532,7 +528,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                                 _ = save_with_encoding(&state.edit_state.result_pixel_op, p, state.current_path.as_deref(), &encoders);
                             },
                             ctx,
-                            Id::new("SAVE"),
+                            Id::new(window_id::SAVE),
                         );
                     }
                 }
@@ -540,7 +536,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 if let Some(p) = &state.current_path {
                     let text = if p.exists() { "Overwrite" } else { "Save"};
 
-                    let modal = Modal::new("overwrite", ui.ctx());
+                    let modal = Modal::new(window_id::OVERWRITE, ui.ctx());
                     modal.show(overwrite_question(state.animated), |_|{
                         _ = save_with_encoding(&state.edit_state.result_pixel_op, p, Some(p), &state.volatile_settings.encoding_options).map(|_| state.send_message_info("Saved")).map_err(|e| state.send_message_err(&format!("Error: {e}")));
                     });
@@ -574,7 +570,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
         #[cfg(debug_assertions)]
         {
-            ui.colored_label(Color32::LIGHT_BLUE, "Debug info");
+            ui.colored_label(BLUE, "Debug info");
             ui.label(format!("image op: {:?}", state.edit_state.result_image_op.color()));
             ui.label(format!("pixel op: {:?}", state.edit_state.result_pixel_op.color()));
 
@@ -586,25 +582,22 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                 state.edit_state.painting = false;
             }
             let mapping = crate::annotate::Mapping::new(&state.edit_state.image_op_stack, original);
+            // Escape to close the file manager does not deselect what is selected
+            let window_open = state.window_was_open || crate::ui::window_open(ctx, state);
             match crate::annotate::annotations_mut(&mut state.edit_state.image_op_stack) {
-                Some(annotations) => {
-                    let copy = crate::annotate::canvas_ui(
-                        ctx,
-                        annotations,
-                        &mut state.edit_state.annotate,
-                        &mapping,
-                        &state.image_geometry,
-                        state.pointer_over_ui,
-                    );
-                    // the keys go to the annotations, copying the image works still
-                    if copy && let Some(img) = effective_image(state) {
-                        clipboard_copy(img);
-                        state.send_message_info("Image copied");
-                    }
-                }
+                // the keys the annotations use are taken, the others go to the shortcuts
+                Some(annotations) => crate::ui::annotate::canvas_ui(
+                    ctx,
+                    annotations,
+                    &mut state.edit_state.annotate,
+                    &mapping,
+                    &state.image_geometry,
+                    state.pointer_over_ui,
+                    window_open,
+                ),
                 None => state.edit_state.annotate.stop(),
             }
-            let annotations = crate::annotate::visible(&state.edit_state.image_op_stack, &state.edit_state.annotate);
+            let annotations = crate::ui::annotate::visible(&state.edit_state.image_op_stack);
 
             // Do the processing
             //
@@ -726,11 +719,9 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
                     });
                 }
 
-                // the annotations on top of everything
+                // the annotations on top of everything, in every layout
                 state.edit_state.annotate.layer.reset();
-                with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
-                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
-                });
+                state.edit_state.annotate.layer.update_image(&mut state.edit_state.result_pixel_op, &annotations, &mapping);
 
                 state.send_frame(crate::utils::Frame::UpdateTexture);
                 debug!(
@@ -749,9 +740,7 @@ pub fn edit_ui(ui: &mut egui::Ui, state: &mut OculanteState) {
 
             // only what changed of the annotations
             if !pixels_changed
-                && let Some(area) = with_pixels!(&mut state.edit_state.result_pixel_op, |buffer| {
-                    state.edit_state.annotate.layer.update(buffer, &annotations, &mapping)
-                }).flatten()
+                && let Some(area) = state.edit_state.annotate.layer.update_image(&mut state.edit_state.result_pixel_op, &annotations, &mapping)
             {
                 state.send_frame(crate::utils::Frame::UpdateTextureArea(area));
             }
@@ -898,11 +887,7 @@ fn modifier_stack_ui(
 
     for (n, &i) in shown.iter().enumerate() {
         let operation = &mut stack[i];
-        let frame_color = if ui.style().visuals.dark_mode {
-            Color32::from_hex("#212121").unwrap()
-        } else {
-            Color32::from_hex("#F2F2F2").unwrap()
-        };
+        let frame_color = CARD.of(ui);
         egui::Frame::new()
             .fill(frame_color)
             .corner_radius(ui.style().visuals.widgets.active.corner_radius)

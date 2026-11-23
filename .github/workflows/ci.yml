@@ -42,6 +42,14 @@ jobs:
         run: cargo clippy --all-targets --all-features
         continue-on-error: true
 
+        # Create colours only in src/ui/colors.rs (see clippy.toml). The run also fails if a listed exception no longer applies.
+      - name: Colours
+        run: >-
+          cargo clippy --all-targets --all-features --
+          -A clippy::all
+          -D clippy::disallowed_methods -D clippy::disallowed_types
+          -D unfulfilled_lint_expectations
+
   linux-arm64:
     runs-on: ubuntu-24.04-arm
     steps:

@@ -22,13 +22,8 @@ fn paint_texture_load_result(
         }
         Err(_) => {
             let font_id = TextStyle::Body.resolve(ui.style());
-            ui.painter().text(
-                rect.center(),
-                Align2::CENTER_CENTER,
-                "⚠",
-                font_id,
-                ui.visuals().error_fg_color,
-            );
+            ui.painter()
+                .text(rect.center(), Align2::CENTER_CENTER, "⚠", font_id, RED);
         }
     }
 }
@@ -68,8 +63,7 @@ pub fn paint_thumbnail(
             }
         }
         Err(_) => {
-            ui.painter()
-                .rect_filled(rect, rounding, Color32::from_gray(80).to_opaque());
+            ui.painter().rect_filled(rect, rounding, FIELD.of(ui));
             ui.painter().text(
                 rect.center(),
                 Align2::CENTER_CENTER,
@@ -77,7 +71,7 @@ pub fn paint_thumbnail(
                     .map(|e| e.to_string_lossy().to_string().to_uppercase())
                     .unwrap_or_default(),
                 FontId::proportional(font_size),
-                Color32::WHITE,
+                TEXT.of(ui),
             );
         }
     }
@@ -103,62 +97,49 @@ pub fn render_file_icon(
     image_rect.min = image_rect.min.round();
     image_rect.set_bottom(image_rect.max.y - THUMB_CAPTION_HEIGHT as f32);
 
+    let text_color = TEXT.of(ui);
     if is_dir {
         ui.painter().text(
             response.rect.center(),
             Align2::CENTER_CENTER,
             FOLDERFILL,
             FontId::proportional(85.),
-            ui.style().visuals.text_color(),
+            text_color,
         );
     } else {
         paint_thumbnail(ui, icon_path, thumbnails, image_rect, rounding, 25.);
     }
 
-    let text = icon_path
+    let name = icon_path
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_default();
-
-    let mut job = LayoutJob::simple(
-        text.clone(),
-        FontId::proportional(13.),
-        ui.style().visuals.text_color(),
-        THUMB_SIZE[0] as f32 * 10.,
-    );
+    let width = THUMB_SIZE[0] as f32;
+    let mut job = LayoutJob::simple(name, FontId::proportional(13.), text_color, width);
     job.halign = Align::Center;
 
     // the generic hover effect, a rect over everything
     if response.hovered() {
         ui.painter()
-            .rect_filled(image_rect, rounding, Color32::from_white_alpha(50));
+            .rect_filled(image_rect, rounding, opacity(WHITE, Opacity::Light));
 
-        let text_pos = image_rect.expand(6.).center_bottom();
-
-        let mut job = LayoutJob::simple(
-            text,
-            FontId::proportional(13.),
-            ui.style().visuals.text_color(),
-            THUMB_SIZE[0] as f32,
-        );
-        job.halign = Align::Center;
+        // the whole name, over what is under it
         let galley = ui.painter().layout_job(job);
         let painter = ui
             .ctx()
             .layer_painter(LayerId::new(Order::Tooltip, "Folder captions".into()))
             .with_clip_rect(ui.clip_rect());
 
-        let c = ui.style().visuals.extreme_bg_color;
         let mut right_bottom = image_rect.right_bottom();
         right_bottom.y += galley.rect.height() + 14.;
         let r = Rect::from_two_pos(image_rect.left_bottom(), right_bottom).expand(1.);
-        painter.rect_filled(r, rounding, c);
-        painter.galley(text_pos, galley, Color32::RED);
+        painter.rect_filled(r, rounding, FIELD.of(ui));
+        painter.galley(image_rect.expand(6.).center_bottom(), galley, text_color);
     } else {
-        job.wrap = TextWrapping::truncate_at_width(THUMB_SIZE[0] as f32);
+        job.wrap = TextWrapping::truncate_at_width(width);
         let galley = ui.painter().layout_job(job);
         ui.painter()
-            .galley(image_rect.expand(6.).center_bottom(), galley, Color32::RED);
+            .galley(image_rect.expand(6.).center_bottom(), galley, text_color);
     }
     response
 }

@@ -248,17 +248,35 @@ pub(crate) fn keep_base<P: Pixel<Subpixel = u8>>(
     img: &Pixels<P>,
     area: Rect,
 ) {
-    let n = channels::<P>();
-    let layout = (img.width(), img.height(), n);
+    keep_base_bytes(
+        base,
+        base_area,
+        img.as_raw(),
+        img.dimensions(),
+        channels::<P>(),
+        area,
+    );
+}
+
+/// As `keep_base`, of an image of any layout as its bytes, `n` to a pixel
+pub(crate) fn keep_base_bytes(
+    base: &mut Base,
+    base_area: &mut Option<Rect>,
+    img: &[u8],
+    (width, height): (u32, u32),
+    n: usize,
+    area: Rect,
+) {
+    let layout = (width, height, n);
     if base.layout != layout {
         // zeroed memory, only the part that is filled in is ever touched
         *base = Base {
-            pixels: vec![0; img.as_raw().len()],
+            pixels: vec![0; img.len()],
             layout,
         };
         *base_area = None;
     }
-    let stride = img.width() as usize * n;
+    let stride = width as usize * n;
     for y in area.y..area.y + area.height {
         let row = y as usize * stride;
         let (left, right) = (
@@ -279,7 +297,7 @@ pub(crate) fn keep_base<P: Pixel<Subpixel = u8>>(
             None => [left..right, right..right],
         };
         for part in parts {
-            base.pixels[part.clone()].copy_from_slice(&img.as_raw()[part]);
+            base.pixels[part.clone()].copy_from_slice(&img[part]);
         }
     }
     *base_area = Some(area);
@@ -287,12 +305,17 @@ pub(crate) fn keep_base<P: Pixel<Subpixel = u8>>(
 
 /// Puts what was kept back into a part of the image
 pub(crate) fn restore<P: Pixel<Subpixel = u8>>(img: &mut Pixels<P>, base: &Base, area: Rect) {
-    let n = channels::<P>();
+    let width = img.width();
+    restore_bytes(img.as_mut(), width, channels::<P>(), base, area);
+}
+
+/// As `restore`, into an image of any layout as its bytes, `n` to a pixel
+pub(crate) fn restore_bytes(img: &mut [u8], width: u32, n: usize, base: &Base, area: Rect) {
     let row = area.width as usize * n;
-    let stride = img.width() as usize * n;
+    let stride = width as usize * n;
     let start = area.y as usize * stride + area.x as usize * n;
     let rows = start..start + (area.height as usize - 1) * stride + row;
-    img.as_mut()[rows.clone()]
+    img[rows.clone()]
         .par_chunks_mut(stride)
         .zip(base.pixels[rows].par_chunks(stride))
         .for_each(|(out, base)| out[..row].copy_from_slice(&base[..row]));

@@ -54,7 +54,6 @@ egui_extras = { version = "0.36", features = ["image", "file"] }
 # images with a color profile are converted to sRGB, image and jxl-oxide use it too
 moxcms = "0.8"
 avif-decode = { version = "3", optional = true }
-bytemuck = { version = "1", optional = true }
 turbojpeg = { version = "1.5", optional = true }
 psd = "0.3"
 quickraw = "0.1.6"
@@ -77,6 +76,8 @@ dds-rs = "0.7"
 exr = "1.74"
 gif = "0.14"
 image = { version = "0.25.10", features = ["hdr"] }
+# the bytes of an image of any layout, to draw annotations into it
+bytemuck = "1"
 jpeg2k = { version = "0.10", optional = true, default-features = false, features = [
     "threads",
     "file-io",
@@ -153,7 +154,7 @@ heif_native = ["dep:heic-rs"]
 # libheif was used with this one until 1.0. It stays so builds that ask for it
 # still work, and gives the same as heif_native.
 heif = ["heif_native"]
-avif_native = ["avif-decode", "bytemuck"]
+avif_native = ["avif-decode"]
 # libavif and libdav1d were used with this one until 1.0. It stays so builds that
 # ask for it still work, and gives the same as avif_native.
 dav1d = ["avif_native"]

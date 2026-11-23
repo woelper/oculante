@@ -21,9 +21,8 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                 let (rect, resp) =
                                     ui.allocate_exact_size(Vec2::splat(32.), Sense::click());
 
-                                let egui_color = Color32::from_rgba_unmultiplied(
-                                    color[0], color[1], color[2], color[3],
-                                );
+                                // straight colours of the image, not premultiplied
+                                let egui_color = (*color).to_color32();
 
                                 let sampled_color = [
                                     state.sampled_color[0] as u8,
@@ -91,7 +90,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
                         #[cfg(not(feature = "file_open"))]
                         if ui.button("Save ASE").clicked() {
-                            crate::ui::open_popup(ui.ctx(), Id::new("SAVEASE"));
+                            crate::ui::open_popup(ui.ctx(), Id::new(window_id::SAVE_PALETTE));
                         }
 
                         #[cfg(feature = "file_open")]
@@ -129,7 +128,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                         }
 
                         #[cfg(not(feature = "file_open"))]
-                        if crate::ui::is_popup_open(ui.ctx(), Id::new("SAVEASE")) {
+                        if crate::ui::is_popup_open(ui.ctx(), Id::new(window_id::SAVE_PALETTE)) {
                             filebrowser::browse_modal(
                                 true,
                                 &["ase"],
@@ -158,7 +157,7 @@ pub fn palette_ui(ui: &mut Ui, state: &mut OculanteState) {
                                     }
                                 },
                                 ui.ctx(),
-                                Id::new("SAVEASE"),
+                                Id::new(window_id::SAVE_PALETTE),
                             );
                         }
                     }
