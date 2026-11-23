@@ -150,8 +150,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: vmactions/netbsd-vm@v1.2.0
+      - uses: vmactions/netbsd-vm@v1.5.3
         with:
+          release: "10.1"
           usesh: true
           copyback: false
           prepare: |
