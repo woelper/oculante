@@ -68,7 +68,7 @@ tiny-skia = "0.12"
 # the outlines of the symbols of stamps, already there for usvg
 ttf-parser = "0.25"
 # HEIC and HEIF in pure Rust, nothing to install or link
-heic-rs = { version = "0.1.1", optional = true }
+heic-rs = { version = "0.1.5", optional = true }
 ktx2 = "0.5"
 basisu = "0.1"
 texture2ddecoder = "0.1"
@@ -249,15 +249,8 @@ name = "my_benchmark"
 harness = false
 
 [patch.crates-io]
-# Both are pinned to a commit, so packagers who build offline can fetch them first.
+# Pinned to a commit, so packagers who build offline can fetch it first.
 #
-# heic-rs 0.1.4 decodes photos from phones with the wrong contrast and colour:
-# it ignores what the video stream says about range and matrix when the file
-# has no colr box (tbraun96/heic-rs#7 and #8). It decodes only the primary image
-# of a file (#9), and camera HIF in 4:2:2 (#10) and 4:4:4 (#12) do not decode right.
-# The commit is the `oculante` branch of the fork, remove this once a release
-# contains all of them.
-heic-rs = { git = "https://github.com/woelper/heic-rs", rev = "5a8e7146aea6f216bff931ddd67ec4a77fe64384" }
 # avif-parse 2.1.0 refuses AVIFs whose last box has the size 0, which means it runs
 # to the end of the file. Lightroom writes its AVIF exports like that. Fixed in
 # kornelski/avif-parse#4, remove this once a release contains it.
