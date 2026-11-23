@@ -239,7 +239,7 @@ In addition, Oculante saves some settings locally, for example:
 
 The Windows downloads, `oculante.exe` and `oculante_setup.exe`, are signed. Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
 
-- Committers and reviewers: [woelper](https://github.com/woelper), [Stoppedpuma](https://github.com/Stoppedpuma), [0323pin](https://github.com/0323pin), [B-LechCode](https://github.com/B-LechCode)
+- Committers and reviewers: [woelper](https://github.com/woelper), [Stoppedpuma](https://github.com/Stoppedpuma), [0323pin](https://github.com/0323pin)
 - Approvers: [woelper](https://github.com/woelper), [Stoppedpuma](https://github.com/Stoppedpuma)
 
 Only what the release workflow of this repository builds from its source gets signed, and every release is approved by hand before it is signed. Everyone with access to the repository or to SignPath uses multi-factor authentication.
