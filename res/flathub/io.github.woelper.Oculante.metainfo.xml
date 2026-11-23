@@ -40,10 +40,10 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release date="2026-10-28" version="1.0.0~rc.3" type="development">
-      <url type="details">https://github.com/woelper/oculante/releases/tag/1.0.0-rc.3</url>
+    <release date="2026-11-23" version="1.0.0~rc.4" type="development">
+      <url type="details">https://github.com/woelper/oculante/releases/tag/1.0.0-rc.4</url>
       <description>
-        <p>The third release candidate of Oculante 1.0, to test.</p>
+        <p>The fourth and last release candidate of Oculante 1.0, to test.</p>
       </description>
     </release>
     <release date="2025-01-12" version="0.9.2">
